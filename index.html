@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sebastian Palej — Trener personalny · Warszawa</title>
+<meta name="description" content="Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- CUSTOM CURSOR -->
+  <div id="cursor"></div>
+
+  <!-- SCROLL PROGRESS -->
+  <div id="scroll-progress"></div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <div class="nav-logo">Sebastian Palej</div>
+    <div class="nav-links">
+      <a href="#o-mnie" class="nav-link hoverable" data-key="about">O mnie</a>
+      <a href="#oferta" class="nav-link hoverable" data-key="offer">Oferta</a>
+      <a href="#opinie" class="nav-link hoverable" data-key="reviews">Opinie</a>
+    </div>
+    <a href="#kontakt" class="nav-cta hoverable">Umów trening</a>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero" id="hero" data-section="hero">
+    <div class="hero-img-wrap" id="hero-img-wrap">
+      <img src="images/hero-gym.jpg" alt="Sala treningowa" />
+    </div>
+    <div class="hero-gradient"></div>
+    <div class="hero-content">
+      <div>
+        <div class="hero-tag" id="hero-tag">
+          <span class="hero-tag-line"></span>
+          <span id="hero-tag-text">Trener personalny · Warszawa</span>
+        </div>
+        <h1 class="hero-title">
+          <span class="hero-line" id="hero-line-1">Trenuj mocniej.</span>
+          <span class="hero-line" id="hero-line-2">Ruszaj się lepiej.</span>
+        </h1>
+      </div>
+      <div class="hero-side" id="hero-side">
+        <p class="hero-desc">Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.</p>
+        <a href="#kontakt" class="btn-primary hoverable">Umów konsultację →</a>
+      </div>
+    </div>
+    <div class="scroll-hint">PRZEWIŃ ⌄</div>
+  </div>
+
+  <!-- MARQUEE -->
+  <div class="marquee-wrap">
+    <div class="marquee-track" id="marquee-track"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats" id="stats" data-section="stats">
+    <div class="stat">
+      <div class="stat-value" data-target="100" data-suffix="">0</div>
+      <div class="stat-label">przeszkolonych sesji</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" data-target="1" data-suffix=":1">0:1</div>
+      <div class="stat-label">indywidualne podejście</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" data-target="100" data-suffix="%">0%</div>
+      <div class="stat-label">skupienia na Tobie</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" data-target="24" data-suffix="h">0h</div>
+      <div class="stat-label">czas odpowiedzi</div>
+    </div>
+  </div>
+
+  <!-- O MNIE -->
+  <div class="about" id="o-mnie" data-section="about">
+    <div class="about-img-wrap">
+      <img src="images/sidebar-trainer.jpg" alt="Sebastian Palej" id="about-img" />
+    </div>
+    <div class="about-content" id="about-content">
+      <div class="eyebrow">O mnie</div>
+      <h2 class="section-title">Sebastian Palej</h2>
+      <p class="about-p">Jestem studentem fizjoterapii i trenerem personalnym — łączę wiedzę o pracy ciała z praktycznym doświadczeniem treningowym.</p>
+      <p class="about-p">Każdy plan buduję pod Twoją sylwetkę, historię kontuzji i tempo życia. Bez gotowych szablonów — z pełną kontrolą techniki.</p>
+      <div class="about-badges">
+        <div>
+          <div class="about-badge-value">Fizjo</div>
+          <div class="about-badge-label">wykształcenie</div>
+        </div>
+        <div>
+          <div class="about-badge-value">1:1</div>
+          <div class="about-badge-label">podejście</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GALERIA -->
+  <div class="gallery" id="galeria" data-section="gallery">
+    <div class="gallery-item hoverable-zoom" data-src="images/gallery-1.jpg" style="transition-delay:0s">
+      <img src="images/gallery-1.jpg" alt="Sesja treningowa" style="object-position:center 15%" />
+    </div>
+    <div class="gallery-item hoverable-zoom" data-src="images/gallery-2.jpg" style="transition-delay:0.12s">
+      <img src="images/gallery-2.jpg" alt="Trener personalny" style="object-position:center 15%" />
+    </div>
+    <div class="gallery-item hoverable-zoom" data-src="images/gallery-3.jpg" style="transition-delay:0.24s">
+      <img src="images/gallery-3.jpg" alt="Portret" style="object-position:center 15%" />
+    </div>
+  </div>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" id="lightbox">
+    <img id="lightbox-img" src="" alt="" />
+    <button id="lightbox-close" aria-label="Zamknij">×</button>
+  </div>
+
+  <!-- OFERTA -->
+  <div class="offer" id="oferta" data-section="offer">
+    <div class="offer-inner" id="offer-inner">
+      <div class="offer-head">
+        <div>
+          <div class="eyebrow">Oferta</div>
+          <h2 class="section-title">Pakiety treningowe</h2>
+        </div>
+      </div>
+      <div class="plans">
+        <div class="plan-card hoverable" id="plan-start">
+          <div class="plan-name">Start</div>
+          <div class="plan-subtitle">Jednorazowa sesja</div>
+          <div class="plan-price">150 zł</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li>Ocena postawy i mobilności</li>
+            <li>Trening próbny 60 min</li>
+            <li>Zalecenia na start</li>
+          </ul>
+          <a href="#kontakt" class="plan-btn hoverable">Wybieram</a>
+        </div>
+        <div class="plan-card plan-highlight hoverable" id="plan-monthly">
+          <div class="plan-badge">NAJCZĘŚCIEJ WYBIERANY</div>
+          <div class="plan-name">Miesięczny</div>
+          <div class="plan-subtitle">8 treningów / miesiąc</div>
+          <div class="plan-price">900 zł</div>
+          <div class="plan-divider plan-divider-dark"></div>
+          <ul class="plan-features">
+            <li>Indywidualny plan treningowy</li>
+            <li>Korekta techniki na żywo</li>
+            <li>Kontakt między sesjami</li>
+          </ul>
+          <a href="#kontakt" class="plan-btn plan-btn-dark hoverable">Wybieram</a>
+        </div>
+        <div class="plan-card hoverable" id="plan-full">
+          <div class="plan-name">Pełne wsparcie</div>
+          <div class="plan-subtitle">12 treningów + dieta</div>
+          <div class="plan-price">1400 zł</div>
+          <div class="plan-divider"></div>
+          <ul class="plan-features">
+            <li>Plan treningowy i żywieniowy</li>
+            <li>Cotygodniowa kontrola postępów</li>
+            <li>Pełna elastyczność grafiku</li>
+          </ul>
+          <a href="#kontakt" class="plan-btn hoverable">Wybieram</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPINIE -->
+  <div class="reviews" id="opinie" data-section="reviews">
+    <div class="reviews-inner" id="reviews-inner">
+      <div class="eyebrow eyebrow-center">Opinie</div>
+      <h2 class="section-title section-title-center">Co mówią klienci</h2>
+      <div class="reviews-carousel">
+        <div class="reviews-viewport">
+          <div class="reviews-track" id="reviews-track">
+            <div class="review-card">
+              <p class="review-text">„Pierwszy trener, który naprawdę patrzył na technikę, a nie tylko liczby na sztandze. Ból pleców zniknął po miesiącu.”</p>
+              <div class="review-name">Marta K.</div>
+            </div>
+            <div class="review-card">
+              <p class="review-text">„Plan dopasowany do mojego grafiku i możliwości. Widać wiedzę fizjoterapeutyczną w każdym ćwiczeniu.”</p>
+              <div class="review-name">Tomasz R.</div>
+            </div>
+            <div class="review-card">
+              <p class="review-text">„Profesjonalizm i cierpliwość. Zaczynałam od zera, teraz trenuję z pełną pewnością siebie.”</p>
+              <div class="review-name">Ania W.</div>
+            </div>
+          </div>
+        </div>
+        <div class="reviews-controls">
+          <button id="review-prev" class="review-arrow hoverable" aria-label="Poprzednia opinia">‹</button>
+          <div class="review-dots" id="review-dots"></div>
+          <button id="review-next" class="review-arrow hoverable" aria-label="Następna opinia">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KONTAKT -->
+  <div class="contact" id="kontakt" data-section="contact">
+    <div class="contact-inner" id="contact-inner">
+      <div class="eyebrow">Kontakt</div>
+      <h2 class="section-title">Umów pierwszą konsultację</h2>
+      <p class="contact-desc">Wypełnij formularz, oddzwonię w ciągu 24 godzin.</p>
+      <form class="contact-form" id="contact-form" name="kontakt" method="POST" data-netlify="true" netlify-honeypot="firma">
+        <input type="hidden" name="form-name" value="kontakt" />
+        <p class="hp-field"><label>Firma <input name="firma" tabindex="-1" autocomplete="off" /></label></p>
+        <div class="contact-row">
+          <input type="text" name="name" placeholder="Imię i nazwisko" required />
+          <input type="text" name="contact" placeholder="Telefon lub e-mail" required />
+        </div>
+        <textarea name="goal" placeholder="Twój cel treningowy..." rows="4"></textarea>
+        <button type="submit" class="btn-submit hoverable">Wyślij zgłoszenie</button>
+      </form>
+      <div class="footer">
+        <div>© 2026 Sebastian Palej · Trener Personalny</div>
+        <div class="footer-links">
+          <a href="#" class="hoverable">Instagram</a>
+          <a href="#" class="hoverable">Facebook</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>
