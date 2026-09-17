@@ -220,7 +220,10 @@
   renderReview();
   restartAutoplay();
 
-  /* CONTACT FORM — submits to Netlify Forms (requires the site to be deployed on Netlify) */
+  /* CONTACT FORM — submits via FormSubmit.co (no backend needed, works on GitHub Pages).
+     First real submission triggers a one-time "confirm this form" email to
+     kontakt@sebastianpalej.com — click the activation link there once, then
+     every future submission is delivered automatically. */
   var form = document.getElementById('contact-form');
 
   function showFormMessage(kind, text) {
@@ -239,15 +242,20 @@
     btn.disabled = true;
     btn.textContent = 'Wysyłanie...';
 
-    var body = new URLSearchParams(new FormData(form)).toString();
+    var payload = {};
+    new FormData(form).forEach(function (value, key) { payload[key] = value; });
 
-    fetch('/', {
+    fetch('https://formsubmit.co/ajax/kontakt@sebastianpalej.com', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
     })
       .then(function (res) {
         if (!res.ok) throw new Error('bad status');
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data || data.success === false) throw new Error('formsubmit error');
         btn.textContent = 'Zgłoszenie wysłane ✓';
         showFormMessage('form-note', 'Dziękuję! Oddzwonię w ciągu 24 godzin.');
         form.reset();

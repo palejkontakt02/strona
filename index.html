@@ -280,9 +280,11 @@
       <div class="eyebrow">Kontakt</div>
       <h2 class="section-title">Umów pierwszą konsultację</h2>
       <p class="contact-desc">Wypełnij formularz, oddzwonię w ciągu 24 godzin.</p>
-      <form class="contact-form" id="contact-form" name="kontakt" method="POST" data-netlify="true" netlify-honeypot="firma">
-        <input type="hidden" name="form-name" value="kontakt" />
-        <p class="hp-field"><label>Firma <input name="firma" tabindex="-1" autocomplete="off" /></label></p>
+      <form class="contact-form" id="contact-form" name="kontakt" method="POST" action="https://formsubmit.co/kontakt@sebastianpalej.com">
+        <input type="hidden" name="_subject" value="Nowe zgloszenie ze strony sebastianpalej.pl" />
+        <input type="hidden" name="_template" value="table" />
+        <input type="hidden" name="_captcha" value="false" />
+        <p class="hp-field"><label>Firma <input name="_honey" tabindex="-1" autocomplete="off" /></label></p>
         <div class="contact-row">
           <input type="text" name="name" placeholder="Imię i nazwisko" required />
           <input type="text" name="contact" placeholder="Telefon lub e-mail" required />
