@@ -519,3 +519,88 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
   .contact-row { grid-template-columns: 1fr; }
   .nav-links { display: none; }
 }
+
+/* OFFER — CATEGORY LAYOUT (cennik 2026) */
+.offer-category { margin-bottom: 60px; }
+.offer-category-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(237,237,237,0.12);
+}
+.offer-category-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; margin: 0; }
+.offer-tag {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(237,237,237,0.1);
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+.offer-category-note { font-size: 13px; opacity: 0.55; white-space: nowrap; }
+
+.price-table { display: flex; flex-direction: column; }
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(237,237,237,0.08);
+}
+.price-row:last-child { border-bottom: none; }
+.price-row-name { font-size: 15.5px; }
+.price-row-sub { display: block; font-size: 13px; opacity: 0.55; margin-top: 4px; max-width: 46ch; }
+.price-row-value { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; white-space: nowrap; text-align: right; }
+.price-row-per { display: block; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 400; opacity: 0.5; margin-top: 2px; }
+
+.offer-includes { font-size: 14px; opacity: 0.6; margin-top: 18px; line-height: 1.6; max-width: 80ch; }
+
+.plans-3 { margin-top: 4px; }
+.plan-price-unit { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; opacity: 0.55; }
+
+.offer-flagship {
+  position: relative;
+  background: #D8D8D8;
+  color: #161616;
+  border-radius: 8px;
+  padding: 44px 40px;
+  margin-top: 8px;
+  box-shadow: 0 20px 45px rgba(0,0,0,0.35);
+}
+.offer-flagship-badge {
+  position: absolute;
+  top: -14px; left: 32px;
+  background: #161616;
+  color: #EDEDED;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 3px;
+}
+.offer-flagship-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.offer-flagship-title { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; margin: 0; max-width: 520px; }
+.offer-flagship-price { font-family: 'Fraunces', serif; font-size: 36px; font-weight: 700; white-space: nowrap; }
+.offer-flagship-desc { font-size: 15px; line-height: 1.65; max-width: 640px; opacity: 0.85; margin: 0 0 24px; }
+.offer-flagship-btn { display: inline-block; width: auto; padding: 14px 28px; }
+
+.offer-footnote { font-size: 12.5px; opacity: 0.45; margin-top: 40px; }
+
+@media (max-width: 900px) {
+  .offer-category-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .price-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .price-row-value { text-align: left; }
+  .offer-flagship { padding: 36px 24px; }
+  .offer-flagship-top { flex-direction: column; }
+}
