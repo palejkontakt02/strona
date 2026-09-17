@@ -73,6 +73,8 @@ a:hover { color: #F0F0F0; }
   font-size: 21px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  color: #EDEDED;
+  text-decoration: none;
 }
 .nav-links { display: flex; gap: 36px; font-size: 14px; font-weight: 600; letter-spacing: 0.02em; }
 .nav-link { color: rgba(237,237,237,0.55); }
@@ -447,7 +449,7 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
 .contact-desc { font-size: 17px; color: rgba(237,237,237,0.6); margin: 0 0 40px; }
 .contact-form { display: flex; flex-direction: column; gap: 18px; }
 .contact-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.contact-form input, .contact-form textarea {
+.contact-form input, .contact-form textarea, .contact-form select {
   padding: 16px;
   border: 1px solid rgba(237,237,237,0.15);
   border-radius: 3px;
@@ -457,6 +459,8 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
   font-family: inherit;
 }
 .contact-form textarea { resize: vertical; }
+.contact-form select { cursor: pointer; }
+.contact-form select:invalid { color: rgba(237,237,237,0.45); }
 .btn-submit {
   background: #D8D8D8;
   color: #161616;

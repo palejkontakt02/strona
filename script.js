@@ -59,15 +59,17 @@
   onScroll();
 
   /* MARQUEE — build duplicated list for seamless loop */
-  var marqueeItems = ['SIŁA', 'MOBILNOŚĆ', 'TECHNIKA', 'WYTRZYMAŁOŚĆ', 'REGENERACJA', 'DYSCYPLINA'];
   var track = document.getElementById('marquee-track');
-  var marqueeHtml = '';
-  for (var m = 0; m < 2; m++) {
-    marqueeItems.forEach(function (word) {
-      marqueeHtml += '<span>' + word + '</span><span>·</span>';
-    });
+  if (track) {
+    var marqueeItems = ['SIŁA', 'MOBILNOŚĆ', 'TECHNIKA', 'WYTRZYMAŁOŚĆ', 'REGENERACJA', 'DYSCYPLINA'];
+    var marqueeHtml = '';
+    for (var m = 0; m < 2; m++) {
+      marqueeItems.forEach(function (word) {
+        marqueeHtml += '<span>' + word + '</span><span>·</span>';
+      });
+    }
+    track.innerHTML = marqueeHtml;
   }
-  track.innerHTML = marqueeHtml;
 
   /* NAV ACTIVE LINK + SECTION REVEALS */
   var navLinks = document.querySelectorAll('.nav-link');
@@ -162,112 +164,123 @@
   /* LIGHTBOX */
   var lightbox = document.getElementById('lightbox');
   var lightboxImg = document.getElementById('lightbox-img');
-  document.querySelectorAll('.gallery-item').forEach(function (item) {
-    item.addEventListener('click', function () {
-      lightboxImg.src = item.getAttribute('data-src');
-      lightbox.classList.add('open');
+  if (lightbox && lightboxImg) {
+    document.querySelectorAll('.gallery-item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        lightboxImg.src = item.getAttribute('data-src');
+        lightbox.classList.add('open');
+      });
     });
-  });
-  function closeLightbox() { lightbox.classList.remove('open'); }
-  lightbox.addEventListener('click', closeLightbox);
-  document.getElementById('lightbox-close').addEventListener('click', function (e) {
-    e.stopPropagation();
-    closeLightbox();
-  });
+    var closeLightbox = function () { lightbox.classList.remove('open'); };
+    lightbox.addEventListener('click', closeLightbox);
+    var lightboxCloseBtn = document.getElementById('lightbox-close');
+    if (lightboxCloseBtn) {
+      lightboxCloseBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closeLightbox();
+      });
+    }
+  }
 
   /* REVIEWS CAROUSEL */
   var reviewsTrack = document.getElementById('reviews-track');
-  var reviewCards = reviewsTrack.querySelectorAll('.review-card');
-  var dotsWrap = document.getElementById('review-dots');
-  var reviewIndex = 0;
-  var reviewTimer = null;
+  if (reviewsTrack) {
+    var reviewCards = reviewsTrack.querySelectorAll('.review-card');
+    var dotsWrap = document.getElementById('review-dots');
+    var reviewIndex = 0;
+    var reviewTimer = null;
 
-  reviewCards.forEach(function (_, i) {
-    var dot = document.createElement('button');
-    dot.setAttribute('aria-label', 'Opinia ' + (i + 1));
-    dot.addEventListener('click', function () { goToReview(i); });
-    dotsWrap.appendChild(dot);
-  });
-  var dots = dotsWrap.querySelectorAll('button');
-
-  function renderReview() {
-    reviewsTrack.style.transform = 'translateX(-' + reviewIndex + '00%)';
-    dots.forEach(function (d, i) {
-      d.classList.toggle('active', i === reviewIndex);
+    reviewCards.forEach(function (_, i) {
+      var dot = document.createElement('button');
+      dot.setAttribute('aria-label', 'Opinia ' + (i + 1));
+      dot.addEventListener('click', function () { goToReview(i); });
+      dotsWrap.appendChild(dot);
     });
-  }
-  function goToReview(i) {
-    reviewIndex = i;
+    var dots = dotsWrap.querySelectorAll('button');
+
+    var renderReview = function () {
+      reviewsTrack.style.transform = 'translateX(-' + reviewIndex + '00%)';
+      dots.forEach(function (d, i) {
+        d.classList.toggle('active', i === reviewIndex);
+      });
+    };
+    var goToReview = function (i) {
+      reviewIndex = i;
+      renderReview();
+      restartAutoplay();
+    };
+    var nextReview = function () {
+      reviewIndex = (reviewIndex + 1) % reviewCards.length;
+      renderReview();
+    };
+    var prevReview = function () {
+      reviewIndex = (reviewIndex - 1 + reviewCards.length) % reviewCards.length;
+      renderReview();
+    };
+    var restartAutoplay = function () {
+      if (reviewTimer) clearInterval(reviewTimer);
+      reviewTimer = setInterval(nextReview, 6000);
+    };
+
+    var reviewNextBtn = document.getElementById('review-next');
+    var reviewPrevBtn = document.getElementById('review-prev');
+    if (reviewNextBtn) reviewNextBtn.addEventListener('click', function () { nextReview(); restartAutoplay(); });
+    if (reviewPrevBtn) reviewPrevBtn.addEventListener('click', function () { prevReview(); restartAutoplay(); });
+
     renderReview();
     restartAutoplay();
   }
-  function nextReview() {
-    reviewIndex = (reviewIndex + 1) % reviewCards.length;
-    renderReview();
-  }
-  function prevReview() {
-    reviewIndex = (reviewIndex - 1 + reviewCards.length) % reviewCards.length;
-    renderReview();
-  }
-  function restartAutoplay() {
-    if (reviewTimer) clearInterval(reviewTimer);
-    reviewTimer = setInterval(nextReview, 6000);
-  }
-
-  document.getElementById('review-next').addEventListener('click', function () { nextReview(); restartAutoplay(); });
-  document.getElementById('review-prev').addEventListener('click', function () { prevReview(); restartAutoplay(); });
-
-  renderReview();
-  restartAutoplay();
 
   /* CONTACT FORM — submits via FormSubmit.co (no backend needed, works on GitHub Pages).
      First real submission triggers a one-time "confirm this form" email to
      kontakt@sebastianpalej.com — click the activation link there once, then
      every future submission is delivered automatically. */
   var form = document.getElementById('contact-form');
+  if (form) {
 
-  function showFormMessage(kind, text) {
-    var existing = form.querySelector('.form-note, .form-error');
-    if (existing) existing.remove();
-    var el = document.createElement('div');
-    el.className = kind;
-    el.textContent = text;
-    form.appendChild(el);
+    function showFormMessage(kind, text) {
+      var existing = form.querySelector('.form-note, .form-error');
+      if (existing) existing.remove();
+      var el = document.createElement('div');
+      el.className = kind;
+      el.textContent = text;
+      form.appendChild(el);
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      var originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Wysyłanie...';
+
+      var payload = {};
+      new FormData(form).forEach(function (value, key) { payload[key] = value; });
+
+      fetch('https://formsubmit.co/ajax/kontakt@sebastianpalej.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('bad status');
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data || data.success === false) throw new Error('formsubmit error');
+          btn.textContent = 'Zgłoszenie wysłane ✓';
+          showFormMessage('form-note', 'Dziękuję! Oddzwonię w ciągu 24 godzin.');
+          form.reset();
+        })
+        .catch(function () {
+          showFormMessage('form-error', 'Coś poszło nie tak. Spróbuj ponownie albo napisz bezpośrednio na kontakt@sebastianpalej.com.');
+        })
+        .finally(function () {
+          setTimeout(function () {
+            btn.disabled = false;
+            btn.textContent = originalText;
+          }, 3000);
+        });
+    });
   }
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var btn = form.querySelector('button[type="submit"]');
-    var originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Wysyłanie...';
-
-    var payload = {};
-    new FormData(form).forEach(function (value, key) { payload[key] = value; });
-
-    fetch('https://formsubmit.co/ajax/kontakt@sebastianpalej.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error('bad status');
-        return res.json();
-      })
-      .then(function (data) {
-        if (!data || data.success === false) throw new Error('formsubmit error');
-        btn.textContent = 'Zgłoszenie wysłane ✓';
-        showFormMessage('form-note', 'Dziękuję! Oddzwonię w ciągu 24 godzin.');
-        form.reset();
-      })
-      .catch(function () {
-        showFormMessage('form-error', 'Coś poszło nie tak. Spróbuj ponownie albo napisz bezpośrednio na kontakt@sebastianpalej.com.');
-      })
-      .finally(function () {
-        setTimeout(function () {
-          btn.disabled = false;
-          btn.textContent = originalText;
-        }, 3000);
-      });
-  });
 })();
