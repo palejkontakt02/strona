@@ -1,15 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1C15FJWJRJ"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-1C15FJWJRJ');
-</script>
+<!-- Google Analytics (gtag.js) jest ladowany warunkowo, dopiero po zgodzie na cookies - patrz script.js -->
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,6 +45,14 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Zgoda na pliki cookies">
+    <p class="cookie-banner-text">Używam plików cookies (Google Analytics), żeby wiedzieć, jak działa ta strona i móc ją ulepszać. Możesz zaakceptować albo odrzucić — szczegóły w <a href="polityka-prywatnosci.html" class="hoverable">Polityce Prywatności</a>.</p>
+    <div class="cookie-banner-buttons">
+      <button type="button" id="cookie-reject" class="cookie-btn hoverable">Odrzuć</button>
+      <button type="button" id="cookie-accept" class="cookie-btn cookie-btn-accept hoverable">Akceptuję</button>
+    </div>
+  </div>
+
 
   <!-- CUSTOM CURSOR -->
   <div id="cursor"></div>
@@ -197,6 +197,7 @@
           <a href="https://instagram.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Instagram</a>
           <a href="https://facebook.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Facebook</a>
           <a href="polityka-prywatnosci.html" class="hoverable">Polityka Prywatności</a>
+          <a href="#" class="hoverable cookie-manage-link">Ustawienia cookies</a>
         </div>
       </div>
     </div>

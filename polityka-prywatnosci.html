@@ -19,6 +19,14 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Zgoda na pliki cookies">
+    <p class="cookie-banner-text">Używam plików cookies (Google Analytics), żeby wiedzieć, jak działa ta strona i móc ją ulepszać. Możesz zaakceptować albo odrzucić — szczegóły w <a href="polityka-prywatnosci.html" class="hoverable">Polityce Prywatności</a>.</p>
+    <div class="cookie-banner-buttons">
+      <button type="button" id="cookie-reject" class="cookie-btn hoverable">Odrzuć</button>
+      <button type="button" id="cookie-accept" class="cookie-btn cookie-btn-accept hoverable">Akceptuję</button>
+    </div>
+  </div>
+
 
   <!-- CUSTOM CURSOR -->
   <div id="cursor"></div>
@@ -92,7 +100,7 @@
         <div class="offer-category-head">
           <h3 class="offer-category-title">Pliki cookies</h3>
         </div>
-        <p class="offer-includes">Strona korzysta z Google Analytics (Google Analytics 4) w celu analizy statystyk odwiedzin (liczba użytkowników, źródła ruchu, popularność podstron). Google Analytics wykorzystuje pliki cookies i podobne technologie do zbierania zanonimizowanych danych o sposobie korzystania ze strony. Dane te nie są wykorzystywane do identyfikacji konkretnych osób. Więcej informacji o tym, jak Google przetwarza dane, znajdziesz w <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" class="hoverable">polityce prywatności Google</a>. Możesz zablokować pliki cookies w ustawieniach swojej przeglądarki lub skorzystać z <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener" class="hoverable">dodatku blokującego Google Analytics</a>.</p>
+        <p class="offer-includes">Przy pierwszej wizycie na stronie wyświetla się pasek z prośbą o zgodę na pliki cookies. Google Analytics (Google Analytics 4), którego używam do analizy statystyk odwiedzin (liczba użytkowników, źródła ruchu, popularność podstron), uruchamia się dopiero po kliknięciu „Akceptuję” — jeśli klikniesz „Odrzuć”, pliki cookies Analytics nie zostaną zapisane. Swoją decyzję możesz zmienić w dowolnym momencie, klikając „Ustawienia cookies” w stopce strony. Google Analytics wykorzystuje pliki cookies i podobne technologie do zbierania zanonimizowanych danych o sposobie korzystania ze strony — dane te nie są wykorzystywane do identyfikacji konkretnych osób. Więcej informacji o tym, jak Google przetwarza dane, znajdziesz w <a href="https://policies.google.com/privacy" target="_blank" rel="noopener" class="hoverable">polityce prywatności Google</a>.</p>
       </div>
 
       <p class="offer-footnote">Ostatnia aktualizacja: wrzesień 2026.</p>
@@ -102,6 +110,7 @@
         <div class="footer-links">
           <a href="https://instagram.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Instagram</a>
           <a href="https://facebook.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Facebook</a>
+          <a href="#" class="hoverable cookie-manage-link">Ustawienia cookies</a>
         </div>
       </div>
     </div>
