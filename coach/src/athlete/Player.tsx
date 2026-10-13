@@ -5,7 +5,7 @@ import { useStore } from '../data/store';
 import { uid } from '../format';
 import { defaultCharge } from '../lib/billing';
 import { repsN } from '../lib/parse';
-import { completeSet, runToExercises, type Run, type RunSet } from '../lib/run';
+import { blockRest, completeSet, runBlocks, runToExercises, type Run, type RunSet } from '../lib/run';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -47,24 +47,34 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<{ srpe: string; pain: string; duration: string; notes: string } | null>(null);
-  const e = run.ex[run.idx];
-  const last = run.idx === run.ex.length - 1;
+  const blocks = runBlocks(run);
+  const bi = Math.max(0, blocks.findIndex((b) => b.includes(run.idx)));
+  const block = blocks[bi] ?? [];
+  const last = bi === blocks.length - 1;
+  const tempoEx = block.map((k) => run.ex[k]).find((x) => x.tempo);
+  const [hintNext, setHintNext] = useState<number | null>(null);
 
   const update = (fn: (r: Run) => void) => {
     const next = structuredClone(run);
     fn(next);
     setRun(next);
+    return next;
   };
-  const setSet = (i: number, patch: Partial<RunSet>) => update((r) => Object.assign(r.ex[r.idx].sets[i], patch));
-  const go = (idx: number) => {
-    update((r) => void (r.idx = idx));
+  const setSet = (k: number, i: number, patch: Partial<RunSet>) => update((r) => void Object.assign(r.ex[k].sets[i], patch));
+  const go = (b: number) => {
+    setHintNext(null);
+    update((r) => void (r.idx = blocks[b][0]));
     window.scrollTo(0, 0);
   };
 
-  const onDone = (i: number) => {
-    const res = completeSet(e, i);
-    update((r) => void (r.ex[r.idx].sets = res.sets));
-    if (res.rest) setRest({ end: Date.now() + res.rest * 1000, total: res.rest });
+  const onDone = (k: number, i: number) => {
+    const wasDone = run.ex[k].sets[i].done;
+    const res = completeSet(run.ex[k], i);
+    const next = update((r) => void (r.ex[k].sets = res.sets));
+    if (wasDone) return;
+    const br = blockRest(next, k, i);
+    setHintNext(br.next ?? null);
+    if (br.rest) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
   };
 
   const save = async () => {
@@ -96,7 +106,137 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
 
   const totalSets = run.ex.reduce((a, x) => a + x.sets.length, 0);
   const doneSets = run.ex.reduce((a, x) => a + x.sets.filter((s) => s.done).length, 0);
-  let n = 0;
+  const blockName = (b: number[]) => b.map((k) => run.ex[k].name).join(' + ');
+
+  const setRow = (k: number, i: number, num: string, label?: string) => {
+    const s = run.ex[k].sets[i];
+    return (
+      <div key={`${k}-${i}`}>
+        <div className={`sgrid ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${hintNext === k && !s.done ? 'is-next' : ''}`}>
+          <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
+          <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
+          <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Powtórzenia, ${run.ex[k].name}, seria ${num}`} />
+          <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
+          <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(k, i)}>
+            ✓
+          </button>
+        </div>
+        {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
+      </div>
+    );
+  };
+
+  const addWarmup = (k: number) =>
+    update((r) => {
+      const sets = r.ex[k].sets;
+      const firstWork = sets.find((s) => !s.warmup);
+      sets.unshift({ load: '', reps: firstWork?.reps || '5', rpe: '', done: false, warmup: true, sug: '', edited: false, tRpe: '', spec: '', rest: '', label: 'Rozgrzewka' });
+    });
+  const addSet = (ks: number[]) =>
+    update((r) => {
+      for (const k of ks) {
+        const sets = r.ex[k].sets;
+        const src = sets[sets.length - 1];
+        sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
+      }
+    });
+  const removeSet = (ks: number[]) =>
+    update((r) => {
+      for (const k of ks) if (r.ex[k].sets.length > 1) r.ex[k].sets.pop();
+    });
+
+  const header = (k: number) => {
+    const e = run.ex[k];
+    return (
+      <div key={`h${k}`} className="ex-head">
+        <div className="between">
+          <h2>
+            {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
+          </h2>
+          {e.video && (
+            <a className="small" href={e.video} target="_blank" rel="noreferrer">
+              ▶ Wideo
+            </a>
+          )}
+        </div>
+        {(e.tempo || e.notes) && (
+          <div className="muted small">
+            {e.tempo && `tempo ${e.tempoStr}`}
+            {e.tempo && e.notes && ' · '}
+            {e.notes}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /** Pojedyncze ćwiczenie: serie po kolei, z nagłówkami bloków serii. */
+  const single = (k: number) => {
+    const e = run.ex[k];
+    let n = 0;
+    return (
+      <>
+        {header(k)}
+        <div className="muted small">{e.rest && `przerwa ${e.rest}`}</div>
+        <button className="link small" onClick={() => addWarmup(k)}>
+          + seria wstępna
+        </button>
+        <div className="sgrid sgrid-head">
+          <span />
+          <span>kg</span>
+          <span>powt.</span>
+          <span>RPE</span>
+          <span />
+        </div>
+        {e.sets.map((s, i) => {
+          if (!s.warmup) n++;
+          return (
+            <div key={i}>
+              {s.first && !s.warmup && s.gdesc && (
+                <div className="ghead">
+                  <b>{s.gdesc}</b>
+                  {s.rest && <span className="muted small">przerwa {s.rest}</span>}
+                </div>
+              )}
+              {setRow(k, i, s.warmup ? 'W' : String(n))}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
+  /** Blok (superseria / obwód): serie ułożone rundami — A1, A2, A3, przerwa, kolejna runda. */
+  const superset = (ks: number[]) => {
+    const work = ks.map((k) => run.ex[k].sets.map((s, i) => ({ s, i })).filter((x) => !x.s.warmup));
+    const warm = ks.flatMap((k) => run.ex[k].sets.map((s, i) => ({ k, s, i })).filter((x) => x.s.warmup));
+    const rounds = Math.max(...work.map((w) => w.length));
+    const lastRest = run.ex[ks[ks.length - 1]].rest;
+    return (
+      <>
+        <div className="block-head">
+          <span className="eyebrow">{ks.length === 2 ? 'Superseria' : 'Obwód'} · {ks.length} ćwiczenia na zmianę</span>
+          <span className="muted small">przerwa po rundzie {lastRest || '2:00'}</span>
+        </div>
+        {ks.map((k) => header(k))}
+        <div className="sgrid sgrid-head">
+          <span />
+          <span>kg</span>
+          <span>powt.</span>
+          <span>RPE</span>
+          <span />
+        </div>
+        {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`))}
+        {Array.from({ length: rounds }, (_, r) => (
+          <div key={r} className="round">
+            <div className="round-label">Runda {r + 1}</div>
+            {ks.map((k, j) => (work[j][r] ? setRow(k, work[j][r].i, String(r + 1), run.ex[k].label) : null))}
+          </div>
+        ))}
+        {hintNext != null && block.includes(hintNext) && <div className="sughint next-hint">Teraz {run.ex[hintNext].label} · {run.ex[hintNext].name} — bez przerwy</div>}
+      </>
+    );
+  };
 
   return (
     <div className="player fade">
@@ -104,7 +244,7 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
         <button className="btn btn-ghost btn-sm" onClick={onHome}>
           ‹ Start
         </button>
-        <button className="btn btn-ghost btn-sm" disabled={!e?.tempo} onClick={() => setTempoOpen(true)}>
+        <button className="btn btn-ghost btn-sm" disabled={!tempoEx} onClick={() => setTempoOpen(true)}>
           ◷ Tempo
         </button>
       </div>
@@ -115,86 +255,23 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
         </p>
       </header>
       <div className="segs">
-        {run.ex.map((x, i) => (
-          <button key={i} aria-label={`Ćwiczenie ${i + 1}: ${x.name}`} className={x.sets.every((s) => s.done) ? 'on' : i === run.idx ? 'cur' : ''} onClick={() => go(i)} />
+        {blocks.map((b, i) => (
+          <button key={i} aria-label={`${i + 1}: ${blockName(b)}`} className={b.every((k) => run.ex[k].sets.every((s) => s.done)) ? 'on' : i === bi ? 'cur' : ''} onClick={() => go(i)} />
         ))}
       </div>
       <div className="muted small upper">
-        Ćwiczenie {run.idx + 1} z {run.ex.length}
+        {block.length > 1 ? 'Blok' : 'Ćwiczenie'} {bi + 1} z {blocks.length}
       </div>
 
-      {e && (
+      {block.length > 0 && (
         <section className="acard">
+          {block.length === 1 ? single(block[0]) : superset(block)}
           <div className="between">
-            <h2>{e.name}</h2>
-            {e.video && (
-              <a className="small" href={e.video} target="_blank" rel="noreferrer">
-                ▶ Wideo
-              </a>
-            )}
-          </div>
-          <div className="muted small">
-            {[e.rest && `przerwa ${e.rest}`, e.tempo && `tempo ${e.tempoStr}`].filter(Boolean).join(' · ')}
-          </div>
-          {e.notes && <p className="small">{e.notes}</p>}
-          <button
-            className="link small"
-            onClick={() =>
-              update((r) => {
-                const sets = r.ex[r.idx].sets;
-                const firstWork = sets.find((s) => !s.warmup);
-                sets.unshift({ load: '', reps: firstWork?.reps || '5', rpe: '', done: false, warmup: true, sug: '', edited: false, tRpe: '', spec: '', rest: '', label: 'Rozgrzewka' });
-              })
-            }
-          >
-            + seria wstępna
-          </button>
-
-          <div className="sgrid sgrid-head">
-            <span />
-            <span>kg</span>
-            <span>powt.</span>
-            <span>RPE</span>
-            <span />
-          </div>
-          {e.sets.map((s, i) => {
-            if (!s.warmup) n++;
-            return (
-              <div key={i}>
-                {s.first && !s.warmup && s.gdesc && (
-                  <div className="ghead">
-                    <b>{s.gdesc}</b>
-                    {s.rest && <span className="muted small">przerwa {s.rest}</span>}
-                  </div>
-                )}
-                <div className={`sgrid ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''}`}>
-                  <span className="sn">{s.warmup ? 'W' : n}</span>
-                  <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, seria ${i + 1}`} />
-                  <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(i, { reps: ev.target.value })} aria-label={`Powtórzenia, seria ${i + 1}`} />
-                  <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(i, { rpe: ev.target.value })} aria-label={`RPE, seria ${i + 1}`} />
-                  <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(i)}>
-                    ✓
-                  </button>
-                </div>
-                {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
-              </div>
-            );
-          })}
-          <div className="between">
-            <button
-              className="link small"
-              onClick={() =>
-                update((r) => {
-                  const sets = r.ex[r.idx].sets;
-                  const src = sets[sets.length - 1];
-                  sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
-                })
-              }
-            >
-              + seria
+            <button className="link small" onClick={() => addSet(block)}>
+              {block.length > 1 ? '+ runda' : '+ seria'}
             </button>
-            {e.sets.length > 1 && (
-              <button className="link small muted" onClick={() => update((r) => void r.ex[r.idx].sets.pop())}>
+            {block.some((k) => run.ex[k].sets.length > 1) && (
+              <button className="link small muted" onClick={() => removeSet(block)}>
                 − usuń ostatnią
               </button>
             )}
@@ -203,7 +280,7 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
       )}
 
       <div className="navrow">
-        <button className="btn btn-ghost" disabled={run.idx === 0} onClick={() => go(run.idx - 1)}>
+        <button className="btn btn-ghost" disabled={bi === 0} onClick={() => go(bi - 1)}>
           ‹ poprzednie
         </button>
         {last ? (
@@ -211,19 +288,19 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
             Zakończ trening
           </button>
         ) : (
-          <button className="btn btn-primary btn-lg" onClick={() => go(run.idx + 1)}>
+          <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
             następne ›
           </button>
         )}
       </div>
       {!last && (
         <div className="acard nextup">
-          <span className="muted small">Dalej</span> {run.ex[run.idx + 1].name}
+          <span className="muted small">Dalej</span> {blockName(blocks[bi + 1])}
         </div>
       )}
 
       {rest && <RestBar rest={rest} setRest={setRest} />}
-      {tempoOpen && e?.tempo && <Tempo name={e.name} phases={e.tempo} reps={repsN(e.sets.find((s) => !s.done)?.reps) || 5} onClose={() => setTempoOpen(false)} />}
+      {tempoOpen && tempoEx?.tempo && <Tempo name={tempoEx.name} phases={tempoEx.tempo} reps={repsN(tempoEx.sets.find((s) => !s.done)?.reps) || 5} onClose={() => setTempoOpen(false)} />}
 
       {finish && (
         <div className="sheet-bg" onMouseDown={(ev) => ev.target === ev.currentTarget && setFinish(null)}>

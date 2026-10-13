@@ -80,7 +80,7 @@ const topBack = (reps: string, backoffs: number) => [
   row('Top set', reps, '', '8'),
   ...rows(backoffs, 'Back-off', reps, '-10%', '7'),
 ];
-const ex = (name: string, groups: SetGroup[], rest = '2:00', notes = ''): PlanExercise => ({ id: uid(), name, rest, notes, groups });
+const ex = (name: string, groups: SetGroup[], rest = '2:00', notes = '', linked = false): PlanExercise => ({ id: uid(), name, rest, notes, groups, linked: linked || undefined });
 
 type WorkoutTpl = { name: string; exercises: () => PlanExercise[] };
 
@@ -104,8 +104,8 @@ const TEMPLATES: Record<string, { name: string; workouts: WorkoutTpl[] }> = {
           ex('Zarzut siłowy', rows(4, 'Robocze', '3', '', '7'), '2:00'),
           ex('Wyciskanie sztangi leżąc', topBack('5', 2), '2:30'),
           ex('Podciąganie', rows(4, 'Robocze', '6', '', '8')),
-          ex('Wiosłowanie hantlem', rows(3, 'Robocze', '10', '', '8'), '90'),
-          ex('Pallof press', rows(3, 'Robocze', '10'), '60'),
+          ex('Wiosłowanie hantlem', rows(3, 'Robocze', '10', '', '8'), ''),
+          ex('Pallof press', rows(3, 'Robocze', '10'), '90', '', true),
         ],
       },
       {
@@ -113,9 +113,9 @@ const TEMPLATES: Record<string, { name: string; workouts: WorkoutTpl[] }> = {
         exercises: () => [
           ex('Skok na skrzynię', rows(4, 'Robocze', '3'), '1:30'),
           ex('Przysiad bułgarski', rows(3, 'Robocze', '8', '', '8'), '2:00', 'Tempo 3-0-1-0'),
-          ex('Hip thrust', [row('Rozgrzewka', '8', '60%'), ...rows(3, 'Robocze', '8', '', '8')]),
-          ex('Wyciskanie żołnierskie', rows(3, 'Robocze', '6', '', '8')),
-          ex('Dead bug', rows(3, 'Robocze', '10'), '60'),
+          ex('Hip thrust', [row('Rozgrzewka', '8', '60%'), ...rows(3, 'Robocze', '8', '', '8')], ''),
+          ex('Wyciskanie żołnierskie', rows(3, 'Robocze', '6', '', '8'), '', '', true),
+          ex('Dead bug', rows(3, 'Robocze', '10'), '2:00', '', true),
         ],
       },
     ],

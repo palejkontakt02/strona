@@ -4,7 +4,7 @@ import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGrou
 import { cloneWeek, savePlan } from '../data/ops';
 import { useStore } from '../data/store';
 import { uid } from '../format';
-import { setCountLabel } from '../lib/plan';
+import { exerciseLabels, setCountLabel } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
 const newRow = (type: SetType = 'Robocze', from?: SetGroup): SetGroup => ({ type, sets: '1', reps: from?.reps ?? '', load: from?.load ?? '', rpe: from?.rpe ?? '' });
@@ -59,7 +59,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       </div>
       <p className="muted small">
         Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
-        Tempo wpisz w uwagach, np. <code>3-1-X-0</code>.
+        Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
       </p>
 
       {p.weeks.map((week, wi) => (
@@ -110,13 +110,33 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 />
               </div>
 
-              {k.exercises.map((e, ei) => {
+              {k.exercises.map((e, ei, all) => {
                 const setEx = (fn: (x: PlanExercise) => void) => upd((d) => fn(findWorkout(d, wi, ki).exercises[ei]));
+                const labels = exerciseLabels(all);
+                const inBlock = labels[ei].length > 1 && /\d$/.test(labels[ei]);
                 return (
-                  <div key={e.id} className="pe-ex">
+                  <div key={e.id} className="pe-ex-wrap">
+                    {ei > 0 && (
+                      <button
+                        type="button"
+                        className={`pe-link ${e.linked ? 'on' : ''}`}
+                        aria-pressed={!!e.linked}
+                        onClick={() => setEx((x) => void (x.linked = !x.linked))}
+                        title="Ćwiczenia w bloku robi się na zmianę (A1 → A2 → A3), przerwa po całej rundzie"
+                      >
+                        {e.linked ? `⛓ w bloku z ${labels[ei - 1]} · rozłącz` : '+ połącz z poprzednim (superseria / obwód)'}
+                      </button>
+                    )}
+                  <div className={`pe-ex ${inBlock ? 'in-block' : ''}`}>
                     <div className="pe-ex-head">
+                      <span className="ex-label">{labels[ei]}</span>
                       <input className="input" list="lib-exercises" value={e.name} placeholder="Ćwiczenie" onChange={(ev) => setEx((x) => void (x.name = ev.target.value))} aria-label="Ćwiczenie" />
-                      <input className="input pe-rest" value={e.rest ?? ''} placeholder="Przerwa" onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" />
+                      <input
+                        className="input pe-rest"
+                        value={e.rest ?? ''}
+                        placeholder={inBlock && all[ei + 1]?.linked ? 'Przejście' : 'Przerwa'}
+                        title={inBlock ? (all[ei + 1]?.linked ? 'Czas przejścia do następnego ćwiczenia bloku (puste = od razu)' : 'Przerwa po całej rundzie bloku') : 'Przerwa między seriami'}
+                        onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" />
                       <span className="muted small nowrap hide-mobile">{setCountLabel(e.groups)}</span>
                       <IconBtn
                         icon="up"
@@ -164,6 +184,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         </button>
                       </div>
                     </div>
+                  </div>
                   </div>
                 );
               })}

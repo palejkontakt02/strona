@@ -90,3 +90,24 @@ describe('runToExercises', () => {
     ]);
   });
 });
+
+describe('blocks (superseries / circuits)', () => {
+  const plain = (name: string, linked = false, rest = '2:00'): PlanExercise => ({ id: name, name, rest, linked, groups: [g({ load: '50' }), g({ load: '50' }), g({ load: '50' })] });
+  it('labels single exercises and blocks', async () => {
+    const { exerciseLabels } = await import('./plan');
+    expect(exerciseLabels([{}, {}, { linked: true }, { linked: true }, {}])).toEqual(['A', 'B1', 'B2', 'B3', 'C']);
+    expect(exerciseLabels([{ linked: true }, {}])).toEqual(['A', 'B']);
+  });
+  it('rest only after the round closes', async () => {
+    const { buildRun, blockRest } = await import('./run');
+    const run = buildRun({ id: 'p', name: 'P' }, 'T1', { id: 'w', name: 'W', exercises: [plain('Przysiad'), plain('Podciąganie', false, ''), plain('Pompki', true, '90')] }, [], {}, '2026-10-13');
+    expect(run.ex.map((e) => e.label)).toEqual(['A', 'B1', 'B2']);
+    expect(blockRest(run, 0, 0)).toEqual({ rest: 120 });
+    // B1 seria 1 → od razu B2
+    expect(blockRest(run, 1, 0)).toEqual({ rest: null, next: 2 });
+    run.ex[1].sets[0].done = true;
+    run.ex[2].sets[0].done = true;
+    // B2 seria 1 zamyka rundę → przerwa z ostatniego ćwiczenia bloku (90 s)
+    expect(blockRest(run, 2, 0)).toEqual({ rest: 90 });
+  });
+});

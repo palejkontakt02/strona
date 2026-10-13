@@ -5,7 +5,7 @@ import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
-import { mergeGroups, nextWorkout, setCountLabel } from '../../lib/plan';
+import { exerciseLabels, mergeGroups, nextWorkout, setCountLabel } from '../../lib/plan';
 import { useNav } from '../../nav';
 
 export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
@@ -93,9 +93,11 @@ export function ClientPlans({ client }: { client: Client }) {
                             <p className="muted small">Brak ćwiczeń.</p>
                           ) : (
                             <ul className="plain">
-                              {k.exercises.map((e) => (
-                                <li key={e.id} className="plan-ex">
-                                  <span>{e.name}</span>
+                              {k.exercises.map((e, ei) => (
+                                <li key={e.id} className={`plan-ex ${e.linked ? 'linked' : ''}`}>
+                                  <span>
+                                    <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
+                                  </span>
                                   <span className="muted small">
                                     {setCountLabel(e.groups)} · {groupSummary(e)}
                                   </span>

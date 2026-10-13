@@ -72,3 +72,38 @@ export function exerciseSummary(groups: SetGroup[]): { sets: string; reps: strin
     load: top && top.load && !/%/.test(top.load) && !Number.isNaN(parseFloat(top.load)) ? top.load : '',
   };
 }
+
+/**
+ * Oznaczenia ćwiczeń: pojedyncze „A”, „B”…; połączone w blok (superseria / obwód) „C1”, „C2”, „C3”.
+ * Ćwiczenie z `linked` dołącza do bloku poprzedniego.
+ */
+export function exerciseLabels(exercises: { linked?: boolean }[]): string[] {
+  const blocks = exerciseBlocks(exercises);
+  const out: string[] = new Array(exercises.length);
+  blocks.forEach((idxs, b) => {
+    const letter = blockLetter(b);
+    idxs.forEach((i, k) => (out[i] = idxs.length > 1 ? `${letter}${k + 1}` : letter));
+  });
+  return out;
+}
+
+/** Bloki jako listy indeksów kolejnych ćwiczeń. */
+export function exerciseBlocks(exercises: { linked?: boolean }[]): number[][] {
+  const blocks: number[][] = [];
+  exercises.forEach((e, i) => {
+    if (e.linked && blocks.length) blocks[blocks.length - 1].push(i);
+    else blocks.push([i]);
+  });
+  return blocks;
+}
+
+function blockLetter(n: number): string {
+  let s = '';
+  n += 1;
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}

@@ -131,6 +131,8 @@ export interface SetGroup {
 export interface PlanExercise {
   id: string;
   name: string;
+  /** Połączone z poprzednim ćwiczeniem w blok (superseria / obwód): A1, A2, A3 i dopiero przerwa. */
+  linked?: boolean;
   rest?: string;
   /** Uwagi, w tym tempo, np. „3-1-X-0”. */
   notes?: string;
@@ -173,6 +175,8 @@ export interface SetLog {
 
 export interface SessionExercise {
   name: string;
+  /** Oznaczenie w planie, np. „A” albo „B2” (blok). */
+  label?: string;
   /** Podsumowanie (zapis trenera): serie, powtórzenia, ciężar, RPE jako tekst z formularza. */
   sets?: string;
   reps?: string;

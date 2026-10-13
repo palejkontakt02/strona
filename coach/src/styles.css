@@ -1613,7 +1613,7 @@ i.line-muted {
 }
 .sgrid {
   display: grid;
-  grid-template-columns: 28px 1fr 1fr 1fr 52px;
+  grid-template-columns: 36px 1fr 1fr 1fr 52px;
   gap: var(--space-3);
   align-items: center;
   margin-top: var(--space-3);
@@ -2030,5 +2030,122 @@ i.line-muted {
   }
   .filters .seg {
     overflow-x: auto;
+  }
+}
+
+/* ---------- bloki ćwiczeń (superserie / obwody) ---------- */
+.ex-label {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  padding: 0 5px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--color-accent-900);
+  color: var(--color-accent-300);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 2px;
+}
+.ex-label-lg {
+  height: 24px;
+  min-width: 32px;
+  font-size: 0.85rem;
+  vertical-align: 3px;
+}
+.pe-ex-wrap {
+  display: flex;
+  flex-direction: column;
+}
+.pe-ex-head .ex-label {
+  flex: none;
+}
+.pe-ex.in-block {
+  border-left: 3px solid var(--color-accent-600);
+}
+.pe-link {
+  align-self: center;
+  border: 1px dashed var(--color-divider);
+  background: transparent;
+  color: var(--color-neutral-400);
+  font-size: 0.78rem;
+  border-radius: 999px;
+  padding: 2px 12px;
+  margin: 6px 0;
+}
+.pe-link:hover {
+  color: var(--color-text);
+  border-color: var(--color-neutral-600);
+}
+.pe-link.on {
+  border-style: solid;
+  border-color: var(--color-accent-700);
+  color: var(--color-accent-300);
+  background: var(--color-accent-900);
+  margin: 0;
+  border-radius: 0 0 8px 8px;
+}
+.pe-workout .pe-ex-wrap + .pe-ex-wrap {
+  margin-top: var(--space-2);
+}
+.plan-ex.linked {
+  border-left: 2px solid var(--color-accent-700);
+  padding-left: 8px;
+  margin-top: -2px;
+}
+.ex-head {
+  margin-bottom: var(--space-2);
+}
+.ex-head + .ex-head {
+  margin-top: var(--space-3);
+}
+.block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.round {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+}
+.round-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-500);
+}
+.round .sgrid {
+  margin-top: var(--space-2);
+}
+.sgrid .sn .ex-label {
+  min-width: 0;
+  padding: 0 3px;
+}
+.sgrid.is-next .ok {
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-cyan) 35%, transparent);
+}
+.next-hint {
+  padding-left: 0;
+  margin-top: var(--space-3);
+  font-weight: 500;
+}
+.pe-ex-head > .input:not(.pe-rest) {
+  flex: 1;
+}
+.pe-ex-head > .pe-rest {
+  flex: 0 0 84px;
+}
+@media (max-width: 900px) {
+  .pe-ex-head > .pe-rest {
+    flex-basis: 64px;
+  }
+  .pe-ex-head {
+    gap: 4px;
   }
 }

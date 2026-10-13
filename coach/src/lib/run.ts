@@ -1,6 +1,6 @@
 import type { PlanExercise, PlanWorkout, SetType, TrainingSession } from '../domain';
 import { num, parseRest, parseTempo, repsN } from './parse';
-import { mergeGroups } from './plan';
+import { exerciseBlocks, exerciseLabels, mergeGroups } from './plan';
 import { e1rmRPE, e1Series, loadFor, resolveLoad } from './strength';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
@@ -28,6 +28,10 @@ export interface RunSet {
 
 export interface RunExercise {
   name: string;
+  /** Oznaczenie z planu: „A” albo „B2” w bloku. */
+  label?: string;
+  /** Połączone z poprzednim w blok (superseria / obwód). */
+  linked?: boolean;
   rest: string;
   tempo: [number, number, number, number] | null;
   tempoStr: string;
@@ -93,6 +97,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
   const notes = String(e.notes || '');
   return {
     name: e.name,
+    linked: e.linked || undefined,
     rest: e.rest || '',
     tempo: parseTempo(notes),
     tempoStr: (notes.match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
@@ -120,8 +125,47 @@ export function buildRun(
     date: today,
     startedAt: now,
     idx: 0,
-    ex: workout.exercises.filter((e) => e.name).map((e) => buildRunExercise(e, history, videos[e.name])),
+    ex: withLabels(workout.exercises.filter((e) => e.name).map((e) => buildRunExercise(e, history, videos[e.name]))),
   };
+}
+
+function withLabels(ex: RunExercise[]): RunExercise[] {
+  const labels = exerciseLabels(ex);
+  return ex.map((e, i) => ({ ...e, label: labels[i] }));
+}
+
+/** Bloki biegu (indeksy ćwiczeń); pojedyncze ćwiczenie to blok jednoelementowy. */
+export function runBlocks(run: Run): number[][] {
+  return exerciseBlocks(run.ex);
+}
+
+/** Numer serii roboczej (bez rozgrzewek) w ćwiczeniu. */
+function workIndex(e: RunExercise, setIdx: number): number {
+  return e.sets.slice(0, setIdx).filter((s) => !s.warmup).length;
+}
+
+/**
+ * Po zaliczeniu serii w bloku (superseria / obwód): jeśli w tej rundzie zostało jeszcze inne
+ * ćwiczenie bloku — przejście bez pełnej przerwy (czas przejścia = przerwa tego ćwiczenia, puste = od razu)
+ * i wskazanie następnego; gdy runda zamknięta — przerwa z ostatniego ćwiczenia bloku (domyślnie 120 s).
+ */
+export function blockRest(run: Run, exIdx: number, setIdx: number): { rest: number | null; next?: number } {
+  const block = runBlocks(run).find((b) => b.includes(exIdx)) ?? [exIdx];
+  const e = run.ex[exIdx];
+  if (e.sets[setIdx]?.warmup) return { rest: null };
+  if (block.length === 1) return { rest: parseRest(e.sets[setIdx]?.rest || e.rest) || 120 };
+  const w = workIndex(e, setIdx);
+  const pos = block.indexOf(exIdx);
+  const order = [...block.slice(pos + 1), ...block.slice(0, pos)];
+  const next = order.find((k) => {
+    const sets = run.ex[k].sets.filter((s) => !s.warmup);
+    return sets[w] && !sets[w].done;
+  });
+  if (next != null) {
+    const t = parseRest(e.rest);
+    return { rest: t > 0 && pos < block.length - 1 ? t : null, next };
+  }
+  return { rest: parseRest(run.ex[block[block.length - 1]].rest) || 120 };
 }
 
 /**
@@ -182,6 +226,7 @@ export function runToExercises(run: Run) {
     const top = work[0];
     return {
       name: e.name,
+      label: e.label,
       sets: String(work.length),
       reps: top?.reps != null ? String(top.reps) : '',
       load: top?.load != null ? String(top.load) : '',
