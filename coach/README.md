@@ -17,6 +17,14 @@ npm run dev      # serwer deweloperski: http://localhost:5173/app/
 npm run build    # buduje do ../app — zbudowane pliki trzeba scommitować
 ```
 
+## Specyfikacja i logika
+
+Docelowy zakres aplikacji opisuje `docs/specyfikacja-panel-trenera.md` (panel trenera + tryb zawodnika).
+Wygląd: styl Fitowa (ciemny motyw, fiolet, Inter); układ i funkcje: panel trenera.
+
+Wzory z prototypu (ACWR, monotonia, e1RM, autoregulacja, pakiety, LSI, kolizje wizyt, sygnały ostrzegawcze)
+są w `src/lib/` jako czyste funkcje z testami: `npm test`. Model danych: `src/domain.ts`.
+
 ## Dane
 
 Na razie dane są zapisywane w `localStorage` przeglądarki (klucz `fitowa-coach:v1`),
