@@ -26,7 +26,7 @@ const FILTERS = ['Aktywni', 'Wszyscy'] as const;
 
 export function ClientsView() {
   const { db } = useStore();
-  const { clientId, openClient, closeClient, clientTab, setClientTab, openModal, startAthlete } = useNav();
+  const { clientId, openClient, closeClient, clientTab, setClientTab, openModal, startAthlete, startLive } = useNav();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Aktywni');
   const today = todayISO();
@@ -98,11 +98,14 @@ export function ClientsView() {
                 </div>
               </div>
               <div className="detail-actions">
-                <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: selected.id })}>
-                  Zapisz trening
+                <button className="btn btn-primary" onClick={() => startLive(selected.id)} title="Prowadź trening 1:1 na żywo, seria po serii">
+                  <Icon name="play" size={14} /> Prowadź trening
                 </button>
-                <button className="btn btn-secondary" onClick={() => startAthlete(selected.id)} title="Widok, który zobaczy zawodnik">
-                  <Icon name="play" size={14} /> Tryb zawodnika
+                <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: selected.id })} title="Wpisz trening po fakcie">
+                  Zapisz po fakcie
+                </button>
+                <button className="btn btn-ghost" onClick={() => startAthlete(selected.id)} title="Widok, który zobaczy zawodnik">
+                  Tryb zawodnika
                 </button>
               </div>
             </header>

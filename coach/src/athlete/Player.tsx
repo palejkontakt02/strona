@@ -5,7 +5,10 @@ import { useStore } from '../data/store';
 import { uid } from '../format';
 import { defaultCharge } from '../lib/billing';
 import { repsN } from '../lib/parse';
-import { blockRest, completeSet, runBlocks, runToExercises, type Run, type RunSet } from '../lib/run';
+import { adHocExercise, appendExercise, blockRest, completeSet, runBlocks, runToExercises, type Run, type RunSet } from '../lib/run';
+import type { Billing } from '../domain';
+import { packageStatus } from '../lib/billing';
+import { num } from '../lib/parse';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -40,17 +43,33 @@ interface Props {
   setRun: (r: Run) => void;
   onHome: () => void;
   onSaved: () => void;
+  /** `trainer` — trener prowadzi trening 1:1 (rozliczenie przy zapisie, wizyta → odbyta). */
+  mode?: 'athlete' | 'trainer';
+  homeLabel?: string;
+  appointmentId?: string;
 }
 
-export function Player({ client, run, setRun, onHome, onSaved }: Props) {
+interface Finish {
+  srpe: string;
+  pain: string;
+  duration: string;
+  notes: string;
+  charge: Billing;
+  amount: string;
+  paidNow: boolean;
+}
+
+export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
   const { db, apply, toast } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
-  const [finish, setFinish] = useState<{ srpe: string; pain: string; duration: string; notes: string } | null>(null);
+  const [finish, setFinish] = useState<Finish | null>(null);
+  const [adding, setAdding] = useState(run.ex.length === 0);
+  const trainer = mode === 'trainer';
   const blocks = runBlocks(run);
   const bi = Math.max(0, blocks.findIndex((b) => b.includes(run.idx)));
   const block = blocks[bi] ?? [];
-  const last = bi === blocks.length - 1;
+  const last = bi >= blocks.length - 1;
   const tempoEx = block.map((k) => run.ex[k]).find((x) => x.tempo);
   const [hintNext, setHintNext] = useState<number | null>(null);
 
@@ -87,7 +106,7 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
       clientId: client.id,
       date: today,
       workoutName: run.name,
-      charge: defaultCharge(client, sessions),
+      charge: trainer ? finish.charge : defaultCharge(client, sessions),
       duration: parseInt(finish.duration, 10) || undefined,
       srpe: Number(finish.srpe),
       pain: finish.pain === '' ? undefined : Number(finish.pain),
@@ -98,10 +117,23 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
       exercises: runToExercises(run),
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
-    const { changes } = saveSession(db, { session, isNew: true });
-    await apply(changes, 'Trening zapisany. Dobra robota! 💪');
+    const { changes, message } = saveSession(db, { session, isNew: true, appointmentId, amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
+    await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪');
     setFinish(null);
     onSaved();
+  };
+
+  const openFinish = () => {
+    const charge = defaultCharge(client, sessionsOf(db, client.id));
+    setFinish({
+      srpe: '',
+      pain: '',
+      duration: String(Math.max(1, Math.round((Date.now() - run.startedAt) / 60000))),
+      notes: '',
+      charge,
+      amount: client.singleRate ? String(client.singleRate) : '',
+      paidNow: true,
+    });
   };
 
   const totalSets = run.ex.reduce((a, x) => a + x.sets.length, 0);
@@ -242,7 +274,7 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
     <div className="player fade">
       <div className="between">
         <button className="btn btn-ghost btn-sm" onClick={onHome}>
-          ‹ Start
+          {homeLabel}
         </button>
         <button className="btn btn-ghost btn-sm" disabled={!tempoEx} onClick={() => setTempoOpen(true)}>
           ◷ Tempo
@@ -279,12 +311,28 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
         </section>
       )}
 
+      {run.ex.length === 0 && !adding && <p className="muted">Ten trening nie ma jeszcze ćwiczeń.</p>}
+      {adding ? (
+        <AddExercise
+          onCancel={run.ex.length ? () => setAdding(false) : undefined}
+          onAdd={(name, sets, reps, load) => {
+            setRun(appendExercise(run, adHocExercise(name, sets, reps, load)));
+            setAdding(false);
+            window.scrollTo(0, 0);
+          }}
+        />
+      ) : (
+        <button className="btn btn-ghost btn-block add-ex" onClick={() => setAdding(true)}>
+          + Dodaj ćwiczenie
+        </button>
+      )}
+
       <div className="navrow">
         <button className="btn btn-ghost" disabled={bi === 0} onClick={() => go(bi - 1)}>
           ‹ poprzednie
         </button>
         {last ? (
-          <button className="btn btn-primary btn-lg" onClick={() => setFinish({ srpe: '', pain: '', duration: String(Math.max(1, Math.round((Date.now() - run.startedAt) / 60000))), notes: '' })}>
+          <button className="btn btn-primary btn-lg" onClick={openFinish}>
             Zakończ trening
           </button>
         ) : (
@@ -293,7 +341,7 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
           </button>
         )}
       </div>
-      {!last && (
+      {!last && blocks[bi + 1] && (
         <div className="acard nextup">
           <span className="muted small">Dalej</span> {blockName(blocks[bi + 1])}
         </div>
@@ -333,9 +381,41 @@ export function Player({ client, run, setRun, onHome, onSaved }: Props) {
               <input className="input" inputMode="numeric" value={finish.duration} onChange={(ev) => setFinish({ ...finish, duration: ev.target.value })} />
             </label>
             <label className="field">
-              <span>Notatka dla trenera</span>
-              <textarea className="input" rows={2} placeholder="Co poszło dobrze, co bolało?" value={finish.notes} onChange={(ev) => setFinish({ ...finish, notes: ev.target.value })} />
+              <span>{trainer ? 'Notatki z treningu' : 'Notatka dla trenera'}</span>
+              <textarea className="input" rows={2} placeholder={trainer ? 'Obserwacje, technika, samopoczucie…' : 'Co poszło dobrze, co bolało?'} value={finish.notes} onChange={(ev) => setFinish({ ...finish, notes: ev.target.value })} />
             </label>
+            {trainer && (
+              <>
+                <label className="field">
+                  <span>Rozliczenie</span>
+                  <select className="input" value={finish.charge} onChange={(ev) => setFinish({ ...finish, charge: ev.target.value as Billing })}>
+                    <option value="pakiet">z pakietu</option>
+                    <option value="abonament">abonament</option>
+                    <option value="pojedyncza">sesja pojedyncza</option>
+                    <option value="brak">bez rozliczenia</option>
+                  </select>
+                </label>
+                {finish.charge === 'pakiet' && (
+                  <p className="muted small">
+                    {(() => {
+                      const pk = packageStatus(client, sessionsOf(db, client.id));
+                      return pk ? `W pakiecie zostało ${pk.left} (po zapisie: ${pk.left - 1}).` : 'Klient nie ma wykupionego pakietu.';
+                    })()}
+                  </p>
+                )}
+                {finish.charge === 'pojedyncza' && (
+                  <div className="between">
+                    <label className="field grow">
+                      <span>Kwota (zł)</span>
+                      <input className="input" inputMode="decimal" value={finish.amount} onChange={(ev) => setFinish({ ...finish, amount: ev.target.value })} />
+                    </label>
+                    <label className="check self-end">
+                      <input type="checkbox" checked={finish.paidNow} onChange={(ev) => setFinish({ ...finish, paidNow: ev.target.checked })} /> zapłacone
+                    </label>
+                  </div>
+                )}
+              </>
+            )}
             <button className="btn btn-primary btn-lg btn-block" disabled={finish.srpe === ''} onClick={save}>
               Zapisz trening
             </button>
@@ -480,5 +560,57 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
         <input type="range" min={1} max={20} value={reps} disabled={state.running} onChange={(ev) => setReps(Number(ev.target.value))} />
       </label>
     </div>
+  );
+}
+
+function AddExercise({ onAdd, onCancel }: { onAdd: (name: string, sets: number, reps: string, load: string) => void; onCancel?: () => void }) {
+  const { db } = useStore();
+  const [name, setName] = useState('');
+  const [sets, setSets] = useState('3');
+  const [reps, setReps] = useState('8');
+  const [load, setLoad] = useState('');
+  return (
+    <form
+      className="acard add-form"
+      onSubmit={(ev) => {
+        ev.preventDefault();
+        if (name.trim()) onAdd(name.trim(), parseInt(sets, 10) || 3, reps, load.replace(',', '.'));
+      }}
+    >
+      <h3>Dodaj ćwiczenie</h3>
+      <datalist id="run-lib">
+        {db.library.map((e) => (
+          <option key={e.id} value={e.name} />
+        ))}
+      </datalist>
+      <label className="field">
+        <span>Ćwiczenie</span>
+        <input className="input" list="run-lib" value={name} onChange={(ev) => setName(ev.target.value)} placeholder="np. Przysiad ze sztangą" required />
+      </label>
+      <div className="add-grid">
+        <label className="field">
+          <span>Serie</span>
+          <input className="input" inputMode="numeric" value={sets} onChange={(ev) => setSets(ev.target.value)} />
+        </label>
+        <label className="field">
+          <span>Powt.</span>
+          <input className="input" value={reps} onChange={(ev) => setReps(ev.target.value)} />
+        </label>
+        <label className="field">
+          <span>kg</span>
+          <input className="input" inputMode="decimal" value={load} onChange={(ev) => setLoad(ev.target.value)} />
+        </label>
+      </div>
+      <div className="actions">
+        <button type="submit" className="btn btn-primary">
+          Dodaj
+        </button>
+        {onCancel && (
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>
+            Anuluj
+          </button>
+        )}
+      </div>
+    </form>
   );
 }

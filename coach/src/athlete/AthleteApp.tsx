@@ -15,19 +15,21 @@ import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
 
-const RUN_KEY = (id: string) => `panel-run-v1-${id}`;
+/** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
+export type RunKind = 'run' | 'live';
+const RUN_KEY = (id: string, kind: RunKind) => `panel-${kind}-v1-${id}`;
 
-export function loadRun(id: string): Run | null {
+export function loadRun(id: string, kind: RunKind = 'run'): Run | null {
   try {
-    return JSON.parse(localStorage.getItem(RUN_KEY(id)) || 'null') as Run | null;
+    return JSON.parse(localStorage.getItem(RUN_KEY(id, kind)) || 'null') as Run | null;
   } catch {
     return null;
   }
 }
-export function storeRun(id: string, run: Run | null) {
+export function storeRun(id: string, run: Run | null, kind: RunKind = 'run') {
   try {
-    if (run) localStorage.setItem(RUN_KEY(id), JSON.stringify(run));
-    else localStorage.removeItem(RUN_KEY(id));
+    if (run) localStorage.setItem(RUN_KEY(id, kind), JSON.stringify(run));
+    else localStorage.removeItem(RUN_KEY(id, kind));
   } catch {
     // brak localStorage — trening trzymany tylko w pamięci
   }

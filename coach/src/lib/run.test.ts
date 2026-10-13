@@ -111,3 +111,17 @@ describe('blocks (superseries / circuits)', () => {
     expect(blockRest(run, 2, 0)).toEqual({ rest: 90 });
   });
 });
+
+describe('ad hoc exercises (trainer live session)', () => {
+  it('appends to an empty run with labels and focus', async () => {
+    const { emptyRun, appendExercise, adHocExercise, runToExercises } = await import('./run');
+    let run = emptyRun('Trening', '2026-10-13', 0);
+    run = appendExercise(run, adHocExercise('Przysiad', 3, '5', '100'));
+    run = appendExercise(run, adHocExercise('Pompki', 2, '12', ''));
+    expect(run.ex.map((e) => e.label)).toEqual(['A', 'B']);
+    expect(run.idx).toBe(1);
+    expect(run.ex[0].sets).toHaveLength(3);
+    run.ex[0].sets[0].done = true;
+    expect(runToExercises(run)).toEqual([{ name: 'Przysiad', label: 'A', sets: '1', reps: '5', load: '100', rpe: '', rest: '2:00', setsLog: [{ load: 100, reps: 5, rpe: undefined, warmup: undefined, label: undefined }] }]);
+  });
+});

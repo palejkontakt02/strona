@@ -2,7 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
 import { CLIENT_TABS, NavCtx, SECTIONS, type ClientTab, type ModalState, type NavValue, type Section } from './nav';
-import { AthleteApp } from './athlete/AthleteApp';
+import { AthleteApp, loadRun } from './athlete/AthleteApp';
+import { LiveSession } from './athlete/LiveSession';
+import { useStore } from './data/store';
 import { CalendarView } from './views/CalendarView';
 import { ClientsView } from './views/ClientsView';
 import { Dashboard } from './views/Dashboard';
@@ -23,6 +25,8 @@ export function App() {
   const [clientTab, setClientTab] = useState<ClientTab>('Przegląd');
   const [modal, setModal] = useState<ModalState | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
+  const [live, setLive] = useState<{ clientId: string; appointmentId?: string } | null>(null);
+  const { db } = useStore();
 
   const go = useCallback((s: Section) => {
     setSection(s);
@@ -51,9 +55,27 @@ export function App() {
         setAthleteId(id);
         window.scrollTo(0, 0);
       },
+      startLive: (clientId, appointmentId) => {
+        setModal(null);
+        setLive({ clientId, appointmentId });
+        window.scrollTo(0, 0);
+      },
     }),
     [section, go, clientId, clientTab],
   );
+
+  if (live) {
+    return (
+      <NavCtx.Provider value={nav}>
+        <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} onExit={() => setLive(null)} />
+      </NavCtx.Provider>
+    );
+  }
+
+  // Treningi prowadzone na żywo, które czekają na dokończenie (np. po przejściu do kalendarza).
+  const running = db.clients
+    .map((c) => ({ c, run: loadRun(c.id, 'live') }))
+    .filter((x) => x.run);
 
   if (athleteId) {
     return (
@@ -88,6 +110,20 @@ export function App() {
         </button>
       </nav>
 
+      {running.length > 0 && (
+        <div className="live-banner">
+          {running.map(({ c, run }) => (
+            <button key={c.id} onClick={() => setLive({ clientId: c.id })}>
+              <span className="live-dot" /> Trening w toku: <b>{c.name}</b>
+              <span className="muted small">
+                {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
+              </span>
+              <span className="grow" />
+              <span className="live-go">Wróć ›</span>
+            </button>
+          ))}
+        </div>
+      )}
       <main className="main">
         {section === 'Pulpit' && <Dashboard />}
         {section === 'Kalendarz' && <CalendarView />}

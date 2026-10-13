@@ -14,7 +14,7 @@ import { ClientSelect } from './ModalHost';
 
 export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const { db, apply, ask } = useStore();
-  const { closeModal, openModal } = useNav();
+  const { closeModal, openModal, startLive } = useNav();
   const editing = m.appt;
   const [clientId, setClientId] = useState(editing?.clientId ?? m.clientId ?? '');
   const [date, setDate] = useState(editing?.date ?? m.date ?? todayISO());
@@ -76,6 +76,17 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
               </button>
             ) : (
               status !== 'cancel' && (
+                <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    await apply([put('appointments', draft)]);
+                    startLive(clientId, draft.id);
+                  }}
+                >
+                  Prowadź trening
+                </button>
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -84,8 +95,9 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
                     openModal({ kind: 'session', appt: draft, clientId, date });
                   }}
                 >
-                  Zapisz trening
+                  Zapisz po fakcie
                 </button>
+                </>
               )
             )}
           </>

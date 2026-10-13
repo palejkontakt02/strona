@@ -1,4 +1,4 @@
-import { Avatar, Card, Dot, Empty, IconBtn, Kpi, Tag } from '../components/ui';
+import { Avatar, Card, Dot, Empty, Icon, IconBtn, Kpi, Tag } from '../components/ui';
 import { allPayments, clientById, lastSessionDate, paymentLabel, sessionsOf, setPaymentStatus } from '../data/ops';
 import { useStore } from '../data/store';
 import { ago, fmtDate, fmtDay, fmtLong, plural, pln } from '../format';
@@ -10,7 +10,7 @@ import { ApptStatusTag } from './CalendarView';
 
 export function Dashboard() {
   const { db, apply } = useStore();
-  const { openClient, openModal } = useNav();
+  const { openClient, openModal, startLive } = useNav();
   const today = todayISO();
   const active = db.clients.filter((c) => c.status === 'aktywny');
 
@@ -72,9 +72,12 @@ export function Dashboard() {
                       <ApptStatusTag status={a.status} />
                     </span>
                     {a.status === 'planned' ? (
-                      <button className="btn btn-primary btn-sm" onClick={() => openModal({ kind: 'session', appt: a, clientId: a.clientId, date: a.date })}>
-                        Zapisz trening
-                      </button>
+                      <>
+                        <button className="btn btn-primary btn-sm" onClick={() => startLive(a.clientId, a.id)} title="Prowadź trening na żywo, seria po serii">
+                          <Icon name="play" size={14} /> Prowadź
+                        </button>
+                        <IconBtn icon="edit" label="Zapisz trening po fakcie" onClick={() => openModal({ kind: 'session', appt: a, clientId: a.clientId, date: a.date })} />
+                      </>
                     ) : (
                       <span className="btn-sm-placeholder" />
                     )}

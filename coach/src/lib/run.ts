@@ -129,6 +129,39 @@ export function buildRun(
   };
 }
 
+/** Nowe ćwiczenie dodane w trakcie treningu (poza planem). */
+export function adHocExercise(name: string, sets: number, reps: string, load: string, rest = '2:00'): RunExercise {
+  return {
+    name,
+    rest,
+    tempo: null,
+    tempoStr: '',
+    notes: '',
+    sets: Array.from({ length: Math.max(1, sets) }, () => ({
+      load,
+      reps,
+      rpe: '',
+      done: false,
+      warmup: false,
+      sug: '',
+      edited: !!load,
+      tRpe: '',
+      spec: load,
+      rest: '',
+    })),
+  };
+}
+
+/** Pusty trening (bez planu) — ćwiczenia dodaje się w trakcie. */
+export function emptyRun(name: string, today: string, now = Date.now()): Run {
+  return { planId: '', workoutId: '', name, planName: '', weekName: '', date: today, startedAt: now, idx: 0, ex: [] };
+}
+
+/** Dodaje ćwiczenie na końcu treningu i przelicza oznaczenia (A, B, C1…). */
+export function appendExercise(run: Run, e: RunExercise): Run {
+  return { ...run, ex: withLabels([...run.ex, e]), idx: run.ex.length };
+}
+
 function withLabels(ex: RunExercise[]): RunExercise[] {
   const labels = exerciseLabels(ex);
   return ex.map((e, i) => ({ ...e, label: labels[i] }));

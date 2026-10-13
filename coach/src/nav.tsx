@@ -31,6 +31,8 @@ export interface NavValue {
   closeModal: () => void;
   /** Uruchamia tryb zawodnika dla klienta. */
   startAthlete: (clientId: string) => void;
+  /** Trener prowadzi trening 1:1 na żywo (opcjonalnie z wizyty). */
+  startLive: (clientId: string, appointmentId?: string) => void;
 }
 
 export const NavCtx = createContext<NavValue | null>(null);
