@@ -1,0 +1,13 @@
+{
+  "name": "Fitowa / coach",
+  "short_name": "Fitowa",
+  "lang": "pl",
+  "start_url": "/app/",
+  "scope": "/app/",
+  "display": "standalone",
+  "background_color": "#161826",
+  "theme_color": "#161826",
+  "icons": [
+    { "src": "/app/icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

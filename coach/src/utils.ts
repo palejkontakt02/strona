@@ -72,3 +72,8 @@ export function nextSession(sessions: Session[]): Session | undefined {
 export function normalize(s: string): string {
   return s.toLocaleLowerCase('pl-PL').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 }
+
+/** Liczba z polskim przecinkiem dziesiętnym: 97,7 */
+export function formatNum(n: number): string {
+  return n.toLocaleString('pl-PL', { maximumFractionDigits: 1 });
+}

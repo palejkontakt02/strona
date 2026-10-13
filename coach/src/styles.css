@@ -642,6 +642,15 @@ main {
   .bars {
     gap: var(--space-3);
   }
+  .seg {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg button {
+    padding: var(--space-2) var(--space-4);
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 480px) {

@@ -2,7 +2,7 @@ import type { ModalState } from '../components/Modals';
 import { Avatar, Empty, Kpi, Tag } from '../components/ui';
 import type { CoachActions } from '../data/useCoach';
 import type { Client } from '../types';
-import { compareSessions, formatDate, formatMoney, formatShortDate, nextSession } from '../utils';
+import { compareSessions, formatDate, formatMoney, formatNum, formatShortDate, nextSession } from '../utils';
 
 export const DETAIL_TABS = ['Przegląd', 'Plan', 'Postępy', 'Sesje', 'Płatności'] as const;
 export type DetailTab = (typeof DETAIL_TABS)[number];
@@ -59,8 +59,8 @@ function Overview({ client }: { client: Client }) {
       <div className="kpi-grid">
         <Kpi
           label="Waga aktualna"
-          value={client.currentWeight !== undefined ? `${client.currentWeight} kg` : '—'}
-          sub={client.targetWeight !== undefined ? `cel: ${client.targetWeight} kg` : undefined}
+          value={client.currentWeight !== undefined ? `${formatNum(client.currentWeight)} kg` : '—'}
+          sub={client.targetWeight !== undefined ? `cel: ${formatNum(client.targetWeight)} kg` : undefined}
         />
         <Kpi label="Sesje odbyte" value={done} sub="łącznie w historii" />
         <Kpi
@@ -167,7 +167,7 @@ function ProgressTab({ client, openModal }: { client: Client; openModal: (m: Mod
           <div className="card bars" aria-label="Wykres wagi">
             {ms.map((m) => (
               <div className="bar-col" key={m.id}>
-                <span className="bar-value">{m.weight}</span>
+                <span className="bar-value">{formatNum(m.weight)}</span>
                 <div className="bar" style={{ height: `${height(m.weight)}%` }} />
                 <span className="bar-label">{formatShortDate(m.date)}</span>
               </div>
@@ -189,7 +189,7 @@ function ProgressTab({ client, openModal }: { client: Client; openModal: (m: Mod
                 {[...ms].reverse().map((m) => (
                   <tr key={m.id}>
                     <td>{formatDate(m.date)}</td>
-                    <td className="num">{m.weight} kg</td>
+                    <td className="num">{formatNum(m.weight)} kg</td>
                     <td className="num">{m.chest ?? '—'}</td>
                     <td className="num">{m.waist ?? '—'}</td>
                     <td className="num">{m.hips ?? '—'}</td>
