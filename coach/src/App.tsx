@@ -25,7 +25,7 @@ export function App() {
   const [clientTab, setClientTab] = useState<ClientTab>('Przegląd');
   const [modal, setModal] = useState<ModalState | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
-  const [live, setLive] = useState<{ clientId: string; appointmentId?: string } | null>(null);
+  const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string } | null>(null);
   const { db } = useStore();
 
   const go = useCallback((s: Section) => {
@@ -55,9 +55,9 @@ export function App() {
         setAthleteId(id);
         window.scrollTo(0, 0);
       },
-      startLive: (clientId, appointmentId) => {
+      startLive: (clientId, appointmentId, editSessionId) => {
         setModal(null);
-        setLive({ clientId, appointmentId });
+        setLive({ clientId, appointmentId, editSessionId });
         window.scrollTo(0, 0);
       },
     }),
@@ -67,7 +67,7 @@ export function App() {
   if (live) {
     return (
       <NavCtx.Provider value={nav}>
-        <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} onExit={() => setLive(null)} />
+        <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} editSessionId={live.editSessionId} onExit={() => setLive(null)} />
       </NavCtx.Provider>
     );
   }

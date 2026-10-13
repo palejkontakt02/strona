@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
-import type { Checkin, PlanWorkout, Wellness } from '../domain';
+import type { Checkin, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { clientById, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
 import { currentPlan, exerciseLabels, mergeGroups, nextWorkout, planSequence } from '../lib/plan';
-import { buildRun, type Run } from '../lib/run';
+import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
@@ -36,7 +36,7 @@ export function storeRun(id: string, run: Run | null, kind: RunKind = 'run') {
 }
 
 export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: string; onExit: () => void; mode?: 'preview' | 'client' }) {
-  const { db, toast } = useStore();
+  const { db, toast, ask } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
   const [screen, setScreen] = useState<'home' | 'run'>('home');
@@ -53,8 +53,21 @@ export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: s
   const plan = plans.find((p) => p.id === planId) ?? currentPlan(plans);
   const sessions = sessionsOf(db, clientId);
 
+  const begin = (r: Run) => {
+    setRun(r);
+    setScreen('run');
+    window.scrollTo(0, 0);
+  };
+  /** Zastępuje trening w toku tylko po potwierdzeniu. */
+  const replaceRun = async (r: Run) => {
+    if (run && run.ex.some((e) => e.sets.some((x) => x.done)) && !(await ask('Masz rozpoczęty trening. Porzucić go i otworzyć ten?', { confirm: 'Tak' }))) return;
+    begin(r);
+  };
+  const startOwn = () => void replaceRun(emptyRun('Trening własny', todayISO()));
+  const editSession = (s: TrainingSession) => void replaceRun(sessionToRun(s));
+
   const start = (workoutId?: string) => {
-    if (!plan) return toast('Brak planu z treningami.');
+    if (!plan) return startOwn();
     const seq = planSequence(plan);
     const step = workoutId ? seq.find((x) => x.workout.id === workoutId) : nextWorkout(plan, sessions);
     if (!step) return toast('Nie znaleziono treningu w planie.');
@@ -100,7 +113,18 @@ export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: s
           }}
         />
       ) : (
-        <Home clientId={clientId} plan={plan} plans={plans} onPlan={setPlanId} run={run} onStart={start} onResume={() => setScreen('run')} onDiscard={() => setRun(null)} />
+        <Home
+          clientId={clientId}
+          plan={plan}
+          plans={plans}
+          onPlan={setPlanId}
+          run={run}
+          onStart={start}
+          onOwn={startOwn}
+          onEdit={editSession}
+          onResume={() => setScreen('run')}
+          onDiscard={() => setRun(null)}
+        />
       )}
     </div>
   );
@@ -113,6 +137,8 @@ function Home({
   onPlan,
   run,
   onStart,
+  onOwn,
+  onEdit,
   onResume,
   onDiscard,
 }: {
@@ -122,6 +148,8 @@ function Home({
   onPlan: (id: string) => void;
   run: Run | null;
   onStart: (workoutId?: string) => void;
+  onOwn: () => void;
+  onEdit: (s: TrainingSession) => void;
   onResume: () => void;
   onDiscard: () => void;
 }) {
@@ -186,9 +214,19 @@ function Home({
           </button>
         </section>
       ) : (
-        <section className="acard">
-          <p className="muted">Trener nie przygotował jeszcze planu.</p>
+        <section className="acard acard-hero">
+          <span className="eyebrow">Trening własny</span>
+          <h2>Zacznij trening</h2>
+          <p className="muted small">Trener nie przygotował jeszcze planu — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.</p>
+          <button className="btn btn-primary btn-lg" onClick={onOwn}>
+            <Icon name="play" /> Start
+          </button>
         </section>
+      )}
+      {!run && nx && (
+        <button className="btn btn-ghost btn-block own-btn" onClick={onOwn}>
+          + Trening własny (poza planem)
+        </button>
       )}
 
       <Upcoming clientId={clientId} />
@@ -215,7 +253,7 @@ function Home({
 
       <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={onStart} />
 
-      <History clientId={clientId} />
+      <History clientId={clientId} onEdit={onEdit} />
     </div>
   );
 }

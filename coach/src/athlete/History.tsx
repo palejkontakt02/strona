@@ -38,7 +38,7 @@ export function Upcoming({ clientId }: { clientId: string }) {
 }
 
 /** Historia odbytych treningów ze szczegółami serii. */
-export function History({ clientId }: { clientId: string }) {
+export function History({ clientId, onEdit }: { clientId: string; onEdit?: (s: TrainingSession) => void }) {
   const { db } = useStore();
   const sessions = sessionsOf(db, clientId);
   const [limit, setLimit] = useState(8);
@@ -75,12 +75,25 @@ export function History({ clientId }: { clientId: string }) {
           Pokaż starsze
         </button>
       )}
-      {open && <SessionSheet s={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <SessionSheet
+          s={open}
+          onClose={() => setOpen(null)}
+          onEdit={
+            onEdit &&
+            (() => {
+              const s = open;
+              setOpen(null);
+              onEdit(s);
+            })
+          }
+        />
+      )}
     </section>
   );
 }
 
-function SessionSheet({ s, onClose }: { s: TrainingSession; onClose: () => void }) {
+function SessionSheet({ s, onClose, onEdit }: { s: TrainingSession; onClose: () => void; onEdit?: () => void }) {
   const ton = tonnage(s);
   const load = sessionLoad(s);
   return (
@@ -154,6 +167,11 @@ function SessionSheet({ s, onClose }: { s: TrainingSession; onClose: () => void 
             <span className="eyebrow">Notatka</span>
             <p>{s.notes}</p>
           </div>
+        )}
+        {onEdit && (
+          <button className="btn btn-secondary btn-block" onClick={onEdit}>
+            ✎ Popraw ten trening
+          </button>
         )}
       </div>
     </div>

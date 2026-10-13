@@ -50,6 +50,8 @@ export interface Run {
   startedAt: number;
   idx: number;
   ex: RunExercise[];
+  /** Edycja zapisanego treningu (zamiast nowego). */
+  editSessionId?: string;
 }
 
 const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;
@@ -319,4 +321,46 @@ export function applyRunLayout(workout: PlanWorkout, run: Run, newId: () => stri
     return { ...(base ?? { id: newId(), notes: '' }), name: e.name, rest: e.rest, linked: e.linked || undefined, groups };
   });
   return { ...workout, exercises };
+}
+
+/**
+ * Otwiera zapisany trening do poprawek seria po serii: serie z zapisu (setsLog) albo
+ * z podsumowania (serie × powt. @kg), wszystkie zaliczone; bloki odtwarzane z oznaczeń (B1, B2…).
+ */
+export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
+  const ex: RunExercise[] = s.exercises.map((e) => {
+    const base = { done: true, sug: '', edited: true, tRpe: '', spec: '', rest: '' };
+    const sets: RunSet[] = e.setsLog?.length
+      ? e.setsLog.map((x) => ({
+          ...base,
+          load: x.load != null ? String(x.load) : '',
+          reps: x.reps != null ? String(x.reps) : '',
+          rpe: x.rpe != null ? String(x.rpe) : '',
+          warmup: !!x.warmup,
+          label: x.label as SetType | undefined,
+        }))
+      : Array.from({ length: repsN(e.sets) || 1 }, () => ({ ...base, load: e.load ?? '', reps: e.reps ?? '', rpe: e.rpe ?? '', warmup: false }));
+    const m = e.label?.match(/^[A-Z]+(\d+)$/);
+    return {
+      name: e.name,
+      linked: m && m[1] !== '1' ? true : undefined,
+      rest: e.rest ?? '',
+      tempo: parseTempo(e.notes),
+      tempoStr: (String(e.notes || '').match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
+      notes: e.notes ?? '',
+      sets,
+    };
+  });
+  return {
+    planId: s.planId ?? '',
+    workoutId: s.workoutId ?? '',
+    name: s.workoutName || 'Trening',
+    planName: '',
+    weekName: '',
+    date: s.date,
+    startedAt: now - (s.duration ?? 0) * 60000,
+    idx: 0,
+    ex: withLabels(ex),
+    editSessionId: s.id,
+  };
 }

@@ -4,7 +4,7 @@ import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
 import { savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { uid } from '../format';
+import { fmtDay, uid } from '../format';
 import { defaultCharge, packageStatus } from '../lib/billing';
 import { num, repsN } from '../lib/parse';
 import {
@@ -111,9 +111,30 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     if (br.rest) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
   };
 
+  const editing = run.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
+
   const save = async () => {
     if (!finish || finish.srpe === '') return;
     const sessions = sessionsOf(db, client.id);
+    if (editing) {
+      const updated: TrainingSession = {
+        ...editing,
+        workoutName: run.name,
+        charge: trainer ? finish.charge : editing.charge,
+        duration: parseInt(finish.duration, 10) || undefined,
+        srpe: Number(finish.srpe),
+        pain: finish.pain === '' ? undefined : Number(finish.pain),
+        notes: finish.notes.trim() || undefined,
+        locationId: (trainer ? finish.locationId : editing.locationId) || undefined,
+        exercises: runToExercises(run),
+      };
+      if (updated.exercises.length === 0) return toast('Zostaw przynajmniej jedną zaliczoną serię (✓).');
+      const { changes } = saveSession(db, { session: updated, isNew: false });
+      await apply(changes, 'Zapisano zmiany w treningu.');
+      setFinish(null);
+      onSaved();
+      return;
+    }
     const today = run.date;
     const check = client.checkins.find((c) => c.date === today);
     const session: TrainingSession = {
@@ -141,6 +162,19 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
 
   const openFinish = () => {
     const charge = defaultCharge(client, sessionsOf(db, client.id));
+    if (editing) {
+      setFinish({
+        srpe: editing.srpe != null ? String(editing.srpe) : '',
+        pain: editing.pain != null ? String(editing.pain) : '',
+        duration: editing.duration != null ? String(editing.duration) : '',
+        notes: editing.notes ?? '',
+        charge: editing.charge,
+        amount: '',
+        paidNow: true,
+        locationId: editing.locationId ?? '',
+      });
+      return;
+    }
     setFinish({
       srpe: '',
       pain: '',
@@ -294,7 +328,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           {homeLabel}
         </button>
         <span className="actions">
-          {trainer && run.ex.length > 0 && (
+          {run.ex.length > 0 && (
             <button className="btn btn-secondary btn-sm" onClick={() => setLayoutOpen(true)}>
               ✎ Układ
             </button>
@@ -307,7 +341,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       <header className="player-head">
         <h1>{run.name}</h1>
         <p className="muted small">
-          {[run.planName, run.weekName].filter(Boolean).join(' · ')} · {doneSets}/{totalSets} serii
+          {editing ? `Poprawki treningu z ${fmtDay(run.date)}` : [run.planName, run.weekName].filter(Boolean).join(' · ')} · {doneSets}/{totalSets} serii
         </p>
       </header>
       <div className="segs">
@@ -359,7 +393,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         </button>
         {last ? (
           <button className="btn btn-primary btn-lg" onClick={openFinish}>
-            Zakończ trening
+            {editing ? 'Zapisz zmiany' : 'Zakończ trening'}
           </button>
         ) : (
           <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
@@ -376,6 +410,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       {rest && <RestBar rest={rest} setRest={setRest} />}
       {layoutOpen && (
         <LayoutSheet
+          canSavePlan={trainer}
           run={run}
           setRun={setRun}
           onClose={() => setLayoutOpen(false)}
@@ -440,7 +475,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
                     })()}
                   </p>
                 )}
-                {finish.charge === 'pojedyncza' && (
+                {finish.charge === 'pojedyncza' && !editing && (
                   <div className="between">
                     <label className="field grow">
                       <span>Kwota (zł)</span>
@@ -454,7 +489,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
               </>
             )}
             <button className="btn btn-primary btn-lg btn-block" disabled={finish.srpe === ''} onClick={save}>
-              Zapisz trening
+              {editing ? 'Zapisz zmiany' : 'Zapisz trening'}
             </button>
             <button className="btn btn-ghost btn-block" onClick={() => setFinish(null)}>
               Wróć do ćwiczeń
@@ -659,7 +694,7 @@ function AddExercise({ onAdd, onCancel, canLink }: { onAdd: (name: string, sets:
 }
 
 /** Układ treningu w trakcie: kolejność, nazwy, przerwy, łączenie w bloki, usuwanie; opcjonalnie zapis do planu. */
-function LayoutSheet({ run, setRun, onClose, onAdd }: { run: Run; setRun: (r: Run) => void; onClose: () => void; onAdd: () => void }) {
+function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; setRun: (r: Run) => void; onClose: () => void; onAdd: () => void; canSavePlan: boolean }) {
   const { db, apply, ask } = useStore();
   const plan = db.plans.find((p) => p.id === run.planId);
   const workout = plan?.weeks.flatMap((w) => w.workouts).find((k) => k.id === run.workoutId);
@@ -712,7 +747,7 @@ function LayoutSheet({ run, setRun, onClose, onAdd }: { run: Run; setRun: (r: Ru
         <button className="btn btn-secondary btn-block" onClick={onAdd}>
           + Dodaj ćwiczenie
         </button>
-        {plan && workout && (
+        {canSavePlan && plan && workout && (
           <button className="btn btn-ghost btn-block" onClick={saveToPlan}>
             Zapisz ten układ także w planie
           </button>

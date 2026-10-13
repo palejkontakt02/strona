@@ -170,3 +170,34 @@ describe('live layout editing', () => {
     expect(out.exercises[1].groups).toHaveLength(2);
   });
 });
+
+describe('editing a saved session', () => {
+  it('rebuilds sets and blocks, and round-trips back to the same exercises', async () => {
+    const { sessionToRun, runToExercises } = await import('./run');
+    const s: TrainingSession = {
+      id: 's1',
+      clientId: 'c',
+      date: '2026-10-10',
+      charge: 'pakiet',
+      duration: 60,
+      exercises: [
+        { name: 'Przysiad', label: 'A', setsLog: [{ load: 60, reps: 5, warmup: true }, { load: 100, reps: 5, rpe: 8 }] },
+        { name: 'Podciąganie', label: 'B1', sets: '3', reps: '6', load: '', rpe: '8' },
+        { name: 'Pompki', label: 'B2', sets: '2', reps: '12' },
+      ],
+    };
+    const run = sessionToRun(s, 1_000_000_000);
+    expect(run.editSessionId).toBe('s1');
+    expect(run.ex.map((e) => e.label)).toEqual(['A', 'B1', 'B2']);
+    expect(run.ex[1].sets).toHaveLength(3);
+    expect(run.ex.every((e) => e.sets.every((x) => x.done))).toBe(true);
+    expect(run.startedAt).toBe(1_000_000_000 - 60 * 60000);
+    const back = runToExercises(run);
+    expect(back[0].setsLog).toEqual([
+      { load: 60, reps: 5, rpe: undefined, warmup: true, label: undefined },
+      { load: 100, reps: 5, rpe: 8, warmup: undefined, label: undefined },
+    ]);
+    expect(back[1]).toMatchObject({ name: 'Podciąganie', label: 'B1', sets: '3', reps: '6', rpe: '8' });
+    expect(back[2].label).toBe('B2');
+  });
+});

@@ -5,7 +5,7 @@ import { useStore } from '../data/store';
 import { fmtDay } from '../format';
 import { todayISO } from '../lib/dates';
 import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
-import { buildRun, emptyRun, type Run } from '../lib/run';
+import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { loadRun, storeRun } from './AthleteApp';
 import { Player } from './Player';
 
@@ -14,10 +14,13 @@ import { Player } from './Player';
  * zapis seria po serii, rozliczenie przy zakończeniu. Postęp zostaje w pamięci urządzenia,
  * więc można wrócić do panelu i kontynuować.
  */
-export function LiveSession({ clientId, appointmentId, onExit }: { clientId: string; appointmentId?: string; onExit: () => void }) {
+export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: { clientId: string; appointmentId?: string; editSessionId?: string; onExit: () => void }) {
   const { db, toast, ask } = useStore();
   const client = clientById(db, clientId);
-  const [run, setRun] = useState<Run | null>(() => loadRun(clientId, 'live'));
+  const [run, setRun] = useState<Run | null>(() => {
+    const s = editSessionId ? db.sessions.find((x) => x.id === editSessionId) : undefined;
+    return s ? sessionToRun(s) : loadRun(clientId, 'live');
+  });
   const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => storeRun(clientId, run, 'live'), [clientId, run]);
@@ -62,9 +65,17 @@ export function LiveSession({ clientId, appointmentId, onExit }: { clientId: str
           client={client}
           run={run}
           setRun={setRun}
-          homeLabel="‹ Zmień trening"
+          homeLabel={run.editSessionId ? '‹ Anuluj poprawki' : '‹ Zmień trening'}
           appointmentId={appointmentId}
           onHome={async () => {
+            if (run.editSessionId) {
+              if (await ask('Porzucić poprawki? Zapisany trening zostanie bez zmian.', { confirm: 'Porzuć' })) {
+                storeRun(clientId, null, 'live');
+                setRun(null);
+                onExit();
+              }
+              return;
+            }
             const started = run.ex.some((e) => e.sets.some((s) => s.done));
             if (!started || (await ask('Porzucić ten trening i wybrać inny? Zaliczone serie nie zostaną zapisane.', { confirm: 'Porzuć' }))) setRun(null);
           }}
