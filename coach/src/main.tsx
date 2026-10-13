@@ -11,3 +11,11 @@ createRoot(document.getElementById('root')!).render(
     </StoreProvider>
   </StrictMode>,
 );
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {
+      // bez trybu offline — aplikacja działa normalnie
+    });
+  });
+}
