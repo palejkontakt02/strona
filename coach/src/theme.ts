@@ -1,9 +1,9 @@
-/** Motywy kolorystyczne aplikacji (zapisywane na tym urządzeniu). */
+/** Motywy kolorystyczne aplikacji (zapisywane na tym urządzeniu). Domyślny: ciemny „Morski”. */
 export const PALETTES = [
-  { id: 'jasny', name: 'Jasny', bg: '#f3f5f4', accent: '#1f8a78' },
   { id: 'morski', name: 'Morski', bg: '#0f1b1e', accent: '#3cc4ad' },
   { id: 'grafit', name: 'Grafit', bg: '#19191b', accent: '#f0a43a' },
   { id: 'fiolet', name: 'Fiolet', bg: '#161826', accent: '#9184d9' },
+  { id: 'jasny', name: 'Jasny', bg: '#f3f5f4', accent: '#1f8a78' },
 ] as const;
 export type PaletteId = (typeof PALETTES)[number]['id'];
 
@@ -16,7 +16,7 @@ export function getPalette(): PaletteId {
   } catch {
     // brak localStorage — motyw domyślny
   }
-  return 'jasny';
+  return 'morski';
 }
 
 export function applyPalette(id: PaletteId) {

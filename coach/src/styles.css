@@ -1,6 +1,7 @@
 /* Fitowa / coach — styl Fitowa (ciemny, fiolet, Inter), układ panelu trenera */
 :root {
   --font-body: 'Inter', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
   --font-heading-weight: 500;
   --radius-sm: 4px;
   --radius-md: 8px;
@@ -14,7 +15,7 @@
   --topbar-h: 56px;
   --bottombar-h: 64px;
 }
-/* Motywy kolorystyczne — wybór w ustawieniach (data-palette na <html>). Domyślny: jasny. */
+/* Motywy kolorystyczne — wybór w ustawieniach (data-palette na <html>). Domyślny: „morski” (ciemny), ustawiany przy starcie. */
 :root {
   --color-bg: #f3f5f4;
   --color-surface: #ffffff;
@@ -2556,5 +2557,245 @@ i.line-muted {
 @media (max-width: 900px) {
   .kpi-grid-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* =========================================================
+   Estetyka: sportowy krój do nagłówków i liczb, głębia kart,
+   poświata akcentu w tle. Działa w każdym motywie (tokeny).
+   ========================================================= */
+body {
+  background:
+    radial-gradient(900px 520px at 8% -8%, color-mix(in srgb, var(--color-accent) 13%, transparent), transparent 70%),
+    radial-gradient(700px 500px at 100% 0%, color-mix(in srgb, var(--color-cyan) 7%, transparent), transparent 70%),
+    var(--color-bg);
+  background-attachment: fixed;
+}
+h1,
+h2,
+.kpi-value,
+.big,
+.row-time,
+.cal-title,
+.tile-time,
+.restbar b,
+.tbig .n,
+.month-num,
+.week-day header strong,
+.sgrid .sn {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+h1 {
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1.05;
+}
+h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.page-head h2,
+.toolbar h3 {
+  text-wrap: balance;
+}
+.toolbar h3,
+.card-head h4,
+.form-section,
+.acard h3 {
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-neutral-400);
+}
+
+/* logo */
+.logo {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.logo span {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 1.15rem;
+}
+
+/* nawigacja: aktywna pozycja z podkreśleniem */
+.nav-links button {
+  position: relative;
+}
+.nav-links button.active::after {
+  content: '';
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: -9px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+.topbar {
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+/* karty z głębią */
+.card,
+.acard,
+.week-day,
+.month-cell {
+  border: 1px solid color-mix(in srgb, var(--color-text) 7%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-text) 3%, transparent), transparent 120px),
+    var(--color-surface);
+}
+.acard-hero {
+  background:
+    radial-gradient(420px 220px at 100% 0%, color-mix(in srgb, var(--color-accent) 30%, transparent), transparent 70%),
+    linear-gradient(135deg, var(--color-accent-900), var(--color-surface) 80%);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* KPI jak tablica wyników */
+.kpi {
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 42px;
+  height: 3px;
+  border-radius: 0 0 3px 0;
+  background: var(--color-accent);
+  opacity: 0.8;
+}
+.kpi-danger::before {
+  background: var(--color-danger);
+}
+.kpi-warn::before {
+  background: var(--color-warn);
+}
+.kpi-ok::before {
+  background: var(--color-ok);
+}
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.kpi-value {
+  font-size: 2.2rem;
+  font-weight: 600;
+  line-height: 1.05;
+  margin: var(--space-3) 0 var(--space-1);
+}
+.row-time {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* przyciski */
+.btn-primary {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 88%, white), var(--color-accent));
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-400);
+}
+.btn-lg {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.seg {
+  border: 1px solid color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+/* lista klientów i zakładki */
+.client-card.selected {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent),
+    var(--color-surface);
+}
+.avatar {
+  background: linear-gradient(140deg, var(--color-accent-800), var(--color-accent-900));
+  color: var(--color-accent-200);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.detail-header h2 {
+  font-size: 2.2rem;
+}
+
+/* tryb treningu */
+.player-head h1 {
+  font-size: 2.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.ath-hello h1 {
+  font-size: 2.4rem;
+}
+.run-ex-head h2 {
+  font-size: 1.7rem;
+}
+.sgrid input {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.sgrid .sn {
+  font-size: 1.15rem;
+}
+.restbar b {
+  font-size: 1.9rem;
+  font-weight: 600;
+}
+.tbig .n {
+  font-size: 6rem;
+}
+.segs button {
+  height: 5px;
+}
+.segs button.cur {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+/* wykresy: miękki blask aktywnej serii */
+.chart .bar-now {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 55%, transparent));
+}
+
+@media (max-width: 900px) {
+  h1 {
+    font-size: 1.9rem;
+  }
+  .page-head h2 {
+    font-size: 1.9rem;
+  }
+  .kpi-value {
+    font-size: 1.75rem;
+  }
+  .logo {
+    font-size: 1.3rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade {
+    animation: none;
   }
 }
