@@ -1,53 +1,193 @@
-import type { ModalState } from '../components/Modals';
-import { Empty, Tag } from '../components/ui';
-import type { Client, Session } from '../types';
-import { compareSessions, formatLongDate, todayISO } from '../utils';
+import { useState } from 'react';
+import { Icon, Seg, Tag } from '../components/ui';
+import type { Appointment, AppointmentStatus, ISODate, TrainingSession } from '../domain';
+import { clientById } from '../data/ops';
+import { useStore } from '../data/store';
+import { fmtMonth, fmtShort, fmtWeekday } from '../format';
+import { clientHue } from '../lib/calendar';
+import { addDays, todayISO, weekStart } from '../lib/dates';
+import { useNav } from '../nav';
 
-interface Props {
-  clients: Client[];
-  openModal: (m: ModalState) => void;
-  onOpenClient: (id: string) => void;
+export const APPT_STATUS: Record<AppointmentStatus, { label: string; tone: 'neutral' | 'ok' | 'muted' | 'warn' }> = {
+  planned: { label: 'Zaplanowana', tone: 'neutral' },
+  done: { label: 'Odbyta', tone: 'ok' },
+  cancel: { label: 'Odwołana', tone: 'muted' },
+  noshow: { label: 'Nieobecność', tone: 'warn' },
+};
+
+export function ApptStatusTag({ status }: { status: AppointmentStatus }) {
+  const s = APPT_STATUS[status];
+  return <Tag tone={s.tone}>{s.label}</Tag>;
 }
 
-export function CalendarView({ clients, openModal, onOpenClient }: Props) {
-  const today = todayISO();
-  const upcoming: (Session & { client: Client })[] = clients
-    .flatMap((client) => client.sessions.map((s) => ({ ...s, client })))
-    .filter((s) => s.status === 'Zaplanowana' && s.date >= today)
-    .sort(compareSessions);
+export const hueStyle = (clientId: string) => ({ '--hue': clientHue(clientId) }) as React.CSSProperties;
 
-  const byDay = new Map<string, typeof upcoming>();
-  for (const s of upcoming) byDay.set(s.date, [...(byDay.get(s.date) ?? []), s]);
+type Mode = 'Tydzień' | 'Miesiąc';
+
+export function CalendarView() {
+  const { db } = useStore();
+  const { openModal } = useNav();
+  const today = todayISO();
+  const [mode, setMode] = useState<Mode>('Tydzień');
+  const [anchor, setAnchor] = useState<ISODate>(today);
+
+  const shift = (dir: number) => {
+    if (mode === 'Tydzień') setAnchor(addDays(anchor, 7 * dir));
+    else {
+      const d = new Date(anchor + 'T12:00:00');
+      d.setDate(1);
+      d.setMonth(d.getMonth() + dir);
+      setAnchor(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`);
+    }
+  };
+
+  const apptsOn = (date: ISODate) => db.appointments.filter((a) => a.date === date).sort((a, b) => a.time.localeCompare(b.time));
+  const linked = new Set(db.appointments.map((a) => a.sessionId).filter(Boolean));
+  const looseOn = (date: ISODate) => db.sessions.filter((s) => s.date === date && !linked.has(s.id));
+
+  const ws = weekStart(anchor);
+  const title =
+    mode === 'Tydzień' ? `${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}` : fmtMonth(anchor.slice(0, 7));
 
   return (
-    <div className="page fade">
-      <div className="toolbar">
-        <h2>Nadchodzące sesje</h2>
-        <button className="btn btn-primary" onClick={() => openModal({ type: 'session' })}>
-          + Zaplanuj sesję
-        </button>
-      </div>
-      {upcoming.length === 0 && <Empty>Brak zaplanowanych sesji.</Empty>}
-      {[...byDay].map(([date, sessions]) => (
-        <section className="day-group" key={date}>
-          <h4 className="day-title">
-            {date === today ? 'Dziś · ' : ''}
-            {formatLongDate(date)}
-          </h4>
-          <div className="card">
-            {sessions.map((s) => (
-              <div className="cal-row" key={s.id}>
-                <span className="cal-time">{s.time}</span>
-                <button className="link" onClick={() => onOpenClient(s.client.id)}>
-                  {s.client.name}
-                </button>
-                <span className="muted">{s.type}</span>
-                <Tag>{s.status}</Tag>
-              </div>
-            ))}
+    <div className="page page-wide fade">
+      <div className="page-head">
+        <h2>Kalendarz</h2>
+        <div className="cal-controls">
+          <Seg options={['Tydzień', 'Miesiąc'] as const} value={mode} onChange={setMode} label="Widok" />
+          <div className="cal-nav">
+            <button className="icon-btn" aria-label="Poprzedni" onClick={() => shift(-1)}>
+              <Icon name="chevL" />
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setAnchor(today)}>
+              Dziś
+            </button>
+            <button className="icon-btn" aria-label="Następny" onClick={() => shift(1)}>
+              <Icon name="chevR" />
+            </button>
+            <strong className="cal-title first-cap">{title}</strong>
           </div>
-        </section>
+        </div>
+      </div>
+
+      {mode === 'Tydzień' ? (
+        <div className="week">
+          {Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => (
+            <section key={date} className={`week-day ${date === today ? 'is-today' : ''}`}>
+              <header>
+                <span className="first-cap">{fmtWeekday(date)}</span> <strong>{fmtShort(date)}</strong>
+                <button className="icon-btn icon-btn-sm" aria-label={`Dodaj wizytę ${fmtShort(date)}`} onClick={() => openModal({ kind: 'appt', date })}>
+                  <Icon name="plus" size={14} />
+                </button>
+              </header>
+              <div className="week-items">
+                {apptsOn(date).map((a) => (
+                  <ApptTile key={a.id} a={a} />
+                ))}
+                {looseOn(date).map((s) => (
+                  <SessionTile key={s.id} s={s} />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <MonthGrid
+          anchor={anchor}
+          today={today}
+          apptsOn={apptsOn}
+          looseOn={looseOn}
+          onPickDay={(d) => {
+            setAnchor(d);
+            setMode('Tydzień');
+          }}
+        />
+      )}
+      <p className="muted small legend-note">
+        Kolor = podopieczny · przerywana ramka = trening zapisany bez wizyty
+      </p>
+    </div>
+  );
+}
+
+function ApptTile({ a }: { a: Appointment }) {
+  const { db } = useStore();
+  const { openModal } = useNav();
+  const c = clientById(db, a.clientId);
+  return (
+    <button className={`tile tile-${a.status}`} style={hueStyle(a.clientId)} onClick={() => openModal({ kind: 'appt', appt: a })}>
+      <span className="tile-time">
+        {a.time}
+        {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
+      </span>
+      <span className="tile-name">{c?.name ?? '—'}</span>
+      {a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>}
+    </button>
+  );
+}
+
+function SessionTile({ s }: { s: TrainingSession }) {
+  const { db } = useStore();
+  const { openModal } = useNav();
+  const c = clientById(db, s.clientId);
+  return (
+    <button className="tile tile-loose" style={hueStyle(s.clientId)} onClick={() => openModal({ kind: 'session', session: s })}>
+      <span className="tile-time">trening</span>
+      <span className="tile-name">{c?.name ?? '—'}</span>
+      <span className="tile-status">{s.workoutName}</span>
+    </button>
+  );
+}
+
+function MonthGrid({
+  anchor,
+  today,
+  apptsOn,
+  looseOn,
+  onPickDay,
+}: {
+  anchor: ISODate;
+  today: ISODate;
+  apptsOn: (d: ISODate) => Appointment[];
+  looseOn: (d: ISODate) => TrainingSession[];
+  onPickDay: (d: ISODate) => void;
+}) {
+  const { db } = useStore();
+  const first = anchor.slice(0, 7) + '-01';
+  const start = weekStart(first);
+  const days: ISODate[] = [];
+  for (let d = start; days.length < 42; d = addDays(d, 1)) days.push(d);
+  while (days.length > 35 && days[days.length - 7].slice(0, 7) !== first.slice(0, 7)) days.splice(-7);
+  return (
+    <div className="month">
+      {['pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nd'].map((d) => (
+        <div key={d} className="month-dow">
+          {d}
+        </div>
       ))}
+      {days.map((d) => {
+        const items = apptsOn(d).filter((a) => a.status !== 'cancel');
+        const loose = looseOn(d);
+        return (
+          <button key={d} className={`month-cell ${d.slice(0, 7) !== first.slice(0, 7) ? 'other' : ''} ${d === today ? 'is-today' : ''}`} onClick={() => onPickDay(d)}>
+            <span className="month-num">{Number(d.slice(8))}</span>
+            {items.slice(0, 3).map((a) => (
+              <span key={a.id} className={`month-item tile-${a.status}`} style={hueStyle(a.clientId)}>
+                <span className="hide-mobile">{a.time} </span>
+                {clientById(db, a.clientId)?.name.split(' ')[0]}
+              </span>
+            ))}
+            {loose.slice(0, 1).map((s) => (
+              <span key={s.id} className="month-item tile-loose" style={hueStyle(s.clientId)}>
+                {clientById(db, s.clientId)?.name.split(' ')[0]}
+              </span>
+            ))}
+            {items.length + loose.length > Math.min(items.length, 3) + Math.min(loose.length, 1) && (
+              <span className="month-more">+{items.length + loose.length - Math.min(items.length, 3) - Math.min(loose.length, 1)}</span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

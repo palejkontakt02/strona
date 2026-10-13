@@ -1,93 +1,120 @@
-import { useEffect, useState } from 'react';
-import { ModalHost, type ModalState } from './components/Modals';
-import { useCoach } from './data/useCoach';
+import { useCallback, useMemo, useState } from 'react';
+import { Icon } from './components/ui';
+import { ModalHost } from './modals/ModalHost';
+import { CLIENT_TABS, NavCtx, SECTIONS, type ClientTab, type ModalState, type NavValue, type Section } from './nav';
+import { AthleteApp } from './athlete/AthleteApp';
 import { CalendarView } from './views/CalendarView';
-import type { DetailTab } from './views/ClientDetail';
 import { ClientsView } from './views/ClientsView';
+import { Dashboard } from './views/Dashboard';
+import { LibraryView } from './views/LibraryView';
 import { PaymentsView } from './views/PaymentsView';
 
-const SECTIONS = ['Podopieczni', 'Kalendarz', 'Płatności'] as const;
-type Section = (typeof SECTIONS)[number];
+const ICON: Record<Section, string> = {
+  Pulpit: 'dash',
+  Kalendarz: 'cal',
+  Klienci: 'users',
+  Płatności: 'money',
+  Ćwiczenia: 'lib',
+};
 
 export function App() {
-  const { clients, actions } = useCoach();
-  const [section, setSection] = useState<Section>('Podopieczni');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<DetailTab>('Przegląd');
-  const [mobileDetail, setMobileDetail] = useState(false);
+  const [section, setSection] = useState<Section>('Pulpit');
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientTab, setClientTab] = useState<ClientTab>('Przegląd');
   const [modal, setModal] = useState<ModalState | null>(null);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
 
-  // Na starcie zaznacz pierwszego podopiecznego (alfabetycznie), jak w prototypie.
-  useEffect(() => {
-    if (clients && !selectedId && clients.length > 0) {
-      setSelectedId([...clients].sort((a, b) => a.name.localeCompare(b.name, 'pl'))[0].id);
-    }
-  }, [clients, selectedId]);
-
-  const openClient = (id: string, t: DetailTab) => {
-    setSection('Podopieczni');
-    setSelectedId(id);
-    setTab(t);
-    setMobileDetail(true);
+  const go = useCallback((s: Section) => {
+    setSection(s);
+    if (s !== 'Klienci') setClientId(null);
     window.scrollTo(0, 0);
-  };
+  }, []);
 
-  if (!clients) return null;
+  const nav = useMemo<NavValue>(
+    () => ({
+      section,
+      go,
+      clientId,
+      clientTab,
+      openClient: (id, tab = 'Przegląd') => {
+        setSection('Klienci');
+        setClientId(id);
+        setClientTab(CLIENT_TABS.includes(tab) ? tab : 'Przegląd');
+        window.scrollTo(0, 0);
+      },
+      setClientTab,
+      closeClient: () => setClientId(null),
+      openModal: setModal,
+      closeModal: () => setModal(null),
+      startAthlete: (id) => {
+        setModal(null);
+        setAthleteId(id);
+        window.scrollTo(0, 0);
+      },
+    }),
+    [section, go, clientId, clientTab],
+  );
+
+  if (athleteId) {
+    return (
+      <NavCtx.Provider value={nav}>
+        <AthleteApp clientId={athleteId} onExit={() => setAthleteId(null)} />
+      </NavCtx.Provider>
+    );
+  }
 
   return (
-    <>
+    <NavCtx.Provider value={nav}>
       <nav className="topbar">
-        <div className="logo">
+        <button className="logo" onClick={() => go('Pulpit')}>
           Fitowa <span>/ coach</span>
-        </div>
+        </button>
         <div className="nav-links">
           {SECTIONS.map((s) => (
-            <button key={s} className={section === s ? 'active' : ''} onClick={() => setSection(s)}>
+            <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
               {s}
             </button>
           ))}
         </div>
+        <span className="grow" />
+        <button className="btn btn-primary btn-sm hide-mobile" onClick={() => setModal({ kind: 'appt' })}>
+          <Icon name="plus" size={16} /> Dodaj wizytę
+        </button>
+        <button className="icon-btn show-mobile" aria-label="Ćwiczenia" title="Ćwiczenia" onClick={() => go('Ćwiczenia')}>
+          <Icon name="lib" />
+        </button>
+        <button className="icon-btn" aria-label="Dane i ustawienia" title="Dane i ustawienia" onClick={() => setModal({ kind: 'data' })}>
+          <Icon name="settings" />
+        </button>
       </nav>
 
-      <main>
-        {section === 'Podopieczni' && (
-          <ClientsView
-            clients={clients}
-            selectedId={selectedId}
-            onSelect={(id) => {
-              setSelectedId(id);
-              setMobileDetail(true);
-            }}
-            tab={tab}
-            onTab={setTab}
-            mobileDetail={mobileDetail}
-            onBack={() => setMobileDetail(false)}
-            actions={actions}
-            openModal={setModal}
-          />
-        )}
-        {section === 'Kalendarz' && (
-          <CalendarView clients={clients} openModal={setModal} onOpenClient={(id) => openClient(id, 'Sesje')} />
-        )}
-        {section === 'Płatności' && (
-          <PaymentsView
-            clients={clients}
-            actions={actions}
-            openModal={setModal}
-            onOpenClient={(id) => openClient(id, 'Płatności')}
-          />
-        )}
+      <main className="main">
+        {section === 'Pulpit' && <Dashboard />}
+        {section === 'Kalendarz' && <CalendarView />}
+        {section === 'Klienci' && <ClientsView />}
+        {section === 'Płatności' && <PaymentsView />}
+        {section === 'Ćwiczenia' && <LibraryView />}
       </main>
 
-      {modal && (
-        <ModalHost
-          modal={modal}
-          clients={clients}
-          actions={actions}
-          onClose={() => setModal(null)}
-          onClientCreated={(id) => openClient(id, 'Przegląd')}
-        />
-      )}
-    </>
+      <nav className="bottombar" aria-label="Menu">
+        {SECTIONS.slice(0, 2).map((s) => (
+          <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
+            <Icon name={ICON[s]} size={20} />
+            <span>{s}</span>
+          </button>
+        ))}
+        <button className="fab" aria-label="Dodaj wizytę" onClick={() => setModal({ kind: 'appt' })}>
+          <Icon name="plus" size={26} />
+        </button>
+        {SECTIONS.slice(2, 4).map((s) => (
+          <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
+            <Icon name={ICON[s]} size={20} />
+            <span>{s}</span>
+          </button>
+        ))}
+      </nav>
+
+      {modal && <ModalHost modal={modal} />}
+    </NavCtx.Provider>
   );
 }

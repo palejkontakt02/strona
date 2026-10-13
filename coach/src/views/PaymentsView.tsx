@@ -1,48 +1,61 @@
 import { useState } from 'react';
-import type { ModalState } from '../components/Modals';
-import { Empty, Kpi, Tag } from '../components/ui';
-import type { CoachActions } from '../data/useCoach';
-import type { Client } from '../types';
-import { formatDate, formatMoney } from '../utils';
-import { PaymentToggle } from './ClientDetail';
+import { Empty, Kpi, Seg, Tag } from '../components/ui';
+import { allPayments, paymentLabel, setPaymentStatus } from '../data/ops';
+import { useStore } from '../data/store';
+import { fmtDate, normalize, pln } from '../format';
+import { isOverdue } from '../lib/billing';
+import { todayISO } from '../lib/dates';
+import { useNav } from '../nav';
 
-const FILTERS = ['Wszystkie', 'Zaległe', 'Opłacone'] as const;
-type Filter = (typeof FILTERS)[number];
+const FILTERS = ['Wszystkie', 'Do zapłaty', 'Zaległe', 'Opłacone'] as const;
+const TYPES = ['Wszystkie typy', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
+const TYPE_KEY = { Pakiety: 'pakiet', Abonamenty: 'abonament', Sesje: 'pojedyncza' } as const;
 
-interface Props {
-  clients: Client[];
-  actions: CoachActions;
-  openModal: (m: ModalState) => void;
-  onOpenClient: (id: string) => void;
-}
+export function PaymentsView() {
+  const { db, apply } = useStore();
+  const { openClient, openModal } = useNav();
+  const today = todayISO();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Wszystkie');
+  const [type, setType] = useState<(typeof TYPES)[number]>('Wszystkie typy');
+  const [q, setQ] = useState('');
+  const all = allPayments(db);
+  const month = today.slice(0, 7);
+  const overdue = all.filter((p) => isOverdue(p, today));
+  const unpaid = all.filter((p) => p.status !== 'paid');
 
-export function PaymentsView({ clients, actions, openModal, onOpenClient }: Props) {
-  const [filter, setFilter] = useState<Filter>('Wszystkie');
-  const all = clients
-    .flatMap((client) => client.payments.map((p) => ({ ...p, client })))
-    .sort((a, b) => b.date.localeCompare(a.date) || a.client.name.localeCompare(b.client.name, 'pl'));
-  const overdue = all.filter((p) => p.status === 'Zaległe');
-  const rows = filter === 'Wszystkie' ? all : all.filter((p) => p.status === filter);
+  const rows = all
+    .filter((p) =>
+      filter === 'Wszystkie' ? true : filter === 'Opłacone' ? p.status === 'paid' : filter === 'Zaległe' ? isOverdue(p, today) : p.status !== 'paid',
+    )
+    .filter((p) => (type === 'Wszystkie typy' ? true : p.type === TYPE_KEY[type]))
+    .filter((p) => normalize(p.client.name).includes(normalize(q.trim())));
 
   return (
     <div className="page fade">
-      <div className="toolbar">
+      <div className="page-head">
         <h2>Płatności</h2>
-        <button className="btn btn-primary" onClick={() => openModal({ type: 'payment' })}>
-          + Dodaj płatność
-        </button>
+        <div className="actions">
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', type: 'pakiet' })}>
+            + Pakiet
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', type: 'abonament' })}>
+            + Abonament
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', type: 'pojedyncza' })}>
+            + Sesja
+          </button>
+        </div>
       </div>
-      <div className="kpi-grid kpi-grid-3">
-        <Kpi label="Suma zaległości" value={formatMoney(overdue.reduce((s, p) => s + p.amount, 0))} />
-        <Kpi label="Suma wszystkich płatności" value={formatMoney(all.reduce((s, p) => s + p.amount, 0))} />
+      <div className="kpi-grid">
+        <Kpi label="Wpłaty w tym miesiącu" value={pln(all.filter((p) => p.status === 'paid' && (p.paidDate || p.date).startsWith(month)).reduce((a, p) => a + p.amount, 0))} />
+        <Kpi label="Do zapłaty" value={pln(unpaid.reduce((a, p) => a + p.amount, 0))} sub={`${unpaid.length} pozycji`} />
+        <Kpi label="Zaległe (po terminie)" value={pln(overdue.reduce((a, p) => a + p.amount, 0))} tone={overdue.length ? 'danger' : undefined} />
         <Kpi label="Podopieczni z zaległością" value={new Set(overdue.map((p) => p.client.id)).size} />
       </div>
-      <div className="seg">
-        {FILTERS.map((f) => (
-          <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>
-            {f}
-          </button>
-        ))}
+      <div className="filters">
+        <Seg options={FILTERS} value={filter} onChange={setFilter} label="Status" />
+        <Seg options={TYPES} value={type} onChange={setType} label="Typ" />
+        <input className="input input-sm" type="search" placeholder="Szukaj klienta…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {rows.length === 0 ? (
         <Empty>Brak płatności.</Empty>
@@ -63,18 +76,24 @@ export function PaymentsView({ clients, actions, openModal, onOpenClient }: Prop
               {rows.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <button className="link" onClick={() => onOpenClient(p.client.id)}>
+                    <button className="link" onClick={() => openClient(p.client.id, 'Płatności')}>
                       {p.client.name}
                     </button>
                   </td>
-                  <td>{formatDate(p.date)}</td>
-                  <td>{p.description}</td>
-                  <td className="num">{formatMoney(p.amount)}</td>
-                  <td>
-                    <Tag>{p.status}</Tag>
-                  </td>
+                  <td className="nowrap">{fmtDate(p.date)}</td>
+                  <td>{paymentLabel(p)}</td>
+                  <td className="num">{pln(p.amount)}</td>
+                  <td>{p.status === 'paid' ? <Tag tone="ok">Opłacone</Tag> : isOverdue(p, today) ? <Tag tone="danger">Zaległe</Tag> : <Tag>Do zapłaty</Tag>}</td>
                   <td className="actions">
-                    <PaymentToggle status={p.status} onToggle={(s) => actions.setPaymentStatus(p.client.id, p.id, s)} />
+                    {p.status === 'paid' ? (
+                      <button className="btn btn-ghost btn-sm" onClick={() => apply([setPaymentStatus(p.client, p.id, false, today)])}>
+                        Cofnij
+                      </button>
+                    ) : (
+                      <button className="btn btn-secondary btn-sm" onClick={() => apply([setPaymentStatus(p.client, p.id, true, today)], 'Oznaczono jako opłacone.')}>
+                        Oznacz opłacone
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

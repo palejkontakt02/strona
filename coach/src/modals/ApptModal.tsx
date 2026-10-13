@@ -1,0 +1,146 @@
+import { useState } from 'react';
+import { Field, Modal } from '../components/ui';
+import type { Appointment, AppointmentStatus } from '../domain';
+import { put } from '../data/db';
+import { clientById, deleteAppointment, saveAppointment } from '../data/ops';
+import { useStore } from '../data/store';
+import { uid } from '../format';
+import { clashes } from '../lib/calendar';
+import { todayISO } from '../lib/dates';
+import { num } from '../lib/parse';
+import { useNav, type ModalState } from '../nav';
+import { APPT_STATUS } from '../views/CalendarView';
+import { ClientSelect } from './ModalHost';
+
+export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
+  const { db, apply, ask } = useStore();
+  const { closeModal, openModal } = useNav();
+  const editing = m.appt;
+  const [clientId, setClientId] = useState(editing?.clientId ?? m.clientId ?? '');
+  const [date, setDate] = useState(editing?.date ?? m.date ?? todayISO());
+  const [time, setTime] = useState(editing?.time ?? m.time ?? '17:00');
+  const [duration, setDuration] = useState(String(editing?.duration ?? 60));
+  const [location, setLocation] = useState(editing?.location ?? 'Siłownia');
+  const [note, setNote] = useState(editing?.note ?? '');
+  const [status, setStatus] = useState<AppointmentStatus>(editing?.status ?? 'planned');
+  const [repeat, setRepeat] = useState(false);
+  const [weeks, setWeeks] = useState('8');
+
+  const draft: Appointment = {
+    ...(editing ?? {}),
+    id: editing?.id ?? uid(),
+    clientId,
+    date,
+    time,
+    duration: num(duration) ?? 60,
+    location: location.trim() || undefined,
+    note: note.trim() || undefined,
+    status,
+  };
+  const clash = clashes(draft, db.appointments);
+
+  const save = async () => {
+    if (!clientId) return;
+    const n = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
+    await apply(saveAppointment(draft, n), n > 1 ? `Dodano ${n} wizyt (co tydzień).` : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
+    closeModal();
+  };
+
+  const remove = async () => {
+    if (!editing) return;
+    let whole = false;
+    if (editing.seriesId) {
+      whole = await ask('To wizyta cykliczna. Usunąć też kolejne zaplanowane wizyty z tej serii?', { confirm: 'Usuń całą serię' });
+      if (!whole && !(await ask('Usunąć tylko tę wizytę?'))) return;
+    } else if (!(await ask('Usunąć tę wizytę?'))) return;
+    await apply(deleteAppointment(db, editing, whole), 'Wizyta usunięta.');
+    closeModal();
+  };
+
+  const linkedSession = editing?.sessionId ? db.sessions.find((s) => s.id === editing.sessionId) : undefined;
+
+  return (
+    <Modal
+      title={editing ? 'Wizyta' : 'Nowa wizyta'}
+      onClose={closeModal}
+      onSubmit={save}
+      extraActions={
+        editing && (
+          <>
+            <button type="button" className="btn btn-ghost btn-danger-text" onClick={remove}>
+              Usuń
+            </button>
+            {linkedSession ? (
+              <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'session', session: linkedSession })}>
+                Pokaż trening
+              </button>
+            ) : (
+              status !== 'cancel' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={async () => {
+                    await apply([put('appointments', draft)]);
+                    openModal({ kind: 'session', appt: draft, clientId, date });
+                  }}
+                >
+                  Zapisz trening
+                </button>
+              )
+            )}
+          </>
+        )
+      }
+    >
+      <div className="form-grid">
+        <Field label="Podopieczny" wide>
+          <ClientSelect value={clientId} onChange={setClientId} />
+        </Field>
+        <Field label="Data">
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </Field>
+        <Field label="Godzina">
+          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+        </Field>
+        <Field label="Czas (min)">
+          <input className="input" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
+        </Field>
+        <Field label="Miejsce">
+          <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} />
+        </Field>
+        {editing && (
+          <Field label="Status" wide>
+            <select className="input" value={status} onChange={(e) => setStatus(e.target.value as AppointmentStatus)}>
+              {(Object.keys(APPT_STATUS) as AppointmentStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {APPT_STATUS[s].label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field label="Notatka" wide>
+          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        {!editing && (
+          <div className="field-wide check-row">
+            <label className="check">
+              <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} /> Powtarzaj co tydzień
+            </label>
+            {repeat && (
+              <label className="check">
+                przez
+                <input className="input input-xs" inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} /> tyg. (4–24)
+              </label>
+            )}
+          </div>
+        )}
+      </div>
+      {clash.length > 0 && (
+        <p className="warn-box">
+          Kolizja z: {clash.map((c) => `${clientById(db, c.clientId)?.name ?? '—'} ${c.time}`).join(', ')}
+        </p>
+      )}
+    </Modal>
+  );
+}

@@ -1,33 +1,41 @@
-# Fitowa / coach
+# Fitowa / coach — panel trenera
 
-Aplikacja dla trenera do zarządzania podopiecznymi (podopieczni, plany, postępy, sesje, płatności).
-Działa pod adresem https://sebastianpalej.pl/app/.
+Aplikacja dla trenera (panel) i jego podopiecznych (tryb zawodnika). Działa pod adresem https://sebastianpalej.pl/app/.
+Wygląd: styl Fitowa (ciemny motyw, fiolet, Inter). Zakres i logika: `docs/specyfikacja-panel-trenera.md`.
+
+## Co jest w środku
+
+- **Pulpit** — dzisiejsze wizyty z szybkim „Zapisz trening”, statystyki, do zapłaty, sygnały ostrzegawcze,
+  kończące się pakiety, klienci bez treningu 10+ dni, ostatnie treningi.
+- **Kalendarz** — tydzień / miesiąc, kolor per klient, wizyty cykliczne (4–24 tyg.), wykrywanie kolizji,
+  statusy (zaplanowana / odbyta / odwołana / nieobecność), przerywane kafelki dla treningów bez wizyty.
+- **Klienci** — Przegląd · Plan · Treningi · Monitoring · Pomiary i testy · Płatności · Profil.
+- **Płatności** — pakiety, abonamenty, sesje pojedyncze, filtry, oznaczanie opłaconych.
+- **Ćwiczenia** — biblioteka z kategoriami i linkami do wideo (podpowiedzi w planach i zapisie treningu).
+- **Tryb zawodnika** — start z następnym treningiem, check-in samopoczucia i gotowość vs norma, cel tygodnia,
+  kalendarz, e1RM, dystrybucja RPE, rekordy; odtwarzacz z autoregulacją ciężaru, timerem przerwy i metronomem tempa.
 
 ## Struktura
 
-- `coach/` — kod źródłowy (React + TypeScript + Vite)
-- `app/` — zbudowana aplikacja serwowana przez GitHub Pages (nie edytować ręcznie)
+- `src/domain.ts` — model danych
+- `src/lib/` — wzory i logika (czyste funkcje + testy `*.test.ts`)
+- `src/data/` — warstwa danych (`Repository`: teraz localStorage, docelowo Supabase), dane przykładowe, operacje
+- `src/views/`, `src/modals/`, `src/athlete/` — interfejs
+- `../app/` — zbudowana aplikacja serwowana przez GitHub Pages (nie edytować ręcznie)
 
 ## Praca lokalnie
 
 ```bash
 cd coach
 npm install
-npm run dev      # serwer deweloperski: http://localhost:5173/app/
+npm run dev      # http://localhost:5173/app/
+npm test         # testy logiki
 npm run build    # buduje do ../app — zbudowane pliki trzeba scommitować
 ```
 
-## Specyfikacja i logika
-
-Docelowy zakres aplikacji opisuje `docs/specyfikacja-panel-trenera.md` (panel trenera + tryb zawodnika).
-Wygląd: styl Fitowa (ciemny motyw, fiolet, Inter); układ i funkcje: panel trenera.
-
-Wzory z prototypu (ACWR, monotonia, e1RM, autoregulacja, pakiety, LSI, kolizje wizyt, sygnały ostrzegawcze)
-są w `src/lib/` jako czyste funkcje z testami: `npm test`. Model danych: `src/domain.ts`.
-
 ## Dane
 
-Na razie dane są zapisywane w `localStorage` przeglądarki (klucz `fitowa-coach:v1`),
-a przy pierwszym uruchomieniu wczytywane są dane przykładowe (`src/data/seed.ts`).
-Cała komunikacja z danymi idzie przez interfejs `CoachRepository` (`src/data/repository.ts`),
-więc backend (Supabase) podpina się jako kolejna implementacja tego interfejsu.
+Na razie dane są zapisywane w `localStorage` przeglądarki (klucz `panel-trenera:v1`) — tylko na jednym urządzeniu.
+Kopia zapasowa / import / wyczyszczenie danych: ikona ustawień w górnym pasku.
+Każda zmiana przechodzi przez `Change` (upsert/delete rekordu kolekcji), więc podpięcie Supabase
+to nowa implementacja `Repository` (kolekcja = tabela) + logowanie i reguły RLS.
