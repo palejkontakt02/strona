@@ -2911,3 +2911,87 @@ h2 {
   align-items: center;
   margin-bottom: var(--space-6);
 }
+
+/* historia treningów (zawodnik) */
+.hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.hist-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: left;
+  background: var(--color-bg);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: var(--space-4);
+}
+.hist-item:hover {
+  border-color: var(--color-divider);
+}
+.hist-item .grow {
+  display: flex;
+  flex-direction: column;
+}
+.hist-date {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  min-width: 56px;
+}
+.hist-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  align-items: center;
+  color: var(--color-neutral-400);
+  font-size: 0.9rem;
+}
+.hist-stats b {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--color-text);
+}
+.hist-ex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.hist-ex-row {
+  background: var(--color-bg);
+  border-radius: 12px;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.hist-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+}
+.set-chip {
+  background: var(--color-surface-2);
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-variant-numeric: tabular-nums;
+}
+.set-chip i {
+  font-style: normal;
+  color: var(--color-neutral-400);
+}
+.hist-note p {
+  margin: 4px 0 0;
+}
+.hist-ex-row.linked {
+  margin-top: calc(-1 * var(--space-2));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: inset 3px 0 0 var(--color-accent-600);
+}

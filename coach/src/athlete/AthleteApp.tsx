@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
-import type { Checkin, Wellness } from '../domain';
+import type { Checkin, PlanWorkout, Wellness } from '../domain';
 import { clientById, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
-import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
+import { currentPlan, exerciseLabels, mergeGroups, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
+import { History, Upcoming } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
 export type RunKind = 'run' | 'live';
@@ -190,6 +191,8 @@ function Home({
         </section>
       )}
 
+      <Upcoming clientId={clientId} />
+
       <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
 
       <div className="ath-grid">
@@ -211,6 +214,8 @@ function Home({
       <Progress clientId={clientId} />
 
       <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={onStart} />
+
+      <History clientId={clientId} />
     </div>
   );
 }
@@ -449,6 +454,7 @@ function Workouts({
   nextId?: string;
   onStart: (workoutId: string) => void;
 }) {
+  const [preview, setPreview] = useState<PlanWorkout | null>(null);
   if (!plan) return null;
   const doneMap: Record<string, string> = {};
   for (const s of [...sessions].reverse()) if (s.planId === plan.id && s.workoutId && !doneMap[s.workoutId]) doneMap[s.workoutId] = s.date;
@@ -477,7 +483,7 @@ function Workouts({
             const dn = doneMap[k.id];
             const isNext = nextId === k.id;
             return (
-              <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${dn ? 'done' : ''}`} disabled={!n} onClick={() => onStart(k.id)}>
+              <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${dn ? 'done' : ''}`} disabled={!n} onClick={() => setPreview(k)}>
                 <span className="wo-st">{dn ? '✓' : isNext ? '▶' : ''}</span>
                 <span className="wo-tx">
                   <b>{k.name}</b>
@@ -486,12 +492,68 @@ function Workouts({
                     {dn ? ` · zrobione ${fmtDay(dn)}` : isNext ? ' · następny' : ''}
                   </span>
                 </span>
-                <span className="wo-go">{n ? 'Start' : ''}</span>
+                <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>
               </button>
             );
           })}
         </div>
       ))}
+      {preview && (
+        <WorkoutPreview
+          workout={preview}
+          done={doneMap[preview.id]}
+          onClose={() => setPreview(null)}
+          onStart={() => {
+            setPreview(null);
+            onStart(preview.id);
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+/** Podgląd jednostki z planu: ćwiczenia (z blokami A1/A2), serie, ciężary, tempo, uwagi. */
+function WorkoutPreview({ workout, done, onClose, onStart }: { workout: PlanWorkout; done?: string; onClose: () => void; onStart: () => void }) {
+  const labels = exerciseLabels(workout.exercises);
+  return (
+    <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={workout.name}>
+        <div className="between">
+          <div>
+            <span className="eyebrow">{done ? `zrobione ${fmtDay(done)}` : 'trening z planu'}</span>
+            <h2>{workout.name}</h2>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>
+            Zamknij
+          </button>
+        </div>
+        <div className="hist-ex">
+          {workout.exercises
+            .filter((e) => e.name)
+            .map((e, i) => (
+              <div key={e.id} className={`hist-ex-row ${e.linked ? 'linked' : ''}`}>
+                <b>
+                  <span className="ex-label">{labels[i]}</span> {e.name}
+                </b>
+                <div className="hist-sets">
+                  {mergeGroups(e.groups).map((g, j) => (
+                    <span key={j} className="set-chip">
+                      {g.type !== 'Robocze' && <i>{g.type} </i>}
+                      {g.sets}×{g.reps || '?'}
+                      {g.load && ` ${g.load}${/^\d+([.,]\d+)?$/.test(g.load) ? ' kg' : ''}`}
+                      {g.rpe && <i> @{g.rpe}</i>}
+                    </span>
+                  ))}
+                </div>
+                <div className="muted small">{[e.rest && `przerwa ${e.rest}`, e.notes].filter(Boolean).join(' · ')}</div>
+              </div>
+            ))}
+        </div>
+        <button className="btn btn-primary btn-lg btn-block" onClick={onStart}>
+          <Icon name="play" /> Start
+        </button>
+      </div>
+    </div>
   );
 }
