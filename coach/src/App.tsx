@@ -114,7 +114,9 @@ export function App() {
         <div className="live-banner">
           {running.map(({ c, run }) => (
             <button key={c.id} onClick={() => setLive({ clientId: c.id })}>
-              <span className="live-dot" /> Trening w toku: <b>{c.name}</b>
+              <span className="live-dot" />
+              <span className="live-label">Trening w toku:</span>
+              <b>{c.name}</b>
               <span className="muted small">
                 {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
               </span>

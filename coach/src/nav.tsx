@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { Appointment, Client, LibraryExercise, Payment, PaymentType, Plan, TrainingSession } from './domain';
+import type { Appointment, Client, LibraryExercise, Location, Payment, PaymentType, Plan, TrainingSession } from './domain';
 
 export const SECTIONS = ['Pulpit', 'Kalendarz', 'Klienci', 'Płatności', 'Ćwiczenia'] as const;
 export type Section = (typeof SECTIONS)[number];
@@ -17,7 +17,9 @@ export type ModalState =
   | { kind: 'injury'; clientId: string; injury?: Client['injuryLog'][number] }
   | { kind: 'exercise'; exercise?: LibraryExercise }
   | { kind: 'plan'; plan: Plan; isNew?: boolean }
-  | { kind: 'data' };
+  | { kind: 'data' }
+  | { kind: 'locations' }
+  | { kind: 'location'; location?: Location };
 
 export interface NavValue {
   section: Section;

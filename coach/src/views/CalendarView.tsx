@@ -7,6 +7,7 @@ import { fmtMonth, fmtShort, fmtWeekday } from '../format';
 import { clientHue } from '../lib/calendar';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { useNav } from '../nav';
+import { LocationTag, locStyle } from '../components/location';
 
 export const APPT_STATUS: Record<AppointmentStatus, { label: string; tone: 'neutral' | 'ok' | 'muted' | 'warn' }> = {
   planned: { label: 'Zaplanowana', tone: 'neutral' },
@@ -30,6 +31,7 @@ export function CalendarView() {
   const today = todayISO();
   const [mode, setMode] = useState<Mode>('Tydzień');
   const [anchor, setAnchor] = useState<ISODate>(today);
+  const [loc, setLoc] = useState('');
 
   const shift = (dir: number) => {
     if (mode === 'Tydzień') setAnchor(addDays(anchor, 7 * dir));
@@ -41,9 +43,10 @@ export function CalendarView() {
     }
   };
 
-  const apptsOn = (date: ISODate) => db.appointments.filter((a) => a.date === date).sort((a, b) => a.time.localeCompare(b.time));
+  const inLoc = (id?: string) => !loc || id === loc;
+  const apptsOn = (date: ISODate) => db.appointments.filter((a) => a.date === date && inLoc(a.locationId)).sort((a, b) => a.time.localeCompare(b.time));
   const linked = new Set(db.appointments.map((a) => a.sessionId).filter(Boolean));
-  const looseOn = (date: ISODate) => db.sessions.filter((s) => s.date === date && !linked.has(s.id));
+  const looseOn = (date: ISODate) => db.sessions.filter((s) => s.date === date && !linked.has(s.id) && inLoc(s.locationId));
 
   const ws = weekStart(anchor);
   const title =
@@ -67,6 +70,18 @@ export function CalendarView() {
             </button>
             <strong className="cal-title first-cap">{title}</strong>
           </div>
+          {db.locations.length > 1 && (
+            <div className="loc-filter" role="radiogroup" aria-label="Miejsce">
+              <button type="button" role="radio" aria-checked={!loc} className={!loc ? 'active' : ''} onClick={() => setLoc('')}>
+                Wszystkie
+              </button>
+              {db.locations.map((l) => (
+                <button key={l.id} type="button" role="radio" aria-checked={loc === l.id} className={loc === l.id ? 'active' : ''} style={locStyle(l)} onClick={() => setLoc(loc === l.id ? '' : l.id)}>
+                  <i /> {l.name.replace(/\s*\(.*?\)/, '')}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -104,7 +119,7 @@ export function CalendarView() {
         />
       )}
       <p className="muted small legend-note">
-        Kolor = podopieczny · przerywana ramka = trening zapisany bez wizyty
+        Kolor paska = podopieczny · kropka = miejsce · przerywana ramka = trening zapisany bez wizyty
       </p>
     </div>
   );
@@ -121,6 +136,7 @@ function ApptTile({ a }: { a: Appointment }) {
         {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
       </span>
       <span className="tile-name">{c?.name ?? '—'}</span>
+      <LocationTag id={a.locationId} short />
       {a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>}
     </button>
   );

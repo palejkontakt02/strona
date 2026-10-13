@@ -7,10 +7,13 @@ import { isOverdue, packageStatus, PACKAGE_WARN_AT } from '../lib/billing';
 import { addDays, daysBetween, todayISO } from '../lib/dates';
 import { useNav } from '../nav';
 import { ApptStatusTag } from './CalendarView';
+import { LocationTag, locStyle } from '../components/location';
+import { clubOutstanding, clubSessions } from '../lib/club';
 
 export function Dashboard() {
   const { db, apply } = useStore();
-  const { openClient, openModal, startLive } = useNav();
+  const { openClient, openModal, startLive, go } = useNav();
+  const clubs = db.locations.filter((l) => l.kind === 'klub');
   const today = todayISO();
   const active = db.clients.filter((c) => c.status === 'aktywny');
 
@@ -67,7 +70,9 @@ export function Dashboard() {
                     <button className="link grow" onClick={() => c && openClient(c.id)}>
                       {c?.name ?? '—'}
                     </button>
-                    <span className="muted small hide-mobile">{a.location}</span>
+                    <span className="hide-mobile">
+                      <LocationTag id={a.locationId} short />
+                    </span>
                     <span className={a.status === 'planned' ? 'hide-mobile' : ''}>
                       <ApptStatusTag status={a.status} />
                     </span>
@@ -131,6 +136,29 @@ export function Dashboard() {
             </ul>
           )}
         </Card>
+
+        {clubs.length > 0 && (
+          <Card title="Rozliczenia z klubami" action={<button className="btn btn-ghost btn-sm" onClick={() => go('Płatności')}>Szczegóły</button>}>
+            <ul className="rows">
+              {clubs.map((c) => {
+                const out = clubOutstanding(c, db.sessions, today);
+                const cur = clubSessions(db.sessions, c.id, today.slice(0, 7)).length;
+                return (
+                  <li key={c.id} className="row row-top">
+                    <span className="loc-dot" style={locStyle(c)} />
+                    <div className="grow">
+                      <strong>{c.name}</strong>
+                      <div className="small muted">
+                        w tym miesiącu {cur} {plural(cur, 'trening', 'treningi', 'treningów')} · {pln(cur * (c.clubRate ?? 0))}
+                      </div>
+                    </div>
+                    {out.amount > 0 ? <Tag tone="warn">do wypłaty {pln(out.amount)}</Tag> : <Tag tone="ok">rozliczone</Tag>}
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
 
         <Card title="Kończące się pakiety">
           {packages.length === 0 ? (

@@ -3,10 +3,11 @@ import type { Client } from '../../domain';
 import { put } from '../../data/db';
 import { paymentLabel, sessionsOf, setPaymentStatus } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { fmtDate, pln } from '../../format';
+import { fmtDate, plural, pln } from '../../format';
 import { isOverdue, packageStatus } from '../../lib/billing';
 import { todayISO } from '../../lib/dates';
 import { useNav } from '../../nav';
+import { clubSessions } from '../../lib/club';
 
 /** Sztanga z talerzami: każdy talerz = jedna sesja z ostatniego pakietu; pełne = pozostałe. */
 export function Barbell({ left, size }: { left: number; size: number }) {
@@ -60,6 +61,22 @@ export function ClientPayments({ client }: { client: Client }) {
           </button>
         </div>
       </div>
+
+      {client.billing === 'klub' && (() => {
+        const club = db.locations.find((l) => l.id === client.locationId);
+        const n = club ? clubSessions(sessionsOf(db, client.id), club.id, today.slice(0, 7)).length : 0;
+        return (
+          <Card className="club-note">
+            <p>
+              <strong>Rozliczany przez klub{club ? `: ${club.name}` : ''}.</strong> Klient płaci klubowi, a klub wypłaca Ci{' '}
+              {club?.clubRate ? `${pln(club.clubRate)} za trening` : 'stawkę za trening'}.
+            </p>
+            <p className="muted small">
+              {club ? `W tym miesiącu: ${n} ${plural(n, 'trening', 'treningi', 'treningów')} = ${pln(n * (club.clubRate ?? 0))} od klubu.` : 'Wybierz klub w Profilu (Miejsce treningów).'} Rozliczenia z klubem: Płatności → Od klubów.
+            </p>
+          </Card>
+        );
+      })()}
 
       <div className="two-col">
         {pk && (

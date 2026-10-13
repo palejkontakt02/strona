@@ -1,4 +1,4 @@
-import { applyChanges, type Db, type Repository } from './db';
+import { applyChanges, normalizeDb, type Db, type Repository } from './db';
 import { createSeed } from './seed';
 
 const KEY = 'panel-trenera:v1';
@@ -6,7 +6,7 @@ const KEY = 'panel-trenera:v1';
 function read(): Db | null {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Db) : null;
+    return raw ? normalizeDb(JSON.parse(raw) as Partial<Db>) : null;
   } catch {
     return null;
   }

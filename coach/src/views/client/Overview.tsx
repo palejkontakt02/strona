@@ -10,8 +10,8 @@ import { acwrZone, loadStats } from '../../lib/load';
 import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { APPT_STATUS } from '../CalendarView';
+import { BILLING_LABEL } from '../../components/location';
 
-const BILLING_LABEL = { pakiet: 'Pakiet', abonament: 'Abonament', pojedyncza: 'Sesje pojedyncze', brak: 'Bez rozliczeń' } as const;
 
 export function ClientOverview({ client }: { client: Client }) {
   const { db } = useStore();

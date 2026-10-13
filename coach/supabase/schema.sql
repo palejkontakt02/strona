@@ -36,6 +36,11 @@ create table if not exists public.library (
   data jsonb not null,
   updated_at timestamptz not null default now()
 );
+create table if not exists public.locations (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
 create index if not exists clients_email_idx on public.clients (lower(email));
 create index if not exists plans_client_idx on public.plans (client_id);
 create index if not exists sessions_client_idx on public.sessions (client_id);
@@ -97,6 +102,7 @@ alter table public.plans enable row level security;
 alter table public.sessions enable row level security;
 alter table public.appointments enable row level security;
 alter table public.library enable row level security;
+alter table public.locations enable row level security;
 
 drop policy if exists own_row on public.trainers;
 create policy own_row on public.trainers for select to authenticated using (user_id = auth.uid());
@@ -104,7 +110,7 @@ create policy own_row on public.trainers for select to authenticated using (user
 do $$
 declare t text;
 begin
-  foreach t in array array['clients', 'plans', 'sessions', 'appointments', 'library'] loop
+  foreach t in array array['clients', 'plans', 'sessions', 'appointments', 'library', 'locations'] loop
     execute format('drop policy if exists trainer_all on public.%I', t);
     execute format('create policy trainer_all on public.%I for all to authenticated using (public.is_trainer()) with check (public.is_trainer())', t);
   end loop;
@@ -139,3 +145,6 @@ create policy client_update on public.appointments for update to authenticated
 
 drop policy if exists client_read on public.library;
 create policy client_read on public.library for select to authenticated using (true);
+
+drop policy if exists client_read on public.locations;
+create policy client_read on public.locations for select to authenticated using (true);

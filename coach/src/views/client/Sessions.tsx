@@ -6,8 +6,8 @@ import { fmtDate, fnum } from '../../format';
 import { sessionLoad, tonnage } from '../../lib/load';
 import { wellnessTotal } from '../../lib/wellness';
 import { useNav } from '../../nav';
+import { CHARGE_SHORT, LocationTag } from '../../components/location';
 
-const CHARGE = { pakiet: 'pakiet', abonament: 'abonament', pojedyncza: 'pojedyncza', brak: '—' } as const;
 
 export function ClientSessions({ client }: { client: Client }) {
   const { db } = useStore();
@@ -48,7 +48,7 @@ export function ClientSessions({ client }: { client: Client }) {
                   <tr key={s.id}>
                     <td className="nowrap">{fmtDate(s.date)}</td>
                     <td>
-                      {s.workoutName || 'Trening'}
+                      {s.workoutName || 'Trening'} <LocationTag id={s.locationId} short />
                       {s.notes && <div className="muted small ellipsis" style={{ maxWidth: 260 }}>{s.notes}</div>}
                     </td>
                     <td className="num">{s.duration != null ? `${s.duration} min` : '—'}</td>
@@ -57,7 +57,7 @@ export function ClientSessions({ client }: { client: Client }) {
                     <td className="num">{ton ? `${fnum(ton, 0)} kg` : '—'}</td>
                     <td className="num">{w != null ? `${w}/25` : '—'}</td>
                     <td className="num">{s.pain != null ? <Tag tone={s.pain >= 6 ? 'danger' : s.pain >= 4 ? 'warn' : 'muted'}>{s.pain}/10</Tag> : '—'}</td>
-                    <td className="hide-mobile muted small">{CHARGE[s.charge]}</td>
+                    <td className="hide-mobile muted small">{CHARGE_SHORT[s.charge]}</td>
                     <td className="actions">
                       <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
                     </td>

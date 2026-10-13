@@ -9,7 +9,8 @@ export type ISODate = string;
 export type YearMonth = string;
 
 export type ClientStatus = 'aktywny' | 'pauza' | 'zakończony';
-export type Billing = 'pakiet' | 'pojedyncza' | 'abonament' | 'brak';
+/** `klub` — klient płaci klubowi fitness, a klub wypłaca trenerowi stawkę za każdy trening. */
+export type Billing = 'pakiet' | 'pojedyncza' | 'abonament' | 'klub' | 'brak';
 export type DominantSide = 'prawa' | 'lewa' | '';
 
 export interface Wellness {
@@ -79,6 +80,8 @@ export interface Injury {
 
 export interface Client {
   id: string;
+  /** Domyślne miejsce treningów (studio, klub…). */
+  locationId?: string;
   name: string;
   phone?: string;
   email?: string;
@@ -190,6 +193,7 @@ export interface SessionExercise {
 
 export interface TrainingSession {
   id: string;
+  locationId?: string;
   clientId: string;
   date: ISODate;
   workoutName?: string;
@@ -221,6 +225,8 @@ export interface Appointment {
   time: string;
   /** Minuty, domyślnie 60. */
   duration?: number;
+  /** Miejsce z listy miejsc; `location` zostaje jako opis (np. sala). */
+  locationId?: string;
   location?: string;
   note?: string;
   status: AppointmentStatus;
@@ -247,4 +253,29 @@ export interface LibraryExercise {
   name: string;
   cat: ExerciseCategory;
   video?: string;
+}
+
+/* ---------- Miejsca treningów i kluby ---------- */
+
+export interface ClubPayout {
+  id: string;
+  /** Miesiąc, za który klub wypłacił. */
+  month: YearMonth;
+  amount: number;
+  sessions: number;
+  paidDate: ISODate;
+  note?: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  /** `własne` — klienci płacą trenerowi; `klub` — klub fitness, może wypłacać za treningi. */
+  kind: 'własne' | 'klub';
+  /** Kolor oznaczenia (odcień 0–360). */
+  hue: number;
+  address?: string;
+  /** Stawka, którą klub wypłaca trenerowi za jeden trening (zł). */
+  clubRate?: number;
+  payouts: ClubPayout[];
 }

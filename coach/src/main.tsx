@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { StoreProvider } from './data/store';
 import './styles.css';
+import { applyPalette, getPalette } from './theme';
+
+applyPalette(getPalette());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

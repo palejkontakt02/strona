@@ -6,6 +6,7 @@ import { fmtDate, normalize, pln } from '../format';
 import { isOverdue } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { useNav } from '../nav';
+import { ClubsPanel } from './ClubsPanel';
 
 const FILTERS = ['Wszystkie', 'Do zapłaty', 'Zaległe', 'Opłacone'] as const;
 const TYPES = ['Wszystkie typy', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
@@ -18,6 +19,7 @@ export function PaymentsView() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Wszystkie');
   const [type, setType] = useState<(typeof TYPES)[number]>('Wszystkie typy');
   const [q, setQ] = useState('');
+  const [tab, setTab] = useState<'Od klientów' | 'Od klubów'>('Od klientów');
   const all = allPayments(db);
   const month = today.slice(0, 7);
   const overdue = all.filter((p) => isOverdue(p, today));
@@ -46,6 +48,12 @@ export function PaymentsView() {
           </button>
         </div>
       </div>
+      <Seg options={['Od klientów', 'Od klubów'] as const} value={tab} onChange={setTab} label="Rozliczenia" />
+      <div className="section-gap-sm" />
+      {tab === 'Od klubów' ? (
+        <ClubsPanel />
+      ) : (
+        <>
       <div className="kpi-grid">
         <Kpi label="Wpłaty w tym miesiącu" value={pln(all.filter((p) => p.status === 'paid' && (p.paidDate || p.date).startsWith(month)).reduce((a, p) => a + p.amount, 0))} />
         <Kpi label="Do zapłaty" value={pln(unpaid.reduce((a, p) => a + p.amount, 0))} sub={`${unpaid.length} pozycji`} />
@@ -100,6 +108,8 @@ export function PaymentsView() {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   );

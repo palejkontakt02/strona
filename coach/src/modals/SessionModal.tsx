@@ -12,6 +12,7 @@ import { bestE1, resolveLoad } from '../lib/strength';
 import { WELLNESS_ITEMS } from '../lib/wellness';
 import { useNav, type ModalState } from '../nav';
 import { ClientSelect } from './ModalHost';
+import { ChargeSelect, LocationSelect } from '../components/location';
 
 interface ExRow {
   key: string;
@@ -70,6 +71,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [pain, setPain] = useState(s(existing?.pain));
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [charge, setCharge] = useState<Billing | ''>(existing?.charge ?? '');
+  const [locationId, setLocationId] = useState(existing?.locationId ?? m.appt?.locationId ?? clientById(db, existing?.clientId ?? m.clientId ?? m.appt?.clientId)?.locationId ?? '');
   const [amount, setAmount] = useState('');
   const [paidNow, setPaidNow] = useState(true);
 
@@ -137,6 +139,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       wellness: Object.keys(wellness).length ? wellness : undefined,
       sleepH: num(sleepH) ?? undefined,
       rhr: num(rhr) ?? undefined,
+      locationId: locationId || undefined,
       planId: planRef.planId,
       workoutId: planRef.workoutId,
       exercises: rows
@@ -170,7 +173,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     >
       <div className="form-grid form-grid-3">
         <Field label="Podopieczny">
-          {existing || m.appt ? <input className="input" value={client?.name ?? ''} disabled /> : <ClientSelect value={clientId} onChange={(id) => { setClientId(id); setAutoLoaded(false); setRows([]); }} />}
+          {existing || m.appt ? <input className="input" value={client?.name ?? ''} disabled /> : <ClientSelect value={clientId} onChange={(id) => { setClientId(id); setAutoLoaded(false); setRows([]); setLocationId(clientById(db, id)?.locationId ?? ''); }} />}
         </Field>
         <Field label="Data">
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -263,13 +266,19 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       <h4 className="form-section">Rozliczenie</h4>
       <div className="form-grid form-grid-3">
         <Field label="Rozliczenie treningu">
-          <select className="input" value={effCharge} onChange={(e) => setCharge(e.target.value as Billing)}>
-            <option value="pakiet">z pakietu</option>
-            <option value="abonament">abonament</option>
-            <option value="pojedyncza">sesja pojedyncza</option>
-            <option value="brak">bez rozliczenia</option>
-          </select>
+          <ChargeSelect value={effCharge} onChange={setCharge} />
         </Field>
+        <Field label="Miejsce">
+          <LocationSelect value={locationId} onChange={setLocationId} />
+        </Field>
+        {effCharge === 'klub' && (
+          <p className="muted small self-end">
+            {(() => {
+              const l = db.locations.find((x) => x.id === locationId);
+              return l?.kind === 'klub' ? `Klub ${l.name} wypłaci ${l.clubRate ?? 0} zł za ten trening.` : 'Wybierz klub, który rozlicza ten trening.';
+            })()}
+          </p>
+        )}
         {effCharge === 'pakiet' && (
           <p className="muted small field-wide-2 self-end">
             {pk ? (pk.left > 0 ? `W pakiecie zostało ${pk.left} (po zapisie: ${pk.left - (existing ? 0 : 1)}).` : 'Pakiet wykorzystany — trening będzie ponad pakiet.') : 'Klient nie ma wykupionego pakietu.'}

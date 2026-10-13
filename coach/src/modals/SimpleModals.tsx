@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import { EXERCISE_CATEGORIES, type Client, type ExerciseCategory, type Injury, type Measurement, type Payment, type TestResult } from '../domain';
-import { del, put, type Db } from '../data/db';
+import { del, normalizeDb, put, type Db } from '../data/db';
 import { clientById } from '../data/ops';
 import { useStore } from '../data/store';
 import { fnum, uid } from '../format';
@@ -10,6 +10,7 @@ import { num } from '../lib/parse';
 import { computeLsi } from '../lib/tests';
 import { useNav, type ModalState } from '../nav';
 import { MEASURE_FIELDS } from '../views/client/Measurements';
+import { getPalette, PALETTES, setPalette, type PaletteId } from '../theme';
 import { ClientFields, fromDraft, toDraft } from '../views/client/Profile';
 import { ClientSelect } from './ModalHost';
 
@@ -397,8 +398,9 @@ export function ExerciseModal({ m }: { m: Extract<ModalState, { kind: 'exercise'
 /* ---------- dane: eksport, import, reset ---------- */
 export function DataModal() {
   const { db, reset, importDb, ask, toast } = useStore();
-  const { closeModal, go } = useNav();
+  const { closeModal, go, openModal } = useNav();
   const file = useRef<HTMLInputElement>(null);
+  const [palette, setPal] = useState<PaletteId>(getPalette());
 
   const exportAll = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -414,7 +416,7 @@ export function DataModal() {
       const data = JSON.parse(await f.text()) as Db;
       if (!Array.isArray(data.clients) || !Array.isArray(data.sessions)) throw new Error('format');
       if (!(await ask('Zastąpić obecne dane danymi z pliku?', { confirm: 'Importuj' }))) return;
-      await importDb({ clients: data.clients, plans: data.plans ?? [], sessions: data.sessions, appointments: data.appointments ?? [], library: data.library ?? [] });
+      await importDb(normalizeDb(data));
       closeModal();
       go('Pulpit');
     } catch {
@@ -423,7 +425,34 @@ export function DataModal() {
   };
 
   return (
-    <Modal title="Dane" onClose={closeModal}>
+    <Modal title="Ustawienia" onClose={closeModal}>
+      <h4>Kolory</h4>
+      <div className="palettes" role="radiogroup" aria-label="Motyw kolorystyczny">
+        {PALETTES.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            role="radio"
+            aria-checked={palette === p.id}
+            className={`palette ${palette === p.id ? 'active' : ''}`}
+            onClick={() => {
+              setPalette(p.id);
+              setPal(p.id);
+            }}
+          >
+            <span className="swatch" style={{ background: p.bg }}>
+              <i style={{ background: p.accent }} />
+            </span>
+            {p.name}
+          </button>
+        ))}
+      </div>
+      <h4 className="form-section">Miejsca treningów</h4>
+      <p className="muted small">{db.locations.map((l) => l.name).join(' · ') || 'Brak zapisanych miejsc.'}</p>
+      <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'locations' })}>
+        Miejsca i kluby…
+      </button>
+      <h4 className="form-section">Dane</h4>
       <p className="small">
         Dane są teraz zapisywane <strong>tylko w tej przeglądarce</strong> na tym urządzeniu. Rób kopię zapasową, zanim wyczyścisz dane przeglądarki.
         Po podłączeniu bazy w chmurze (Supabase) dane będą wspólne dla wszystkich urządzeń i dostępne dla klientów po zalogowaniu.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { IconBtn } from '../components/ui';
+import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
 import { savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -69,6 +70,7 @@ interface Finish {
   charge: Billing;
   amount: string;
   paidNow: boolean;
+  locationId: string;
 }
 
 export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
@@ -125,6 +127,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       pain: finish.pain === '' ? undefined : Number(finish.pain),
       notes: finish.notes.trim() || undefined,
       wellness: check ? { sleep: check.sleep, energy: check.energy, muscle: check.muscle, stress: check.stress, mood: check.mood } : undefined,
+      locationId: (trainer ? finish.locationId : client.locationId) || undefined,
       planId: run.planId,
       workoutId: run.workoutId,
       exercises: runToExercises(run),
@@ -146,6 +149,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       charge,
       amount: client.singleRate ? String(client.singleRate) : '',
       paidNow: true,
+      locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
     });
   };
 
@@ -193,7 +197,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
   const header = (k: number) => {
     const e = run.ex[k];
     return (
-      <div key={`h${k}`} className="ex-head">
+      <div key={`h${k}`} className="run-ex-head">
         <div className="between">
           <h2>
             {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
@@ -422,12 +426,11 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
               <>
                 <label className="field">
                   <span>Rozliczenie</span>
-                  <select className="input" value={finish.charge} onChange={(ev) => setFinish({ ...finish, charge: ev.target.value as Billing })}>
-                    <option value="pakiet">z pakietu</option>
-                    <option value="abonament">abonament</option>
-                    <option value="pojedyncza">sesja pojedyncza</option>
-                    <option value="brak">bez rozliczenia</option>
-                  </select>
+                  <ChargeSelect value={finish.charge} onChange={(charge) => setFinish({ ...finish, charge })} />
+                </label>
+                <label className="field">
+                  <span>Miejsce</span>
+                  <LocationSelect value={finish.locationId} onChange={(locationId) => setFinish({ ...finish, locationId })} />
                 </label>
                 {finish.charge === 'pakiet' && (
                   <p className="muted small">

@@ -11,6 +11,7 @@ import { num } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 import { APPT_STATUS } from '../views/CalendarView';
 import { ClientSelect } from './ModalHost';
+import { LocationSelect } from '../components/location';
 
 export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const { db, apply, ask } = useStore();
@@ -20,7 +21,8 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const [date, setDate] = useState(editing?.date ?? m.date ?? todayISO());
   const [time, setTime] = useState(editing?.time ?? m.time ?? '17:00');
   const [duration, setDuration] = useState(String(editing?.duration ?? 60));
-  const [location, setLocation] = useState(editing?.location ?? 'Siłownia');
+  const [locationId, setLocationId] = useState(editing?.locationId ?? clientById(db, editing?.clientId ?? m.clientId)?.locationId ?? db.locations[0]?.id ?? '');
+  const [location, setLocation] = useState(editing?.location ?? '');
   const [note, setNote] = useState(editing?.note ?? '');
   const [status, setStatus] = useState<AppointmentStatus>(editing?.status ?? 'planned');
   const [repeat, setRepeat] = useState(false);
@@ -33,7 +35,8 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     date,
     time,
     duration: num(duration) ?? 60,
-    location: location.trim() || undefined,
+    locationId: locationId || undefined,
+    location: location.trim() || db.locations.find((l) => l.id === locationId)?.name || undefined,
     note: note.trim() || undefined,
     status,
   };
@@ -106,7 +109,14 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     >
       <div className="form-grid">
         <Field label="Podopieczny" wide>
-          <ClientSelect value={clientId} onChange={setClientId} />
+          <ClientSelect
+            value={clientId}
+            onChange={(id) => {
+              setClientId(id);
+              const loc = clientById(db, id)?.locationId;
+              if (loc && !editing) setLocationId(loc);
+            }}
+          />
         </Field>
         <Field label="Data">
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -118,7 +128,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           <input className="input" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
         </Field>
         <Field label="Miejsce">
-          <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} />
+          <LocationSelect value={locationId} onChange={(v) => { setLocationId(v); setLocation(''); }} />
         </Field>
         {editing && (
           <Field label="Status" wide>

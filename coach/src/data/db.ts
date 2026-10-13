@@ -1,4 +1,4 @@
-import type { Appointment, Client, LibraryExercise, Plan, TrainingSession } from '../domain';
+import type { Appointment, Client, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -6,6 +6,19 @@ export interface Db {
   sessions: TrainingSession[];
   appointments: Appointment[];
   library: LibraryExercise[];
+  locations: Location[];
+}
+
+/** Uzupełnia brakujące kolekcje (dane zapisane starszą wersją aplikacji). */
+export function normalizeDb(db: Partial<Db>): Db {
+  return {
+    clients: db.clients ?? [],
+    plans: db.plans ?? [],
+    sessions: db.sessions ?? [],
+    appointments: db.appointments ?? [],
+    library: db.library ?? [],
+    locations: db.locations ?? [],
+  };
 }
 
 export type Collection = keyof Db;

@@ -5,6 +5,7 @@ import type {
   Client,
   ExerciseCategory,
   LibraryExercise,
+  Location,
   Payment,
   Plan,
   PlanExercise,
@@ -230,6 +231,8 @@ interface ClientTpl {
   /** Dni tygodnia treningów (0 = pon). */
   days: number[];
   time: string;
+  /** Miejsce treningów (klucz z LOCATIONS). */
+  place?: 'studio' | 'energy' | 'hala';
   /** Ile tygodni historii. */
   weeks: number;
   /** Dni bez treningu na końcu (np. 14 = ostatni trening 2 tygodnie temu). */
@@ -241,12 +244,12 @@ const CLIENTS: ClientTpl[] = [
   { name: 'Kacper Nowak', sex: 'm', sport: 'Piłka nożna', position: 'Pomocnik', goal: 'Siła i szybkość przed rundą', level: 'Zaawansowany', status: 'aktywny', billing: 'pakiet', template: 'sc', strength: 1.1, days: [0, 3], time: '17:00', weeks: 9, special: 'pkgLow' },
   { name: 'Julia Wiśniewska', sex: 'k', sport: 'Piłka ręczna', position: 'Rozgrywająca', goal: 'Powrót do gry po rekonstrukcji ACL', level: 'Średniozaawansowany', status: 'aktywny', billing: 'pakiet', template: 'rts', strength: 0.6, days: [1, 4], time: '15:30', weeks: 10, special: 'acl' },
   { name: 'Michał Zieliński', sex: 'm', sport: 'CrossFit', goal: 'Przygotowanie do zawodów', level: 'Zaawansowany', status: 'aktywny', billing: 'abonament', template: 'sc', strength: 1.25, days: [0, 2, 4], time: '07:00', weeks: 8, special: 'acwr' },
-  { name: 'Aleksandra Kamińska', sex: 'k', sport: 'Bieganie', goal: 'Półmaraton poniżej 1:45', level: 'Średniozaawansowany', status: 'aktywny', billing: 'abonament', template: 'gen', strength: 0.55, days: [1, 3], time: '18:30', weeks: 8, special: 'overdue' },
-  { name: 'Tomasz Lewandowski', sex: 'm', sport: 'Rekreacja', goal: 'Zdrowe plecy i forma', level: 'Początkujący', status: 'aktywny', billing: 'pojedyncza', template: 'gen', strength: 0.75, days: [2], time: '12:00', weeks: 7, gap: 14 },
-  { name: 'Zofia Dąbrowska', sex: 'k', sport: 'Siatkówka', position: 'Atakująca', goal: 'Wyskok i stabilność kolan', level: 'Średniozaawansowany', status: 'aktywny', billing: 'pakiet', template: 'sc', strength: 0.65, days: [1, 4], time: '16:30', weeks: 8, special: 'pain' },
+  { name: 'Aleksandra Kamińska', sex: 'k', sport: 'Bieganie', goal: 'Półmaraton poniżej 1:45', level: 'Średniozaawansowany', status: 'aktywny', billing: 'abonament', place: 'energy', template: 'gen', strength: 0.55, days: [1, 3], time: '18:30', weeks: 8, special: 'overdue' },
+  { name: 'Tomasz Lewandowski', sex: 'm', sport: 'Rekreacja', goal: 'Zdrowe plecy i forma', level: 'Początkujący', status: 'aktywny', billing: 'klub', place: 'energy', template: 'gen', strength: 0.75, days: [2], time: '12:00', weeks: 7, gap: 14 },
+  { name: 'Zofia Dąbrowska', sex: 'k', sport: 'Siatkówka', position: 'Atakująca', goal: 'Wyskok i stabilność kolan', level: 'Średniozaawansowany', status: 'aktywny', billing: 'pakiet', place: 'hala', template: 'sc', strength: 0.65, days: [1, 4], time: '16:30', weeks: 8, special: 'pain' },
   { name: 'Paweł Wójcik', sex: 'm', sport: 'Trójbój siłowy', goal: 'Przysiad 200 kg', level: 'Zaawansowany', status: 'aktywny', billing: 'abonament', template: 'sc', strength: 1.45, days: [0, 2, 4], time: '19:00', weeks: 9 },
   { name: 'Marta Krawczyk', sex: 'k', sport: 'Tenis', goal: 'Powrót do gry bez bólu barku', level: 'Średniozaawansowany', status: 'aktywny', billing: 'pojedyncza', template: 'shoulder', strength: 0.5, days: [0, 3], time: '10:00', weeks: 6, special: 'shoulder' },
-  { name: 'Natalia Kowalczyk', sex: 'k', sport: 'Rekreacja', goal: 'Redukcja i siła', level: 'Początkujący', status: 'aktywny', billing: 'pakiet', template: 'gen', strength: 0.5, days: [2, 5], time: '09:00', weeks: 2 },
+  { name: 'Natalia Kowalczyk', sex: 'k', sport: 'Rekreacja', goal: 'Redukcja i siła', level: 'Początkujący', status: 'aktywny', billing: 'klub', place: 'energy', template: 'gen', strength: 0.5, days: [2, 5], time: '09:00', weeks: 2 },
   { name: 'Bartosz Mazur', sex: 'm', sport: 'Koszykówka', position: 'Rozgrywający', goal: 'Utrzymanie formy w sezonie', level: 'Średniozaawansowany', status: 'pauza', billing: 'pakiet', template: 'sc', strength: 0.95, days: [1], time: '20:00', weeks: 6, gap: 30 },
 ];
 
@@ -264,12 +267,20 @@ function buildPlan(clientId: string, key: keyof typeof TEMPLATES, start: string)
   return { id: uid(), clientId, name: t.name, startDate: start, active: true, weeks, updatedAt: start + 'T08:00:00Z' };
 }
 
+const LOCATIONS: Record<'studio' | 'energy' | 'hala', Omit<Location, 'id' | 'payouts'>> = {
+  studio: { name: 'Studio (własne)', kind: 'własne', hue: 165, address: 'ul. Przykładowa 1, Kraków' },
+  energy: { name: 'Klub Fitness Energy', kind: 'klub', hue: 28, clubRate: 90, address: 'Galeria, poziom -1' },
+  hala: { name: 'Hala sportowa', kind: 'własne', hue: 265 },
+};
+
 export function createSeed(today = todayISO()): Db {
   const rand = rng(2026);
   const r = (a: number, b: number) => a + rand() * (b - a);
   const ri = (a: number, b: number) => Math.round(r(a, b));
 
   const library: LibraryExercise[] = LIBRARY.map(([name, cat]) => ({ id: uid(), name, cat }));
+  const locIds = { studio: uid(), energy: uid(), hala: uid() };
+  const locations: Location[] = (Object.keys(LOCATIONS) as (keyof typeof LOCATIONS)[]).map((k) => ({ id: locIds[k], ...LOCATIONS[k], payouts: [] }));
   const clients: Client[] = [];
   const plans: Plan[] = [];
   const sessions: TrainingSession[] = [];
@@ -277,6 +288,9 @@ export function createSeed(today = todayISO()): Db {
 
   CLIENTS.forEach((t, ci) => {
     const id = uid();
+    const place = t.place ?? 'studio';
+    const locationId = locIds[place];
+    const locName = LOCATIONS[place].name;
     const startDate = addDays(weekStart(today), -7 * t.weeks);
     const plan = buildPlan(id, t.template, startDate);
     // Starszy, zakończony plan dla części klientów.
@@ -302,7 +316,7 @@ export function createSeed(today = todayISO()): Db {
         // Co jakiś czas odwołana wizyta lub nieobecność.
         const roll = rand();
         if (roll < 0.05 || (roll < 0.08 && ci % 3 === 0)) {
-          appointments.push({ id: apptId, clientId: id, date, time: t.time, duration: 60, location: 'Siłownia', status: roll < 0.05 ? 'cancel' : 'noshow' });
+          appointments.push({ id: apptId, clientId: id, date, time: t.time, duration: 60, locationId, location: locName, status: roll < 0.05 ? 'cancel' : 'noshow' });
           continue;
         }
         const workout = seq[k % seq.length];
@@ -340,11 +354,12 @@ export function createSeed(today = todayISO()): Db {
           wellness: t.special === 'pain' && isLast ? { sleep: 2, energy: 2, muscle: 2, stress: 2, mood: 3 } : wellness,
           planId: plan.id,
           workoutId: workout.id,
+          locationId,
           exercises: sessionExercises,
           notes: t.special === 'pain' && isLast ? 'Ból przedniej części kolana przy skokach, odpuszczona plyometria.' : '',
         };
         clientSessions.push(session);
-        appointments.push({ id: apptId, clientId: id, date, time: t.time, duration: 60, location: 'Siłownia', status: 'done', sessionId: session.id });
+        appointments.push({ id: apptId, clientId: id, date, time: t.time, duration: 60, locationId, location: locName, status: 'done', sessionId: session.id });
       }
     }
     // Dodatkowe ciężkie jednostki w ostatnim tygodniu dla skoku ACWR.
@@ -364,7 +379,7 @@ export function createSeed(today = todayISO()): Db {
         for (const d of t.days) {
           const date = addDays(addDays(weekStart(today), 7 * w), d);
           if (date < today) continue;
-          appointments.push({ id: uid(), clientId: id, date, time: t.time, duration: 60, location: 'Siłownia', status: 'planned', seriesId });
+          appointments.push({ id: uid(), clientId: id, date, time: t.time, duration: 60, locationId, location: locName, status: 'planned', seriesId });
         }
       }
     }
@@ -480,6 +495,7 @@ export function createSeed(today = todayISO()): Db {
       pkgSize: t.billing === 'pakiet' ? 10 : undefined,
       pkgPrice: t.billing === 'pakiet' ? 1600 : undefined,
       startDate,
+      locationId,
       injuries: t.special === 'acl' ? 'ACL lewe (rekonstrukcja)' : '',
       notes: '',
       createdAt: startDate + 'T08:00:00Z',
@@ -491,10 +507,26 @@ export function createSeed(today = todayISO()): Db {
     });
   });
 
-  return { clients, plans, sessions, appointments, library };
+  // Klub wypłacił już za miesiąc sprzed dwóch miesięcy.
+  const energy = locations.find((l) => l.id === locIds.energy)!;
+  const d = new Date(today + 'T12:00:00');
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 2);
+  const old = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const n = sessions.filter((x) => x.charge === 'klub' && x.locationId === energy.id && x.date.startsWith(old)).length;
+  if (n) energy.payouts.push({ id: uid(), month: old, amount: n * (energy.clubRate ?? 0), sessions: n, paidDate: addDays(old + '-01', 38) });
+
+  return { clients, plans, sessions, appointments, library, locations };
 }
 
 /** Pusta baza (start bez danych przykładowych) — zostawia bibliotekę ćwiczeń. */
 export function createEmpty(): Db {
-  return { clients: [], plans: [], sessions: [], appointments: [], library: LIBRARY.map(([name, cat]) => ({ id: uid(), name, cat })) };
+  return {
+    clients: [],
+    plans: [],
+    sessions: [],
+    appointments: [],
+    library: LIBRARY.map(([name, cat]) => ({ id: uid(), name, cat })),
+    locations: [{ id: uid(), name: 'Studio (własne)', kind: 'własne', hue: 165, payouts: [] }],
+  };
 }

@@ -4,6 +4,7 @@ import type { ModalState } from '../nav';
 import { ApptModal } from './ApptModal';
 import { ClientModal, DataModal, ExerciseModal, InjuryModal, MeasurementModal, PaymentModal, TestModal } from './SimpleModals';
 import { PlanEditor } from './PlanEditor';
+import { LocationModal, LocationsModal } from './LocationModals';
 import { SessionModal } from './SessionModal';
 
 export function ModalHost({ modal }: { modal: ModalState }) {
@@ -31,6 +32,8 @@ export function ModalHost({ modal }: { modal: ModalState }) {
       {modal.kind === 'injury' && <InjuryModal m={modal} />}
       {modal.kind === 'exercise' && <ExerciseModal m={modal} />}
       {modal.kind === 'data' && <DataModal />}
+      {modal.kind === 'locations' && <LocationsModal />}
+      {modal.kind === 'location' && <LocationModal m={modal} />}
     </>
   );
 }

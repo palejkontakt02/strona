@@ -7,6 +7,7 @@ import { useStore } from '../../data/store';
 import { fmtDate, slugify } from '../../format';
 import { num } from '../../lib/parse';
 import { useNav } from '../../nav';
+import { LocationSelect } from '../../components/location';
 
 type Draft = Record<string, string>;
 
@@ -15,14 +16,14 @@ const DATE_FIELDS = ['dob', 'targetDate', 'startDate'] as const;
 const NUM_FIELDS = ['height', 'daysPerWeek', 'singleRate', 'subRate', 'pkgSize', 'pkgPrice'] as const;
 
 export function toDraft(c: Partial<Client>): Draft {
-  const d: Draft = { status: c.status ?? 'aktywny', billing: c.billing ?? '', dominant: c.dominant ?? '' };
+  const d: Draft = { status: c.status ?? 'aktywny', billing: c.billing ?? '', dominant: c.dominant ?? '', locationId: c.locationId ?? '' };
   for (const k of [...TEXT_FIELDS, ...DATE_FIELDS]) d[k] = (c[k] as string | undefined) ?? '';
   for (const k of NUM_FIELDS) d[k] = c[k] != null ? String(c[k]) : '';
   return d;
 }
 
 export function fromDraft(base: Client, d: Draft): Client {
-  const c: Client = { ...base, status: d.status as ClientStatus, billing: (d.billing || undefined) as Billing | undefined, dominant: d.dominant as Client['dominant'] };
+  const c: Client = { ...base, status: d.status as ClientStatus, billing: (d.billing || undefined) as Billing | undefined, dominant: d.dominant as Client['dominant'], locationId: d.locationId || undefined };
   for (const k of TEXT_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k].trim() || undefined;
   c.name = d.name.trim();
   for (const k of DATE_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k] || undefined;
@@ -78,8 +79,12 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <option value="pakiet">pakiet</option>
           <option value="abonament">abonament</option>
           <option value="pojedyncza">sesje pojedyncze</option>
+          <option value="klub">przez klub (klub mi wypłaca)</option>
           <option value="brak">brak</option>
         </select>
+      </Field>
+      <Field label="Miejsce treningów">
+        <LocationSelect value={d.locationId} onChange={(v) => set('locationId', v)} />
       </Field>
       <Field label="Stawka za sesję (zł)">{inp('singleRate', 'text', { inputMode: 'decimal' })}</Field>
       {!compact && (
