@@ -1,5 +1,6 @@
-/** Motywy kolorystyczne aplikacji (zapisywane na tym urządzeniu). Domyślny: ciemny „Morski”. */
+/** Motywy kolorystyczne aplikacji (zapisywane na tym urządzeniu). Domyślny: czarno-biały „mono”. */
 export const PALETTES = [
+  { id: 'mono', name: 'Czarno-biały', bg: '#0b0b0c', accent: '#f2f2f2' },
   { id: 'morski', name: 'Morski', bg: '#0f1b1e', accent: '#3cc4ad' },
   { id: 'grafit', name: 'Grafit', bg: '#19191b', accent: '#f0a43a' },
   { id: 'fiolet', name: 'Fiolet', bg: '#161826', accent: '#9184d9' },
@@ -16,7 +17,7 @@ export function getPalette(): PaletteId {
   } catch {
     // brak localStorage — motyw domyślny
   }
-  return 'morski';
+  return 'mono';
 }
 
 export function applyPalette(id: PaletteId) {
