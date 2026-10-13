@@ -57,7 +57,7 @@ export function StoreProvider({
       setDb(next);
       setLoadError(null);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoadError(e && typeof e === 'object' && 'message' in e ? [(e as { code?: string }).code, (e as { message: string }).message].filter(Boolean).join(' · ') : String(e));
     }
   }, [repo, onEmpty]);
 

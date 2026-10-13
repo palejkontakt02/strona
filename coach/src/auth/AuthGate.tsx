@@ -46,6 +46,15 @@ type Role = { kind: 'loading' } | { kind: 'trainer' } | { kind: 'client'; client
 
 const signOut = () => void supabase.auth.signOut();
 
+/** Czytelny opis błędu (błędy Supabase to zwykłe obiekty, nie Error). */
+export function errorText(e: unknown): string {
+  if (e && typeof e === 'object') {
+    const o = e as { message?: string; code?: string; details?: string; hint?: string };
+    return [o.code, o.message, o.details, o.hint].filter(Boolean).join(' · ') || JSON.stringify(e);
+  }
+  return String(e);
+}
+
 /** Pusta baza trenera przy pierwszym uruchomieniu: biblioteka ćwiczeń i jedno miejsce. */
 const seedEmpty = (db: Db) => (db.library.length || db.clients.length ? null : createEmpty());
 
@@ -65,7 +74,7 @@ function RoleGate({ email }: { email: string }) {
       if (ex.error) throw ex.error;
       setRole({ kind: ex.data ? 'nolink' : 'unclaimed' });
     } catch (e) {
-      setRole({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setRole({ kind: 'error', message: errorText(e) });
     }
   }, []);
 
