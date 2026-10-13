@@ -1,4 +1,4 @@
-import type { Appointment, Client, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
+import type { Appointment, Checkin, Client, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -54,4 +54,6 @@ export interface Repository {
   load(): Promise<Db>;
   apply(changes: Change[]): Promise<void>;
   replaceAll(db: Db): Promise<void>;
+  /** Check-in samopoczucia (klient zapisuje tylko to w swoim profilu). */
+  saveCheckin(clientId: string, checkin: Checkin): Promise<void>;
 }

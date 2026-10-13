@@ -397,7 +397,7 @@ export function ExerciseModal({ m }: { m: Extract<ModalState, { kind: 'exercise'
 
 /* ---------- dane: eksport, import, reset ---------- */
 export function DataModal() {
-  const { db, reset, importDb, ask, toast } = useStore();
+  const { db, reset, importDb, ask, toast, cloud, signOut } = useStore();
   const { closeModal, go, openModal } = useNav();
   const file = useRef<HTMLInputElement>(null);
   const [palette, setPal] = useState<PaletteId>(getPalette());
@@ -453,10 +453,15 @@ export function DataModal() {
         Miejsca i kluby…
       </button>
       <h4 className="form-section">Dane</h4>
-      <p className="small">
-        Dane są teraz zapisywane <strong>tylko w tej przeglądarce</strong> na tym urządzeniu. Rób kopię zapasową, zanim wyczyścisz dane przeglądarki.
-        Po podłączeniu bazy w chmurze (Supabase) dane będą wspólne dla wszystkich urządzeń i dostępne dla klientów po zalogowaniu.
-      </p>
+      {cloud ? (
+        <p className="small">
+          Dane są zapisane <strong>w chmurze</strong> — widzisz je na każdym urządzeniu po zalogowaniu, a klienci widzą tylko swoje treningi i plany.
+        </p>
+      ) : (
+        <p className="small">
+          Dane są teraz zapisywane <strong>tylko w tej przeglądarce</strong> na tym urządzeniu. Rób kopię zapasową, zanim wyczyścisz dane przeglądarki.
+        </p>
+      )}
       <p className="muted small">
         {db.clients.length} podopiecznych · {db.sessions.length} treningów · {db.appointments.length} wizyt · {db.plans.length} planów
       </p>
@@ -494,6 +499,11 @@ export function DataModal() {
         >
           Wyczyść dane i zacznij od zera
         </button>
+        {signOut && (
+          <button type="button" className="btn btn-ghost" onClick={signOut}>
+            Wyloguj
+          </button>
+        )}
       </div>
     </Modal>
   );

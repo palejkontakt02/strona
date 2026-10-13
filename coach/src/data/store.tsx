@@ -1,9 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { applyChanges, type Change, type Db } from './db';
-import { createLocalRepository } from './localRepository';
+import type { Checkin } from '../domain';
+import { applyChanges, type Change, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
-
-const repo = createLocalRepository();
 
 interface AskState {
   message: string;
@@ -20,19 +18,60 @@ interface StoreValue {
   ask: (message: string, opts?: { confirm?: string; danger?: boolean }) => Promise<boolean>;
   reset: (mode: 'seed' | 'empty') => Promise<void>;
   importDb: (db: Db) => Promise<void>;
+  saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
+  /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
+  cloud: boolean;
+  signOut?: () => void;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
+export function StoreProvider({
+  children,
+  repo,
+  cloud = false,
+  signOut,
+  onEmpty,
+}: {
+  children: ReactNode;
+  repo: Repository;
+  cloud?: boolean;
+  signOut?: () => void;
+  /** Wywoływane, gdy baza trenera jest pusta (pierwsze uruchomienie w chmurze). */
+  onEmpty?: (db: Db) => Db | null;
+}) {
   const [db, setDb] = useState<Db | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const [askState, setAsk] = useState<AskState | null>(null);
   const toastId = useRef(0);
 
+  const load = useCallback(async () => {
+    try {
+      let next = await repo.load();
+      const seeded = onEmpty?.(next);
+      if (seeded) {
+        await repo.replaceAll(seeded);
+        next = seeded;
+      }
+      setDb(next);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [repo, onEmpty]);
+
   useEffect(() => {
-    void repo.load().then(setDb);
-  }, []);
+    void load();
+  }, [load]);
+
+  // Po powrocie do aplikacji (inne urządzenie mogło coś zmienić) — odśwież dane z chmury.
+  useEffect(() => {
+    if (!cloud) return;
+    const onVis = () => document.visibilityState === 'visible' && void load();
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [cloud, load]);
 
   const toast = useCallback((text: string) => {
     const id = ++toastId.current;
@@ -43,10 +82,33 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const apply = useCallback(
     async (changes: Change[], message?: string) => {
       setDb((cur) => (cur ? applyChanges(cur, changes) : cur));
-      await repo.apply(changes);
-      if (message) toast(message);
+      try {
+        await repo.apply(changes);
+        if (message) toast(message);
+      } catch {
+        toast('Nie udało się zapisać — sprawdź połączenie z internetem i spróbuj ponownie.');
+        void load();
+      }
     },
-    [toast],
+    [toast, repo, load],
+  );
+
+  const saveCheckin = useCallback(
+    async (clientId: string, checkin: Checkin) => {
+      setDb((cur) =>
+        cur
+          ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, checkins: [...c.checkins.filter((x) => x.date !== checkin.date), checkin] } : c)) }
+          : cur,
+      );
+      try {
+        await repo.saveCheckin(clientId, checkin);
+        toast('Dzięki! Zapisano samopoczucie.');
+      } catch {
+        toast('Nie udało się zapisać samopoczucia — sprawdź połączenie.');
+        void load();
+      }
+    },
+    [repo, toast, load],
   );
 
   const ask = useCallback(
@@ -64,7 +126,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDb(next);
       toast(mode === 'seed' ? 'Wczytano dane przykładowe.' : 'Wyczyszczono dane.');
     },
-    [toast],
+    [toast, repo],
   );
 
   const importDb = useCallback(
@@ -73,11 +135,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setDb(next);
       toast('Zaimportowano dane.');
     },
-    [toast],
+    [toast, repo],
   );
 
-  const value = useMemo(() => (db ? { db, apply, toast, ask, reset, importDb } : null), [db, apply, toast, ask, reset, importDb]);
-  if (!value) return null;
+  const value = useMemo(
+    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, cloud, signOut } : null),
+    [db, apply, toast, ask, reset, importDb, saveCheckin, cloud, signOut],
+  );
+  if (loadError)
+    return (
+      <div className="center-screen">
+        <div className="card auth-card">
+          <h2>Brak połączenia</h2>
+          <p className="muted">Nie udało się wczytać danych. Sprawdź internet i spróbuj ponownie.</p>
+          <p className="muted small">{loadError}</p>
+          <div className="actions">
+            <button className="btn btn-primary" onClick={() => void load()}>
+              Spróbuj ponownie
+            </button>
+            {signOut && (
+              <button className="btn btn-ghost" onClick={signOut}>
+                Wyloguj
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  if (!value) return <div className="center-screen muted">Wczytywanie…</div>;
 
   const close = (ok: boolean) => {
     askState?.resolve(ok);

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import type { Checkin, Wellness } from '../domain';
-import { put } from '../data/db';
 import { clientById, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
@@ -35,7 +34,7 @@ export function storeRun(id: string, run: Run | null, kind: RunKind = 'run') {
   }
 }
 
-export function AthleteApp({ clientId, onExit }: { clientId: string; onExit: () => void }) {
+export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: string; onExit: () => void; mode?: 'preview' | 'client' }) {
   const { db, toast } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
@@ -67,12 +66,23 @@ export function AthleteApp({ clientId, onExit }: { clientId: string; onExit: () 
 
   return (
     <div className="ath">
-      <div className="ath-preview">
-        <span>Podgląd trybu zawodnika · {client.name}</span>
-        <button className="btn btn-ghost btn-sm" onClick={onExit}>
-          Wróć do panelu
-        </button>
-      </div>
+      {mode === 'client' ? (
+        <div className="ath-top">
+          <span className="auth-logo small-logo">
+            FITOWA <span>/ coach</span>
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={onExit}>
+            Wyloguj
+          </button>
+        </div>
+      ) : (
+        <div className="ath-preview">
+          <span>Podgląd trybu zawodnika · {client.name}</span>
+          <button className="btn btn-ghost btn-sm" onClick={onExit}>
+            Wróć do panelu
+          </button>
+        </div>
+      )}
       {screen === 'run' && run ? (
         <Player
           client={client}
@@ -114,7 +124,7 @@ function Home({
   onResume: () => void;
   onDiscard: () => void;
 }) {
-  const { db, apply, ask } = useStore();
+  const { db, ask, saveCheckin } = useStore();
   const client = clientById(db, clientId)!;
   const today = todayISO();
   const sessions = sessionsOf(db, clientId);
@@ -180,7 +190,7 @@ function Home({
         </section>
       )}
 
-      <Checkin client={client} onSave={(c) => apply([put('clients', { ...client, checkins: [...client.checkins.filter((x) => x.date !== today), c].slice(-200) })], 'Dzięki! Zapisano samopoczucie.')} />
+      <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
 
       <div className="ath-grid">
         <section className="acard">

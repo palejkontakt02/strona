@@ -35,5 +35,14 @@ export function createLocalRepository(): Repository {
       db = next;
       write(db);
     },
+    async saveCheckin(clientId, checkin) {
+      db = {
+        ...db,
+        clients: db.clients.map((c) =>
+          c.id === clientId ? { ...c, checkins: [...c.checkins.filter((x) => x.date !== checkin.date), checkin].slice(-200) } : c,
+        ),
+      };
+      write(db);
+    },
   };
 }
