@@ -1,14 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Client, TrainingSession } from '../domain';
-import { saveSession, sessionsOf } from '../data/ops';
+import { IconBtn } from '../components/ui';
+import type { Billing, Client, TrainingSession } from '../domain';
+import { savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { uid } from '../format';
-import { defaultCharge } from '../lib/billing';
-import { repsN } from '../lib/parse';
-import { adHocExercise, appendExercise, blockRest, completeSet, runBlocks, runToExercises, type Run, type RunSet } from '../lib/run';
-import type { Billing } from '../domain';
-import { packageStatus } from '../lib/billing';
-import { num } from '../lib/parse';
+import { defaultCharge, packageStatus } from '../lib/billing';
+import { num, repsN } from '../lib/parse';
+import {
+  adHocExercise,
+  appendExercise,
+  applyRunLayout,
+  blockRest,
+  completeSet,
+  moveExercise,
+  removeExercise,
+  renameExercise,
+  runBlocks,
+  runToExercises,
+  toggleLink,
+  type Run,
+  type RunSet,
+} from '../lib/run';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -65,6 +77,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
   const [adding, setAdding] = useState(run.ex.length === 0);
+  const [layoutOpen, setLayoutOpen] = useState(false);
   const trainer = mode === 'trainer';
   const blocks = runBlocks(run);
   const bi = Math.max(0, blocks.findIndex((b) => b.includes(run.idx)));
@@ -276,9 +289,16 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         <button className="btn btn-ghost btn-sm" onClick={onHome}>
           {homeLabel}
         </button>
-        <button className="btn btn-ghost btn-sm" disabled={!tempoEx} onClick={() => setTempoOpen(true)}>
-          ◷ Tempo
-        </button>
+        <span className="actions">
+          {trainer && run.ex.length > 0 && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setLayoutOpen(true)}>
+              ✎ Układ
+            </button>
+          )}
+          <button className="btn btn-ghost btn-sm" disabled={!tempoEx} onClick={() => setTempoOpen(true)}>
+            ◷ Tempo
+          </button>
+        </span>
       </div>
       <header className="player-head">
         <h1>{run.name}</h1>
@@ -315,8 +335,10 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       {adding ? (
         <AddExercise
           onCancel={run.ex.length ? () => setAdding(false) : undefined}
-          onAdd={(name, sets, reps, load) => {
-            setRun(appendExercise(run, adHocExercise(name, sets, reps, load)));
+          canLink={run.ex.length > 0}
+          onAdd={(name, sets, reps, load, linked) => {
+            const next = appendExercise(run, adHocExercise(name, sets, reps, load));
+            setRun(linked ? toggleLink(next, next.ex.length - 1) : next);
             setAdding(false);
             window.scrollTo(0, 0);
           }}
@@ -348,6 +370,18 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       )}
 
       {rest && <RestBar rest={rest} setRest={setRest} />}
+      {layoutOpen && (
+        <LayoutSheet
+          run={run}
+          setRun={setRun}
+          onClose={() => setLayoutOpen(false)}
+          onAdd={() => {
+            setLayoutOpen(false);
+            setAdding(true);
+            setTimeout(() => document.querySelector('.add-form')?.scrollIntoView({ behavior: 'smooth' }), 50);
+          }}
+        />
+      )}
       {tempoOpen && tempoEx?.tempo && <Tempo name={tempoEx.name} phases={tempoEx.tempo} reps={repsN(tempoEx.sets.find((s) => !s.done)?.reps) || 5} onClose={() => setTempoOpen(false)} />}
 
       {finish && (
@@ -563,18 +597,19 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
   );
 }
 
-function AddExercise({ onAdd, onCancel }: { onAdd: (name: string, sets: number, reps: string, load: string) => void; onCancel?: () => void }) {
+function AddExercise({ onAdd, onCancel, canLink }: { onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean) => void; onCancel?: () => void; canLink?: boolean }) {
   const { db } = useStore();
   const [name, setName] = useState('');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8');
   const [load, setLoad] = useState('');
+  const [linked, setLinked] = useState(false);
   return (
     <form
       className="acard add-form"
       onSubmit={(ev) => {
         ev.preventDefault();
-        if (name.trim()) onAdd(name.trim(), parseInt(sets, 10) || 3, reps, load.replace(',', '.'));
+        if (name.trim()) onAdd(name.trim(), parseInt(sets, 10) || 3, reps, load.replace(',', '.'), linked);
       }}
     >
       <h3>Dodaj ćwiczenie</h3>
@@ -601,6 +636,11 @@ function AddExercise({ onAdd, onCancel }: { onAdd: (name: string, sets: number, 
           <input className="input" inputMode="decimal" value={load} onChange={(ev) => setLoad(ev.target.value)} />
         </label>
       </div>
+      {canLink && (
+        <label className="check">
+          <input type="checkbox" checked={linked} onChange={(ev) => setLinked(ev.target.checked)} /> w bloku z poprzednim (superseria / obwód)
+        </label>
+      )}
       <div className="actions">
         <button type="submit" className="btn btn-primary">
           Dodaj
@@ -612,5 +652,69 @@ function AddExercise({ onAdd, onCancel }: { onAdd: (name: string, sets: number, 
         )}
       </div>
     </form>
+  );
+}
+
+/** Układ treningu w trakcie: kolejność, nazwy, przerwy, łączenie w bloki, usuwanie; opcjonalnie zapis do planu. */
+function LayoutSheet({ run, setRun, onClose, onAdd }: { run: Run; setRun: (r: Run) => void; onClose: () => void; onAdd: () => void }) {
+  const { db, apply, ask } = useStore();
+  const plan = db.plans.find((p) => p.id === run.planId);
+  const workout = plan?.weeks.flatMap((w) => w.workouts).find((k) => k.id === run.workoutId);
+
+  const saveToPlan = async () => {
+    if (!plan || !workout) return;
+    if (!(await ask(`Zapisać ten układ w planie „${plan.name}” (${workout.name})? Następnym razem trening będzie wyglądał tak samo.`, { confirm: 'Zapisz w planie', danger: false }))) return;
+    const updated = applyRunLayout(workout, run, uid);
+    const next = { ...plan, weeks: plan.weeks.map((w) => ({ ...w, workouts: w.workouts.map((k) => (k.id === workout.id ? updated : k)) })) };
+    await apply(savePlan(db, next), 'Układ zapisany w planie.');
+  };
+
+  return (
+    <div className="sheet-bg" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Układ treningu">
+        <div className="between">
+          <h2>Układ treningu</h2>
+          <button className="btn btn-primary btn-sm" onClick={onClose}>
+            Gotowe
+          </button>
+        </div>
+        <p className="muted small">⛓ łączy ćwiczenie z poprzednim w superserię / obwód — robi się je na zmianę, przerwa po całej rundzie.</p>
+        <ul className="layout-list">
+          {run.ex.map((e, k) => (
+            <li key={k} className={`layout-row ${e.linked ? 'linked' : ''}`}>
+              <span className="ex-label">{e.label}</span>
+              <input className="input" value={e.name} onChange={(ev) => setRun(renameExercise(run, k, { name: ev.target.value }))} aria-label={`Nazwa ćwiczenia ${e.label}`} />
+              <input className="input layout-rest" value={e.rest} placeholder="Przerwa" onChange={(ev) => setRun(renameExercise(run, k, { rest: ev.target.value }))} aria-label={`Przerwa ${e.label}`} />
+              <span className="layout-actions">
+                {k > 0 && (
+                  <button className={`chain ${e.linked ? 'on' : ''}`} aria-pressed={!!e.linked} title={e.linked ? 'Rozłącz z poprzednim' : 'Połącz z poprzednim (superseria / obwód)'} onClick={() => setRun(toggleLink(run, k))}>
+                    ⛓
+                  </button>
+                )}
+                <IconBtn icon="up" label="W górę" onClick={() => setRun(moveExercise(run, k, -1))} />
+                <IconBtn icon="chevD" label="W dół" onClick={() => setRun(moveExercise(run, k, 1))} />
+                <IconBtn
+                  icon="trash"
+                  label="Usuń ćwiczenie"
+                  danger
+                  onClick={async () => {
+                    const done = e.sets.some((x) => x.done);
+                    if (!done || (await ask(`Usunąć „${e.name}”? Zaliczone serie tego ćwiczenia nie zostaną zapisane.`))) setRun(removeExercise(run, k));
+                  }}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+        <button className="btn btn-secondary btn-block" onClick={onAdd}>
+          + Dodaj ćwiczenie
+        </button>
+        {plan && workout && (
+          <button className="btn btn-ghost btn-block" onClick={saveToPlan}>
+            Zapisz ten układ także w planie
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

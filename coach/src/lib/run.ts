@@ -269,3 +269,54 @@ export function runToExercises(run: Run) {
     };
   }).filter((e) => e.setsLog.length > 0);
 }
+
+/* ---------- edycja układu treningu w trakcie (trener) ---------- */
+
+function relabel(run: Run, ex: RunExercise[], idx: number): Run {
+  const fixed = ex.map((e, i) => (i === 0 && e.linked ? { ...e, linked: undefined } : e));
+  return { ...run, ex: withLabels(fixed), idx: Math.max(0, Math.min(idx, fixed.length - 1)) };
+}
+
+/** Łączy ćwiczenie z poprzednim w blok (superseria / obwód) albo rozłącza. */
+export function toggleLink(run: Run, k: number): Run {
+  if (k <= 0) return run;
+  const ex = run.ex.map((e, i) => (i === k ? { ...e, linked: e.linked ? undefined : true } : e));
+  return relabel(run, ex, k);
+}
+
+/** Przesuwa ćwiczenie w górę (-1) lub w dół (+1). */
+export function moveExercise(run: Run, k: number, dir: -1 | 1): Run {
+  const j = k + dir;
+  if (j < 0 || j >= run.ex.length) return run;
+  const ex = [...run.ex];
+  [ex[k], ex[j]] = [ex[j], ex[k]];
+  return relabel(run, ex, j);
+}
+
+/** Usuwa ćwiczenie; jeśli było początkiem bloku, następne przejmuje rolę początku. */
+export function removeExercise(run: Run, k: number): Run {
+  const ex = run.ex.filter((_, i) => i !== k);
+  if (!run.ex[k]?.linked && ex[k]?.linked) ex[k] = { ...ex[k], linked: undefined };
+  return relabel(run, ex, Math.min(run.idx, ex.length - 1));
+}
+
+export function renameExercise(run: Run, k: number, patch: Partial<Pick<RunExercise, 'name' | 'rest'>>): Run {
+  return { ...run, ex: run.ex.map((e, i) => (i === k ? { ...e, ...patch } : e)) };
+}
+
+/**
+ * Przenosi układ z treningu do jednostki planu: kolejność, nazwy, przerwy i bloki.
+ * Ćwiczenia z planu zachowują swoje serie; dodane w trakcie dostają serie z treningu.
+ */
+export function applyRunLayout(workout: PlanWorkout, run: Run, newId: () => string): PlanWorkout {
+  const pool = [...workout.exercises];
+  const exercises = run.ex.map((e) => {
+    const i = pool.findIndex((p) => p.name === e.name);
+    const base = i >= 0 ? pool.splice(i, 1)[0] : null;
+    const groups = base
+      ? base.groups
+      : e.sets.map((s) => ({ type: (s.warmup ? 'Rozgrzewka' : 'Robocze') as SetType, sets: '1', reps: s.reps, load: s.spec || s.load, rpe: s.tRpe || s.rpe }));
+    return { ...(base ?? { id: newId(), notes: '' }), name: e.name, rest: e.rest, linked: e.linked || undefined, groups };
+  });
+  return { ...workout, exercises };
+}

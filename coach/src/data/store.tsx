@@ -95,7 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ))}
       </div>
       {askState && (
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
+        <div className="modal-backdrop ask-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
           <div className="card modal modal-sm" role="alertdialog" aria-modal="true">
             <p className="ask-text">{askState.message}</p>
             <div className="modal-actions">

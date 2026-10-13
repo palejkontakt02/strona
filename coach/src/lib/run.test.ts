@@ -125,3 +125,48 @@ describe('ad hoc exercises (trainer live session)', () => {
     expect(runToExercises(run)).toEqual([{ name: 'Przysiad', label: 'A', sets: '1', reps: '5', load: '100', rpe: '', rest: '2:00', setsLog: [{ load: 100, reps: 5, rpe: undefined, warmup: undefined, label: undefined }] }]);
   });
 });
+
+describe('live layout editing', () => {
+  const mk = async () => {
+    const { emptyRun, appendExercise, adHocExercise } = await import('./run');
+    let run = emptyRun('T', '2026-10-13', 0);
+    for (const n of ['Przysiad', 'Podciąganie', 'Pompki', 'Plank']) run = appendExercise(run, adHocExercise(n, 2, '8', ''));
+    return run;
+  };
+  it('links, moves and unlinks into supersets / circuits', async () => {
+    const { toggleLink, moveExercise } = await import('./run');
+    let run = await mk();
+    run = toggleLink(run, 2);
+    run = toggleLink(run, 3);
+    expect(run.ex.map((e) => e.label)).toEqual(['A', 'B1', 'B2', 'B3']);
+    run = toggleLink(run, 2);
+    expect(run.ex.map((e) => e.label)).toEqual(['A', 'B', 'C1', 'C2']);
+    run = moveExercise(run, 3, -1);
+    expect(run.ex.map((e) => e.name)).toEqual(['Przysiad', 'Podciąganie', 'Plank', 'Pompki']);
+    expect(run.idx).toBe(2);
+  });
+  it('removing a block head keeps the rest of the block together', async () => {
+    const { toggleLink, removeExercise } = await import('./run');
+    let run = await mk();
+    run = toggleLink(toggleLink(run, 2), 3); // A, B1 B2 B3
+    run = removeExercise(run, 1);
+    expect(run.ex.map((e) => `${e.label}:${e.name}`)).toEqual(['A:Przysiad', 'B1:Pompki', 'B2:Plank']);
+  });
+  it('applies the layout back to the plan, keeping planned sets', async () => {
+    const { applyRunLayout, toggleLink, renameExercise } = await import('./run');
+    let run = await mk();
+    run = toggleLink(run, 3);
+    run = renameExercise(run, 3, { rest: '90' });
+    const workout = { id: 'w', name: 'W', exercises: [{ id: 'p1', name: 'Przysiad', rest: '3:00', groups: [g({ type: 'Top set', load: '100' })] }] };
+    const out = applyRunLayout(workout, run, () => 'new');
+    expect(out.exercises.map((e) => [e.name, e.linked ?? false, e.rest])).toEqual([
+      ['Przysiad', false, '2:00'],
+      ['Podciąganie', false, '2:00'],
+      ['Pompki', false, '2:00'],
+      ['Plank', true, '90'],
+    ]);
+    expect(out.exercises[0].id).toBe('p1');
+    expect(out.exercises[0].groups[0].type).toBe('Top set');
+    expect(out.exercises[1].groups).toHaveLength(2);
+  });
+});
