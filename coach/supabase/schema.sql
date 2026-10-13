@@ -148,3 +148,10 @@ create policy client_read on public.library for select to authenticated using (t
 
 drop policy if exists client_read on public.locations;
 create policy client_read on public.locations for select to authenticated using (true);
+
+-- Nowe projekty Supabase nie udostępniają tabel automatycznie przez API.
+-- Uprawnienia dla zalogowanych — co kto widzi, i tak rozstrzygają reguły RLS powyżej.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.trainers, public.clients, public.plans, public.sessions,
+  public.appointments, public.library, public.locations to authenticated;
+notify pgrst, 'reload schema';
