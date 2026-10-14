@@ -4,7 +4,7 @@ import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGrou
 import { cloneWeek, savePlan } from '../data/ops';
 import { useStore } from '../data/store';
 import { uid } from '../format';
-import { exerciseLabels, setCountLabel } from '../lib/plan';
+import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
 const newRow = (type: SetType = 'Robocze', from?: SetGroup): SetGroup => ({ type, sets: '1', reps: from?.reps ?? '', load: from?.load ?? '', rpe: from?.rpe ?? '' });
@@ -30,7 +30,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
 
   const save = async () => {
     const clean = structuredClone(p);
-    for (const w of clean.weeks) for (const k of w.workouts) k.exercises = k.exercises.filter((e) => e.name.trim());
+    for (const w of clean.weeks)
+      for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
     await apply(savePlan(db, clean), m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
     closeModal();
   };
@@ -79,7 +80,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={() => {
-                const copy = cloneWeek(p.weeks[wi], `Tydzień ${p.weeks.length + 1}`);
+                const copy = cloneWeek(p.weeks[wi], `${p.weeks[wi].name} (kopia)`);
                 upd((d) => void d.weeks.splice(wi + 1, 0, copy));
                 setOpen((o) => new Set([...o, copy.id]));
               }}
@@ -144,12 +145,18 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         onClick={() =>
                           ei > 0 &&
                           upd((d) => {
-                            const list = findWorkout(d, wi, ki).exercises;
-                            [list[ei - 1], list[ei]] = [list[ei], list[ei - 1]];
+                            const k = findWorkout(d, wi, ki);
+                            k.exercises = moveInBlocks(k.exercises, ei, -1);
                           })
                         }
                       />
-                      <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() => upd((d) => void findWorkout(d, wi, ki).exercises.splice(ei, 1))} />
+                      <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() =>
+                          upd((d) => {
+                            const k = findWorkout(d, wi, ki);
+                            k.exercises = removeFromBlocks(k.exercises, ei);
+                          })
+                        }
+                      />
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
                     <div className="pe-sets">

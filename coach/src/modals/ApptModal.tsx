@@ -4,8 +4,8 @@ import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
 import { clientById, deleteAppointment, saveAppointment } from '../data/ops';
 import { useStore } from '../data/store';
-import { uid } from '../format';
-import { clashes } from '../lib/calendar';
+import { fmtShort, uid } from '../format';
+import { clashes, weeklyDates } from '../lib/calendar';
 import { todayISO } from '../lib/dates';
 import { num } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
@@ -40,7 +40,9 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     note: note.trim() || undefined,
     status,
   };
-  const clash = clashes(draft, db.appointments);
+  // Kolizje sprawdzamy dla każdego terminu serii (wizyty cykliczne), nie tylko pierwszego.
+  const repeatN = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
+  const clash = weeklyDates(draft.date, repeatN).flatMap((d) => clashes({ ...draft, date: d }, db.appointments));
 
   const save = async () => {
     if (!clientId) return;
@@ -160,7 +162,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
       </div>
       {clash.length > 0 && (
         <p className="warn-box">
-          Kolizja z: {clash.map((c) => `${clientById(db, c.clientId)?.name ?? '—'} ${c.time}`).join(', ')}
+          Kolizja{repeatN > 1 ? ` (${clash.length} w serii)` : ''}: {clash.map((c) => `${repeatN > 1 ? fmtShort(c.date) + ' ' : ''}${clientById(db, c.clientId)?.name ?? '—'} ${c.time}`).join(', ')}
         </p>
       )}
     </Modal>

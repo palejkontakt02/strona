@@ -1,6 +1,6 @@
 import type { PlanExercise, PlanWorkout, SetType, TrainingSession } from '../domain';
 import { num, parseRest, parseTempo, repsN } from './parse';
-import { exerciseBlocks, exerciseLabels, mergeGroups } from './plan';
+import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
 import { e1rmRPE, e1Series, loadFor, resolveLoad } from './strength';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
@@ -52,6 +52,8 @@ export interface Run {
   ex: RunExercise[];
   /** Edycja zapisanego treningu (zamiast nowego). */
   editSessionId?: string;
+  /** Wizyta, z której trener uruchomił trening (zachowana po wyjściu do panelu). */
+  appointmentId?: string;
 }
 
 const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;
@@ -286,20 +288,16 @@ export function toggleLink(run: Run, k: number): Run {
   return relabel(run, ex, k);
 }
 
-/** Przesuwa ćwiczenie w górę (-1) lub w dół (+1). */
+/** Przesuwa ćwiczenie w górę (-1) lub w dół (+1) z zachowaniem bloków. */
 export function moveExercise(run: Run, k: number, dir: -1 | 1): Run {
   const j = k + dir;
   if (j < 0 || j >= run.ex.length) return run;
-  const ex = [...run.ex];
-  [ex[k], ex[j]] = [ex[j], ex[k]];
-  return relabel(run, ex, j);
+  return relabel(run, moveInBlocks(run.ex, k, dir), j);
 }
 
 /** Usuwa ćwiczenie; jeśli było początkiem bloku, następne przejmuje rolę początku. */
 export function removeExercise(run: Run, k: number): Run {
-  const ex = run.ex.filter((_, i) => i !== k);
-  if (!run.ex[k]?.linked && ex[k]?.linked) ex[k] = { ...ex[k], linked: undefined };
-  return relabel(run, ex, Math.min(run.idx, ex.length - 1));
+  return relabel(run, removeFromBlocks(run.ex, k), Math.min(run.idx, run.ex.length - 2));
 }
 
 export function renameExercise(run: Run, k: number, patch: Partial<Pick<RunExercise, 'name' | 'rest'>>): Run {

@@ -49,15 +49,21 @@ export function currentPlan(plans: Plan[]): Plan | null {
 }
 
 /**
- * Następny trening: pierwsza jednostka planu, której nie ma jeszcze w sesjach z tego planu.
- * Gdy wszystkie zrobione — ostatnia.
+ * Następny trening: jednostka po ostatnio wykonanej z tego planu (wg daty, w kolejności
+ * tydzień → jednostka), cyklicznie — po ostatniej wraca do pierwszej. Bez historii — pierwsza.
  */
 export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (PlanStep & { total: number }) | null {
   if (!plan) return null;
   const seq = planSequence(plan);
   if (seq.length === 0) return null;
-  const done = new Set(sessions.filter((s) => s.planId === plan.id && s.workoutId).map((s) => s.workoutId));
-  const nx = seq.find((x) => !done.has(x.workout.id)) || seq[seq.length - 1];
+  const pos = new Map(seq.map((x, i) => [x.workout.id, i]));
+  let last: { date: string; i: number } | null = null;
+  for (const s of sessions) {
+    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId)) continue;
+    const i = pos.get(s.workoutId)!;
+    if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
+  }
+  const nx = seq[last ? (last.i + 1) % seq.length : 0];
   return { ...nx, total: seq.length };
 }
 
@@ -106,4 +112,36 @@ function blockLetter(n: number): string {
     n = Math.floor((n - 1) / 26);
   }
   return s;
+}
+
+/**
+ * Przesunięcie ćwiczenia o jedno miejsce z zachowaniem bloków (superserii / obwodów):
+ * w obrębie bloku zmienia się tylko kolejność; poza blok ćwiczenie wychodzi jako samodzielne,
+ * a wstawione w środek bloku — dołącza do niego.
+ */
+export function moveInBlocks<T extends { linked?: boolean }>(list: T[], k: number, dir: -1 | 1): T[] {
+  const j = k + dir;
+  if (j < 0 || j >= list.length) return list;
+  const blocks = exerciseBlocks(list);
+  const blockOf = (i: number) => blocks.findIndex((b) => b.includes(i));
+  if (blockOf(k) === blockOf(j)) {
+    const out = [...list];
+    const lk = out[k].linked;
+    const lj = out[j].linked;
+    [out[k], out[j]] = [{ ...out[j], linked: lk }, { ...out[k], linked: lj }];
+    return out;
+  }
+  const item = list[k];
+  const rest = removeFromBlocks(list, k);
+  const next = rest[j];
+  const joined = !!next?.linked && j > 0;
+  const out = [...rest.slice(0, j), { ...item, linked: joined ? true : undefined }, ...rest.slice(j)];
+  return out.map((e, i) => (i === 0 && e.linked ? { ...e, linked: undefined } : e));
+}
+
+/** Usunięcie ćwiczenia; jeśli zaczynało blok, następne przejmuje rolę początku bloku. */
+export function removeFromBlocks<T extends { linked?: boolean }>(list: T[], k: number): T[] {
+  const out = list.filter((_, i) => i !== k);
+  if (!list[k]?.linked && out[k]?.linked) out[k] = { ...out[k], linked: undefined };
+  return out;
 }

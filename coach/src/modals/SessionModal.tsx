@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal } from '../components/ui';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { clientById, deleteSession, plansOf, saveSession, sessionsOf } from '../data/ops';
+import { clientById, deleteSession, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fnum, uid } from '../format';
+import { fnum, pln, uid } from '../format';
 import { defaultCharge, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { num } from '../lib/parse';
-import { currentPlan, exerciseSummary, nextWorkout, planSequence } from '../lib/plan';
+import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
 import { WELLNESS_ITEMS } from '../lib/wellness';
 import { useNav, type ModalState } from '../nav';
@@ -25,10 +25,26 @@ interface ExRow {
   notes: string;
   setsLog?: SessionExercise['setsLog'];
   hint?: string;
+  /** W bloku z poprzednim ćwiczeniem (superseria / obwód). */
+  linked?: boolean;
+}
+
+/** Blok odczytany z oznaczenia: „B2”, „C3” → połączone z poprzednim. */
+const linkedFromLabel = (label?: string) => {
+  const m = label?.match(/^[A-Z]+(\d+)$/);
+  return m && m[1] !== '1' ? true : undefined;
+};
+
+/** Usuwa puste wiersze (zachowując bloki) i nadaje oznaczenia A, B1, B2… */
+function withBlockLabels(rows: ExRow[]): (ExRow & { label: string })[] {
+  let list = rows;
+  for (let i = list.length - 1; i >= 0; i--) if (!list[i].name.trim()) list = removeFromBlocks(list, i);
+  const labels = exerciseLabels(list);
+  return list.map((r, i) => ({ ...r, label: labels[i] }));
 }
 
 const s = (v: number | undefined | null) => (v == null ? '' : String(v));
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', setsLog: e.setsLog });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', setsLog: e.setsLog, linked: linkedFromLabel(e.label) });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '' });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -99,6 +115,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           rest: e.rest ?? '',
           notes: e.notes ?? '',
           hint: sug.why || undefined,
+          linked: e.linked,
         };
       }),
     );
@@ -114,7 +131,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   }
 
   const setRow = (i: number, patch: Partial<ExRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch, setsLog: patch.setsLog ?? (Object.keys(patch).some((k) => ['sets', 'reps', 'load', 'rpe'].includes(k)) ? undefined : x.setsLog) } : x)));
-  const moveUp = (i: number) => i > 0 && setRows((r) => [...r.slice(0, i - 1), r[i], r[i - 1], ...r.slice(i + 1)]);
+  const moveUp = (i: number) => i > 0 && setRows((r) => moveInBlocks(r, i, -1));
 
   const au = num(srpe) != null && num(duration) != null ? num(srpe)! * num(duration)! : null;
 
@@ -142,9 +159,17 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       locationId: locationId || undefined,
       planId: planRef.planId,
       workoutId: planRef.workoutId,
-      exercises: rows
-        .filter((r) => r.name.trim())
-        .map((r) => ({ name: r.name.trim(), sets: r.sets, reps: r.reps, load: r.load, rpe: r.rpe, rest: r.rest || undefined, notes: r.notes || undefined, setsLog: r.setsLog })),
+      exercises: withBlockLabels(rows).map((r) => ({
+        name: r.name.trim(),
+        label: r.label,
+        sets: r.sets,
+        reps: r.reps,
+        load: r.load,
+        rpe: r.rpe,
+        rest: r.rest || undefined,
+        notes: r.notes || undefined,
+        setsLog: r.setsLog,
+      })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: m.appt?.id, amount: num(amount) ?? undefined, paidNow });
     await apply(changes, message);
@@ -153,7 +178,14 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
 
   const remove = async () => {
     if (!existing || !(await ask('Usunąć ten trening? Powiązana wizyta wróci do „zaplanowanej”.'))) return;
-    await apply(deleteSession(db, existing.id), 'Trening usunięty.');
+    const sp = sessionPayment(db, existing);
+    const removePayment =
+      !!sp &&
+      (await ask(
+        `Za ten trening jest płatność ${pln(sp.payment.amount)} (${sp.payment.status === 'paid' ? 'opłacona' : 'do zapłaty'}). Usunąć ją też?`,
+        { confirm: 'Usuń płatność' },
+      ));
+    await apply(deleteSession(db, existing.id, removePayment), removePayment ? 'Trening i płatność usunięte.' : 'Trening usunięty.');
     closeModal();
   };
 
@@ -235,7 +267,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <input className="input" value={r.rest} onChange={(e) => setRow(i, { rest: e.target.value })} aria-label="Przerwa" />
             <span className="ex-actions">
               <IconBtn icon="up" label="Przesuń w górę" onClick={() => moveUp(i)} />
-              <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() => setRows(rows.filter((_, j) => j !== i))} />
+              <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() => setRows(removeFromBlocks(rows, i))} />
             </span>
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {(r.hint || r.setsLog) && (

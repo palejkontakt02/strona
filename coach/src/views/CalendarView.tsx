@@ -4,7 +4,7 @@ import type { Appointment, AppointmentStatus, ISODate, TrainingSession } from '.
 import { clientById } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtMonth, fmtShort, fmtWeekday } from '../format';
-import { clientHue } from '../lib/calendar';
+import { clashes, clientHue } from '../lib/calendar';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { useNav } from '../nav';
 import { LocationTag, locStyle } from '../components/location';
@@ -129,9 +129,16 @@ function ApptTile({ a }: { a: Appointment }) {
   const { db } = useStore();
   const { openModal } = useNav();
   const c = clientById(db, a.clientId);
+  const clash = a.status === 'planned' && clashes(a, db.appointments).length > 0;
   return (
-    <button className={`tile tile-${a.status}`} style={hueStyle(a.clientId)} onClick={() => openModal({ kind: 'appt', appt: a })}>
+    <button
+      className={`tile tile-${a.status} ${clash ? 'tile-clash' : ''}`}
+      style={hueStyle(a.clientId)}
+      title={clash ? 'Kolizja z inną wizytą o tej porze' : undefined}
+      onClick={() => openModal({ kind: 'appt', appt: a })}
+    >
       <span className="tile-time">
+        {clash && <span className="clash-mark" aria-label="Kolizja">⚠ </span>}
         {a.time}
         {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
       </span>

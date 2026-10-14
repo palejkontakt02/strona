@@ -193,6 +193,8 @@ export interface SessionExercise {
 
 export interface TrainingSession {
   id: string;
+  /** Płatność za sesję pojedynczą utworzona przy zapisie tego treningu. */
+  paymentId?: string;
   locationId?: string;
   clientId: string;
   date: ISODate;

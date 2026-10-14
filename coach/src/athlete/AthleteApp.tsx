@@ -495,7 +495,7 @@ function Workouts({
   const [preview, setPreview] = useState<PlanWorkout | null>(null);
   if (!plan) return null;
   const doneMap: Record<string, string> = {};
-  for (const s of [...sessions].reverse()) if (s.planId === plan.id && s.workoutId && !doneMap[s.workoutId]) doneMap[s.workoutId] = s.date;
+  for (const s of sessions) if (s.planId === plan.id && s.workoutId && !doneMap[s.workoutId]) doneMap[s.workoutId] = s.date; // od najnowszej
   return (
     <section className="acard">
       <div className="between">

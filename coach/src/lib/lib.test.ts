@@ -296,7 +296,11 @@ describe('plan', () => {
     const done = [sess({ date: TODAY, planId: 'p1', workoutId: 'a' }), sess({ date: TODAY, planId: 'other', workoutId: 'b' })];
     expect(nextWorkout(plan, done)).toMatchObject({ index: 1, total: 3 });
     const all = ['a', 'b', 'c'].map((w) => sess({ date: TODAY, planId: 'p1', workoutId: w }));
-    expect(nextWorkout(plan, all)?.workout.id).toBe('c');
+    // po ostatniej jednostce plan zaczyna się od nowa
+    expect(nextWorkout(plan, all)?.workout.id).toBe('a');
+    // liczy się ostatnio wykonana jednostka, nie pierwsza niewykonana
+    const outOfOrder = [sess({ date: '2026-10-01', planId: 'p1', workoutId: 'a' }), sess({ date: '2026-10-08', planId: 'p1', workoutId: 'b' }), sess({ date: '2026-09-20', planId: 'p1', workoutId: 'c' })];
+    expect(nextWorkout(plan, outOfOrder)?.workout.id).toBe('c');
     expect(nextWorkout(null, [])).toBeNull();
   });
 });
@@ -342,4 +346,28 @@ describe('alerts', () => {
     ]);
   });
   it('no alerts for a healthy client', () => expect(clientAlerts(client(), [], TODAY)).toEqual([]));
+});
+
+describe('moving and removing within blocks', () => {
+  const L = (spec: string) => spec.split(' ').map((t) => ({ n: t.replace('*', ''), linked: t.endsWith('*') || undefined }));
+  const show = (l: { n: string; linked?: boolean }[]) => l.map((e) => e.n + (e.linked ? '*' : '')).join(' ');
+  it('reorders inside a block without changing its boundaries', async () => {
+    const { moveInBlocks } = await import('./plan');
+    // A | B C* D* | E   (C, D w bloku z B)
+    expect(show(moveInBlocks(L('A B C* D* E'), 2, -1))).toBe('A C B* D* E');
+  });
+  it('leaving a block makes the exercise standalone and keeps the block together', async () => {
+    const { moveInBlocks } = await import('./plan');
+    expect(show(moveInBlocks(L('A B C* D* E'), 1, -1))).toBe('B A C D* E');
+    expect(show(moveInBlocks(L('A B C* D* E'), 3, 1))).toBe('A B C* E D');
+  });
+  it('moving into the middle of a block joins it', async () => {
+    const { moveInBlocks } = await import('./plan');
+    expect(show(moveInBlocks(L('A B C* D* E'), 4, -1))).toBe('A B C* E* D*');
+  });
+  it('removing a block head keeps the rest together', async () => {
+    const { removeFromBlocks } = await import('./plan');
+    expect(show(removeFromBlocks(L('A B C* D* E'), 1))).toBe('A C D* E');
+    expect(show(removeFromBlocks(L('A B C* E'), 2))).toBe('A B E');
+  });
 });

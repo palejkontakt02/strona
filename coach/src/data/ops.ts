@@ -61,10 +61,10 @@ export interface SessionSave {
  * - pakiet → komunikat o saldzie.
  */
 export function saveSession(db: Db, s: SessionSave): { changes: Change[]; message: string } {
-  const changes: Change[] = [put('sessions', s.session)];
   let message = 'Trening zapisany.';
-  if (!s.isNew) return { changes, message };
-  const { session } = s;
+  if (!s.isNew) return { changes: [put('sessions', s.session)], message };
+  let session = s.session;
+  const changes: Change[] = [];
 
   const appt =
     db.appointments.find((a) => a.id === s.appointmentId) ??
@@ -74,6 +74,7 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
   const client = clientById(db, session.clientId);
   if (client && session.charge === 'pojedyncza' && s.amount) {
     const pay = singleSessionPayment(uid(), session.date, s.amount, !!s.paidNow, `Sesja ${fmtDay(session.date)}`);
+    session = { ...session, paymentId: pay.id };
     changes.push(put('clients', { ...client, payments: [...client.payments, pay] }));
     message = s.paidNow ? 'Trening zapisany i opłacony.' : 'Trening zapisany, płatność czeka w „Do zapłaty”.';
   }
@@ -81,12 +82,23 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
     const pk = packageStatus(client, sessionsOf(db, client.id));
     if (pk) message = packageMessage(pk.left);
   }
-  return { changes, message };
+  return { changes: [put('sessions', session), ...changes], message };
 }
 
-/** Usunięcie treningu; powiązana wizyta wraca do `planned`. */
-export function deleteSession(db: Db, id: string): Change[] {
+/** Płatność utworzona przy zapisie treningu (sesja pojedyncza), jeśli nadal istnieje. */
+export function sessionPayment(db: Db, s: TrainingSession) {
+  if (!s.paymentId) return undefined;
+  const client = clientById(db, s.clientId);
+  const payment = client?.payments.find((p) => p.id === s.paymentId);
+  return client && payment ? { client, payment } : undefined;
+}
+
+/** Usunięcie treningu; powiązana wizyta wraca do `planned`, opcjonalnie znika też jego płatność. */
+export function deleteSession(db: Db, id: string, removePayment = false): Change[] {
   const changes: Change[] = [del('sessions', id)];
+  const s = db.sessions.find((x) => x.id === id);
+  const sp = s && removePayment ? sessionPayment(db, s) : undefined;
+  if (sp) changes.push(put('clients', { ...sp.client, payments: sp.client.payments.filter((p) => p.id !== sp.payment.id) }));
   for (const a of db.appointments.filter((x) => x.sessionId === id)) {
     const { sessionId: _drop, ...rest } = a;
     changes.push(put('appointments', { ...rest, status: 'planned' }));

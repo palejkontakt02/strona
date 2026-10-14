@@ -17,13 +17,21 @@ import { Player } from './Player';
 export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: { clientId: string; appointmentId?: string; editSessionId?: string; onExit: () => void }) {
   const { db, toast, ask } = useStore();
   const client = clientById(db, clientId);
-  const [run, setRun] = useState<Run | null>(() => {
+  // Poprawki zapisanego treningu trzymamy tylko w pamięci — nie nadpisują treningu w toku.
+  const editing = !!editSessionId;
+  const [run, setRunState] = useState<Run | null>(() => {
     const s = editSessionId ? db.sessions.find((x) => x.id === editSessionId) : undefined;
-    return s ? sessionToRun(s) : loadRun(clientId, 'live');
+    if (s) return sessionToRun(s);
+    const stored = loadRun(clientId, 'live');
+    return stored && !stored.editSessionId ? stored : null;
   });
+  // Trening uruchomiony z wizyty pamięta ją, także po wyjściu do panelu i powrocie przez pasek.
+  const setRun = (r: Run | null) => setRunState(r && !r.editSessionId && appointmentId && !r.appointmentId ? { ...r, appointmentId } : r);
   const [planId, setPlanId] = useState<string | null>(null);
 
-  useEffect(() => storeRun(clientId, run, 'live'), [clientId, run]);
+  useEffect(() => {
+    if (!editing) storeRun(clientId, run, 'live');
+  }, [clientId, run, editing]);
   useEffect(() => {
     document.body.classList.add('athlete-mode');
     return () => document.body.classList.remove('athlete-mode');
@@ -35,7 +43,7 @@ export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: 
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
   const done: Record<string, string> = {};
-  for (const s of [...sessions].reverse()) if (plan && s.planId === plan.id && s.workoutId && !done[s.workoutId]) done[s.workoutId] = s.date;
+  for (const s of sessions) if (plan && s.planId === plan.id && s.workoutId && !done[s.workoutId]) done[s.workoutId] = s.date; // sesje od najnowszej
 
   const start = (workoutId: string | null) => {
     if (!workoutId || !plan) {
@@ -55,7 +63,13 @@ export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: 
         <span className="row-inline">
           <Avatar name={client.name} size={24} /> Trening na żywo · {client.name}
         </span>
-        <button className="btn btn-ghost btn-sm" onClick={onExit}>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={async () => {
+            if (editing && run && !(await ask('Wyjść bez zapisywania poprawek? Zapisany trening zostanie bez zmian.', { confirm: 'Wyjdź' }))) return;
+            onExit();
+          }}
+        >
           ‹ Panel
         </button>
       </div>
@@ -66,11 +80,10 @@ export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: 
           run={run}
           setRun={setRun}
           homeLabel={run.editSessionId ? '‹ Anuluj poprawki' : '‹ Zmień trening'}
-          appointmentId={appointmentId}
+          appointmentId={run.appointmentId ?? appointmentId}
           onHome={async () => {
             if (run.editSessionId) {
               if (await ask('Porzucić poprawki? Zapisany trening zostanie bez zmian.', { confirm: 'Porzuć' })) {
-                storeRun(clientId, null, 'live');
                 setRun(null);
                 onExit();
               }
@@ -80,7 +93,7 @@ export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: 
             if (!started || (await ask('Porzucić ten trening i wybrać inny? Zaliczone serie nie zostaną zapisane.', { confirm: 'Porzuć' }))) setRun(null);
           }}
           onSaved={() => {
-            storeRun(clientId, null, 'live');
+            if (!editing) storeRun(clientId, null, 'live');
             setRun(null);
             onExit();
           }}
