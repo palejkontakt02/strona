@@ -3,6 +3,7 @@ import { LocationTag } from '../components/location';
 import type { TrainingSession } from '../domain';
 import { sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
+import { StartButtons } from './StartButtons';
 import { fmtDay, fmtLong, fnum } from '../format';
 import { todayISO } from '../lib/dates';
 import { sessionLoad, tonnage } from '../lib/load';
@@ -38,7 +39,18 @@ export function Upcoming({ clientId }: { clientId: string }) {
 }
 
 /** Historia odbytych treningów ze szczegółami serii. */
-export function History({ clientId, onEdit }: { clientId: string; onEdit?: (s: TrainingSession) => void }) {
+interface HistoryActions {
+  onEdit?: (s: TrainingSession) => void;
+  /** Ten sam trening jeszcze raz (zawodnik). */
+  onRepeat?: (s: TrainingSession) => void;
+  /** Ten sam trening jeszcze raz, prowadzony przez trenera. */
+  onTrainer?: (s: TrainingSession) => void;
+  /** Oznacz jako niewykonany (usuwa zapis, jednostka wraca do listy). */
+  onUndo?: (s: TrainingSession) => void;
+  canUndo?: (s: TrainingSession) => boolean;
+}
+
+export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo }: { clientId: string } & HistoryActions) {
   const { db } = useStore();
   const sessions = sessionsOf(db, clientId);
   const [limit, setLimit] = useState(8);
@@ -79,21 +91,31 @@ export function History({ clientId, onEdit }: { clientId: string; onEdit?: (s: T
         <SessionSheet
           s={open}
           onClose={() => setOpen(null)}
-          onEdit={
-            onEdit &&
-            (() => {
-              const s = open;
-              setOpen(null);
-              onEdit(s);
-            })
-          }
+          onEdit={onEdit && (() => (setOpen(null), onEdit(open)))}
+          onRepeat={onRepeat && (() => (setOpen(null), onRepeat(open)))}
+          onTrainer={onTrainer && (() => (setOpen(null), onTrainer(open)))}
+          onUndo={onUndo && (!canUndo || canUndo(open)) ? () => (setOpen(null), onUndo(open)) : undefined}
         />
       )}
     </section>
   );
 }
 
-function SessionSheet({ s, onClose, onEdit }: { s: TrainingSession; onClose: () => void; onEdit?: () => void }) {
+function SessionSheet({
+  s,
+  onClose,
+  onEdit,
+  onRepeat,
+  onTrainer,
+  onUndo,
+}: {
+  s: TrainingSession;
+  onClose: () => void;
+  onEdit?: () => void;
+  onRepeat?: () => void;
+  onTrainer?: () => void;
+  onUndo?: () => void;
+}) {
   const ton = tonnage(s);
   const load = sessionLoad(s);
   return (
@@ -168,11 +190,19 @@ function SessionSheet({ s, onClose, onEdit }: { s: TrainingSession; onClose: () 
             <p>{s.notes}</p>
           </div>
         )}
-        {onEdit && (
-          <button className="btn btn-secondary btn-block" onClick={onEdit}>
-            ✎ Popraw ten trening
-          </button>
-        )}
+        {onRepeat && s.exercises.length > 0 && <StartButtons onStart={onRepeat} onTrainer={onTrainer} label="Zrób ten trening jeszcze raz" />}
+        <div className="sheet-actions">
+          {onEdit && (
+            <button className="btn btn-secondary" onClick={onEdit}>
+              ✎ Popraw
+            </button>
+          )}
+          {onUndo && (
+            <button className="btn btn-ghost btn-danger-text" onClick={onUndo}>
+              ✕ Oznacz jako niewykonany
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { plural } from './format';
+import type { RunStart } from './athlete/start';
 import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
 import { CLIENT_TABS, NavCtx, SECTIONS, type ClientTab, type ModalState, type NavValue, type Section } from './nav';
@@ -25,8 +26,8 @@ export function App() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientTab, setClientTab] = useState<ClientTab>('Przegląd');
   const [modal, setModal] = useState<ModalState | null>(null);
-  const [athleteId, setAthleteId] = useState<string | null>(null);
-  const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string } | null>(null);
+  const [athlete, setAthlete] = useState<{ id: string; start?: RunStart } | null>(null);
+  const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart } | null>(null);
   const [bannerOpen, setBannerOpen] = useState(false);
   const { db } = useStore();
 
@@ -52,14 +53,15 @@ export function App() {
       closeClient: () => setClientId(null),
       openModal: setModal,
       closeModal: () => setModal(null),
-      startAthlete: (id) => {
+      startAthlete: (id, start) => {
         setModal(null);
-        setAthleteId(id);
+        setAthlete({ id, start });
         window.scrollTo(0, 0);
       },
-      startLive: (clientId, appointmentId, editSessionId) => {
+      startLive: (clientId, appointmentId, editSessionId, start) => {
         setModal(null);
-        setLive({ clientId, appointmentId, editSessionId });
+        setAthlete(null);
+        setLive({ clientId, appointmentId, editSessionId, start });
         window.scrollTo(0, 0);
       },
     }),
@@ -69,7 +71,7 @@ export function App() {
   if (live) {
     return (
       <NavCtx.Provider value={nav}>
-        <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} editSessionId={live.editSessionId} onExit={() => setLive(null)} />
+        <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} editSessionId={live.editSessionId} start={live.start} onExit={() => setLive(null)} />
       </NavCtx.Provider>
     );
   }
@@ -79,10 +81,10 @@ export function App() {
     .map((c) => ({ c, run: loadRun(c.id, 'live') }))
     .filter((x) => x.run);
 
-  if (athleteId) {
+  if (athlete) {
     return (
       <NavCtx.Provider value={nav}>
-        <AthleteApp clientId={athleteId} onExit={() => setAthleteId(null)} />
+        <AthleteApp key={athlete.id} clientId={athlete.id} start={athlete.start} onExit={() => setAthlete(null)} onTrainer={(st) => nav.startLive(athlete.id, undefined, undefined, st)} />
       </NavCtx.Provider>
     );
   }

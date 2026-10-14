@@ -27,7 +27,7 @@ export function newPlan(clientId: string): Plan {
 
 export function ClientPlans({ client }: { client: Client }) {
   const { db, apply, ask } = useStore();
-  const { openModal } = useNav();
+  const { openModal, startLive, startAthlete } = useNav();
   const plans = plansOf(db, client.id).sort((a, b) => Number(b.active) - Number(a.active) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const sessions = sessionsOf(db, client.id);
 
@@ -88,6 +88,16 @@ export function ClientPlans({ client }: { client: Client }) {
                           <div className="plan-workout-head">
                             <strong>{k.name}</strong>
                             {done.has(k.id) ? <Tag tone="ok">✓ zrobione</Tag> : nx?.workout.id === k.id ? <Tag tone="accent">następny</Tag> : null}
+                            {k.exercises.some((e) => e.name) && (
+                              <span className="plan-workout-actions">
+                                <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: k.id })}>
+                                  ▶ Prowadź
+                                </button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: p.id, workoutId: k.id })}>
+                                  Jako zawodnik
+                                </button>
+                              </span>
+                            )}
                           </div>
                           {k.exercises.length === 0 ? (
                             <p className="muted small">Brak ćwiczeń.</p>

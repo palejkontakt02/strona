@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import type { Checkin, PlanWorkout, TrainingSession, Wellness } from '../domain';
-import { clientById, plansOf, sessionsOf } from '../data/ops';
+import { clientById, deleteSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
-import { currentPlan, exerciseLabels, mergeGroups, nextWorkout, planSequence } from '../lib/plan';
-import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
+import { currentPlan, exerciseLabels, mergeGroups, nextWorkout } from '../lib/plan';
+import { emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
+import { StartButtons } from './StartButtons';
+import { runFromStart, type RunStart } from './start';
 import { History, Upcoming } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
@@ -35,14 +37,35 @@ export function storeRun(id: string, run: Run | null, kind: RunKind = 'run') {
   }
 }
 
-export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: string; onExit: () => void; mode?: 'preview' | 'client' }) {
-  const { db, toast, ask } = useStore();
+export function AthleteApp({
+  clientId,
+  onExit,
+  mode = 'preview',
+  start: initial,
+  onTrainer,
+}: {
+  clientId: string;
+  onExit: () => void;
+  mode?: 'preview' | 'client';
+  /** Od razu rozpocznij wybrany trening. */
+  start?: RunStart;
+  /** Podgląd trenera: „Prowadź jako trener” przełącza do treningu na żywo. */
+  onTrainer?: (st: RunStart) => void;
+}) {
+  const { db, toast, ask, apply } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
   const [screen, setScreen] = useState<'home' | 'run'>('home');
   const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => storeRun(clientId, run), [clientId, run]);
+  const started = useRef(false);
+  useEffect(() => {
+    if (!initial || !client || started.current) return;
+    started.current = true;
+    startFrom(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     document.body.classList.add('athlete-mode');
     return () => document.body.classList.remove('athlete-mode');
@@ -66,15 +89,25 @@ export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: s
   const startOwn = () => void replaceRun(emptyRun('Trening własny', todayISO()));
   const editSession = (s: TrainingSession) => void replaceRun(sessionToRun(s));
 
+  const startFrom = (st: RunStart) => {
+    const r = runFromStart(db, clientId, st, todayISO());
+    if (typeof r === 'string') return toast(r);
+    void replaceRun(r);
+  };
   const start = (workoutId?: string) => {
     if (!plan) return startOwn();
-    const seq = planSequence(plan);
-    const step = workoutId ? seq.find((x) => x.workout.id === workoutId) : nextWorkout(plan, sessions);
-    if (!step) return toast('Nie znaleziono treningu w planie.');
-    if (!step.workout.exercises.some((e) => e.name)) return toast('Ten trening nie ma jeszcze ćwiczeń.');
-    const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
-    void replaceRun(buildRun(plan, step.week.name, step.workout, sessions, videos, todayISO()));
+    const id = workoutId ?? nextWorkout(plan, sessions)?.workout.id;
+    if (!id) return toast('Nie znaleziono treningu w planie.');
+    startFrom({ planId: plan.id, workoutId: id });
   };
+  const undo = async (s: TrainingSession) => {
+    if (!(await ask(`Oznaczyć trening z ${fmtDay(s.date)} jako niewykonany? Zniknie z historii, a trening z planu wróci na listę do zrobienia.`, { confirm: 'Oznacz' }))) return;
+    const sp = sessionPayment(db, s);
+    const removePayment = !!sp && mode === 'preview' && (await ask(`Usunąć też płatność „${paymentLabel(sp.payment)}” za ten trening?`, { confirm: 'Usuń płatność' }));
+    await apply(deleteSession(db, s.id, removePayment), 'Trening oznaczony jako niewykonany.');
+  };
+  // Podopieczny cofa tylko swoje treningi (bez rozliczenia); trener w podglądzie — każdy.
+  const canUndo = (s: TrainingSession) => mode === 'preview' || s.charge === 'brak';
 
   return (
     <div className="ath">
@@ -120,6 +153,10 @@ export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: s
           onStart={start}
           onOwn={startOwn}
           onEdit={editSession}
+          onRepeat={(s) => startFrom({ repeatSessionId: s.id })}
+          onTrainer={onTrainer}
+          onUndo={undo}
+          canUndo={canUndo}
           onResume={() => setScreen('run')}
           onDiscard={() => setRun(null)}
         />
@@ -137,6 +174,10 @@ function Home({
   onStart,
   onOwn,
   onEdit,
+  onRepeat,
+  onTrainer,
+  onUndo,
+  canUndo,
   onResume,
   onDiscard,
 }: {
@@ -148,6 +189,10 @@ function Home({
   onStart: (workoutId?: string) => void;
   onOwn: () => void;
   onEdit: (s: TrainingSession) => void;
+  onRepeat: (s: TrainingSession) => void;
+  onTrainer?: (st: RunStart) => void;
+  onUndo: (s: TrainingSession) => void;
+  canUndo: (s: TrainingSession) => boolean;
   onResume: () => void;
   onDiscard: () => void;
 }) {
@@ -249,9 +294,16 @@ function Home({
 
       <Progress clientId={clientId} />
 
-      <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={onStart} />
+      <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={onStart} onTrainer={onTrainer} />
 
-      <History clientId={clientId} onEdit={onEdit} />
+      <History
+        clientId={clientId}
+        onEdit={onEdit}
+        onRepeat={onRepeat}
+        onTrainer={onTrainer && ((s) => onTrainer({ repeatSessionId: s.id }))}
+        onUndo={onUndo}
+        canUndo={canUndo}
+      />
     </div>
   );
 }
@@ -482,6 +534,7 @@ function Workouts({
   sessions,
   nextId,
   onStart,
+  onTrainer,
 }: {
   plan: ReturnType<typeof currentPlan>;
   plans: ReturnType<typeof plansOf>;
@@ -489,6 +542,7 @@ function Workouts({
   sessions: ReturnType<typeof sessionsOf>;
   nextId?: string;
   onStart: (workoutId: string) => void;
+  onTrainer?: (st: RunStart) => void;
 }) {
   const [preview, setPreview] = useState<PlanWorkout | null>(null);
   if (!plan) return null;
@@ -543,6 +597,13 @@ function Workouts({
             setPreview(null);
             onStart(preview.id);
           }}
+          onTrainer={
+            onTrainer &&
+            (() => {
+              setPreview(null);
+              onTrainer({ planId: plan.id, workoutId: preview.id });
+            })
+          }
         />
       )}
     </section>
@@ -550,7 +611,7 @@ function Workouts({
 }
 
 /** Podgląd jednostki z planu: ćwiczenia (z blokami A1/A2), serie, ciężary, tempo, uwagi. */
-function WorkoutPreview({ workout, done, onClose, onStart }: { workout: PlanWorkout; done?: string; onClose: () => void; onStart: () => void }) {
+function WorkoutPreview({ workout, done, onClose, onStart, onTrainer }: { workout: PlanWorkout; done?: string; onClose: () => void; onStart: () => void; onTrainer?: () => void }) {
   const labels = exerciseLabels(workout.exercises);
   return (
     <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -586,10 +647,9 @@ function WorkoutPreview({ workout, done, onClose, onStart }: { workout: PlanWork
               </div>
             ))}
         </div>
-        <button className="btn btn-primary btn-lg btn-block" onClick={onStart}>
-          <Icon name="play" /> Start
-        </button>
+        <StartButtons onStart={onStart} onTrainer={onTrainer} />
       </div>
     </div>
   );
 }
+

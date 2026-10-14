@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanExercise, SetGroup, TrainingSession } from '../domain';
-import { adHocExercise, appendExercise, buildRunExercise, completeSet, emptyRun, runToExercises, type Run } from './run';
+import { adHocExercise, appendExercise, buildRunExercise, completeSet, emptyRun, repeatRun, runToExercises, type Run } from './run';
 
 const g = (p: Partial<SetGroup>): SetGroup => ({ type: 'Robocze', sets: '1', reps: '5', load: '', rpe: '8', ...p });
 const ex = (groups: SetGroup[], notes = ''): PlanExercise => ({ id: 'e', name: 'Przysiad', rest: '2:00', notes, groups });
@@ -215,5 +215,15 @@ describe('poprawki z testów zawodnika', () => {
     const r = appendExercise(emptyRun('T', '2026-10-14'), { ...adHocExercise('Plank', 1, '45 s', ''), notes: 'neutralny kręgosłup' });
     r.ex[0].sets[0].done = true;
     expect(runToExercises(r)[0]).toMatchObject({ reps: '45 s', notes: 'neutralny kręgosłup' });
+  });
+});
+
+describe('repeatRun', () => {
+  it('copies exercises and loads, with nothing done and no edit link', () => {
+    const s: TrainingSession = { id: 's1', clientId: 'c', date: '2026-10-13', charge: 'brak', workoutName: 'Dół', planId: 'p', workoutId: 'w', exercises: [{ name: 'Przysiad', label: 'A1', setsLog: [{ load: 100, reps: 5 }, { load: 100, reps: 5 }] }, { name: 'Plank', label: 'A2', sets: '2', reps: '45 s' }] };
+    const r = repeatRun(s, '2026-10-14', 1000);
+    expect(r).toMatchObject({ date: '2026-10-14', startedAt: 1000, editSessionId: undefined, planId: 'p', workoutId: 'w', name: 'Dół' });
+    expect(r.ex.map((e) => [e.label, e.sets.length, e.sets.every((x) => !x.done)])).toEqual([['A1', 2, true], ['A2', 2, true]]);
+    expect(r.ex[0].sets[0].load).toBe('100');
   });
 });

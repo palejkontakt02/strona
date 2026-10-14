@@ -369,3 +369,15 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
     editSessionId: s.id,
   };
 }
+
+/** Ten sam trening jeszcze raz: ćwiczenia, bloki i ciężary z zapisu, wszystkie serie do zrobienia. */
+export function repeatRun(s: TrainingSession, date: string, now = Date.now()): Run {
+  const r = sessionToRun(s, now);
+  return {
+    ...r,
+    date,
+    startedAt: now,
+    editSessionId: undefined,
+    ex: r.ex.map((e) => ({ ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0 })) })),
+  };
+}

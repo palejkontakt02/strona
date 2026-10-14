@@ -140,3 +140,8 @@ end $$;
 revoke all on function public.guard_client_session, public.my_client_ids, public.claim_trainer, public.save_checkin from public, anon;
 grant execute on function public.my_client_ids, public.claim_trainer, public.save_checkin to authenticated;
 notify pgrst, 'reload schema';
+
+-- 8. Podopieczny może oznaczyć jako niewykonany (usunąć) tylko swój trening bez rozliczenia
+drop policy if exists client_delete on public.sessions;
+create policy client_delete on public.sessions for delete to authenticated
+  using (client_id in (select public.my_client_ids()) and data ->> 'charge' = 'brak');

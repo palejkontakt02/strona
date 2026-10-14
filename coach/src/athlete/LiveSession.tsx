@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
 import { clientById, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -8,13 +8,26 @@ import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { loadRun, storeRun } from './AthleteApp';
 import { Player } from './Player';
+import { runFromStart, type RunStart } from './start';
 
 /**
  * Trener prowadzi trening 1:1 na żywo: wybór jednostki z planu (albo pusty trening),
  * zapis seria po serii, rozliczenie przy zakończeniu. Postęp zostaje w pamięci urządzenia,
  * więc można wrócić do panelu i kontynuować.
  */
-export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: { clientId: string; appointmentId?: string; editSessionId?: string; onExit: () => void }) {
+export function LiveSession({
+  clientId,
+  appointmentId,
+  editSessionId,
+  start: initial,
+  onExit,
+}: {
+  clientId: string;
+  appointmentId?: string;
+  editSessionId?: string;
+  start?: RunStart;
+  onExit: () => void;
+}) {
   const { db, toast, ask } = useStore();
   const client = clientById(db, clientId);
   // Poprawki zapisanego treningu trzymamy tylko w pamięci — nie nadpisują treningu w toku.
@@ -32,6 +45,20 @@ export function LiveSession({ clientId, appointmentId, editSessionId, onExit }: 
   useEffect(() => {
     if (!editing) storeRun(clientId, run, 'live');
   }, [clientId, run, editing]);
+  // Start od razu z wybranego treningu (lista treningów, historia); trening w toku zastępujemy tylko po potwierdzeniu.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!initial || editing || started.current) return;
+    started.current = true;
+    const r = runFromStart(db, clientId, initial, todayISO());
+    if (typeof r === 'string') return void toast(r);
+    void (async () => {
+      if (run && run.ex.some((e) => e.sets.some((x) => x.done)) && !(await ask('Masz rozpoczęty trening z tym podopiecznym. Porzucić go i zacząć wybrany?', { confirm: 'Tak' }))) return;
+      setRun(r);
+      window.scrollTo(0, 0);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     document.body.classList.add('athlete-mode');
     return () => document.body.classList.remove('athlete-mode');

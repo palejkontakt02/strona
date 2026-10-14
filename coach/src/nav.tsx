@@ -1,3 +1,4 @@
+import type { RunStart } from './athlete/start';
 import { createContext, useContext } from 'react';
 import type { Appointment, Client, LibraryExercise, Location, Payment, PaymentType, Plan, TrainingSession } from './domain';
 
@@ -31,10 +32,10 @@ export interface NavValue {
   closeClient: () => void;
   openModal: (m: ModalState) => void;
   closeModal: () => void;
-  /** Uruchamia tryb zawodnika dla klienta. */
-  startAthlete: (clientId: string) => void;
-  /** Trener prowadzi trening 1:1 na żywo (opcjonalnie z wizyty). */
-  startLive: (clientId: string, appointmentId?: string, editSessionId?: string) => void;
+  /** Uruchamia tryb zawodnika dla klienta (opcjonalnie od razu z wybranym treningiem). */
+  startAthlete: (clientId: string, start?: RunStart) => void;
+  /** Trener prowadzi trening 1:1 na żywo (opcjonalnie z wizyty albo od razu z wybranym treningiem). */
+  startLive: (clientId: string, appointmentId?: string, editSessionId?: string, start?: RunStart) => void;
 }
 
 export const NavCtx = createContext<NavValue | null>(null);
