@@ -88,6 +88,32 @@ a:hover { color: #F0F0F0; }
   font-weight: 700;
 }
 .nav-cta:hover { color: #161616; }
+.nav-actions { display: flex; align-items: center; gap: 10px; }
+.nav-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(237,237,237,0.28);
+  border-radius: 3px;
+  color: #EDEDED;
+  font-size: 14px;
+  font-weight: 700;
+  transition: border-color 0.2s, background 0.2s;
+}
+.nav-app:hover { border-color: #EDEDED; background: rgba(237,237,237,0.06); color: #EDEDED; }
+@media (max-width: 480px) {
+  .nav-actions { gap: 8px; }
+  .nav-app { padding: 9px 11px; font-size: 13px; }
+  .nav-app svg { display: none; }
+  .nav-cta { padding: 10px 12px; font-size: 13px; }
+  .nav-logo { font-size: 18px; }
+  .nav { padding: 18px 16px; gap: 8px; }
+}
+@media (max-width: 374px) {
+  .nav-logo { font-size: 16px; }
+  .nav-app, .nav-cta { padding: 9px 9px; font-size: 12px; }
+}
 
 /* HERO */
 .hero {
