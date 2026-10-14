@@ -3381,3 +3381,21 @@ h2 {
 .account-list {
   margin-bottom: var(--space-2);
 }
+
+/* wklejanie treningu z notatki (trener) */
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.paste-box textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+}
+.paste-box .actions {
+  justify-content: flex-end;
+}
+.between.form-section h4 {
+  margin: 0;
+}

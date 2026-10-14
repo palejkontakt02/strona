@@ -10,7 +10,7 @@ export type ClientTab = (typeof CLIENT_TABS)[number];
 
 export type ModalState =
   | { kind: 'appt'; appt?: Appointment; date?: string; time?: string; clientId?: string }
-  | { kind: 'session'; session?: TrainingSession; clientId?: string; appt?: Appointment; date?: string }
+  | { kind: 'session'; session?: TrainingSession; clientId?: string; appt?: Appointment; date?: string; /** Otwórz od razu z polem „Wklej z notatki”. */ paste?: boolean }
   | { kind: 'client'; client?: Client }
   | { kind: 'measurement'; clientId: string }
   | { kind: 'test'; clientId: string; name?: string }

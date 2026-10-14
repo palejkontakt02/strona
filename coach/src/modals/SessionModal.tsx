@@ -6,6 +6,7 @@ import { useStore } from '../data/store';
 import { fnum, pln, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
+import { parseWorkoutNote } from '../lib/note';
 import { num, numIn } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
@@ -75,6 +76,20 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [workoutName, setWorkoutName] = useState(existing?.workoutName ?? '');
   const [planRef, setPlanRef] = useState<{ planId?: string; workoutId?: string }>({ planId: existing?.planId, workoutId: existing?.workoutId });
   const [rows, setRows] = useState<ExRow[]>(() => (existing ? existing.exercises.map(toRow) : []));
+  const [paste, setPaste] = useState<string | null>(m.paste ? '' : null);
+  /** Wczytuje ćwiczenia (seria po serii) z tekstu notatki trenera. */
+  const loadNote = async () => {
+    const r = parseWorkoutNote(paste ?? '');
+    if (r.exercises.length === 0) return toast('Nie rozpoznano ćwiczeń. Format: nazwa ćwiczenia, pod nią serie, np. „4x100” albo „8x70kg RPE 8”.');
+    const keep = rows.filter((x) => x.name.trim());
+    if (keep.length && !(await ask(`Zastąpić ${keep.length} wpisanych ćwiczeń tymi z notatki?`, { confirm: 'Zastąp', danger: false }))) return;
+    setRows(r.exercises.map(toRow));
+    setPlanRef({}); // trening z notatki — nie jednostka z planu
+    if (r.date && !existing) setDate(r.date);
+    if (!workoutName.trim() || keep.length) setWorkoutName(r.exercises.slice(0, 2).map((e) => e.name.replace(/\s*\(.*\)$/, '')).join(' + '));
+    setPaste(null);
+    toast(`Wczytano ${r.exercises.length} ćwiczeń (${r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0)} serii)${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
+  };
   const [w, setW] = useState<Record<keyof Wellness, string>>({
     sleep: s(existing?.wellness?.sleep),
     energy: s(existing?.wellness?.energy),
@@ -123,7 +138,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   };
 
   // Nowy trening: od razu podpowiedz następną jednostkę z planu.
-  const [autoLoaded, setAutoLoaded] = useState(!!existing);
+  const [autoLoaded, setAutoLoaded] = useState(!!existing || !!m.paste); // przy wklejaniu z notatki nie wczytujemy jednostki z planu
   if (!autoLoaded && client) {
     setAutoLoaded(true);
     const nx = nextWorkout(plan, history);
@@ -250,7 +265,35 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         </Field>
       </div>
 
-      <h4 className="form-section">Ćwiczenia</h4>
+      <div className="between form-section">
+        <h4>Ćwiczenia</h4>
+        {paste === null && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaste('')}>
+            📋 Wklej z notatki
+          </button>
+        )}
+      </div>
+      {paste !== null && (
+        <div className="paste-box">
+          <textarea
+            className="input"
+            rows={8}
+            autoFocus
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            placeholder={'Wklej trening z notatek, np.\n\n13.10.2026\nFront Squat\n4x100\n4x105\n8x90\n\nWiosłowanie sztangą\n8x70kg RPE 8'}
+            aria-label="Tekst treningu z notatki"
+          />
+          <div className="actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaste(null)}>
+              Anuluj
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={!paste.trim()} onClick={() => void loadNote()}>
+              Wczytaj ćwiczenia
+            </button>
+          </div>
+        </div>
+      )}
       <div className="ex-table">
         <div className="ex-head">
           <span>Ćwiczenie</span>
@@ -276,7 +319,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {(r.hint || r.setsLog) && (
               <span className="ex-hint">
-                {r.setsLog ? `${r.setsLog.filter((x) => !x.warmup).length} serii zapisanych w trybie zawodnika: ${r.setsLog.filter((x) => !x.warmup).map((x) => `${fnum(x.load)}×${x.reps ?? '?'}`).join(', ')}` : `Podpowiedź: ${r.hint}`}
+                {r.setsLog ? `${r.setsLog.filter((x) => !x.warmup).length} serii zapisanych: ${r.setsLog.filter((x) => !x.warmup).map((x) => `${fnum(x.load)}×${x.reps ?? '?'}${x.rpe != null ? ` @${fnum(x.rpe)}` : ''}`).join(', ')}` : `Podpowiedź: ${r.hint}`}
               </span>
             )}
           </div>

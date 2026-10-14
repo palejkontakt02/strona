@@ -19,9 +19,14 @@ export function ClientSessions({ client }: { client: Client }) {
       <WorkoutList client={client} />
       <div className="toolbar section-gap">
         <h3>Zapisane treningi ({sessions.length})</h3>
-        <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
-          + Zapisz trening
-        </button>
+        <div className="actions">
+          <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
+            📋 Wklej z notatki
+          </button>
+          <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
+            + Zapisz trening
+          </button>
+        </div>
       </div>
       {sessions.length === 0 ? (
         <Empty>Brak zapisanych treningów.</Empty>
