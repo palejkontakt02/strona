@@ -3497,3 +3497,168 @@ h2 {
     display: block !important;
   }
 }
+
+/* koło do zamknięcia */
+.ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+.ring svg {
+  display: block;
+}
+.ring-track {
+  stroke: var(--color-surface-2);
+}
+.ring-value {
+  stroke: var(--color-accent);
+  transition: stroke-dasharray 0.4s ease;
+}
+.ring.is-closed .ring-value {
+  stroke: var(--color-ok);
+}
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-value {
+    transition: none;
+  }
+}
+
+/* zadania dzienne: trener */
+.habit-rings {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+.habit-rings > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.habit-days {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 2px;
+  margin: var(--space-2) 0 var(--space-4);
+}
+.habit-days > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.68rem;
+  color: var(--color-neutral-400);
+}
+.habit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.habit-form .actions {
+  justify-content: flex-end;
+}
+.day-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.day-chips button:not(.link) {
+  min-width: 42px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.day-chips.month button:not(.link) {
+  min-width: 38px;
+}
+.day-chips button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.note.is-new {
+  border-left: 3px solid var(--color-warn, #d9a441);
+  padding-left: var(--space-3);
+}
+.note p {
+  margin: 4px 0 0;
+}
+
+/* zadania dzienne: podopieczny */
+.today-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.today-head h3 {
+  margin: 2px 0;
+}
+.today-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.today-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 1rem;
+  text-align: left;
+}
+.today-item.on {
+  border-color: color-mix(in srgb, var(--color-ok) 50%, transparent);
+  background: color-mix(in srgb, var(--color-ok) 10%, var(--color-bg));
+}
+.today-item.on span:last-child {
+  color: var(--color-neutral-400);
+  text-decoration: line-through;
+}
+.today-check {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-neutral-500);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+.today-item.on .today-check {
+  background: var(--color-ok);
+  border-color: var(--color-ok);
+  color: var(--ok-on, #0b1a12);
+}
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.habit-days > div.off {
+  opacity: 0.35;
+}

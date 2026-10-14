@@ -161,3 +161,41 @@ end $$;
 revoke all on function public.trainer_accounts from public, anon;
 grant execute on function public.trainer_accounts to authenticated;
 notify pgrst, 'reload schema';
+
+-- 10. Zadania dzienne (odhaczenia) i notatki od podopiecznego — zapis tylko przez te funkcje
+create or replace function public.save_habit_day(p_client_id text, p_date text, p_done jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare clean jsonb;
+begin
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if coalesce(p_date, '') !~ '^\d{4}-\d{2}-\d{2}$' or jsonb_typeof(p_done) is distinct from 'array' or jsonb_array_length(p_done) > 50 then
+    raise exception 'Nieprawidłowe dane';
+  end if;
+  select coalesce(jsonb_agg(x), '[]'::jsonb) into clean from jsonb_array_elements(p_done) x where jsonb_typeof(x) = 'string' and length(x #>> '{}') <= 64;
+  update clients
+  set data = jsonb_set(data, '{habitLog}',
+        coalesce((select jsonb_agg(d order by d ->> 'date') from (
+          select d from jsonb_array_elements(coalesce(data -> 'habitLog', '[]'::jsonb)) d where d ->> 'date' is distinct from p_date
+          order by d ->> 'date' desc limit 399) t), '[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object('date', p_date, 'done', clean))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+
+create or replace function public.add_client_note(p_client_id text, p_note jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare txt text := left(coalesce(p_note ->> 'text', ''), 2000);
+begin
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if length(trim(txt)) = 0 then raise exception 'Pusta notatka'; end if;
+  update clients
+  set data = jsonb_set(data, '{inbox}',
+        coalesce((select jsonb_agg(n) from (select n from jsonb_array_elements(coalesce(data -> 'inbox', '[]'::jsonb)) n offset greatest(0, jsonb_array_length(coalesce(data -> 'inbox', '[]'::jsonb)) - 199)) t), '[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object('id', left(coalesce(p_note ->> 'id', md5(random()::text)), 40), 'at', now(), 'text', txt))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+
+revoke all on function public.save_habit_day, public.add_client_note from public, anon;
+grant execute on function public.save_habit_day, public.add_client_note to authenticated;
+notify pgrst, 'reload schema';

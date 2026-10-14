@@ -1,3 +1,4 @@
+import { ClientHabits, ClientInbox } from './Habits';
 import { Card, Dot, Empty, Kpi } from '../../components/ui';
 import type { Client } from '../../domain';
 import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
@@ -32,6 +33,7 @@ export function ClientOverview({ client }: { client: Client }) {
 
   return (
     <>
+      <ClientInbox client={client} />
       <div className="kpi-grid">
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
@@ -103,6 +105,8 @@ export function ClientOverview({ client }: { client: Client }) {
           )}
         </Card>
       </div>
+      <div className="section-gap-sm" />
+      <ClientHabits client={client} />
     </>
   );
 }

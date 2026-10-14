@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { Empty, IconBtn } from '../components/ui';
 import { EXERCISE_CATEGORIES } from '../domain';
 import { useStore } from '../data/store';
-import { normalize } from '../format';
+import { normalize, uid } from '../format';
+import { put } from '../data/db';
+import { missingFromAtlas } from '../data/atlas';
 import { useNav } from '../nav';
 
 export function LibraryView() {
-  const { db } = useStore();
+  const { db, apply } = useStore();
+  const missing = missingFromAtlas(db.library.map((e) => e.name));
   const { openModal } = useNav();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
@@ -22,9 +25,20 @@ export function LibraryView() {
           <h2>Biblioteka ćwiczeń</h2>
           <p className="muted small">{db.library.length} ćwiczeń · podpowiadane przy tworzeniu planów i zapisie treningu</p>
         </div>
-        <button className="btn btn-primary" onClick={() => openModal({ kind: 'exercise' })}>
-          + Ćwiczenie
-        </button>
+        <div className="actions">
+          {missing.length > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => apply(missing.map(([name, cat]) => put('library', { id: uid(), name, cat })), `Dodano ${missing.length} ćwiczeń z atlasu.`)}
+              title="Ćwiczenia siłowe, dwubojowe, plyometryczne, kondycyjne i rehabilitacyjne — nazwy po angielsku"
+            >
+              + Atlas ćwiczeń ({missing.length})
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => openModal({ kind: 'exercise' })}>
+            + Ćwiczenie
+          </button>
+        </div>
       </div>
       <div className="filters">
         <input className="input input-sm" type="search" placeholder="Szukaj ćwiczenia…" value={q} onChange={(e) => setQ(e.target.value)} />

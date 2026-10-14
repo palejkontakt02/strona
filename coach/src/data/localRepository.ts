@@ -1,5 +1,6 @@
 import { applyChanges, normalizeDb, type Db, type Repository } from './db';
 import { createSeed } from './seed';
+import { withDay } from '../lib/habits';
 
 const KEY = 'panel-trenera:v1';
 
@@ -45,6 +46,16 @@ export function createLocalRepository(): Repository {
           c.id === clientId ? { ...c, checkins: [...c.checkins.filter((x) => x.date !== checkin.date), checkin].slice(-200) } : c,
         ),
       };
+      write(db);
+    },
+    async saveHabitDay(clientId, date, done) {
+      db = read() ?? db;
+      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, habitLog: withDay(c.habitLog, date, done) } : c)) };
+      write(db);
+    },
+    async addClientNote(clientId, note) {
+      db = read() ?? db;
+      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
       write(db);
     },
   };

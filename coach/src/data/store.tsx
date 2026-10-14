@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Checkin } from '../domain';
+import type { Checkin, ClientNote } from '../domain';
+import { uid } from '../format';
+import { withDay } from '../lib/habits';
+import { emailTrainer } from './mail';
 import { applyChanges, type Change, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
 
@@ -19,6 +22,8 @@ interface StoreValue {
   reset: (mode: 'seed' | 'empty') => Promise<void>;
   importDb: (db: Db) => Promise<void>;
   saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
+  saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
+  sendClientNote: (clientId: string, text: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
   signOut?: () => void;
@@ -121,6 +126,43 @@ export function StoreProvider({
     [repo, toast, load],
   );
 
+  const saveHabitDay = useCallback(
+    async (clientId: string, date: string, done: string[]) => {
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, habitLog: withDay(c.habitLog, date, done) } : c)) } : cur));
+      try {
+        await repo.saveHabitDay(clientId, date, done);
+      } catch {
+        toast('Nie udało się zapisać — sprawdź połączenie.');
+        void load();
+      }
+    },
+    [repo, toast, load],
+  );
+
+  /** Notatka od podopiecznego: zapis w aplikacji + e-mail do trenera. */
+  const sendClientNote = useCallback(
+    async (clientId: string, text: string): Promise<boolean> => {
+      const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000) };
+      const client = db?.clients.find((c) => c.id === clientId);
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note] } : c)) } : cur));
+      let saved = true;
+      try {
+        await repo.addClientNote(clientId, note);
+      } catch {
+        saved = false;
+      }
+      const mailed = await emailTrainer(client?.name ?? 'Podopieczny', client?.email, note.text);
+      if (!saved && !mailed) {
+        toast('Nie udało się wysłać — sprawdź połączenie i spróbuj ponownie.');
+        void load();
+        return false;
+      }
+      toast('Wysłano do trenera.');
+      return true;
+    },
+    [db, repo, toast, load],
+  );
+
   const ask = useCallback(
     (message: string, opts: { confirm?: string; danger?: boolean } = {}) =>
       new Promise<boolean>((resolve) =>
@@ -149,8 +191,8 @@ export function StoreProvider({
   );
 
   const value = useMemo(
-    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, cloud, signOut } : null),
-    [db, apply, toast, ask, reset, importDb, saveCheckin, cloud, signOut],
+    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, saveHabitDay, sendClientNote, cloud, signOut } : null),
+    [db, apply, toast, ask, reset, importDb, saveCheckin, saveHabitDay, sendClientNote, cloud, signOut],
   );
   if (loadError)
     return (

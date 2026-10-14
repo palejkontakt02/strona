@@ -110,6 +110,39 @@ export interface Client {
   tests: TestResult[];
   injuryLog: Injury[];
   checkins: Checkin[];
+  /** Zadania dzienne ustawione przez trenera (np. „10 000 kroków”, „mobilność bioder”). */
+  habits?: Habit[];
+  /** Odhaczone zadania dzień po dniu (zapisuje podopieczny). */
+  habitLog?: HabitDay[];
+  /** Notatki od podopiecznego do trenera (wysyłane też e-mailem). */
+  inbox?: ClientNote[];
+}
+
+/** Kiedy zadanie obowiązuje: codziennie, w wybrane dni tygodnia (1 = pn … 7 = nd) albo dni miesiąca (1–31). */
+export type HabitSchedule = { kind: 'daily' } | { kind: 'week'; days: number[] } | { kind: 'month'; days: number[] };
+
+export interface Habit {
+  id: string;
+  title: string;
+  schedule: HabitSchedule;
+  /** Od kiedy obowiązuje (wcześniejsze dni nie liczą się do statystyk). */
+  since?: ISODate;
+  archived?: boolean;
+}
+
+export interface HabitDay {
+  date: ISODate;
+  /** Id odhaczonych zadań. */
+  done: string[];
+}
+
+export interface ClientNote {
+  id: string;
+  /** Data i godzina (ISO). */
+  at: string;
+  text: string;
+  /** Trener przeczytał. */
+  read?: boolean;
 }
 
 /* ---------- Plany ---------- */

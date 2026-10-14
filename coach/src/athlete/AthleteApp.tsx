@@ -14,6 +14,7 @@ import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
 import { WorkoutPreview } from './WorkoutPreview';
+import { NoteToTrainer, TodayHabits } from './Today';
 import { runFromStart, type RunStart } from './start';
 import { History, SessionSheet, Upcoming } from './History';
 
@@ -278,6 +279,7 @@ function Home({
 
       <Upcoming clientId={clientId} />
 
+      <TodayHabits client={client} />
       <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
 
       <div className="ath-grid">
@@ -308,6 +310,7 @@ function Home({
         onUndo={onUndo}
         canUndo={canUndo}
       />
+      <NoteToTrainer client={client} />
     </div>
   );
 }

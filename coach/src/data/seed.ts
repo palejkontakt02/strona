@@ -19,6 +19,7 @@ import { addDays, todayISO, weekStart } from '../lib/dates';
 import { computeLsi } from '../lib/tests';
 import { loadFor } from '../lib/strength';
 import type { Db } from './db';
+import { missingFromAtlas } from './atlas';
 
 /* Deterministyczny generator — dane przykładowe zawsze takie same względem dzisiejszej daty. */
 function rng(seed: number) {
@@ -30,6 +31,7 @@ function rng(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
 
 const LIBRARY: [string, ExerciseCategory][] = [
   ['Przysiad ze sztangą', 'Dół ciała'],
@@ -526,7 +528,7 @@ export function createEmpty(): Db {
     plans: [],
     sessions: [],
     appointments: [],
-    library: LIBRARY.map(([name, cat]) => ({ id: uid(), name, cat })),
+    library: [...LIBRARY, ...missingFromAtlas(LIBRARY.map(([n]) => n))].map(([name, cat]) => ({ id: uid(), name, cat })),
     locations: [{ id: uid(), name: 'Studio (własne)', kind: 'własne', hue: 165, payouts: [] }],
   };
 }

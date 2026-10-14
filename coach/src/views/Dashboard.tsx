@@ -137,6 +137,27 @@ export function Dashboard() {
           )}
         </Card>
 
+        {(() => {
+          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => b.n.at.localeCompare(a.n.at));
+          if (!notes.length) return null;
+          return (
+            <Card title={`Notatki od podopiecznych (${notes.length})`}>
+              <ul className="rows">
+                {notes.slice(0, 6).map(({ c, n }) => (
+                  <li key={n.id} className="row row-top">
+                    <div className="grow">
+                      <button className="link" onClick={() => openClient(c.id, 'Przegląd')}>
+                        {c.name}
+                      </button>
+                      <span className="muted small"> · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="small ellipsis-2">{n.text}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          );
+        })()}
         {clubs.length > 0 && (
           <Card title="Rozliczenia z klubami" action={<button className="btn btn-ghost btn-sm" onClick={() => go('Płatności')}>Szczegóły</button>}>
             <ul className="rows">

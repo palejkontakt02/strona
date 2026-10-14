@@ -1,4 +1,4 @@
-import type { Appointment, Checkin, Client, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
+import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -33,6 +33,9 @@ export function normalizeDb(db: Partial<Db>): Db {
       tests: arr(r.tests).filter(isRec),
       injuryLog: arr(r.injuryLog).filter(isRec),
       checkins: arr(r.checkins).filter((c) => isRec(c) && isDate(c.date)),
+      habits: Array.isArray(r.habits) ? r.habits.filter((h) => isRec(h) && typeof h.id === 'string' && typeof h.title === 'string' && isRec(h.schedule)) : undefined,
+      habitLog: Array.isArray(r.habitLog) ? r.habitLog.filter((d) => isRec(d) && isDate(d.date) && Array.isArray(d.done)) : undefined,
+      inbox: Array.isArray(r.inbox) ? r.inbox.filter((n) => isRec(n) && typeof n.text === 'string') : undefined,
     })),
     plans: clean<Plan>(db.plans, (r) => typeof r.clientId === 'string', (r) => ({
       ...r,
@@ -87,4 +90,8 @@ export interface Repository {
   replaceAll(db: Db): Promise<void>;
   /** Check-in samopoczucia (klient zapisuje tylko to w swoim profilu). */
   saveCheckin(clientId: string, checkin: Checkin): Promise<void>;
+  /** Odhaczone zadania dzienne podopiecznego w danym dniu. */
+  saveHabitDay(clientId: string, date: string, done: string[]): Promise<void>;
+  /** Notatka od podopiecznego do trenera. */
+  addClientNote(clientId: string, note: ClientNote): Promise<void>;
 }

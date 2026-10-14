@@ -1,4 +1,4 @@
-import type { Checkin } from '../domain';
+import type { Checkin, ClientNote } from '../domain';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
 
@@ -62,6 +62,16 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
           if (e2) throw e2;
         }
       }
+    },
+
+    async saveHabitDay(clientId: string, date: string, done: string[]) {
+      const { error } = await supabase.rpc('save_habit_day', { p_client_id: clientId, p_date: date, p_done: done });
+      if (error) throw error;
+    },
+
+    async addClientNote(clientId: string, note: ClientNote) {
+      const { error } = await supabase.rpc('add_client_note', { p_client_id: clientId, p_note: note });
+      if (error) throw error;
     },
 
     async saveCheckin(clientId: string, checkin: Checkin) {
