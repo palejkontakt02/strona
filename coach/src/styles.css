@@ -3360,3 +3360,10 @@ h2 {
     flex: 1;
   }
 }
+
+/* dodatkowe treningi: osobno pod planami, wyraźnie oddzielone */
+.extra-card {
+  margin-top: var(--space-8);
+  border: 1px dashed color-mix(in srgb, var(--color-text) 30%, transparent);
+  background: transparent;
+}

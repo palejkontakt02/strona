@@ -45,58 +45,6 @@ export function ClientPlans({ client }: { client: Client }) {
         </button>
       </div>
       {plans.length === 0 && <Empty>Ten podopieczny nie ma jeszcze planu treningowego.</Empty>}
-      <Card
-        title="Dodatkowe treningi"
-        action={
-          <div className="actions">
-            {extra && <IconBtn icon="edit" label="Edytuj dodatkowe treningi" onClick={() => openModal({ kind: 'plan', plan: extra })} />}
-            <button className="btn btn-secondary btn-sm" onClick={addExtra}>
-              + Dodaj trening
-            </button>
-          </div>
-        }
-      >
-        {extraWorkouts.length === 0 ? (
-          <p className="muted small">Jednostki poza planem (np. dodatkowa siłownia, mobilność, kondycja). Podopieczny widzi je osobno i może zrobić w dowolnym momencie.</p>
-        ) : (
-          <div className="plan-week">
-            {extraWorkouts.map((k) => (
-              <div key={k.id} className="plan-workout">
-                <div className="plan-workout-head">
-                  <strong>{k.name}</strong>
-                  {lastDone(k.id) && <Tag tone="ok">ostatnio {fmtDate(lastDone(k.id)!)}</Tag>}
-                  {k.exercises.some((e) => e.name) ? (
-                    <span className="plan-workout-actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
-                        ▶ Prowadź
-                      </button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: extra!.id, workoutId: k.id })}>
-                        Jako zawodnik
-                      </button>
-                    </span>
-                  ) : (
-                    <span className="muted small">brak ćwiczeń</span>
-                  )}
-                </div>
-                {k.exercises.length > 0 && (
-                  <ul className="plain">
-                    {k.exercises.map((e, ei) => (
-                      <li key={e.id} className={`plan-ex ${e.linked ? 'linked' : ''}`}>
-                        <span>
-                          <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
-                        </span>
-                        <span className="muted small">
-                          {setCountLabel(e.groups)} · {groupSummary(e)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
       <div className="stack">
         {plans.map((p) => {
           const nx = nextWorkout(p, sessions);
@@ -182,6 +130,59 @@ export function ClientPlans({ client }: { client: Client }) {
           );
         })}
       </div>
+      <Card
+        className="extra-card"
+        title="Dodatkowe treningi"
+        action={
+          <div className="actions">
+            {extra && <IconBtn icon="edit" label="Edytuj dodatkowe treningi" onClick={() => openModal({ kind: 'plan', plan: extra })} />}
+            <button className="btn btn-secondary btn-sm" onClick={addExtra}>
+              + Dodaj trening
+            </button>
+          </div>
+        }
+      >
+        {extraWorkouts.length === 0 ? (
+          <p className="muted small">Jednostki poza planem (np. dodatkowa siłownia, mobilność, kondycja). Podopieczny widzi je osobno i może zrobić w dowolnym momencie.</p>
+        ) : (
+          <div className="plan-week">
+            {extraWorkouts.map((k) => (
+              <div key={k.id} className="plan-workout">
+                <div className="plan-workout-head">
+                  <strong>{k.name}</strong>
+                  {lastDone(k.id) && <Tag tone="ok">ostatnio {fmtDate(lastDone(k.id)!)}</Tag>}
+                  {k.exercises.some((e) => e.name) ? (
+                    <span className="plan-workout-actions">
+                      <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
+                        ▶ Prowadź
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: extra!.id, workoutId: k.id })}>
+                        Jako zawodnik
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="muted small">brak ćwiczeń</span>
+                  )}
+                </div>
+                {k.exercises.length > 0 && (
+                  <ul className="plain">
+                    {k.exercises.map((e, ei) => (
+                      <li key={e.id} className={`plan-ex ${e.linked ? 'linked' : ''}`}>
+                        <span>
+                          <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
+                        </span>
+                        <span className="muted small">
+                          {setCountLabel(e.groups)} · {groupSummary(e)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </>
   );
 }
