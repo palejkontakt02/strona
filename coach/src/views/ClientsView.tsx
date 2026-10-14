@@ -101,10 +101,7 @@ export function ClientsView() {
                 <button className="btn btn-primary" onClick={() => startLive(selected.id)} title="Prowadź trening 1:1 na żywo, seria po serii">
                   <Icon name="play" size={14} /> Prowadź trening
                 </button>
-                <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: selected.id })} title="Wpisz trening po fakcie">
-                  Zapisz po fakcie
-                </button>
-                <button className="btn btn-ghost" onClick={() => startAthlete(selected.id)} title="Widok, który zobaczy zawodnik">
+                <button className="btn btn-secondary" onClick={() => startAthlete(selected.id)} title="Widok, który zobaczy zawodnik">
                   Tryb zawodnika
                 </button>
               </div>
