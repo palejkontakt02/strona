@@ -521,7 +521,7 @@ function Progress({ clientId }: { clientId: string }) {
                   <span className="muted small"> · {fmtDay(r.date)}</span>
                 </span>
                 <span className="small">
-                  {fnum(num(r.load))} kg × {String(r.reps)}
+                  {String(r.reps)} × {fnum(num(r.load))} kg
                 </span>
               </li>
             ))}

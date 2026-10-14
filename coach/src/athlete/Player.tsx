@@ -205,8 +205,8 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       <div key={`${k}-${i}`}>
         <div className={`sgrid ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${hintNext === k && !s.done ? 'is-next' : ''}`}>
           <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
-          <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Powtórzenia, ${run.ex[k].name}, seria ${num}`} />
+          <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
           <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(k, i)}>
             ✓
@@ -277,8 +277,8 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         </button>
         <div className="sgrid sgrid-head">
           <span />
-          <span>kg</span>
           <span>powt.</span>
+          <span>kg</span>
           <span>RPE</span>
           <span />
         </div>
@@ -315,8 +315,8 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         {ks.map((k) => header(k))}
         <div className="sgrid sgrid-head">
           <span />
-          <span>kg</span>
           <span>powt.</span>
+          <span>kg</span>
           <span>RPE</span>
           <span />
         </div>

@@ -123,7 +123,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
                 <span className="row-time">{fmtDay(r.date)}</span>
                 <strong className="grow">{r.name}</strong>
                 <span className="small">
-                  {fnum(num(r.load))} kg × {String(r.reps)}
+                  {String(r.reps)} × {fnum(num(r.load))} kg
                 </span>
                 <span className="tag tag-ok">
                   e1RM {fnum(r.e1, 1)} (+{fnum(r.gain, 1)})

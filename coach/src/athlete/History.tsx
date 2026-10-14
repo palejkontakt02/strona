@@ -166,10 +166,10 @@ function SessionSheet({
                 </div>
                 {work.length > 0 ? (
                   <div className="hist-sets">
-                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${fnum(x.load)}×${x.reps ?? '?'}`).join(', ')}</span>}
+                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
-                        {x.load != null ? `${fnum(x.load)} kg` : '—'} × {x.reps ?? '?'}
+                        {x.reps ?? '?'} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
                         {x.rpe != null && <i> @{fnum(x.rpe)}</i>}
                       </span>
                     ))}
@@ -178,7 +178,7 @@ function SessionSheet({
                   <div className="hist-sets">
                     {Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, (_, j) => (
                       <span key={j} className="set-chip">
-                        <i>{j + 1}.</i> {num(e.load) != null ? `${fnum(num(e.load))} kg` : '—'} × {e.reps || '?'}
+                        <i>{j + 1}.</i> {e.reps || '?'} × {num(e.load) != null ? `${fnum(num(e.load))} kg` : '—'}
                         {e.rpe && <i> @{e.rpe}</i>}
                       </span>
                     ))}

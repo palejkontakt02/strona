@@ -384,8 +384,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               <div className="set-edit">
                 <div className="set-edit-head">
                   <span>#</span>
-                  <span>kg</span>
                   <span>powt.</span>
+                  <span>kg</span>
                   <span>RPE</span>
                   <span />
                 </div>
@@ -397,8 +397,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                       <button type="button" className="set-no" title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                         {x.warmup ? 'R' : workNo}
                       </button>
-                      <input className="input" inputMode="decimal" value={x.load} onChange={(e) => upd({ load: e.target.value })} aria-label={`Ciężar, seria ${k + 1}`} placeholder="kg" />
                       <input className="input" inputMode="numeric" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Powtórzenia, seria ${k + 1}`} placeholder="powt." />
+                      <input className="input" inputMode="decimal" value={x.load} onChange={(e) => upd({ load: e.target.value })} aria-label={`Ciężar, seria ${k + 1}`} placeholder="kg" />
                       <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, seria ${k + 1}`} placeholder="RPE" />
                       <IconBtn icon="trash" label={`Usuń serię ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
                     </div>
