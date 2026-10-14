@@ -18,6 +18,11 @@ export function mergeGroups(groups: SetGroup[]): SetGroup[] {
   return out;
 }
 
+/** Każda seria osobno: wiersz „3 serie × 5” zamienia się w trzy wiersze po jednej serii. */
+export function expandSets(groups: SetGroup[]): SetGroup[] {
+  return groups.flatMap((g) => Array.from({ length: Math.min(20, Math.max(1, repsN(g.sets) ?? 1)) }, () => ({ ...g, sets: '1' })));
+}
+
 /** „3 serie + 1 rozgrz.” */
 export function setCountLabel(groups: SetGroup[]): string {
   const w = groups.filter((g) => g.type === 'Rozgrzewka').length;

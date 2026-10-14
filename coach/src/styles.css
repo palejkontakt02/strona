@@ -3456,3 +3456,9 @@ h2 {
     padding-right: 0;
   }
 }
+.set-chip.warm {
+  opacity: 0.6;
+}
+.plan-ex .hist-sets {
+  margin-top: 4px;
+}

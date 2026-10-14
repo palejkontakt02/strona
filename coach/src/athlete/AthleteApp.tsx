@@ -7,7 +7,8 @@ import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
-import { currentPlan, exerciseLabels, mergeGroups, nextWorkout } from '../lib/plan';
+import { currentPlan, exerciseLabels, nextWorkout } from '../lib/plan';
+import { PlanSets } from '../components/sets';
 import { emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
@@ -647,16 +648,7 @@ function WorkoutPreview({ workout, done, extra, onClose, onStart, onTrainer }: {
                 <b>
                   <span className="ex-label">{labels[i]}</span> {e.name}
                 </b>
-                <div className="hist-sets">
-                  {mergeGroups(e.groups).map((g, j) => (
-                    <span key={j} className="set-chip">
-                      {g.type !== 'Robocze' && <i>{g.type} </i>}
-                      {g.sets}×{g.reps || '?'}
-                      {g.load && ` ${g.load}${/^\d+([.,]\d+)?$/.test(g.load) ? ' kg' : ''}`}
-                      {g.rpe && <i> @{g.rpe}</i>}
-                    </span>
-                  ))}
-                </div>
+                <PlanSets groups={e.groups} />
                 <div className="muted small">{[e.rest && `przerwa ${e.rest}`, e.notes].filter(Boolean).join(' · ')}</div>
               </div>
             ))}

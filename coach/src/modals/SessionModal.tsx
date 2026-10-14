@@ -79,7 +79,12 @@ function seriesSummary(d: SetDraft[], repsText: string) {
   return { sets: String(work.length), reps: repsText.includes('+') ? repsText : (first?.reps ?? ''), load: first?.load ?? '' };
 }
 const blankSet = (prev?: SetDraft): SetDraft => ({ key: uid(), load: prev?.load ?? '', reps: prev?.reps ?? '', rpe: '' });
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : undefined, linked: linkedFromLabel(e.label) });
+/** Starszy zapis „4 serie × 5 × 100” → cztery osobne serie. */
+const splitSummary = (e: SessionExercise): SetDraft[] => {
+  const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
+  return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
+};
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label) });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {

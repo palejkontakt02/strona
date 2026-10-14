@@ -7,7 +7,7 @@ import { StartButtons } from './StartButtons';
 import { fmtDay, fmtLong, fnum } from '../format';
 import { todayISO } from '../lib/dates';
 import { sessionLoad, tonnage } from '../lib/load';
-import { num } from '../lib/parse';
+import { num, repsN } from '../lib/parse';
 
 /** Najbliższe zaplanowane wizyty klienta. */
 export function Upcoming({ clientId }: { clientId: string }) {
@@ -175,8 +175,13 @@ function SessionSheet({
                     ))}
                   </div>
                 ) : (
-                  <div className="muted small">
-                    {[e.sets && `${e.sets} serie`, e.reps && `× ${e.reps}`, num(e.load) != null && `${fnum(num(e.load))} kg`, e.rpe && `@${e.rpe}`].filter(Boolean).join(' ')}
+                  <div className="hist-sets">
+                    {Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, (_, j) => (
+                      <span key={j} className="set-chip">
+                        <i>{j + 1}.</i> {num(e.load) != null ? `${fnum(num(e.load))} kg` : '—'} × {e.reps || '?'}
+                        {e.rpe && <i> @{e.rpe}</i>}
+                      </span>
+                    ))}
                   </div>
                 )}
                 {e.notes && <div className="muted small">{e.notes}</div>}

@@ -5,8 +5,9 @@ import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
-import { exerciseLabels, mergeGroups, nextWorkout, setCountLabel } from '../../lib/plan';
+import { exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
+import { PlanSets } from '../../components/sets';
 import { extraWithNewWorkout } from './WorkoutList';
 
 export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
@@ -113,9 +114,7 @@ export function ClientPlans({ client }: { client: Client }) {
                                   <span>
                                     <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                                   </span>
-                                  <span className="muted small">
-                                    {setCountLabel(e.groups)} · {groupSummary(e)}
-                                  </span>
+                                  <PlanSets groups={e.groups} />
                                 </li>
                               ))}
                             </ul>
@@ -171,9 +170,7 @@ export function ClientPlans({ client }: { client: Client }) {
                         <span>
                           <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                         </span>
-                        <span className="muted small">
-                          {setCountLabel(e.groups)} · {groupSummary(e)}
-                        </span>
+                        <PlanSets groups={e.groups} />
                       </li>
                     ))}
                   </ul>
