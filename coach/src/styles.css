@@ -3462,3 +3462,9 @@ h2 {
 .plan-ex .hist-sets {
   margin-top: 4px;
 }
+@media (max-width: 600px) {
+  .wl-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

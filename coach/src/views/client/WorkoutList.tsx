@@ -1,10 +1,14 @@
-import { Card, Empty, IconBtn, Tag } from '../../components/ui';
+import { Card, Empty, Icon, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { extraPlanOf, newExtraPlan, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { fmtDate, uid } from '../../format';
 import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
+import { useState } from 'react';
+import type { PlanWorkout, TrainingSession } from '../../domain';
+import { WorkoutPreview } from '../../athlete/WorkoutPreview';
+import { SessionSheet } from '../../athlete/History';
 import { newPlan } from './Plans';
 
 /** Edytor dodatkowych treningów z nową, pustą jednostką na końcu. */
@@ -30,7 +34,10 @@ export function WorkoutList({ client }: { client: Client }) {
     ...(plan ? plan.weeks.map((w) => ({ plan, label: `${plan.name} · ${w.name}`, workouts: w.workouts })) : []),
     ...(extra ? [{ plan: extra, label: 'Poza planem', workouts: extra.weeks.flatMap((w) => w.workouts) }] : []),
   ].filter((g) => g.workouts.length);
-  const last = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id)?.date;
+  const lastSession = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id);
+  const last = (p: Plan, id: string) => lastSession(p, id)?.date;
+  const [preview, setPreview] = useState<{ workout: PlanWorkout; plan: Plan } | null>(null);
+  const [shown, setShown] = useState<TrainingSession | null>(null);
 
   return (
     <Card
@@ -77,7 +84,12 @@ export function WorkoutList({ client }: { client: Client }) {
                           </button>
                         </>
                       )}
-                      <IconBtn icon="edit" label={`Edytuj „${k.name}”`} onClick={() => openModal({ kind: 'plan', plan: g.plan, focusWorkoutId: k.id })} />
+                      <button className="btn btn-ghost btn-sm" onClick={() => setPreview({ workout: k, plan: g.plan })}>
+                        <Icon name="eye" size={15} /> Podgląd
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openModal({ kind: 'plan', plan: g.plan, focusWorkoutId: k.id })}>
+                        <Icon name="edit" size={15} /> Edytuj
+                      </button>
                     </span>
                   </li>
                 );
@@ -86,6 +98,18 @@ export function WorkoutList({ client }: { client: Client }) {
           </div>
         ))
       )}
+      {preview && (
+        <WorkoutPreview
+          workout={preview.workout}
+          done={last(preview.plan, preview.workout.id)}
+          extra={preview.plan.extra}
+          onClose={() => setPreview(null)}
+          onShowDone={() => setShown(lastSession(preview.plan, preview.workout.id) ?? null)}
+          onStart={preview.workout.exercises.some((e) => e.name) ? () => startAthlete(client.id, { planId: preview.plan.id, workoutId: preview.workout.id }) : undefined}
+          onTrainer={() => startLive(client.id, undefined, undefined, { planId: preview.plan.id, workoutId: preview.workout.id })}
+        />
+      )}
+      {shown && <SessionSheet s={shown} onClose={() => setShown(null)} onEdit={() => (setShown(null), setPreview(null), openModal({ kind: 'session', session: shown }))} />}
     </Card>
   );
 }

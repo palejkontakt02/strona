@@ -7,16 +7,15 @@ import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
-import { currentPlan, exerciseLabels, nextWorkout } from '../lib/plan';
-import { PlanSets } from '../components/sets';
+import { currentPlan, nextWorkout } from '../lib/plan';
 import { emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
-import { StartButtons } from './StartButtons';
+import { WorkoutPreview } from './WorkoutPreview';
 import { runFromStart, type RunStart } from './start';
-import { History, Upcoming } from './History';
+import { History, SessionSheet, Upcoming } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
 export type RunKind = 'run' | 'live';
@@ -553,6 +552,7 @@ function Workouts({
   onTrainer?: (st: RunStart) => void;
 }) {
   const [preview, setPreview] = useState<{ workout: PlanWorkout; planId: string } | null>(null);
+  const [shown, setShown] = useState<TrainingSession | null>(null);
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
   if (!plan && extraWorkouts.length === 0) return null;
   const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id)?.date; // sesje od najnowszej
@@ -608,6 +608,10 @@ function Workouts({
           done={done(preview.planId, preview.workout.id)}
           extra={preview.planId === extra?.id}
           onClose={() => setPreview(null)}
+          onShowDone={() => {
+            const last = sessions.find((x) => x.planId === preview.planId && x.workoutId === preview.workout.id);
+            if (last) setShown(last);
+          }}
           onStart={() => {
             setPreview(null);
             onStart(preview.workout.id, preview.planId);
@@ -621,41 +625,9 @@ function Workouts({
           }
         />
       )}
+      {shown && <SessionSheet s={shown} onClose={() => setShown(null)} />}
     </section>
   );
 }
 
-/** Podgląd jednostki z planu: ćwiczenia (z blokami A1/A2), serie, ciężary, tempo, uwagi. */
-function WorkoutPreview({ workout, done, extra, onClose, onStart, onTrainer }: { workout: PlanWorkout; done?: string; extra?: boolean; onClose: () => void; onStart: () => void; onTrainer?: () => void }) {
-  const labels = exerciseLabels(workout.exercises);
-  return (
-    <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={workout.name}>
-        <div className="between">
-          <div>
-            <span className="eyebrow">{[extra ? 'poza planem' : 'trening z planu', done && `ostatnio ${fmtDay(done)}`].filter(Boolean).join(' · ')}</span>
-            <h2>{workout.name}</h2>
-          </div>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>
-            Zamknij
-          </button>
-        </div>
-        <div className="hist-ex">
-          {workout.exercises
-            .filter((e) => e.name)
-            .map((e, i) => (
-              <div key={e.id} className={`hist-ex-row ${e.linked ? 'linked' : ''}`}>
-                <b>
-                  <span className="ex-label">{labels[i]}</span> {e.name}
-                </b>
-                <PlanSets groups={e.groups} />
-                <div className="muted small">{[e.rest && `przerwa ${e.rest}`, e.notes].filter(Boolean).join(' · ')}</div>
-              </div>
-            ))}
-        </div>
-        <StartButtons onStart={onStart} onTrainer={onTrainer} />
-      </div>
-    </div>
-  );
-}
 

@@ -101,7 +101,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
   );
 }
 
-function SessionSheet({
+export function SessionSheet({
   s,
   onClose,
   onEdit,

@@ -164,6 +164,7 @@ const ICONS: Record<string, ReactNode> = {
   chevR: <path d="M9 6l6 6-6 6" />,
   chevD: <path d="M6 9l6 6 6-6" />,
   play: <path d="M7 5l12 7-12 7z" />,
+  eye: <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
   check: <path d="M5 12l5 5L20 7" />,
   alert: <path d="M12 3l10 18H2zM12 10v5M12 18v.5" />,
   more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,

@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { SessionSheet } from '../../athlete/History';
+import type { TrainingSession } from '../../domain';
 import { Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { sessionsOf } from '../../data/ops';
@@ -14,6 +17,8 @@ export function ClientSessions({ client }: { client: Client }) {
   const { db } = useStore();
   const { openModal } = useNav();
   const sessions = sessionsOf(db, client.id);
+  const { startLive, startAthlete } = useNav();
+  const [shown, setShown] = useState<TrainingSession | null>(null);
   return (
     <>
       <WorkoutList client={client} />
@@ -66,6 +71,7 @@ export function ClientSessions({ client }: { client: Client }) {
                     <td className="num">{s.pain != null ? <Tag tone={s.pain >= 6 ? 'danger' : s.pain >= 4 ? 'warn' : 'muted'}>{s.pain}/10</Tag> : '—'}</td>
                     <td className="hide-mobile muted small">{CHARGE_SHORT[s.charge]}</td>
                     <td className="actions">
+                      <IconBtn icon="eye" label="Podgląd treningu" onClick={() => setShown(s)} />
                       <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
                     </td>
                   </tr>
@@ -74,6 +80,15 @@ export function ClientSessions({ client }: { client: Client }) {
             </tbody>
           </table>
         </div>
+      )}
+      {shown && (
+        <SessionSheet
+          s={shown}
+          onClose={() => setShown(null)}
+          onEdit={() => (setShown(null), openModal({ kind: 'session', session: shown }))}
+          onTrainer={shown.exercises.length ? () => startLive(client.id, undefined, undefined, { repeatSessionId: shown.id }) : undefined}
+          onRepeat={shown.exercises.length ? () => startAthlete(client.id, { repeatSessionId: shown.id }) : undefined}
+        />
       )}
     </>
   );
