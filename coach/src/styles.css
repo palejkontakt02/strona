@@ -3468,3 +3468,32 @@ h2 {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* zapisane treningi: lista na telefonie, klikalne wiersze na komputerze */
+.sess-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+}
+.sess-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+}
+.tr-click {
+  cursor: pointer;
+}
+.tr-click:hover td {
+  background: var(--color-surface-2);
+}
+@media (max-width: 900px) {
+  .sess-list.show-mobile {
+    display: block !important;
+  }
+}

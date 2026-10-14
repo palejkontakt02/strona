@@ -2,7 +2,7 @@ import { Card, Empty, Icon, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { extraPlanOf, newExtraPlan, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { fmtDate, uid } from '../../format';
+import { fmtDate, plural, uid } from '../../format';
 import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { useState } from 'react';
@@ -34,6 +34,8 @@ export function WorkoutList({ client }: { client: Client }) {
     ...(plan ? plan.weeks.map((w) => ({ plan, label: `${plan.name} · ${w.name}`, workouts: w.workouts })) : []),
     ...(extra ? [{ plan: extra, label: 'Poza planem', workouts: extra.weeks.flatMap((w) => w.workouts) }] : []),
   ].filter((g) => g.workouts.length);
+  // Treningi zrobione bez planu (np. wklejone z notatki, „pusty trening”) — też do podglądu i powtórki.
+  const adhoc = sessions.filter((s) => !s.planId || !db.plans.some((p) => p.id === s.planId)).slice(0, 12);
   const lastSession = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id);
   const last = (p: Plan, id: string) => lastSession(p, id)?.date;
   const [preview, setPreview] = useState<{ workout: PlanWorkout; plan: Plan } | null>(null);
@@ -55,7 +57,7 @@ export function WorkoutList({ client }: { client: Client }) {
         </div>
       }
     >
-      {groups.length === 0 ? (
+      {groups.length === 0 && adhoc.length === 0 ? (
         <Empty>Brak treningów. Dodaj plan albo trening poza planem.</Empty>
       ) : (
         groups.map((g) => (
@@ -71,7 +73,7 @@ export function WorkoutList({ client }: { client: Client }) {
                     <div className="grow">
                       <strong>{k.name}</strong>{' '}
                       {isNext ? <Tag tone="accent">następny</Tag> : dn ? <Tag tone="ok">✓ {fmtDate(dn)}</Tag> : null}
-                      <div className="muted small">{n ? `${n} ćwiczeń` : 'brak ćwiczeń — dodaj je w edycji'}</div>
+                      <div className="muted small">{n ? `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}` : 'brak ćwiczeń — dodaj je w edycji'}</div>
                     </div>
                     <span className="wl-actions">
                       {n > 0 && (
@@ -97,6 +99,45 @@ export function WorkoutList({ client }: { client: Client }) {
             </ul>
           </div>
         ))
+      )}
+      {adhoc.length > 0 && (
+        <div className="wl-group">
+          <div className="wl-label">Wykonane bez planu</div>
+          <ul className="rows">
+            {adhoc.map((s) => (
+              <li key={s.id} className="row wl-row">
+                <div className="grow">
+                  <strong>{s.workoutName || 'Trening'}</strong> <Tag tone="ok">✓ {fmtDate(s.date)}</Tag>
+                  <div className="muted small">
+                    {(() => {
+                      const ex = s.exercises.length;
+                      const sets = s.exercises.reduce((a, e) => a + (e.setsLog?.filter((x) => !x.warmup).length ?? (parseInt(e.sets ?? '', 10) || 0)), 0);
+                      return `${ex} ${plural(ex, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')} · ${sets} ${plural(sets, 'seria', 'serie', 'serii')}`;
+                    })()}
+                  </div>
+                </div>
+                <span className="wl-actions">
+                  {s.exercises.length > 0 && (
+                    <>
+                      <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { repeatSessionId: s.id })}>
+                        ▶ Prowadź
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { repeatSessionId: s.id })}>
+                        Jako zawodnik
+                      </button>
+                    </>
+                  )}
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShown(s)}>
+                    <Icon name="eye" size={15} /> Podgląd
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => openModal({ kind: 'session', session: s })}>
+                    <Icon name="edit" size={15} /> Edytuj
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {preview && (
         <WorkoutPreview

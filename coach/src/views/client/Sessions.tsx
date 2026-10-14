@@ -36,7 +36,26 @@ export function ClientSessions({ client }: { client: Client }) {
       {sessions.length === 0 ? (
         <Empty>Brak zapisanych treningów.</Empty>
       ) : (
-        <div className="card table-wrap">
+        <>
+        {/* telefon: lista z widocznymi przyciskami (tabela przewijana w bok chowała akcje) */}
+        <ul className="card rows show-mobile sess-list">
+          {sessions.map((s) => {
+            const ton = tonnage(s);
+            return (
+              <li key={s.id} className="row row-top">
+                <button className="grow sess-open" onClick={() => setShown(s)}>
+                  <strong>{s.workoutName || 'Trening'}</strong>
+                  <span className="muted small">
+                    {[fmtDate(s.date), s.duration != null && `${s.duration} min`, s.srpe != null && `RPE ${fnum(s.srpe)}`, ton ? `${fnum(ton, 0)} kg` : null].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+                <IconBtn icon="eye" label="Podgląd treningu" onClick={() => setShown(s)} />
+                <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
+              </li>
+            );
+          })}
+        </ul>
+        <div className="card table-wrap hide-mobile">
           <table className="table">
             <thead>
               <tr>
@@ -57,7 +76,7 @@ export function ClientSessions({ client }: { client: Client }) {
                 const w = wellnessTotal(s.wellness);
                 const ton = tonnage(s);
                 return (
-                  <tr key={s.id}>
+                  <tr key={s.id} className="tr-click" onClick={(e) => !(e.target as HTMLElement).closest('button') && setShown(s)}>
                     <td className="nowrap">{fmtDate(s.date)}</td>
                     <td>
                       {s.workoutName || 'Trening'} <LocationTag id={s.locationId} short />
@@ -80,6 +99,7 @@ export function ClientSessions({ client }: { client: Client }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
       {shown && (
         <SessionSheet
