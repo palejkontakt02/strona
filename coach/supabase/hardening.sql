@@ -145,3 +145,19 @@ notify pgrst, 'reload schema';
 drop policy if exists client_delete on public.sessions;
 create policy client_delete on public.sessions for delete to authenticated
   using (client_id in (select public.my_client_ids()) and data ->> 'charge' = 'brak');
+
+-- 9. Trener widzi konta w aplikacji (e-mail, potwierdzenie, ostatnie logowanie) — tylko trener
+create or replace function public.trainer_accounts()
+returns table (email text, confirmed boolean, created_at timestamptz, last_sign_in_at timestamptz, is_trainer boolean)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not is_trainer() then raise exception 'Brak dostępu'; end if;
+  return query
+    select lower(u.email)::text, u.email_confirmed_at is not null, u.created_at, u.last_sign_in_at,
+           exists (select 1 from trainers t where t.user_id = u.id)
+    from auth.users u
+    order by u.created_at desc;
+end $$;
+revoke all on function public.trainer_accounts from public, anon;
+grant execute on function public.trainer_accounts to authenticated;
+notify pgrst, 'reload schema';

@@ -1,3 +1,4 @@
+import { AccountsPanel } from '../components/accounts';
 import { useRef, useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import { EXERCISE_CATEGORIES, type Client, type ExerciseCategory, type Injury, type Measurement, type Payment, type TestResult } from '../domain';
@@ -456,6 +457,8 @@ export function DataModal() {
           </button>
         ))}
       </div>
+      <h4 className="form-section">Konta w aplikacji</h4>
+      <AccountsPanel />
       <h4 className="form-section">Miejsca treningów</h4>
       <p className="muted small">{db.locations.map((l) => l.name).join(' · ') || 'Brak zapisanych miejsc.'}</p>
       <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'locations' })}>

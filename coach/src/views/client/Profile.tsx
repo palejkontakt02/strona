@@ -8,6 +8,7 @@ import { fmtDate, slugify } from '../../format';
 import { num } from '../../lib/parse';
 import { useNav } from '../../nav';
 import { LocationSelect } from '../../components/location';
+import { AccountStatusCard } from '../../components/accounts';
 
 type Draft = Record<string, string>;
 
@@ -155,6 +156,7 @@ export function ClientProfile({ client }: { client: Client }) {
 
   return (
     <>
+      <AccountStatusCard client={client} />
       <form
         className="card"
         onSubmit={(e) => {

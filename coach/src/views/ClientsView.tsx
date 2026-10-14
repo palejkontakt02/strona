@@ -1,3 +1,5 @@
+import { AccountBadge } from '../components/accounts';
+import { useAccounts } from '../data/accounts';
 import { useState } from 'react';
 import { Avatar, Dot, Icon, Seg, Tag, type Tone } from '../components/ui';
 import type { ClientStatus } from '../domain';
@@ -25,7 +27,8 @@ export function StatusTag({ status }: { status: ClientStatus }) {
 const FILTERS = ['Aktywni', 'Wszyscy'] as const;
 
 export function ClientsView() {
-  const { db } = useStore();
+  const { db, cloud } = useStore();
+  const accounts = useAccounts(cloud);
   const { clientId, openClient, closeClient, clientTab, setClientTab, openModal, startAthlete, startLive } = useNav();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Aktywni');
@@ -62,7 +65,9 @@ export function ClientsView() {
                       {alerts.length > 0 ? <Dot tone={red ? 'danger' : 'warn'} /> : <StatusTag status={c.status} />}
                     </div>
                     <div className="muted small ellipsis">{[c.sport, c.goal].filter(Boolean).join(' · ')}</div>
-                    <div className="muted small">Ostatni trening: {ago(lastSessionDate(db, c.id))}</div>
+                    <div className="muted small row-inline">
+                      Ostatni trening: {ago(lastSessionDate(db, c.id))} <AccountBadge client={c} state={accounts} />
+                    </div>
                   </div>
                 </button>
               </li>

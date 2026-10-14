@@ -3367,3 +3367,17 @@ h2 {
   border: 1px dashed color-mix(in srgb, var(--color-text) 30%, transparent);
   background: transparent;
 }
+
+/* konta w aplikacji */
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.row-inline.wrap {
+  flex-wrap: wrap;
+}
+.account-list {
+  margin-bottom: var(--space-2);
+}
