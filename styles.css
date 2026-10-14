@@ -722,35 +722,35 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
 
 /* wejście do aplikacji nad stopką */
 .app-cta {
-  margin-top: 60px;
+  margin-top: 96px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px 24px;
-  padding: 24px 28px;
+  gap: 18px 24px;
+  padding: 26px 28px;
   border: 1px solid rgba(237,237,237,0.22);
   border-radius: 10px;
   background: rgba(237,237,237,0.04);
   color: #EDEDED;
-  text-decoration: none;
-  transition: border-color 0.2s, background 0.2s;
 }
-.app-cta:hover { border-color: #EDEDED; background: rgba(237,237,237,0.08); color: #EDEDED; }
 .app-cta-text { display: flex; flex-direction: column; gap: 4px; }
 .app-cta-eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(237,237,237,0.5); }
 .app-cta strong { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; }
 .app-cta-sub { font-size: 14px; color: rgba(237,237,237,0.6); }
 .app-cta-go {
-  background: #D8D8D8;
-  color: #161616;
-  padding: 12px 22px;
+  display: inline-block;
+  background: #8FD9A8;
+  color: #0F2318;
+  padding: 13px 24px;
   border-radius: 3px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
+  transition: background 0.2s, transform 0.2s;
 }
-.app-cta + .footer { margin-top: 32px; }
+.app-cta-go:hover { background: #A9E8BD; color: #0F2318; transform: translateY(-1px); }
+.app-cta + .footer { margin-top: 40px; }
 @media (max-width: 640px) {
   .app-cta { padding: 20px; }
   .app-cta-go { width: 100%; text-align: center; }
