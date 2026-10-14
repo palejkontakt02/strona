@@ -31,7 +31,9 @@ export function CalendarView() {
   const today = todayISO();
   const [mode, setMode] = useState<Mode>('Tydzień');
   const [anchor, setAnchor] = useState<ISODate>(today);
-  const [loc, setLoc] = useState('');
+  const [locSel, setLoc] = useState('');
+  // Filtr usuniętego miejsca nie może dalej ukrywać wizyt.
+  const loc = db.locations.some((l) => l.id === locSel) ? locSel : '';
 
   const shift = (dir: number) => {
     if (mode === 'Tydzień') setAnchor(addDays(anchor, 7 * dir));

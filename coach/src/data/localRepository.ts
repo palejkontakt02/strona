@@ -24,11 +24,13 @@ export function createLocalRepository(): Repository {
   let db: Db = read() ?? createSeed();
   write(db);
   return {
+    // Zawsze od świeżej kopii z localStorage: druga karta mogła w międzyczasie coś zapisać.
     async load() {
+      db = read() ?? db;
       return db;
     },
     async apply(changes) {
-      db = applyChanges(db, changes);
+      db = applyChanges(read() ?? db, changes);
       write(db);
     },
     async replaceAll(next) {
@@ -36,6 +38,7 @@ export function createLocalRepository(): Repository {
       write(db);
     },
     async saveCheckin(clientId, checkin) {
+      db = read() ?? db;
       db = {
         ...db,
         clients: db.clients.map((c) =>

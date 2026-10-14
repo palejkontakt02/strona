@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanExercise, SetGroup, TrainingSession } from '../domain';
-import { buildRunExercise, completeSet, runToExercises, type Run } from './run';
+import { adHocExercise, appendExercise, buildRunExercise, completeSet, emptyRun, runToExercises, type Run } from './run';
 
 const g = (p: Partial<SetGroup>): SetGroup => ({ type: 'Robocze', sets: '1', reps: '5', load: '', rpe: '8', ...p });
 const ex = (groups: SetGroup[], notes = ''): PlanExercise => ({ id: 'e', name: 'Przysiad', rest: '2:00', notes, groups });
@@ -199,5 +199,21 @@ describe('editing a saved session', () => {
     ]);
     expect(back[1]).toMatchObject({ name: 'Podciąganie', label: 'B1', sets: '3', reps: '6', rpe: '8' });
     expect(back[2].label).toBe('B2');
+  });
+});
+
+describe('poprawki z testów zawodnika', () => {
+  it('linking an ad-hoc exercise moves the round rest to the new last member', () => {
+    const base = appendExercise(emptyRun('T', '2026-10-14'), adHocExercise('Wyciskanie', 3, '8', '', '2:00'));
+    const r = appendExercise(base, { ...adHocExercise('Wiosłowanie', 3, '10', '', '1:30'), linked: true });
+    expect(r.ex.map((e) => [e.label, e.rest])).toEqual([
+      ['A1', ''],
+      ['A2', '1:30'],
+    ]);
+  });
+  it('keeps timed reps text and notes when saving', () => {
+    const r = appendExercise(emptyRun('T', '2026-10-14'), { ...adHocExercise('Plank', 1, '45 s', ''), notes: 'neutralny kręgosłup' });
+    r.ex[0].sets[0].done = true;
+    expect(runToExercises(r)[0]).toMatchObject({ reps: '45 s', notes: 'neutralny kręgosłup' });
   });
 });

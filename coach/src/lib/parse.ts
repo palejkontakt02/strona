@@ -1,7 +1,13 @@
-/** Liczba z pola formularza (akceptuje przecinek). */
+/** Liczba z pola formularza (akceptuje przecinek, spacje tysięcy i jednostkę na końcu, np. „100 kg”). */
 export function num(v: unknown): number | null {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-  const n = parseFloat(String(v ?? '').replace(',', '.'));
+  // „1 500”, „1 500,50”, „1.500,00” → 1500 / 1500,5 / 1500; tekst, który nie jest liczbą → null.
+  let t = String(v ?? '').trim().replace(/[\s\u00a0\u202f]/g, '');
+  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, '');
+  t = t.replace(',', '.');
+  const m = t.match(/^[-+]?(\d+\.?\d*|\.\d+)/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
   return Number.isNaN(n) ? null : n;
 }
 
@@ -35,4 +41,10 @@ export function parseTempo(s: string | undefined | null): [number, number, numbe
   const m = String(s || '').match(/([0-9xX])\s*-\s*([0-9xX])\s*-\s*([0-9xX])\s*-\s*([0-9xX])/);
   if (!m) return null;
   return m.slice(1).map((v) => (/x/i.test(v) ? 1 : +v)) as [number, number, number, number];
+}
+
+/** Liczba z pola z zakresu [min, max]; poza zakresem albo nie-liczba → null. */
+export function numIn(v: unknown, min: number, max: number): number | null {
+  const n = num(v);
+  return n != null && n >= min && n <= max ? n : null;
 }

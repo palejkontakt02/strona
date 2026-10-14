@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { plural } from './format';
 import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
 import { CLIENT_TABS, NavCtx, SECTIONS, type ClientTab, type ModalState, type NavValue, type Section } from './nav';
@@ -26,6 +27,7 @@ export function App() {
   const [modal, setModal] = useState<ModalState | null>(null);
   const [athleteId, setAthleteId] = useState<string | null>(null);
   const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string } | null>(null);
+  const [bannerOpen, setBannerOpen] = useState(false);
   const { db } = useStore();
 
   const go = useCallback((s: Section) => {
@@ -112,18 +114,28 @@ export function App() {
 
       {running.length > 0 && (
         <div className="live-banner">
-          {running.map(({ c, run }) => (
-            <button key={c.id} onClick={() => setLive({ clientId: c.id })}>
+          {running.length > 1 && (
+            <button onClick={() => setBannerOpen(!bannerOpen)} aria-expanded={bannerOpen}>
               <span className="live-dot" />
-              <span className="live-label">Trening w toku:</span>
-              <b>{c.name}</b>
-              <span className="muted small">
-                {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
-              </span>
+              <b>W toku: {running.length} {plural(running.length, 'trening', 'treningi', 'treningów')}</b>
+              <span className="muted small">{running.map(({ c }) => c.name.split(' ')[0]).join(', ')}</span>
               <span className="grow" />
-              <span className="live-go">Wróć ›</span>
+              <span className="live-go">{bannerOpen ? 'Zwiń ▴' : 'Pokaż ▾'}</span>
             </button>
-          ))}
+          )}
+          {(running.length === 1 || bannerOpen) &&
+            running.map(({ c, run }) => (
+              <button key={c.id} className={running.length > 1 ? 'live-sub' : ''} onClick={() => setLive({ clientId: c.id })}>
+                <span className="live-dot" />
+                <span className="live-label">Trening w toku:</span>
+                <b>{c.name}</b>
+                <span className="muted small">
+                  {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
+                </span>
+                <span className="grow" />
+                <span className="live-go">Wróć ›</span>
+              </button>
+            ))}
         </div>
       )}
       <main className="main">

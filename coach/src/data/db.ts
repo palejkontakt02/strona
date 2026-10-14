@@ -9,15 +9,46 @@ export interface Db {
   locations: Location[];
 }
 
-/** Uzupełnia brakujące kolekcje (dane zapisane starszą wersją aplikacji). */
+type Rec = Record<string, unknown>;
+const isRec = (x: unknown): x is Rec => !!x && typeof x === 'object' && !Array.isArray(x);
+const arr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
+const isDate = (x: unknown) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x);
+
+/** Rekordy z `id`; pomija śmieci (np. zapisane ręcznie przez API), żeby jeden zły wiersz nie zablokował całego panelu. */
+function clean<T>(list: unknown, ok: (r: Rec) => boolean, fix: (r: Rec) => Rec = (r) => r): T[] {
+  return arr(list)
+    .filter((r): r is Rec => isRec(r) && typeof r.id === 'string' && ok(r))
+    .map((r) => fix(r) as T);
+}
+
+/** Uzupełnia brakujące kolekcje i pola (dane ze starszej wersji aplikacji albo uszkodzone). */
 export function normalizeDb(db: Partial<Db>): Db {
   return {
-    clients: db.clients ?? [],
-    plans: db.plans ?? [],
-    sessions: db.sessions ?? [],
-    appointments: db.appointments ?? [],
-    library: db.library ?? [],
-    locations: db.locations ?? [],
+    clients: clean<Client>(db.clients, (r) => typeof r.name === 'string', (r) => ({
+      ...r,
+      payments: arr(r.payments)
+        .filter((p) => isRec(p) && isDate(p.date))
+        .map((p) => ({ type: 'pojedyncza', status: 'due', ...(p as Rec), amount: typeof (p as Rec).amount === 'number' ? (p as Rec).amount : 0 })),
+      measurements: arr(r.measurements).filter(isRec),
+      tests: arr(r.tests).filter(isRec),
+      injuryLog: arr(r.injuryLog).filter(isRec),
+      checkins: arr(r.checkins).filter((c) => isRec(c) && isDate(c.date)),
+    })),
+    plans: clean<Plan>(db.plans, (r) => typeof r.clientId === 'string', (r) => ({
+      ...r,
+      weeks: arr(r.weeks).filter(isRec).map((w) => ({ ...w, workouts: arr(w.workouts).filter(isRec).map((k) => ({ ...k, exercises: arr(k.exercises).filter(isRec).map((e) => ({ ...e, groups: arr(e.groups).filter(isRec) })) })) })),
+    })),
+    sessions: clean<TrainingSession>(db.sessions, (r) => typeof r.clientId === 'string' && isDate(r.date), (r) => ({
+      ...r,
+      charge: typeof r.charge === 'string' ? r.charge : 'brak',
+      exercises: arr(r.exercises).filter((e) => isRec(e) && typeof e.name === 'string').map((e) => ({ ...(e as Rec), setsLog: Array.isArray((e as Rec).setsLog) ? ((e as Rec).setsLog as unknown[]).filter(isRec) : undefined })),
+    })),
+    appointments: clean<Appointment>(db.appointments, (r) => typeof r.clientId === 'string' && isDate(r.date) && typeof r.time === 'string', (r) => ({
+      ...r,
+      status: ['planned', 'done', 'cancel', 'noshow'].includes(r.status as string) ? r.status : 'planned',
+    })),
+    library: clean<LibraryExercise>(db.library, (r) => typeof r.name === 'string'),
+    locations: clean<Location>(db.locations, (r) => typeof r.name === 'string', (r) => ({ ...r, payouts: arr(r.payouts).filter(isRec) })),
   };
 }
 

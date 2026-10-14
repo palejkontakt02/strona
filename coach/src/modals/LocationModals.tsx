@@ -5,6 +5,7 @@ import type { Location } from '../domain';
 import { put, del } from '../data/db';
 import { useStore } from '../data/store';
 import { pln, uid } from '../format';
+import { clubMonths } from '../lib/club';
 import { num } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 
@@ -45,7 +46,7 @@ export function LocationsModal() {
 }
 
 export function LocationModal({ m }: { m: Extract<ModalState, { kind: 'location' }> }) {
-  const { db, apply, ask } = useStore();
+  const { db, apply, ask, toast } = useStore();
   const { openModal } = useNav();
   const l = m.location;
   const [name, setName] = useState(l?.name ?? '');
@@ -65,8 +66,12 @@ export function LocationModal({ m }: { m: Extract<ModalState, { kind: 'location'
             type="button"
             className="btn btn-ghost btn-danger-text"
             onClick={async () => {
-              const used = db.appointments.some((a) => a.locationId === l.id) || db.sessions.some((s) => s.locationId === l.id);
-              if (!(await ask(used ? `Usunąć „${l.name}”? Wizyty i treningi zostaną, ale stracą oznaczenie miejsca.` : `Usunąć „${l.name}”?`))) return;
+              const due = clubMonths(l, db.sessions).reduce((a, m) => a + m.due, 0);
+              if (l.kind === 'klub' && due > 0)
+                return toast(`„${l.name}” ma jeszcze ${pln(due)} niewypłaconych należności. Najpierw oznacz wypłaty (Płatności → Od klubów), potem usuń klub.`);
+              const billed = db.clients.filter((c) => c.billing === 'klub' && c.locationId === l.id).length;
+              const used = db.appointments.some((a) => a.locationId === l.id) || db.sessions.some((s) => s.locationId === l.id) || billed > 0;
+              if (!(await ask(used ? `Usunąć „${l.name}”? Wizyty i treningi zostaną, ale stracą oznaczenie miejsca${billed ? `, a ${billed} ${billed === 1 ? 'klient rozliczany' : 'klientów rozliczanych'} przez ten klub trzeba będzie przepiąć` : ''}.` : `Usunąć „${l.name}”?`))) return;
               await apply([del('locations', l.id)], 'Miejsce usunięte.');
               back();
             }}

@@ -1,5 +1,5 @@
 import type { Appointment, Client, Payment, Plan, TrainingSession } from '../domain';
-import { fmtDay, uid } from '../format';
+import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
 import { del, put, type Change, type Db } from './db';
@@ -34,7 +34,7 @@ export function allPayments(db: Db): PaymentRow[] {
 }
 
 export function paymentLabel(p: Payment): string {
-  if (p.type === 'pakiet') return `Pakiet ${p.sessions ?? '?'} sesji`;
+  if (p.type === 'pakiet') return p.sessions ? `Pakiet ${p.sessions} ${plural(p.sessions, 'sesja', 'sesje', 'sesji')}` : 'Pakiet';
   if (p.type === 'abonament') {
     const m = p.month ? new Date(p.month + '-15T12:00:00').toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' }) : '';
     return `Abonament ${m}`.trim();
@@ -49,6 +49,8 @@ export interface SessionSave {
   isNew: boolean;
   /** Wizyta, z której zapisywany jest trening. */
   appointmentId?: string;
+  /** Szukaj zaplanowanej wizyty z tego dnia, gdy nie podano `appointmentId` (domyślnie tak). */
+  matchAppointment?: boolean;
   /** Kwota za sesję pojedynczą. */
   amount?: number;
   paidNow?: boolean;
@@ -62,13 +64,13 @@ export interface SessionSave {
  */
 export function saveSession(db: Db, s: SessionSave): { changes: Change[]; message: string } {
   let message = 'Trening zapisany.';
-  if (!s.isNew) return { changes: [put('sessions', s.session)], message };
-  let session = s.session;
+  let session = withClubRate(db, s.session);
+  if (!s.isNew) return { changes: [put('sessions', session)], message };
   const changes: Change[] = [];
 
   const appt =
     db.appointments.find((a) => a.id === s.appointmentId) ??
-    db.appointments.find((a) => a.clientId === session.clientId && a.date === session.date && a.status === 'planned');
+    (s.matchAppointment === false ? undefined : db.appointments.find((a) => a.clientId === session.clientId && a.date === session.date && a.status === 'planned'));
   if (appt) changes.push(put('appointments', { ...appt, status: 'done', sessionId: session.id }));
 
   const client = clientById(db, session.clientId);
@@ -83,6 +85,26 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
     if (pk) message = packageMessage(pk.left);
   }
   return { changes: [put('sessions', session), ...changes], message };
+}
+
+/** Trening „przez klub” zapamiętuje stawkę klubu z chwili zapisu (albo zmiany miejsca). */
+function withClubRate(db: Db, session: TrainingSession): TrainingSession {
+  if (session.charge !== 'klub') {
+    if (session.clubRate == null) return session;
+    const { clubRate: _drop, ...rest } = session;
+    return rest;
+  }
+  const prev = db.sessions.find((x) => x.id === session.id);
+  if (session.clubRate != null && prev?.locationId === session.locationId && prev?.charge === 'klub') return session;
+  const loc = db.locations.find((l) => l.id === session.locationId && l.kind === 'klub');
+  return { ...session, clubRate: loc?.clubRate };
+}
+
+/** Problem z rozliczeniem „przez klub”: miejsce musi być klubem. */
+export function chargeProblem(db: Db, charge: string, locationId?: string): string | null {
+  if (charge !== 'klub') return null;
+  if (!db.locations.some((l) => l.id === locationId && l.kind === 'klub')) return 'Rozliczenie „przez klub” wymaga miejsca, które jest klubem. Wybierz klub albo zmień rozliczenie.';
+  return null;
 }
 
 /** Płatność utworzona przy zapisie treningu (sesja pojedyncza), jeśli nadal istnieje. */

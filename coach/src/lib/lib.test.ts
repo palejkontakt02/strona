@@ -254,6 +254,9 @@ describe('billing', () => {
     expect(packageMessage(1)).toBe('Zapisano. To był ostatni trening z pakietu.');
     expect(packageMessage(2)).toBe('Zapisano. Został 1 trening w pakiecie.');
     expect(packageMessage(6)).toBe('Zapisano. Zostało 5 treningów w pakiecie.');
+    expect(packageMessage(4)).toBe('Zapisano. Zostały 3 treningi w pakiecie.');
+    expect(packageMessage(0)).toBe('Zapisano. 1 trening ponad pakiet — czas na nowy pakiet.');
+    expect(packageMessage(-4)).toBe('Zapisano. 5 treningów ponad pakiet — czas na nowy pakiet.');
   });
 });
 
@@ -369,5 +372,24 @@ describe('moving and removing within blocks', () => {
     const { removeFromBlocks } = await import('./plan');
     expect(show(removeFromBlocks(L('A B C* D* E'), 1))).toBe('A C D* E');
     expect(show(removeFromBlocks(L('A B C* E'), 2))).toBe('A B E');
+  });
+});
+
+describe('num — liczby z formularza', () => {
+  it('handles thousands separators and decimal comma', () => {
+    expect(num('1 500')).toBe(1500);
+    expect(num('1 500,50')).toBe(1500.5);
+    expect(num('1.500,00')).toBe(1500);
+    expect(num('72,5')).toBe(72.5);
+    expect(num('45 s')).toBe(45);
+    expect(num('-10%')).toBe(-10);
+    expect(num('abc')).toBeNull();
+    expect(num('')).toBeNull();
+  });
+  it('numIn rejects out-of-range values', async () => {
+    const { numIn } = await import('./parse');
+    expect(numIn('-60', 1, 600)).toBeNull();
+    expect(numIn('15', 0, 10)).toBeNull();
+    expect(numIn('8,5', 0, 10)).toBe(8.5);
   });
 });

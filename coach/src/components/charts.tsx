@@ -113,7 +113,7 @@ export function LineChart({
           </g>
         ))}
         {[sortedX[0], sortedX[Math.floor(sortedX.length / 2)], sortedX[sortedX.length - 1]].filter((v, i, a) => a.indexOf(v) === i).map((x) => (
-          <text key={x} x={X(x)} y={height - 6} className="chart-axis" textAnchor="middle">
+          <text key={x} x={X(x)} y={height - 6} className="chart-axis" textAnchor={sortedX.length > 1 && x === sortedX[0] ? 'start' : sortedX.length > 1 && x === sortedX[sortedX.length - 1] ? 'end' : 'middle'}>
             {fmtShort(x)}
           </text>
         ))}

@@ -22,10 +22,20 @@ describe('club billing', () => {
   });
   it('monthly statement with payouts, newest first', () => {
     expect(clubMonths(club, sessions, '2026-10-13')).toEqual([
-      { month: '2026-10', sessions: 1, amount: 90, payout: undefined, current: true },
-      { month: '2026-09', sessions: 2, amount: 180, payout: undefined, current: false },
-      { month: '2026-08', sessions: 3, amount: 270, payout: club.payouts[0], current: false },
+      { month: '2026-10', sessions: 1, amount: 90, payout: undefined, paid: 0, due: 90, current: true },
+      { month: '2026-09', sessions: 2, amount: 180, payout: undefined, paid: 0, due: 180, current: false },
+      { month: '2026-08', sessions: 3, amount: 270, payout: club.payouts[0], paid: 270, due: 0, current: false },
     ]);
+  });
+  it('session added after payout leaves a top-up due', () => {
+    const more = [...sessions, s('2026-08-24', 'klub')];
+    const aug = clubMonths(club, more, '2026-10-13').find((m) => m.month === '2026-08')!;
+    expect(aug).toMatchObject({ sessions: 4, amount: 360, paid: 270, due: 90 });
+    expect(clubOutstanding(club, more, '2026-10-13')).toEqual({ amount: 270, months: 2 });
+  });
+  it('uses the rate stored on the session, not the current one', () => {
+    const old = { ...s('2026-09-02', 'klub'), clubRate: 80 };
+    expect(clubMonths({ ...club, clubRate: 100 }, [old], '2026-10-13')[0]).toMatchObject({ month: '2026-09', amount: 80 });
   });
   it('outstanding = finished months without payout', () => {
     expect(clubOutstanding(club, sessions, '2026-10-13')).toEqual({ amount: 180, months: 1 });

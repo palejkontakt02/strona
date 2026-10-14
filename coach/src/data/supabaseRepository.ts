@@ -28,7 +28,7 @@ async function selectAll(table: Collection): Promise<unknown[]> {
 /**
  * Dane w Supabase: każda kolekcja to tabela (id, data jsonb). Reguły RLS decydują,
  * co widzi trener (wszystko), a co klient (tylko swoje).
- * `role` = 'client': klient nie wstawia wizyt (tylko je aktualizuje) i check-iny zapisuje przez funkcję.
+ * `role` = 'client': klient zapisuje tylko treningi, a check-iny przez funkcję.
  */
 export function createSupabaseRepository(role: 'trainer' | 'client'): Repository {
   return {
@@ -45,13 +45,10 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
           continue;
         }
         const row = toRow(ch.col, ch.item as unknown as { id: string } & Record<string, unknown>);
-        if (role === 'client' && ch.col === 'appointments') {
-          const { error } = await supabase.from(ch.col).update(row).eq('id', row.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from(ch.col).upsert(row);
-          if (error) throw error;
-        }
+        // Klient zapisuje tylko swoje treningi (rozliczenie pilnuje baza: hardening.sql); wizyt nie zmienia.
+        if (role === 'client' && ch.col !== 'sessions') continue;
+        const { error } = await supabase.from(ch.col).upsert(row);
+        if (error) throw error;
       }
     },
 

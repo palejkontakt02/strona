@@ -109,7 +109,7 @@ export function Modal({
           {extraActions}
           <span className="grow" />
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Anuluj
+            {onSubmit ? 'Anuluj' : 'Zamknij'}
           </button>
           {onSubmit && (
             <button type="submit" className="btn btn-primary">

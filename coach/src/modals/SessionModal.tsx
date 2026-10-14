@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal } from '../components/ui';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { clientById, deleteSession, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
+import { chargeProblem, clientById, deleteSession, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fnum, pln, uid } from '../format';
-import { defaultCharge, packageStatus } from '../lib/billing';
+import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
-import { num } from '../lib/parse';
+import { num, numIn } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
 import { WELLNESS_ITEMS } from '../lib/wellness';
@@ -92,7 +92,6 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [paidNow, setPaidNow] = useState(true);
 
   const effCharge: Billing = charge || (client ? defaultCharge(client, history) : 'brak');
-  const pk = client ? packageStatus(client, history) : null;
 
   /** Wczytuje jednostkę z planu: ćwiczenia z podsumowaniem serii i podpowiedzią ciężaru z historii. */
   const loadWorkout = (workoutId: string) => {
@@ -138,6 +137,9 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const save = async () => {
     if (!client) return toast('Wybierz podopiecznego.');
     if (!date) return toast('Podaj datę treningu.');
+    if (duration.trim() && numIn(duration, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
+    const problem = chargeProblem(db, effCharge, locationId);
+    if (problem) return toast(problem);
     const wellness: Wellness = {};
     for (const [k] of WELLNESS_ITEMS) {
       const v = num(w[k]);
@@ -149,7 +151,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       date,
       workoutName: workoutName.trim() || undefined,
       charge: effCharge,
-      duration: num(duration) ?? undefined,
+      duration: numIn(duration, 1, 600) ?? undefined,
       srpe: num(srpe) ?? undefined,
       pain: num(pain) ?? undefined,
       notes: notes.trim() || undefined,
@@ -260,11 +262,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         {rows.map((r, i) => (
           <div key={r.key} className="ex-row">
             <input className="input" list="lib-exercises" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="Ćwiczenie" aria-label="Ćwiczenie" />
-            <input className="input" value={r.sets} onChange={(e) => setRow(i, { sets: e.target.value })} aria-label="Serie" />
-            <input className="input" value={r.reps} onChange={(e) => setRow(i, { reps: e.target.value })} aria-label="Powtórzenia" />
-            <input className="input" inputMode="decimal" value={r.load} onChange={(e) => setRow(i, { load: e.target.value })} aria-label="Ciężar" />
-            <input className="input" inputMode="decimal" value={r.rpe} onChange={(e) => setRow(i, { rpe: e.target.value })} aria-label="RPE" />
-            <input className="input" value={r.rest} onChange={(e) => setRow(i, { rest: e.target.value })} aria-label="Przerwa" />
+            <input className="input" value={r.sets} onChange={(e) => setRow(i, { sets: e.target.value })} aria-label="Serie" placeholder="serie" />
+            <input className="input" value={r.reps} onChange={(e) => setRow(i, { reps: e.target.value })} aria-label="Powtórzenia" placeholder="powt." />
+            <input className="input" inputMode="decimal" value={r.load} onChange={(e) => setRow(i, { load: e.target.value })} aria-label="Ciężar" placeholder="kg" />
+            <input className="input" inputMode="decimal" value={r.rpe} onChange={(e) => setRow(i, { rpe: e.target.value })} aria-label="RPE" placeholder="RPE" />
+            <input className="input" value={r.rest} onChange={(e) => setRow(i, { rest: e.target.value })} aria-label="Przerwa" placeholder="przerwa" />
             <span className="ex-actions">
               <IconBtn icon="up" label="Przesuń w górę" onClick={() => moveUp(i)} />
               <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() => setRows(removeFromBlocks(rows, i))} />
@@ -312,13 +314,13 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           <p className="muted small self-end">
             {(() => {
               const l = db.locations.find((x) => x.id === locationId);
-              return l?.kind === 'klub' ? `Klub ${l.name} wypłaci ${l.clubRate ?? 0} zł za ten trening.` : 'Wybierz klub, który rozlicza ten trening.';
+              return l?.kind === 'klub' ? `${l.name} wypłaci ${l.clubRate ?? 0} zł za ten trening.` : 'Wybierz klub, który rozlicza ten trening.';
             })()}
           </p>
         )}
         {effCharge === 'pakiet' && (
           <p className="muted small field-wide-2 self-end">
-            {pk ? (pk.left > 0 ? `W pakiecie zostało ${pk.left} (po zapisie: ${pk.left - (existing ? 0 : 1)}).` : 'Pakiet wykorzystany — trening będzie ponad pakiet.') : 'Klient nie ma wykupionego pakietu.'}
+            {packageHint(client ? packageStatus(client, sessionsOf(db, clientId))?.left ?? null : null, existing?.charge !== 'pakiet')}
           </p>
         )}
         {effCharge === 'pojedyncza' && !existing && (

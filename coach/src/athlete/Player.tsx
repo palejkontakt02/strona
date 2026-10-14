@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { IconBtn } from '../components/ui';
 import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
-import { savePlan, saveSession, sessionsOf } from '../data/ops';
+import { chargeProblem, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
-import { defaultCharge, packageStatus } from '../lib/billing';
-import { num, repsN } from '../lib/parse';
+import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
+import { num, numIn, repsN } from '../lib/parse';
 import {
   adHocExercise,
   appendExercise,
@@ -73,6 +73,12 @@ interface Finish {
   locationId: string;
 }
 
+/** Czas od startu; po kilku godzinach (trening wznowiony następnego dnia) zostawia pole puste do wpisania. */
+function elapsedMinutes(startedAt: number): string {
+  const m = Math.round((Date.now() - startedAt) / 60000);
+  return m > 0 && m <= 240 ? String(m) : '';
+}
+
 export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
   const { db, apply, toast } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
@@ -115,13 +121,15 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
 
   const save = async () => {
     if (!finish || finish.srpe === '') return;
-    const sessions = sessionsOf(db, client.id);
+    if (finish.duration.trim() && numIn(finish.duration, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
+    const problem = trainer ? chargeProblem(db, finish.charge, finish.locationId) : null;
+    if (problem) return toast(problem);
     if (editing) {
       const updated: TrainingSession = {
         ...editing,
         workoutName: run.name,
         charge: trainer ? finish.charge : editing.charge,
-        duration: parseInt(finish.duration, 10) || undefined,
+        duration: numIn(finish.duration, 1, 600) ?? undefined,
         srpe: Number(finish.srpe),
         pain: finish.pain === '' ? undefined : Number(finish.pain),
         notes: finish.notes.trim() || undefined,
@@ -142,8 +150,8 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       clientId: client.id,
       date: today,
       workoutName: run.name,
-      charge: trainer ? finish.charge : defaultCharge(client, sessions),
-      duration: parseInt(finish.duration, 10) || undefined,
+      charge: trainer ? finish.charge : 'brak',
+      duration: numIn(finish.duration, 1, 600) ?? undefined,
       srpe: Number(finish.srpe),
       pain: finish.pain === '' ? undefined : Number(finish.pain),
       notes: finish.notes.trim() || undefined,
@@ -154,7 +162,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       exercises: runToExercises(run),
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
-    const { changes, message } = saveSession(db, { session, isNew: true, appointmentId, amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
+    const { changes, message } = saveSession(db, { session, isNew: true, appointmentId, matchAppointment: trainer, amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
     await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪');
     setFinish(null);
     onSaved();
@@ -178,7 +186,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     setFinish({
       srpe: '',
       pain: '',
-      duration: String(Math.max(1, Math.round((Date.now() - run.startedAt) / 60000))),
+      duration: elapsedMinutes(run.startedAt),
       notes: '',
       charge,
       amount: client.singleRate ? String(client.singleRate) : '',
@@ -217,10 +225,13 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     });
   const addSet = (ks: number[]) =>
     update((r) => {
+      // Runda wyrównuje blok: ćwiczenia z mniejszą liczbą serii dostają brakujące, przy równych — każde po jednej.
+      const lens = ks.map((k) => r.ex[k].sets.length);
+      const target = Math.max(...lens) + (lens.every((n) => n === lens[0]) ? 1 : 0);
       for (const k of ks) {
         const sets = r.ex[k].sets;
         const src = sets[sets.length - 1];
-        sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
+        while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
       }
     });
   const removeSet = (ks: number[]) =>
@@ -316,7 +327,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
             {ks.map((k, j) => (work[j][r] ? setRow(k, work[j][r].i, String(r + 1), run.ex[k].label) : null))}
           </div>
         ))}
-        {hintNext != null && block.includes(hintNext) && <div className="sughint next-hint">Teraz {run.ex[hintNext].label} · {run.ex[hintNext].name} — bez przerwy</div>}
+        {hintNext != null && block.includes(hintNext) && <div className="sughint next-hint">Teraz {run.ex[hintNext].label} · {run.ex[hintNext].name} — {rest ? 'po krótkiej przerwie' : 'bez przerwy'}</div>}
       </>
     );
   };
@@ -328,7 +339,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           {homeLabel}
         </button>
         <span className="actions">
-          {run.ex.length > 0 && (
+          {run.ex.length > 0 && (trainer || !run.editSessionId) && (
             <button className="btn btn-secondary btn-sm" onClick={() => setLayoutOpen(true)}>
               ✎ Układ
             </button>
@@ -341,7 +352,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       <header className="player-head">
         <h1>{run.name}</h1>
         <p className="muted small">
-          {editing ? `Poprawki treningu z ${fmtDay(run.date)}` : [run.planName, run.weekName].filter(Boolean).join(' · ')} · {doneSets}/{totalSets} serii
+          {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
       </header>
       <div className="segs">
@@ -360,7 +371,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
             <button className="link small" onClick={() => addSet(block)}>
               {block.length > 1 ? '+ runda' : '+ seria'}
             </button>
-            {block.some((k) => run.ex[k].sets.length > 1) && (
+            {(trainer || !run.editSessionId) && block.some((k) => run.ex[k].sets.length > 1) && (
               <button className="link small muted" onClick={() => removeSet(block)}>
                 − usuń ostatnią
               </button>
@@ -470,8 +481,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
                 {finish.charge === 'pakiet' && (
                   <p className="muted small">
                     {(() => {
-                      const pk = packageStatus(client, sessionsOf(db, client.id));
-                      return pk ? `W pakiecie zostało ${pk.left} (po zapisie: ${pk.left - 1}).` : 'Klient nie ma wykupionego pakietu.';
+                      return packageHint(packageStatus(client, sessionsOf(db, client.id))?.left ?? null, editing?.charge !== 'pakiet');
                     })()}
                   </p>
                 )}

@@ -95,7 +95,7 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Urazy (podsumowanie)" wide>
             {inp('injuries')}
           </Field>
-          <Field label="Notatki" wide>
+          <Field label="Notatki" wide hint="Podopieczny ma techniczny dostęp do swojego profilu — nie wpisuj tu nic, czego nie powinien przeczytać.">
             <textarea className="input" rows={3} value={d.notes} onChange={(e) => set('notes', e.target.value)} />
           </Field>
         </>

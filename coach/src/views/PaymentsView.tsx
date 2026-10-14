@@ -69,7 +69,7 @@ export function PaymentsView() {
         <Empty>Brak płatności.</Empty>
       ) : (
         <div className="card table-wrap">
-          <table className="table">
+          <table className="table table-cards">
             <thead>
               <tr>
                 <th>Podopieczny</th>

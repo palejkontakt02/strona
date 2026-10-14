@@ -2,8 +2,8 @@ import { Card, Empty, IconBtn, Kpi, Tag } from '../components/ui';
 import { locStyle } from '../components/location';
 import { put } from '../data/db';
 import { useStore } from '../data/store';
-import { fmtDate, fmtMonth, plural, pln, uid } from '../format';
-import { clubMonths, clubOutstanding, clubSessions } from '../lib/club';
+import { fmtDate, fmtMonth, pln, uid } from '../format';
+import { clubAmount, clubMonths, clubOutstanding, clubSessions } from '../lib/club';
 import { todayISO } from '../lib/dates';
 import { useNav } from '../nav';
 
@@ -25,7 +25,7 @@ export function ClubsPanel() {
     );
 
   const outstanding = clubs.reduce((a, c) => a + clubOutstanding(c, db.sessions, today).amount, 0);
-  const thisMonth = clubs.reduce((a, c) => a + clubSessions(db.sessions, c.id, today.slice(0, 7)).length * (c.clubRate ?? 0), 0);
+  const thisMonth = clubs.reduce((a, c) => a + clubAmount(c, clubSessions(db.sessions, c.id, today.slice(0, 7))), 0);
   const year = today.slice(0, 4);
   const paidYear = clubs.reduce((a, c) => a + c.payouts.filter((p) => p.paidDate.startsWith(year)).reduce((b, p) => b + p.amount, 0), 0);
 
@@ -67,7 +67,7 @@ export function ClubsPanel() {
                 <Empty>Brak treningów rozliczanych przez ten klub.</Empty>
               ) : (
                 <div className="table-wrap flush">
-                  <table className="table">
+                  <table className="table table-cards">
                     <thead>
                       <tr>
                         <th>Miesiąc</th>
@@ -85,32 +85,42 @@ export function ClubsPanel() {
                             <div className="muted small">{clientsOf(m.month)}</div>
                           </td>
                           <td className="num">{m.sessions}</td>
-                          <td className="num">{pln(m.payout?.amount ?? m.amount)}</td>
+                          <td className="num">
+                            {pln(m.amount)}
+                            {m.paid > 0 && m.due > 0 && <div className="muted small">wypłacono {pln(m.paid)}</div>}
+                          </td>
                           <td>
-                            {m.payout ? <Tag tone="ok">Wypłacono {fmtDate(m.payout.paidDate)}</Tag> : m.current ? <Tag>W trakcie</Tag> : <Tag tone="warn">Do wypłaty</Tag>}
+                            {m.payout && m.due === 0 ? (
+                              <Tag tone="ok">Wypłacono {fmtDate(m.payout.paidDate)}</Tag>
+                            ) : m.current ? (
+                              <Tag>W trakcie</Tag>
+                            ) : m.payout ? (
+                              <Tag tone="warn">Dopłata {pln(m.due)}</Tag>
+                            ) : (
+                              <Tag tone="warn">Do wypłaty</Tag>
+                            )}
                           </td>
                           <td className="actions">
-                            {m.payout ? (
+                            {m.due > 0 && !m.current && (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() =>
+                                  apply(
+                                    [put('locations', { ...club, payouts: [...club.payouts, { id: uid(), month: m.month, amount: m.due, sessions: m.sessions, paidDate: today }] })],
+                                    `Klub wypłacił ${pln(m.due)} za ${fmtMonth(m.month)}.`,
+                                  )
+                                }
+                              >
+                                {m.payout ? 'Oznacz dopłatę' : 'Oznacz wypłacone'}
+                              </button>
+                            )}
+                            {m.payout && (
                               <button
                                 className="btn btn-ghost btn-sm"
                                 onClick={() => apply([put('locations', { ...club, payouts: club.payouts.filter((p) => p.id !== m.payout!.id) })], 'Cofnięto wypłatę.')}
                               >
                                 Cofnij
                               </button>
-                            ) : (
-                              m.sessions > 0 && (
-                                <button
-                                  className="btn btn-secondary btn-sm"
-                                  onClick={() =>
-                                    apply(
-                                      [put('locations', { ...club, payouts: [...club.payouts, { id: uid(), month: m.month, amount: m.amount, sessions: m.sessions, paidDate: today }] })],
-                                      `Klub wypłacił ${pln(m.amount)} za ${m.sessions} ${plural(m.sessions, 'trening', 'treningi', 'treningów')}.`,
-                                    )
-                                  }
-                                >
-                                  Oznacz wypłacone
-                                </button>
-                              )
                             )}
                           </td>
                         </tr>

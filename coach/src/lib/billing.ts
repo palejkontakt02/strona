@@ -1,5 +1,6 @@
 import type { Billing, Client, ISODate, Payment, TrainingSession } from '../domain';
 import { addDays, todayISO } from './dates';
+import { plural } from '../format';
 
 export interface PackageStatus {
   total: number;
@@ -65,7 +66,23 @@ export function singleSessionPayment(
 /** Komunikat po zapisie treningu z pakietu (left = saldo przed zapisem). */
 export function packageMessage(leftBefore: number): string {
   const left = leftBefore - 1;
-  if (left <= 0) return 'Zapisano. To był ostatni trening z pakietu.';
-  if (left === 1) return 'Zapisano. Został 1 trening w pakiecie.';
-  return `Zapisano. Zostało ${left} treningów w pakiecie.`;
+  if (left === 0) return 'Zapisano. To był ostatni trening z pakietu.';
+  if (left < 0) return `Zapisano. ${overPackage(-left)} — czas na nowy pakiet.`;
+  return `Zapisano. ${plural(left, 'Został', 'Zostały', 'Zostało')} ${left} ${plural(left, 'trening', 'treningi', 'treningów')} w pakiecie.`;
+}
+
+/** „1 trening ponad pakiet”, „3 treningi ponad pakiet”, „5 treningów ponad pakiet”. */
+export function overPackage(n: number): string {
+  return `${n} ${plural(n, 'trening', 'treningi', 'treningów')} ponad pakiet`;
+}
+
+/**
+ * Podpowiedź przy formularzu: `left` — saldo z zapisanymi treningami,
+ * `consumes` — czy zapis zużyje kolejne wejście (nowy trening albo zmiana rozliczenia na pakiet).
+ */
+export function packageHint(left: number | null, consumes: boolean): string {
+  if (left == null) return 'Klient nie ma wykupionego pakietu.';
+  const after = left - (consumes ? 1 : 0);
+  if (after < 0) return `Pakiet wykorzystany — po zapisie: ${overPackage(-after)}.`;
+  return consumes ? `W pakiecie zostało ${left} (po zapisie: ${after}).` : `W pakiecie zostało ${left}.`;
 }

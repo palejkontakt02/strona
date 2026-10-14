@@ -6,7 +6,7 @@ import { clientById } from '../data/ops';
 import { useStore } from '../data/store';
 import { fnum, uid } from '../format';
 import { addDays, todayISO } from '../lib/dates';
-import { num } from '../lib/parse';
+import { num, numIn } from '../lib/parse';
 import { computeLsi } from '../lib/tests';
 import { useNav, type ModalState } from '../nav';
 import { MEASURE_FIELDS } from '../views/client/Measurements';
@@ -188,7 +188,7 @@ export function TestModal({ m }: { m: Extract<ModalState, { kind: 'test' }> }) {
 const PAY_TITLE = { pakiet: 'Pakiet', abonament: 'Abonament', pojedyncza: 'Sesja pojedyncza' } as const;
 
 export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }> }) {
-  const { db, apply } = useStore();
+  const { db, apply, toast } = useStore();
   const { closeModal } = useNav();
   const p = m.payment;
   const [clientId, setClientId] = useState(m.clientId ?? '');
@@ -201,6 +201,7 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
   const [desc, setDesc] = useState(p?.desc ?? '');
   const [date, setDate] = useState(p?.date ?? today);
   const [dueDate, setDueDate] = useState(p?.dueDate ?? addDays(today, 7));
+  const [dueTouched, setDueTouched] = useState(false);
   const [paid, setPaid] = useState(p ? p.status === 'paid' : m.type !== 'abonament');
 
   return (
@@ -209,15 +210,17 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
       onClose={closeModal}
       onSubmit={async () => {
         if (!client) return;
+        if (numIn(amount, 0.01, 1_000_000) == null) return toast('Podaj kwotę większą od zera, np. 1500 albo 1 500,00.');
         const pay: Payment = {
           id: p?.id ?? uid(),
           type: m.type,
-          amount: num(amount) ?? 0,
+          amount: num(amount)!,
           date,
           dueDate: dueDate || undefined,
           desc: desc.trim() || undefined,
           status: paid ? 'paid' : 'due',
-          paidDate: paid ? (p?.paidDate ?? today) : undefined,
+          // Wpłata wpisywana wstecz liczy się w miesiącu swojej daty, nie dzisiejszym.
+          paidDate: paid ? (p?.paidDate ?? (date && date < today ? date : today)) : undefined,
         };
         if (m.type === 'pakiet') pay.sessions = parseInt(sessions, 10) || 0;
         if (m.type === 'abonament') pay.month = month;
@@ -259,10 +262,16 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
           </Field>
         )}
         <Field label="Data">
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input className="input" type="date" value={date} onChange={(e) => {
+            setDate(e.target.value);
+            if (!p && !dueTouched && e.target.value) setDueDate(addDays(e.target.value, 7));
+          }} required />
         </Field>
         <Field label="Termin płatności">
-          <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          <input className="input" type="date" value={dueDate} onChange={(e) => {
+            setDueDate(e.target.value);
+            setDueTouched(true);
+          }} />
         </Field>
         <div className="field-wide check-row">
           <label className="check">

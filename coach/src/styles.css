@@ -3004,3 +3004,154 @@ h2 {
 .clash-mark {
   color: var(--color-warn);
 }
+
+/* ---------- telefon: poprawki z testów ---------- */
+.live-banner button.live-sub {
+  padding-left: calc(var(--space-8) + var(--space-4));
+}
+.scale {
+  flex-wrap: nowrap;
+}
+.scale button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.scale-11 {
+  flex-wrap: wrap;
+}
+.scale-11 button {
+  flex: 1 0 28px;
+}
+.segs button {
+  /* pasek 6 px, ale pole dotyku ~28 px */
+  height: 28px;
+  background: linear-gradient(var(--color-neutral-800), var(--color-neutral-800)) center / 100% 6px no-repeat;
+  border-radius: 0;
+}
+.segs button.cur {
+  background: linear-gradient(var(--color-accent), var(--color-accent)) center / 100% 6px no-repeat;
+}
+.segs button.on {
+  background: linear-gradient(var(--color-ok), var(--color-ok)) center / 100% 6px no-repeat;
+}
+.segs {
+  margin-bottom: var(--space-1);
+}
+@media (max-width: 600px) {
+  /* tabele płatności jako karty: nic nie chowa się w przewijaniu w bok */
+  .table-cards thead {
+    display: none;
+  }
+  .table-cards,
+  .table-cards tbody {
+    display: block;
+  }
+  .table-cards tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-divider);
+  }
+  .table-cards tr:last-child {
+    border-bottom: 0;
+  }
+  .table-cards td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+  .table-cards td:first-child {
+    flex: 1 0 100%;
+    font-weight: 600;
+  }
+  .table-cards td.num {
+    text-align: left;
+    font-weight: 600;
+  }
+  .table-cards td.actions {
+    flex: 1 0 100%;
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--space-2);
+  }
+  .table-cards td.actions:empty {
+    display: none;
+  }
+  .table-cards td.actions > * + * {
+    margin-left: 0;
+  }
+  .table-cards td.actions .btn {
+    min-height: 40px;
+  }
+  /* „Zapisz po fakcie”: wszystkie pola widoczne, z podpowiedzią w polu */
+  .ex-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .ex-row > input:first-child {
+    grid-column: 1 / -1;
+  }
+  .ex-row > input:nth-child(6) {
+    display: block;
+  }
+  .ex-row .ex-notes {
+    grid-column: 1 / 5;
+    grid-row: 3;
+  }
+  .ex-row .ex-actions {
+    grid-column: 5;
+    grid-row: 3;
+    justify-content: flex-end;
+  }
+  .wellness-grid {
+    grid-template-columns: 1fr;
+  }
+  /* wykresy: viewBox 600 px skaluje tekst w dół, więc większy font */
+  .chart-val,
+  .chart-axis {
+    font-size: 19px;
+  }
+  .icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .icon-btn-sm {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .player .link.small {
+    min-height: 40px;
+    padding: var(--space-2) var(--space-1);
+  }
+}
+/* motyw czarno-biały: paski podopiecznych i kropki miejsc muszą się różnić */
+:root[data-palette='mono'] .loc-dot,
+:root[data-palette='mono'] .loc-filter i,
+:root[data-palette='mono'] .tile,
+:root[data-palette='mono'] .month-item,
+:root[data-palette='mono'] [style*='--hue'],
+:root[data-palette='mono'] [style*='--lhue'] {
+  --tile-s: 42%;
+}
+@media (max-width: 600px) {
+  /* edytor planu: nazwa ćwiczenia w całym wierszu, mniej zagnieżdżonych odstępów */
+  .pe-ex {
+    padding: var(--space-3);
+  }
+  .pe-ex-head {
+    flex-wrap: wrap;
+  }
+  .pe-ex-head > .input:not(.pe-rest) {
+    flex: 1 0 calc(100% - 44px);
+  }
+  .pe-ex-head > .pe-rest {
+    flex: 1 1 auto;
+    margin-right: auto;
+  }
+  .pe-set {
+    grid-template-columns: 18px minmax(78px, 1.2fr) minmax(54px, 1fr) minmax(44px, 1fr) minmax(40px, 1fr) 28px;
+  }
+}

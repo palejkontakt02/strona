@@ -4,7 +4,7 @@ import { put } from '../../data/db';
 import { paymentLabel, sessionsOf, setPaymentStatus } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, pln } from '../../format';
-import { isOverdue, packageStatus } from '../../lib/billing';
+import { isOverdue, overPackage, packageStatus } from '../../lib/billing';
 import { todayISO } from '../../lib/dates';
 import { useNav } from '../../nav';
 import { clubSessions } from '../../lib/club';
@@ -81,17 +81,17 @@ export function ClientPayments({ client }: { client: Client }) {
       <div className="two-col">
         {pk && (
           <Card title="Pakiet">
-            <Barbell left={pk.left} size={pk.size || 10} />
+            <Barbell left={pk.left} size={Math.max(pk.size || 10, pk.left)} />
             <p className="lead center">
               {pk.left < 0 ? (
-                <span className="text-danger">{-pk.left} {-pk.left === 1 ? 'trening' : 'treningi'} ponad pakiet</span>
+                <span className="text-danger">{overPackage(-pk.left)}</span>
               ) : (
                 <>
                   Zostało <strong>{pk.left}</strong> z {pk.total} wykupionych
                 </>
               )}
             </p>
-            <p className="muted small center">Wykorzystano {pk.used} · ostatni pakiet: {pk.size} sesji</p>
+            <p className="muted small center">Wykorzystano {pk.used} · ostatni pakiet: {pk.size} {plural(pk.size, 'sesja', 'sesje', 'sesji')}</p>
           </Card>
         )}
         <Card title="Podsumowanie">
@@ -118,7 +118,7 @@ export function ClientPayments({ client }: { client: Client }) {
         <Empty>Brak płatności.</Empty>
       ) : (
         <div className="card table-wrap">
-          <table className="table">
+          <table className="table table-cards">
             <thead>
               <tr>
                 <th>Data</th>

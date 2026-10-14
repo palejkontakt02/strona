@@ -65,6 +65,16 @@ export function StoreProvider({
     void load();
   }, [load]);
 
+  // Tryb lokalny: zmiana zapisana w innej karcie tej przeglądarki — wczytaj ją tutaj.
+  useEffect(() => {
+    if (cloud) return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'panel-trenera:v1') void load();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [cloud, load]);
+
   // Po powrocie do aplikacji (inne urządzenie mogło coś zmienić) — odśwież dane z chmury.
   useEffect(() => {
     if (!cloud) return;

@@ -196,6 +196,8 @@ export interface TrainingSession {
   /** Płatność za sesję pojedynczą utworzona przy zapisie tego treningu. */
   paymentId?: string;
   locationId?: string;
+  /** Stawka klubu w chwili zapisu (charge = „klub”) — późniejsza zmiana stawki nie przelicza historii. */
+  clubRate?: number;
   clientId: string;
   date: ISODate;
   workoutName?: string;

@@ -34,7 +34,7 @@ export function LoginScreen() {
         if (e) throw e;
       } else if (mode === 'signup') {
         if (password.length < 8) throw new Error('password should be at least 8');
-        const { data, error: e } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: REDIRECT() } });
+        const { data, error: e } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: REDIRECT(), data: { consent_health_at: new Date().toISOString(), privacy_version: '2026-10' } } });
         if (e) throw e;
         if (!data.session) setInfo(`Wysłaliśmy link potwierdzający na ${email.trim()}. Kliknij go, a potem zaloguj się tutaj.`);
       } else {

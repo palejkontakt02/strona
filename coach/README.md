@@ -39,3 +39,9 @@ Na razie dane są zapisywane w `localStorage` przeglądarki (klucz `panel-trener
 Kopia zapasowa / import / wyczyszczenie danych: ikona ustawień w górnym pasku.
 Każda zmiana przechodzi przez `Change` (upsert/delete rekordu kolekcji), więc podpięcie Supabase
 to nowa implementacja `Repository` (kolekcja = tabela) + logowanie i reguły RLS.
+
+## Baza w chmurze (Supabase)
+
+1. `supabase/schema.sql` — tabele, funkcje i reguły dostępu (RLS).
+2. `supabase/hardening.sql` — zabezpieczenia: klient nie zmienia rozliczeń ani wizyt, walidacja kształtu danych,
+   dostęp tylko po potwierdzonym e-mailu, jeden trener. Uruchom po `schema.sql` (oba można uruchamiać ponownie).

@@ -8,7 +8,7 @@ import { addDays, daysBetween, todayISO } from '../lib/dates';
 import { useNav } from '../nav';
 import { ApptStatusTag } from './CalendarView';
 import { LocationTag, locStyle } from '../components/location';
-import { clubOutstanding, clubSessions } from '../lib/club';
+import { clubAmount, clubOutstanding, clubSessions } from '../lib/club';
 
 export function Dashboard() {
   const { db, apply } = useStore();
@@ -142,14 +142,15 @@ export function Dashboard() {
             <ul className="rows">
               {clubs.map((c) => {
                 const out = clubOutstanding(c, db.sessions, today);
-                const cur = clubSessions(db.sessions, c.id, today.slice(0, 7)).length;
+                const curList = clubSessions(db.sessions, c.id, today.slice(0, 7));
+                const cur = curList.length;
                 return (
                   <li key={c.id} className="row row-top">
                     <span className="loc-dot" style={locStyle(c)} />
                     <div className="grow">
                       <strong>{c.name}</strong>
                       <div className="small muted">
-                        w tym miesiącu {cur} {plural(cur, 'trening', 'treningi', 'treningów')} · {pln(cur * (c.clubRate ?? 0))}
+                        w tym miesiącu {cur} {plural(cur, 'trening', 'treningi', 'treningów')} · {pln(clubAmount(c, curList))}
                       </div>
                     </div>
                     {out.amount > 0 ? <Tag tone="warn">do wypłaty {pln(out.amount)}</Tag> : <Tag tone="ok">rozliczone</Tag>}

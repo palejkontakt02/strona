@@ -7,14 +7,14 @@ import { useStore } from '../data/store';
 import { fmtShort, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
 import { todayISO } from '../lib/dates';
-import { num } from '../lib/parse';
+import { num, numIn } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 import { APPT_STATUS } from '../views/CalendarView';
 import { ClientSelect } from './ModalHost';
 import { LocationSelect } from '../components/location';
 
 export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
-  const { db, apply, ask } = useStore();
+  const { db, apply, ask, toast } = useStore();
   const { closeModal, openModal, startLive } = useNav();
   const editing = m.appt;
   const [clientId, setClientId] = useState(editing?.clientId ?? m.clientId ?? '');
@@ -34,7 +34,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     clientId,
     date,
     time,
-    duration: num(duration) ?? 60,
+    duration: numIn(duration, 5, 600) ?? 60,
     locationId: locationId || undefined,
     location: location.trim() || db.locations.find((l) => l.id === locationId)?.name || undefined,
     note: note.trim() || undefined,
@@ -46,6 +46,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
 
   const save = async () => {
     if (!clientId) return;
+    if (duration.trim() && numIn(duration, 5, 600) == null) return toast('Czas wizyty: od 5 do 600 minut.');
     const n = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
     await apply(saveAppointment(draft, n), n > 1 ? `Dodano ${n} wizyt (co tydzień).` : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
     closeModal();

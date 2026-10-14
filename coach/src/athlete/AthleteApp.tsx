@@ -73,9 +73,7 @@ export function AthleteApp({ clientId, onExit, mode = 'preview' }: { clientId: s
     if (!step) return toast('Nie znaleziono treningu w planie.');
     if (!step.workout.exercises.some((e) => e.name)) return toast('Ten trening nie ma jeszcze ćwiczeń.');
     const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
-    setRun(buildRun(plan, step.week.name, step.workout, sessions, videos, todayISO()));
-    setScreen('run');
-    window.scrollTo(0, 0);
+    void replaceRun(buildRun(plan, step.week.name, step.workout, sessions, videos, todayISO()));
   };
 
   return (
@@ -186,7 +184,7 @@ function Home({
           <span className="eyebrow">W trakcie</span>
           <h2>{run.name}</h2>
           <p className="muted small">
-            {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+            {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {run.date !== todayISO() ? `${fmtDay(run.date)}, ` : ''}{new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
           </p>
           <div className="actions">
             <button className="btn btn-primary btn-lg" onClick={onResume}>

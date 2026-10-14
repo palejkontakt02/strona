@@ -1,5 +1,5 @@
 import type { PlanExercise, PlanWorkout, SetType, TrainingSession } from '../domain';
-import { num, parseRest, parseTempo, repsN } from './parse';
+import { num, numIn, parseRest, parseTempo, repsN } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
 import { e1rmRPE, e1Series, loadFor, resolveLoad } from './strength';
 
@@ -163,7 +163,11 @@ export function emptyRun(name: string, today: string, now = Date.now()): Run {
 
 /** Dodaje ćwiczenie na końcu treningu i przelicza oznaczenia (A, B, C1…). */
 export function appendExercise(run: Run, e: RunExercise): Run {
-  return { ...run, ex: withLabels([...run.ex, e]), idx: run.ex.length };
+  // Dołączone do bloku: przerwa po rundzie należy do ostatniego ćwiczenia, poprzednie przechodzi bez odpoczynku.
+  const prev = e.linked && run.ex.length ? run.ex.map((x, i) => (i === run.ex.length - 1 ? { ...x, rest: '' } : x)) : run.ex;
+  const last = run.ex[run.ex.length - 1];
+  const added = e.linked && last?.rest && !e.rest ? { ...e, rest: last.rest } : e;
+  return { ...run, ex: withLabels([...prev, added]), idx: run.ex.length };
 }
 
 function withLabels(ex: RunExercise[]): RunExercise[] {
@@ -258,17 +262,20 @@ export function runToExercises(run: Run) {
   return run.ex.map((e) => {
     const log = e.sets
       .filter((s) => s.done)
-      .map((s) => ({ load: num(s.load) ?? undefined, reps: num(s.reps) ?? undefined, rpe: num(s.rpe) ?? undefined, warmup: s.warmup || undefined, label: s.label }));
+      .map((s) => ({ load: num(s.load) ?? undefined, reps: numIn(s.reps, 0, 10000) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label }));
     const work = log.filter((s) => !s.warmup);
     const top = work[0];
+    // Tekst powtórzeń z jednostką (np. „45 s”) zostaje w podsumowaniu.
+    const topRaw = e.sets.find((x) => x.done && !x.warmup)?.reps.trim();
     return {
       name: e.name,
       label: e.label,
       sets: String(work.length),
-      reps: top?.reps != null ? String(top.reps) : '',
+      reps: topRaw || (top?.reps != null ? String(top.reps) : ''),
       load: top?.load != null ? String(top.load) : '',
       rpe: top?.rpe != null ? String(top.rpe) : '',
       rest: e.rest || undefined,
+      notes: e.notes.trim() || undefined,
       setsLog: log,
     };
   }).filter((e) => e.setsLog.length > 0);
