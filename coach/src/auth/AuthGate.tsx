@@ -161,14 +161,50 @@ function RoleGate({ email }: { email: string }) {
 
 export function Screen({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="center-screen">
-      <div className="card auth-card">
+    <div className="auth-split">
+      <aside className="auth-hero" aria-hidden="true">
         <div className="auth-logo">
           FITOWA <span>/ coach</span>
         </div>
-        <h2>{title}</h2>
-        {children}
-      </div>
+        <svg className="auth-plate" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="96" />
+          <circle cx="100" cy="100" r="78" />
+          <circle cx="100" cy="100" r="22" />
+          <circle cx="100" cy="100" r="10" className="hole" />
+          <text x="100" y="47" textAnchor="middle">20 KG</text>
+          <text x="100" y="164" textAnchor="middle">FITOWA</text>
+        </svg>
+        <div className="auth-claim">
+          <h1>
+            Trenuj
+            <br />
+            z planem.
+            <br />
+            <em>Wracaj silniejszy.</em>
+          </h1>
+          <ul className="auth-points">
+            <li>
+              <b>01</b> Plan na każdy tydzień
+            </li>
+            <li>
+              <b>02</b> Seria po serii, z podpowiedzią ciężaru
+            </li>
+            <li>
+              <b>03</b> Postęp, obciążenie i samopoczucie
+            </li>
+          </ul>
+        </div>
+        <p className="auth-sign">Sebastian Palej · S&amp;C · Return to Sport · Kraków</p>
+      </aside>
+      <main className="auth-side">
+        <div className="auth-card">
+          <div className="auth-logo auth-logo-mobile">
+            FITOWA <span>/ coach</span>
+          </div>
+          <h2 className="auth-h">{title}</h2>
+          {children}
+        </div>
+      </main>
     </div>
   );
 }
