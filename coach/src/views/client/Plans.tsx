@@ -1,12 +1,13 @@
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
-import { clonePlan, extraPlanOf, newExtraPlan, plansOf, savePlan, sessionsOf } from '../../data/ops';
+import { clonePlan, extraPlanOf, plansOf, savePlan, sessionsOf } from '../../data/ops';
 import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
 import { exerciseLabels, mergeGroups, nextWorkout, setCountLabel } from '../../lib/plan';
 import { useNav } from '../../nav';
+import { extraWithNewWorkout } from './WorkoutList';
 
 export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
   return mergeGroups(e.groups)
@@ -33,14 +34,7 @@ export function ClientPlans({ client }: { client: Client }) {
   const extra = extraPlanOf(db, client.id);
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
   const lastDone = (id: string) => sessions.find((s) => s.planId === extra?.id && s.workoutId === id)?.date;
-  /** Otwiera edytor listy dodatkowych treningów z nową, pustą jednostką na końcu. */
-  const addExtra = () => {
-    const base = extra ?? newExtraPlan(client.id);
-    const weeks = base.weeks.length ? base.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
-    const n = weeks.reduce((a, w) => a + w.workouts.length, 0);
-    const next = { ...base, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, { id: uid(), name: `Trening dodatkowy ${n + 1}`, exercises: [] }] } : w)) };
-    openModal({ kind: 'plan', plan: next, isNew: !extra });
-  };
+  const addExtra = () => openModal({ kind: 'plan', plan: extraWithNewWorkout(client.id, extra), isNew: !extra });
 
   return (
     <>

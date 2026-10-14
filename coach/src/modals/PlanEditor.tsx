@@ -16,7 +16,10 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
   // Rozwinięty tylko pierwszy tydzień — reszta na kliknięcie (długie plany).
-  const [open, setOpen] = useState<Set<string>>(() => new Set(m.plan.weeks.slice(0, 1).map((w) => w.id)));
+  const [open, setOpen] = useState<Set<string>>(() => {
+    const focus = m.focusWorkoutId && m.plan.weeks.find((w) => w.workouts.some((k) => k.id === m.focusWorkoutId));
+    return new Set((focus ? [focus] : m.plan.weeks.slice(0, 1)).map((w) => w.id));
+  });
   const toggle = (id: string) => setOpen((o) => (o.has(id) ? new Set([...o].filter((x) => x !== id)) : new Set([...o, id])));
 
   const upd = (fn: (draft: Plan) => void) =>

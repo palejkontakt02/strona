@@ -7,6 +7,7 @@ import { sessionLoad, tonnage } from '../../lib/load';
 import { wellnessTotal } from '../../lib/wellness';
 import { useNav } from '../../nav';
 import { CHARGE_SHORT, LocationTag } from '../../components/location';
+import { WorkoutList } from './WorkoutList';
 
 
 export function ClientSessions({ client }: { client: Client }) {
@@ -15,8 +16,9 @@ export function ClientSessions({ client }: { client: Client }) {
   const sessions = sessionsOf(db, client.id);
   return (
     <>
-      <div className="toolbar">
-        <h3>Treningi ({sessions.length})</h3>
+      <WorkoutList client={client} />
+      <div className="toolbar section-gap">
+        <h3>Zapisane treningi ({sessions.length})</h3>
         <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
           + Zapisz trening
         </button>

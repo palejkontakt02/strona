@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
-import type { Checkin, PlanWorkout, TrainingSession, Wellness } from '../domain';
+import type { Checkin, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { clientById, deleteSession, extraPlanOf, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
@@ -298,10 +298,7 @@ function Home({
 
       <Progress clientId={clientId} />
 
-      <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id) => onStart(id)} onTrainer={onTrainer} />
-      {extra && extra.weeks.some((w) => w.workouts.length) && (
-        <Workouts plan={extra} title="Dodatkowe treningi" sessions={sessions} onStart={(id, planId) => onStartFrom({ planId, workoutId: id })} onTrainer={onTrainer} />
-      )}
+      <Workouts plan={plan} extra={extra} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id, planId) => (planId === plan?.id ? onStart(id) : onStartFrom({ planId, workoutId: id }))} onTrainer={onTrainer} />
 
       <History
         clientId={clientId}
@@ -536,32 +533,50 @@ function Progress({ clientId }: { clientId: string }) {
 
 function Workouts({
   plan,
+  extra,
   plans,
   onPlan,
   sessions,
   nextId,
   onStart,
   onTrainer,
-  title = 'Twoje treningi',
 }: {
   plan: ReturnType<typeof currentPlan> | undefined;
+  /** Dodatkowe treningi poza planem — w tej samej sekcji, osobną grupą. */
+  extra?: Plan;
   plans?: ReturnType<typeof plansOf>;
   onPlan?: (id: string) => void;
-  title?: string;
   sessions: ReturnType<typeof sessionsOf>;
   nextId?: string;
   onStart: (workoutId: string, planId: string) => void;
   onTrainer?: (st: RunStart) => void;
 }) {
-  const [preview, setPreview] = useState<PlanWorkout | null>(null);
-  if (!plan) return null;
-  const doneMap: Record<string, string> = {};
-  for (const s of sessions) if (s.planId === plan.id && s.workoutId && !doneMap[s.workoutId]) doneMap[s.workoutId] = s.date; // od najnowszej
+  const [preview, setPreview] = useState<{ workout: PlanWorkout; planId: string } | null>(null);
+  const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
+  if (!plan && extraWorkouts.length === 0) return null;
+  const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id)?.date; // sesje od najnowszej
+  const item = (k: PlanWorkout, planId: string, isNext: boolean) => {
+    const n = k.exercises.filter((e) => e.name).length;
+    const dn = done(planId, k.id);
+    return (
+      <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${dn ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
+        <span className="wo-st">{dn ? '✓' : isNext ? '▶' : ''}</span>
+        <span className="wo-tx">
+          <b>{k.name}</b>
+          <span className="muted small">
+            {n ? `${n} ćwiczeń` : 'brak ćwiczeń'}
+            {dn ? ` · ${planId === extra?.id ? 'ostatnio' : 'zrobione'} ${fmtDay(dn)}` : isNext ? ' · następny' : ''}
+          </span>
+        </span>
+        <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>
+      </button>
+    );
+  };
   return (
     <section className="acard">
       <div className="between">
-        <h3>{title}</h3>
-        {plans && onPlan && plans.length > 1 ? (
+        <h3>Treningi</h3>
+        {plan && plans && onPlan && plans.length > 1 ? (
           <select className="input input-sm ath-sel" value={plan.id} onChange={(e) => onPlan(e.target.value)} aria-label="Wybierz plan">
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
@@ -570,49 +585,37 @@ function Workouts({
               </option>
             ))}
           </select>
-        ) : plan.extra ? (
-          <span className="muted small">poza planem · w dowolnym momencie</span>
         ) : (
-          <span className="muted small">{plan.name}</span>
+          plan && <span className="muted small">{plan.name}</span>
         )}
       </div>
-      {plan.weeks.map((w) => (
+      {plan?.weeks.map((w) => (
         <div key={w.id}>
-          {!plan.extra && <div className="wk-label">{w.name}</div>}
-          {w.workouts.map((k) => {
-            const n = k.exercises.filter((e) => e.name).length;
-            const dn = doneMap[k.id];
-            const isNext = nextId === k.id;
-            return (
-              <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${dn ? 'done' : ''}`} disabled={!n} onClick={() => setPreview(k)}>
-                <span className="wo-st">{dn ? '✓' : isNext ? '▶' : ''}</span>
-                <span className="wo-tx">
-                  <b>{k.name}</b>
-                  <span className="muted small">
-                    {n ? `${n} ćwiczeń` : 'brak ćwiczeń'}
-                    {dn ? ` · zrobione ${fmtDay(dn)}` : isNext ? ' · następny' : ''}
-                  </span>
-                </span>
-                <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>
-              </button>
-            );
-          })}
+          <div className="wk-label">{w.name}</div>
+          {w.workouts.map((k) => item(k, plan.id, nextId === k.id))}
         </div>
       ))}
+      {extra && extraWorkouts.length > 0 && (
+        <div>
+          <div className="wk-label">Poza planem · w dowolnym momencie</div>
+          {extraWorkouts.map((k) => item(k, extra.id, false))}
+        </div>
+      )}
       {preview && (
         <WorkoutPreview
-          workout={preview}
-          done={doneMap[preview.id]}
+          workout={preview.workout}
+          done={done(preview.planId, preview.workout.id)}
+          extra={preview.planId === extra?.id}
           onClose={() => setPreview(null)}
           onStart={() => {
             setPreview(null);
-            onStart(preview.id, plan.id);
+            onStart(preview.workout.id, preview.planId);
           }}
           onTrainer={
             onTrainer &&
             (() => {
               setPreview(null);
-              onTrainer({ planId: plan.id, workoutId: preview.id });
+              onTrainer({ planId: preview.planId, workoutId: preview.workout.id });
             })
           }
         />
@@ -622,14 +625,14 @@ function Workouts({
 }
 
 /** Podgląd jednostki z planu: ćwiczenia (z blokami A1/A2), serie, ciężary, tempo, uwagi. */
-function WorkoutPreview({ workout, done, onClose, onStart, onTrainer }: { workout: PlanWorkout; done?: string; onClose: () => void; onStart: () => void; onTrainer?: () => void }) {
+function WorkoutPreview({ workout, done, extra, onClose, onStart, onTrainer }: { workout: PlanWorkout; done?: string; extra?: boolean; onClose: () => void; onStart: () => void; onTrainer?: () => void }) {
   const labels = exerciseLabels(workout.exercises);
   return (
     <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={workout.name}>
         <div className="between">
           <div>
-            <span className="eyebrow">{done ? `zrobione ${fmtDay(done)}` : 'trening z planu'}</span>
+            <span className="eyebrow">{[extra ? 'poza planem' : 'trening z planu', done && `ostatnio ${fmtDay(done)}`].filter(Boolean).join(' · ')}</span>
             <h2>{workout.name}</h2>
           </div>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>

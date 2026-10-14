@@ -3331,3 +3331,32 @@ h2 {
   flex-wrap: wrap;
   align-items: center;
 }
+
+/* panel: wszystkie treningi (plan + poza planem) */
+.wl-group + .wl-group {
+  margin-top: var(--space-4);
+}
+.wl-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-400);
+  margin-bottom: var(--space-1);
+}
+.wl-row {
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+.wl-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+@media (max-width: 600px) {
+  .wl-actions {
+    width: 100%;
+  }
+  .wl-actions .btn {
+    flex: 1;
+  }
+}
