@@ -20,10 +20,11 @@ export function runFromStart(db: Db, clientId: string, st: RunStart, date: strin
     return repeatRun(s, date);
   }
   const plans = plansOf(db, clientId);
-  const plan = plans.find((p) => p.id === st.planId) ?? currentPlan(plans);
+  const plan = db.plans.find((p) => p.id === st.planId && p.clientId === clientId) ?? currentPlan(plans);
   const step = plan && planSequence(plan).find((x) => x.workout.id === st.workoutId);
   if (!plan || !step) return 'Nie znaleziono treningu w planie.';
   if (!step.workout.exercises.some((e) => e.name)) return 'Ten trening nie ma jeszcze ćwiczeń.';
   const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
-  return buildRun(plan, step.week.name, step.workout, sessions, videos, date);
+  const r = buildRun(plan, step.week.name, step.workout, sessions, videos, date);
+  return plan.extra ? { ...r, planName: 'Trening dodatkowy', weekName: '' } : r;
 }

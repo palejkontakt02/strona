@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import type { Checkin, PlanWorkout, TrainingSession, Wellness } from '../domain';
-import { clientById, deleteSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { clientById, deleteSession, extraPlanOf, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
@@ -154,6 +154,7 @@ export function AthleteApp({
           onOwn={startOwn}
           onEdit={editSession}
           onRepeat={(s) => startFrom({ repeatSessionId: s.id })}
+          onStartFrom={startFrom}
           onTrainer={onTrainer}
           onUndo={undo}
           canUndo={canUndo}
@@ -175,6 +176,7 @@ function Home({
   onOwn,
   onEdit,
   onRepeat,
+  onStartFrom,
   onTrainer,
   onUndo,
   canUndo,
@@ -190,6 +192,7 @@ function Home({
   onOwn: () => void;
   onEdit: (s: TrainingSession) => void;
   onRepeat: (s: TrainingSession) => void;
+  onStartFrom: (st: RunStart) => void;
   onTrainer?: (st: RunStart) => void;
   onUndo: (s: TrainingSession) => void;
   canUndo: (s: TrainingSession) => boolean;
@@ -201,6 +204,7 @@ function Home({
   const today = todayISO();
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
+  const extra = extraPlanOf(db, clientId);
   const st = streak(sessions, today);
   const first = client.name.split(' ')[0];
 
@@ -294,7 +298,10 @@ function Home({
 
       <Progress clientId={clientId} />
 
-      <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={onStart} onTrainer={onTrainer} />
+      <Workouts plan={plan} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id) => onStart(id)} onTrainer={onTrainer} />
+      {extra && extra.weeks.some((w) => w.workouts.length) && (
+        <Workouts plan={extra} title="Dodatkowe treningi" sessions={sessions} onStart={(id, planId) => onStartFrom({ planId, workoutId: id })} onTrainer={onTrainer} />
+      )}
 
       <History
         clientId={clientId}
@@ -535,13 +542,15 @@ function Workouts({
   nextId,
   onStart,
   onTrainer,
+  title = 'Twoje treningi',
 }: {
-  plan: ReturnType<typeof currentPlan>;
-  plans: ReturnType<typeof plansOf>;
-  onPlan: (id: string) => void;
+  plan: ReturnType<typeof currentPlan> | undefined;
+  plans?: ReturnType<typeof plansOf>;
+  onPlan?: (id: string) => void;
+  title?: string;
   sessions: ReturnType<typeof sessionsOf>;
   nextId?: string;
-  onStart: (workoutId: string) => void;
+  onStart: (workoutId: string, planId: string) => void;
   onTrainer?: (st: RunStart) => void;
 }) {
   const [preview, setPreview] = useState<PlanWorkout | null>(null);
@@ -551,8 +560,8 @@ function Workouts({
   return (
     <section className="acard">
       <div className="between">
-        <h3>Twoje treningi</h3>
-        {plans.length > 1 ? (
+        <h3>{title}</h3>
+        {plans && onPlan && plans.length > 1 ? (
           <select className="input input-sm ath-sel" value={plan.id} onChange={(e) => onPlan(e.target.value)} aria-label="Wybierz plan">
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
@@ -561,13 +570,15 @@ function Workouts({
               </option>
             ))}
           </select>
+        ) : plan.extra ? (
+          <span className="muted small">poza planem · w dowolnym momencie</span>
         ) : (
           <span className="muted small">{plan.name}</span>
         )}
       </div>
       {plan.weeks.map((w) => (
         <div key={w.id}>
-          <div className="wk-label">{w.name}</div>
+          {!plan.extra && <div className="wk-label">{w.name}</div>}
           {w.workouts.map((k) => {
             const n = k.exercises.filter((e) => e.name).length;
             const dn = doneMap[k.id];
@@ -595,7 +606,7 @@ function Workouts({
           onClose={() => setPreview(null)}
           onStart={() => {
             setPreview(null);
-            onStart(preview.id);
+            onStart(preview.id, plan.id);
           }}
           onTrainer={
             onTrainer &&

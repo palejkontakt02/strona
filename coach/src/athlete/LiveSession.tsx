@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
-import { clientById, plansOf, sessionsOf } from '../data/ops';
+import { clientById, extraPlanOf, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay } from '../format';
 import { todayISO } from '../lib/dates';
@@ -69,6 +69,14 @@ export function LiveSession({
   const plan = plans.find((p) => p.id === planId) ?? currentPlan(plans);
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
+  const extra = extraPlanOf(db, clientId);
+  const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts).filter((k) => k.exercises.some((e) => e.name)) ?? [];
+  const startExtra = (workoutId: string) => {
+    const r = runFromStart(db, clientId, { planId: extra?.id, workoutId }, todayISO());
+    if (typeof r === 'string') return toast(r);
+    setRun(r);
+    window.scrollTo(0, 0);
+  };
   const done: Record<string, string> = {};
   for (const s of sessions) if (plan && s.planId === plan.id && s.workoutId && !done[s.workoutId]) done[s.workoutId] = s.date; // sesje od najnowszej
 
@@ -181,6 +189,26 @@ export function LiveSession({
                   ))}
                 </div>
               ))}
+            </section>
+          )}
+          {extraWorkouts.length > 0 && (
+            <section className="acard">
+              <h3>Dodatkowe treningi</h3>
+              {extraWorkouts.map((k) => {
+                const last = sessions.find((x) => x.planId === extra?.id && x.workoutId === k.id)?.date;
+                return (
+                  <button key={k.id} className="wo-item" onClick={() => startExtra(k.id)}>
+                    <span className="wo-st">{last ? '✓' : ''}</span>
+                    <span className="wo-tx">
+                      <b>{k.name}</b>
+                      <span className="muted small">
+                        {k.exercises.length} ćwiczeń{last ? ` · ostatnio ${fmtDay(last)}` : ''}
+                      </span>
+                    </span>
+                    <span className="wo-go">Start</span>
+                  </button>
+                );
+              })}
             </section>
           )}
         </div>

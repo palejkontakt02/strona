@@ -41,8 +41,9 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   };
 
   return (
-    <Modal wide title={m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz plan">
-      <div className="form-grid form-grid-3">
+    <Modal wide title={p.extra ? 'Dodatkowe treningi' : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
+      {p.extra && <p className="muted small">Jednostki poza planem — podopieczny widzi je osobno i może je zrobić w każdej chwili. Kolejność planu się nie zmienia.</p>}
+      <div className="form-grid form-grid-3" style={p.extra ? { display: 'none' } : undefined}>
         <Field label="Nazwa planu">
           <input className="input" value={p.name} onChange={(e) => upd((d) => void (d.name = e.target.value))} required />
         </Field>

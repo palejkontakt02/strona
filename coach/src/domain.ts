@@ -160,6 +160,8 @@ export interface Plan {
   name: string;
   startDate?: ISODate;
   active: boolean;
+  /** Dodatkowe treningi poza planem (osobna lista jednostek; nie wchodzi w kolejność planu). */
+  extra?: boolean;
   notes?: string;
   updatedAt?: string;
   weeks: PlanWeek[];

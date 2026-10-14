@@ -15,8 +15,18 @@ export function lastSessionDate(db: Db, clientId: string): string | null {
   return sessionsOf(db, clientId)[0]?.date ?? null;
 }
 
+/** Plany treningowe klienta (bez listy dodatkowych treningów). */
 export function plansOf(db: Db, clientId: string): Plan[] {
-  return db.plans.filter((p) => p.clientId === clientId);
+  return db.plans.filter((p) => p.clientId === clientId && !p.extra);
+}
+
+/** Dodatkowe treningi klienta — jednostki poza planem, które trener może dopisywać w każdej chwili. */
+export function extraPlanOf(db: Db, clientId: string): Plan | undefined {
+  return db.plans.find((p) => p.clientId === clientId && p.extra);
+}
+
+export function newExtraPlan(clientId: string): Plan {
+  return { id: uid(), clientId, name: 'Dodatkowe treningi', active: false, extra: true, weeks: [{ id: uid(), name: 'Dodatkowe', workouts: [] }] };
 }
 
 export function clientById(db: Db, id: string | null | undefined): Client | undefined {
@@ -152,8 +162,8 @@ export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolea
 /** Zapis planu; aktywny może być tylko jeden plan klienta. */
 export function savePlan(db: Db, plan: Plan): Change[] {
   const changes: Change[] = [put('plans', { ...plan, updatedAt: new Date().toISOString() })];
-  if (plan.active) {
-    for (const o of db.plans.filter((p) => p.clientId === plan.clientId && p.id !== plan.id && p.active)) {
+  if (plan.active && !plan.extra) {
+    for (const o of db.plans.filter((p) => p.clientId === plan.clientId && p.id !== plan.id && p.active && !p.extra)) {
       changes.push(put('plans', { ...o, active: false }));
     }
   }

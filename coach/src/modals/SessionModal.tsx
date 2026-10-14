@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal } from '../components/ui';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { chargeProblem, clientById, deleteSession, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
+import { chargeProblem, clientById, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { fnum, pln, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
@@ -67,7 +67,9 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const client = clientById(db, clientId);
   const history = useMemo(() => (clientId ? sessionsOf(db, clientId).filter((x) => x.id !== existing?.id) : []), [db, clientId, existing?.id]);
   const plan = currentPlan(plansOf(db, clientId));
-  const seq = plan ? planSequence(plan) : [];
+  const extra = extraPlanOf(db, clientId);
+  // Jednostki z planu i dodatkowe treningi (z informacją, z której listy pochodzą).
+  const seq = [...(plan ? planSequence(plan).map((x) => ({ ...x, planId: plan.id })) : []), ...(extra ? planSequence(extra).map((x) => ({ ...x, planId: extra.id })) : [])];
 
   const [date, setDate] = useState(existing?.date ?? m.appt?.date ?? m.date ?? todayISO());
   const [workoutName, setWorkoutName] = useState(existing?.workoutName ?? '');
@@ -96,8 +98,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   /** Wczytuje jednostkę z planu: ćwiczenia z podsumowaniem serii i podpowiedzią ciężaru z historii. */
   const loadWorkout = (workoutId: string) => {
     const step = seq.find((x) => x.workout.id === workoutId);
-    if (!step || !plan) return;
-    setPlanRef({ planId: plan.id, workoutId });
+    if (!step) return;
+    setPlanRef({ planId: step.planId, workoutId });
     setWorkoutName(step.workout.name);
     setRows(
       step.workout.exercises.map((e) => {
