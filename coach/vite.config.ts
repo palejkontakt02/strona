@@ -9,5 +9,7 @@ export default defineConfig({
   build: {
     outDir: '../app',
     emptyOutDir: true,
+    // biblioteki osobno — przy kolejnych wdrożeniach telefon pobiera tylko kod aplikacji
+    rollupOptions: { output: { manualChunks: { react: ['react', 'react-dom'], supabase: ['@supabase/supabase-js'] } } },
   },
 });

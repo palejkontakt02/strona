@@ -128,6 +128,8 @@ export interface Habit {
   /** Od kiedy obowiązuje (wcześniejsze dni nie liczą się do statystyk). */
   since?: ISODate;
   archived?: boolean;
+  /** Od kiedy usunięte — wcześniejsze dni dalej liczą się w statystykach. */
+  archivedAt?: ISODate;
 }
 
 export interface HabitDay {

@@ -33,9 +33,19 @@ export function normalizeDb(db: Partial<Db>): Db {
       tests: arr(r.tests).filter(isRec),
       injuryLog: arr(r.injuryLog).filter(isRec),
       checkins: arr(r.checkins).filter((c) => isRec(c) && isDate(c.date)),
-      habits: Array.isArray(r.habits) ? r.habits.filter((h) => isRec(h) && typeof h.id === 'string' && typeof h.title === 'string' && isRec(h.schedule)) : undefined,
+      habits: Array.isArray(r.habits)
+        ? r.habits
+            .filter((h): h is Rec => isRec(h) && typeof h.id === 'string' && typeof h.title === 'string')
+            .map((h) => {
+              const sc = isRec(h.schedule) ? h.schedule : {};
+              const kind = sc.kind === 'week' || sc.kind === 'month' ? sc.kind : 'daily';
+              return { ...h, schedule: kind === 'daily' ? { kind } : { kind, days: arr(sc.days).filter((d) => Number.isInteger(d)) } };
+            })
+        : undefined,
       habitLog: Array.isArray(r.habitLog) ? r.habitLog.filter((d) => isRec(d) && isDate(d.date) && Array.isArray(d.done)) : undefined,
-      inbox: Array.isArray(r.inbox) ? r.inbox.filter((n) => isRec(n) && typeof n.text === 'string') : undefined,
+      inbox: Array.isArray(r.inbox)
+        ? r.inbox.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ ...n, id: typeof n.id === 'string' ? n.id : `n${i}`, at: typeof n.at === 'string' ? n.at : '' }))
+        : undefined,
     })),
     plans: clean<Plan>(db.plans, (r) => typeof r.clientId === 'string', (r) => ({
       ...r,

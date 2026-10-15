@@ -170,7 +170,7 @@ export function Dashboard() {
         </Card>
 
         {(() => {
-          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => b.n.at.localeCompare(a.n.at));
+          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
           if (!notes.length) return null;
           return (
             <Card title={`Notatki od podopiecznych (${notes.length})`}>

@@ -26,7 +26,7 @@ export function TodayHabits({ client }: { client: Client }) {
           <span className="eyebrow">Na dziś</span>
           <h3>{!due.length ? 'Dziś wolne od zadań' : n === due.length ? 'Koło zamknięte! 🎉' : `Zostało ${due.length - n}`}</h3>
           <p className="muted small">
-            Zamknięte dni w tym tygodniu: {week.closed} z {week.active}
+            Zamknięte dni (ostatnie 7): {week.closed} z {week.active}
             {streak > 1 && ` · seria ${streak} ${plural(streak, 'dzień', 'dni', 'dni')}`}
           </p>
         </div>

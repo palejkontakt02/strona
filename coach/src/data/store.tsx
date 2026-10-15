@@ -15,7 +15,7 @@ interface AskState {
 
 interface StoreValue {
   db: Db;
-  apply: (changes: Change[], message?: string) => Promise<void>;
+  apply: (changes: Change[], message?: string) => Promise<boolean>;
   /** Powiadomienie; z `action` — przycisk w powiadomieniu (np. „Cofnij”), dłużej widoczne. */
   toast: (message: string, action?: { label: string; run: () => void }) => void;
   /** Własny dialog potwierdzenia (window.confirm bywa blokowany). */
@@ -51,6 +51,8 @@ export function StoreProvider({
   const [toasts, setToasts] = useState<{ id: number; text: string; action?: { label: string; run: () => void } }[]>([]);
   const [askState, setAsk] = useState<AskState | null>(null);
   const toastId = useRef(0);
+  const hasDb = useRef(false);
+  hasDb.current = db != null;
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +65,11 @@ export function StoreProvider({
       setDb(next);
       setLoadError(null);
     } catch (e) {
+      // gdy dane już są (np. chwilowy brak sieci) — zostają na ekranie, bez ekranu błędu
+      if (hasDb.current) {
+        setToasts((t) => [...t, { id: ++toastId.current, text: 'Brak połączenia — pokazuję ostatnie dane.' }]);
+        return;
+      }
       setLoadError(e && typeof e === 'object' && 'message' in e ? [(e as { code?: string }).code, (e as { message: string }).message].filter(Boolean).join(' · ') : String(e));
     }
   }, [repo, onEmpty]);
@@ -95,15 +102,24 @@ export function StoreProvider({
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 9000 : 3200);
   }, []);
 
+  /** Zapis zmian; zwraca false, gdy się nie udał (wtedy np. trening zostaje do ponownego zapisu). */
   const apply = useCallback(
-    async (changes: Change[], message?: string) => {
-      setDb((cur) => (cur ? applyChanges(cur, changes) : cur));
+    async (changes: Change[], message?: string): Promise<boolean> => {
+      let before: Db | null = null;
+      setDb((cur) => {
+        before = cur;
+        return cur ? applyChanges(cur, changes) : cur;
+      });
       try {
         await repo.apply(changes);
         if (message) toast(message);
+        return true;
       } catch {
         toast('Nie udało się zapisać — sprawdź połączenie z internetem i spróbuj ponownie.');
-        void load();
+        // cofamy podgląd zmiany, żeby ponowny zapis nie zdublował treningu
+        if (before) setDb(before);
+        if (typeof navigator === 'undefined' || navigator.onLine) void load();
+        return false;
       }
     },
     [toast, repo, load],
@@ -127,11 +143,15 @@ export function StoreProvider({
     [repo, toast, load],
   );
 
+  // odhaczenia zapisywane po kolei — szybkie stuknięcia nie wyprzedzają się w sieci
+  const habitQueue = useRef<Promise<unknown>>(Promise.resolve());
   const saveHabitDay = useCallback(
     async (clientId: string, date: string, done: string[]) => {
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, habitLog: withDay(c.habitLog, date, done) } : c)) } : cur));
+      const job = habitQueue.current.then(() => repo.saveHabitDay(clientId, date, done));
+      habitQueue.current = job.catch(() => undefined);
       try {
-        await repo.saveHabitDay(clientId, date, done);
+        await job;
       } catch {
         toast('Nie udało się zapisać — sprawdź połączenie.');
         void load();
@@ -151,14 +171,15 @@ export function StoreProvider({
         await repo.addClientNote(clientId, note);
       } catch {
         saved = false;
+        // nie zapisało się w bazie — nie udajemy, że jest w aplikacji
+        setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: (c.inbox ?? []).filter((n) => n.id !== note.id) } : c)) } : cur));
       }
-      const mailed = await emailTrainer(client?.name ?? 'Podopieczny', client?.email, note.text);
-      if (!saved && !mailed) {
+      const mail = await emailTrainer(client?.name ?? 'Podopieczny', client?.email, note.text);
+      if (!saved && mail !== 'sent') {
         toast('Nie udało się wysłać — sprawdź połączenie i spróbuj ponownie.');
-        void load();
         return false;
       }
-      toast('Wysłano do trenera.');
+      toast(saved && mail !== 'failed' ? 'Wysłano do trenera.' : saved ? 'Zapisano w aplikacji (e-mail nie wyszedł — trener zobaczy wiadomość w panelu).' : 'Wysłano e-mailem do trenera.');
       return true;
     },
     [db, repo, toast, load],

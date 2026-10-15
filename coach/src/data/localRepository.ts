@@ -22,41 +22,60 @@ function write(db: Db) {
 }
 
 export function createLocalRepository(): Repository {
-  let db: Db = read() ?? createSeed();
-  write(db);
+  const stored = read();
+  let db: Db = stored ?? createSeed();
+  if (!stored) write(db);
+  // Zapis do localStorage zbijany (duża baza = drogi JSON.stringify), dane w pamięci są źródłem prawdy;
+  // przy zamknięciu / schowaniu karty zapisujemy od razu.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let dirty = false;
+  const flush = () => {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    if (dirty) write(db);
+    dirty = false;
+  };
+  const persist = () => {
+    dirty = true;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(flush, 120);
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
+  }
   return {
-    // Zawsze od świeżej kopii z localStorage: druga karta mogła w międzyczasie coś zapisać.
+    // Odczyt z localStorage: druga karta mogła coś zapisać (store przeładowuje po zdarzeniu „storage”).
     async load() {
+      flush();
       db = read() ?? db;
       return db;
     },
     async apply(changes) {
-      db = applyChanges(read() ?? db, changes);
-      write(db);
+      db = applyChanges(db, changes);
+      persist();
     },
     async replaceAll(next) {
       db = next;
-      write(db);
+      dirty = true;
+      flush();
     },
     async saveCheckin(clientId, checkin) {
-      db = read() ?? db;
       db = {
         ...db,
         clients: db.clients.map((c) =>
           c.id === clientId ? { ...c, checkins: [...c.checkins.filter((x) => x.date !== checkin.date), checkin].slice(-200) } : c,
         ),
       };
-      write(db);
+      persist();
     },
     async saveHabitDay(clientId, date, done) {
-      db = read() ?? db;
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, habitLog: withDay(c.habitLog, date, done) } : c)) };
-      write(db);
+      persist();
     },
     async addClientNote(clientId, note) {
-      db = read() ?? db;
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
-      write(db);
+      persist();
     },
   };
 }

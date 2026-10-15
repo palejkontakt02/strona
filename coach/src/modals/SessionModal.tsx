@@ -249,7 +249,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: m.appt?.id, amount: num(amount) ?? undefined, paidNow });
-    await apply(changes, message);
+    if (!(await apply(changes, message))) return; // formularz zostaje otwarty — można ponowić
     closeModal();
   };
 

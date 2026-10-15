@@ -9,7 +9,7 @@ export const WEEKDAYS = ['pn', 'wt', 'śr', 'cz', 'pt', 'sb', 'nd'] as const;
 
 /** Czy zadanie obowiązuje danego dnia. */
 export function isDue(h: Habit, date: ISODate): boolean {
-  if (h.archived) return false;
+  if (h.archived && (!h.archivedAt || date >= h.archivedAt)) return false;
   if (h.since && date < h.since) return false;
   const s = h.schedule;
   if (s.kind === 'daily') return true;

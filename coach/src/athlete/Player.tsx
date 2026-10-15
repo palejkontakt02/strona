@@ -161,7 +161,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       };
       if (updated.exercises.length === 0) return toast('Zostaw przynajmniej jedną zaliczoną serię (✓).');
       const { changes } = saveSession(db, { session: updated, isNew: false });
-      await apply(changes, 'Zapisano zmiany w treningu.');
+      if (!(await apply(changes, 'Zapisano zmiany w treningu.'))) return; // trening zostaje — można ponowić zapis
       setFinish(null);
       onSaved();
       return;
@@ -186,7 +186,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     const { changes, message } = saveSession(db, { session, isNew: true, appointmentId, matchAppointment: trainer, amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
-    await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪');
+    if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪'))) return; // trening zostaje — można ponowić zapis
     setFinish(null);
     onSaved();
   };

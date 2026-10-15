@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { plural } from './format';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import type { RunStart } from './athlete/start';
 import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
@@ -141,11 +142,14 @@ export function App() {
         </div>
       )}
       <main className="main">
-        {section === 'Pulpit' && <Dashboard />}
-        {section === 'Kalendarz' && <CalendarView />}
-        {section === 'Klienci' && <ClientsView />}
-        {section === 'Płatności' && <PaymentsView />}
-        {section === 'Ćwiczenia' && <LibraryView />}
+        {/* błąd w jednej sekcji nie zasłania menu ani Ustawień (np. kopii zapasowej) */}
+        <ErrorBoundary key={section + (clientId ?? '')}>
+          {section === 'Pulpit' && <Dashboard />}
+          {section === 'Kalendarz' && <CalendarView />}
+          {section === 'Klienci' && <ClientsView />}
+          {section === 'Płatności' && <PaymentsView />}
+          {section === 'Ćwiczenia' && <LibraryView />}
+        </ErrorBoundary>
       </main>
 
       <nav className="bottombar" aria-label="Menu">

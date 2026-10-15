@@ -116,6 +116,7 @@ declare
   k text;
   clean jsonb;
 begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
   if not (is_trainer() or p_client_id in (select my_client_ids())) then
     raise exception 'Brak dostępu';
   end if;
@@ -167,6 +168,7 @@ create or replace function public.save_habit_day(p_client_id text, p_date text, 
 language plpgsql security definer set search_path = public as $$
 declare clean jsonb;
 begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
   if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
   if coalesce(p_date, '') !~ '^\d{4}-\d{2}-\d{2}$' or jsonb_typeof(p_done) is distinct from 'array' or jsonb_array_length(p_done) > 50 then
     raise exception 'Nieprawidłowe dane';
@@ -186,6 +188,7 @@ create or replace function public.add_client_note(p_client_id text, p_note jsonb
 language plpgsql security definer set search_path = public as $$
 declare txt text := left(coalesce(p_note ->> 'text', ''), 2000);
 begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
   if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
   if length(trim(txt)) = 0 then raise exception 'Pusta notatka'; end if;
   update clients
@@ -198,4 +201,26 @@ end $$;
 
 revoke all on function public.save_habit_day, public.add_client_note from public, anon;
 grant execute on function public.save_habit_day, public.add_client_note to authenticated;
+notify pgrst, 'reload schema';
+
+-- 11. Zapis profilu przez trenera nie nadpisuje danych zapisywanych przez podopiecznego
+--     (odhaczenia zadań, check-iny, wiadomości) — trener może tylko oznaczać wiadomości jako przeczytane.
+create or replace function public.guard_client_owned() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := new.data || jsonb_build_object(
+    'habitLog', coalesce(old.data -> 'habitLog', '[]'::jsonb),
+    'checkins', coalesce(old.data -> 'checkins', '[]'::jsonb),
+    'inbox', coalesce((
+      select jsonb_agg(o || case when exists (
+          select 1 from jsonb_array_elements(coalesce(new.data -> 'inbox', '[]'::jsonb)) n
+          where n ->> 'id' = o ->> 'id' and (n ->> 'read')::boolean is true) then '{"read": true}'::jsonb else '{}'::jsonb end)
+      from jsonb_array_elements(coalesce(old.data -> 'inbox', '[]'::jsonb)) o), '[]'::jsonb));
+  return new;
+end $$;
+
+drop trigger if exists guard_client_owned on public.clients;
+create trigger guard_client_owned before update on public.clients
+  for each row execute function public.guard_client_owned();
 notify pgrst, 'reload schema';

@@ -67,7 +67,11 @@ export function parseWorkoutNote(text: string): ParsedNote {
     if (!line) continue;
     const d = line.match(DATE);
     if (d) {
-      if (!out.date) out.date = `${d[3]}-${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}`;
+      const iso = `${d[3]}-${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}`;
+      const t = new Date(`${iso}T12:00:00`);
+      // tylko istniejąca data (31.02 odrzucamy)
+      if (!out.date && !Number.isNaN(+t) && t.getDate() === +d[1] && t.getMonth() + 1 === +d[2]) out.date = iso;
+      else if (!out.date) out.skipped.push(line);
       continue;
     }
     // „Podciąganie 4x6”, „Przysiad 5x3x100” — nazwa i serie w jednej linii

@@ -130,7 +130,7 @@ export function ClientHabits({ client }: { client: Client }) {
             </div>
           </div>
           <p className="muted small center">
-            Zamknięte dni w tym tygodniu: {week.closed} z {week.active} · seria {streak} {plural(streak, 'dzień', 'dni', 'dni')}
+            Zamknięte dni (ostatnie 7): {week.closed} z {week.active} · seria {streak} {plural(streak, 'dzień', 'dni', 'dni')}
           </p>
           <div className="habit-days" aria-label="Ostatnie 14 dni">
             {rangeProgress(client.habits, client.habitLog, today, 14).perDay.map((d) => (
@@ -168,7 +168,7 @@ export function ClientHabits({ client }: { client: Client }) {
                 danger
                 onClick={async () => {
                   if (await ask(`Usunąć zadanie „${h.title}”? Historia odhaczeń zostanie w statystykach do dziś.`))
-                    await save((client.habits ?? []).map((x) => (x.id === h.id ? { ...x, archived: true } : x)), 'Usunięto zadanie.');
+                    await save((client.habits ?? []).map((x) => (x.id === h.id ? { ...x, archived: true, archivedAt: today } : x)), 'Usunięto zadanie.');
                 }}
               />
             </li>
