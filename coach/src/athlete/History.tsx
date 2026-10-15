@@ -4,7 +4,7 @@ import type { TrainingSession } from '../domain';
 import { sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { StartButtons } from './StartButtons';
-import { fmtDay, fmtLong, fnum } from '../format';
+import { fmtDay, fmtLong, fnum, nEx } from '../format';
 import { todayISO } from '../lib/dates';
 import { sessionLoad, tonnage } from '../lib/load';
 import { num, repsN } from '../lib/parse';
@@ -50,7 +50,7 @@ interface HistoryActions {
   canUndo?: (s: TrainingSession) => boolean;
 }
 
-export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo }: { clientId: string } & HistoryActions) {
+export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo, plain }: { clientId: string; /** Widok podopiecznego: bez skrótów trenerskich. */ plain?: boolean } & HistoryActions) {
   const { db } = useStore();
   const sessions = sessionsOf(db, clientId);
   const [limit, setLimit] = useState(8);
@@ -71,7 +71,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                 <span className="grow">
                   <b>{s.workoutName || 'Trening'}</b>
                   <span className="muted small">
-                    {s.exercises.length} ćwiczeń
+                    {nEx(s.exercises.length)}
                     {s.duration ? ` · ${s.duration} min` : ''}
                     {s.srpe != null ? ` · RPE ${s.srpe}` : ''}
                   </span>
@@ -89,6 +89,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
       )}
       {open && (
         <SessionSheet
+          plain={plain}
           s={open}
           onClose={() => setOpen(null)}
           onEdit={onEdit && (() => (setOpen(null), onEdit(open)))}
@@ -102,6 +103,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
 }
 
 export function SessionSheet({
+  plain,
   s,
   onClose,
   onEdit,
@@ -109,6 +111,7 @@ export function SessionSheet({
   onTrainer,
   onUndo,
 }: {
+  plain?: boolean;
   s: TrainingSession;
   onClose: () => void;
   onEdit?: () => void;
@@ -138,15 +141,16 @@ export function SessionSheet({
           )}
           {s.srpe != null && (
             <span>
-              RPE <b>{s.srpe}</b>
+              {plain ? 'wysiłek' : 'RPE'} <b>{s.srpe}</b>
+              {plain && '/10'}
             </span>
           )}
           {ton > 0 && (
-            <span>
-              <b>{fnum(ton / 1000, 1)}</b> t tonażu
+            <span title="Suma: ciężar × powtórzenia ze wszystkich serii">
+              <b>{fnum(ton / 1000, 1)}</b> {plain ? 't podniesione łącznie' : 't tonażu'}
             </span>
           )}
-          {load != null && (
+          {load != null && !plain && (
             <span>
               <b>{fnum(load, 0)}</b> AU
             </span>

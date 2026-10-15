@@ -7,6 +7,21 @@ import { uid } from '../format';
 import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
+/**
+ * Wpis w serii uzupełnia kolejne puste serie tego samego typu („3 × 10” wpisuje się raz):
+ * kopiowane jest tylko tam, gdzie pole było puste albo równe poprzedniej wartości.
+ */
+function fillDown(groups: SetGroup[], gi: number, key: 'reps' | 'load', value: string) {
+  const before = groups[gi][key];
+  groups[gi][key] = value;
+  for (let j = gi + 1; j < groups.length; j++) {
+    const g = groups[j];
+    if (g.type !== groups[gi].type) break;
+    if (g[key] === '' || g[key] === before) g[key] = value;
+    else break;
+  }
+}
+
 const newRow = (type: SetType = 'Robocze', from?: SetGroup): SetGroup => ({ type, sets: '1', reps: from?.reps ?? '', load: from?.load ?? '', rpe: from?.rpe ?? '' });
 const newExercise = (): PlanExercise => ({ id: uid(), name: '', rest: '2:00', notes: '', groups: [newRow(), newRow(), newRow()] });
 
@@ -136,13 +151,14 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     <div className="pe-ex-head">
                       <span className="ex-label">{labels[ei]}</span>
                       <input className="input" list="lib-exercises" value={e.name} placeholder="Ćwiczenie" onChange={(ev) => setEx((x) => void (x.name = ev.target.value))} aria-label="Ćwiczenie" />
+                      <span className="muted small pe-rest-lbl">przerwa</span>
                       <input
                         className="input pe-rest"
                         value={e.rest ?? ''}
                         placeholder={inBlock && all[ei + 1]?.linked ? 'Przejście' : 'Przerwa'}
                         title={inBlock ? (all[ei + 1]?.linked ? 'Czas przejścia do następnego ćwiczenia bloku (puste = od razu)' : 'Przerwa po całej rundzie bloku') : 'Przerwa między seriami'}
                         onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" />
-                      <span className="muted small nowrap hide-mobile">{setCountLabel(e.groups)}</span>
+                      <span className="muted small nowrap">{setCountLabel(e.groups)}</span>
                       <IconBtn
                         icon="up"
                         label="Przesuń ćwiczenie w górę"
@@ -180,8 +196,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                               <option key={t}>{t}</option>
                             ))}
                           </select>
-                          <input className="input" value={g.reps} onChange={(ev) => setEx((x) => void (x.groups[gi].reps = ev.target.value))} aria-label="Powtórzenia" />
-                          <input className="input" value={g.load} onChange={(ev) => setEx((x) => void (x.groups[gi].load = ev.target.value))} aria-label="Ciężar" />
+                          <input className="input" value={g.reps} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label="Powtórzenia" />
+                          <input className="input" value={g.load} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label="Ciężar" />
                           <input className="input" inputMode="decimal" value={g.rpe} onChange={(ev) => setEx((x) => void (x.groups[gi].rpe = ev.target.value))} aria-label="RPE" />
                           <IconBtn icon="x" label="Usuń serię" onClick={() => setEx((x) => void x.groups.splice(gi, 1))} />
                         </div>

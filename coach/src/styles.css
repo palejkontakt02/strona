@@ -3309,8 +3309,20 @@ h2 {
 /* rozpoczęcie: trener / zawodnik; akcje w szczegółach treningu */
 .start-pair {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: var(--space-2);
+}
+.start-pair > .btn {
+  min-width: 0;
+  white-space: normal;
+}
+@media (max-width: 420px) {
+  .start-pair {
+    grid-template-columns: 1fr;
+  }
+}
+.start-label {
+  margin: 0 0 var(--space-1);
 }
 .sheet-actions {
   display: flex;
@@ -3661,4 +3673,59 @@ h2 {
 }
 .habit-days > div.off {
   opacity: 0.35;
+}
+.finish-early {
+  margin-top: var(--space-2);
+}
+.warm-remove {
+  display: block;
+  margin: 2px 0 6px 44px;
+}
+.rpe-legend {
+  margin-top: 4px;
+}
+.player .acard .between .link + .link {
+  margin-left: var(--space-6);
+}
+.toast-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: 14px;
+  pointer-events: auto;
+}
+.pe-rest-lbl {
+  flex: none;
+}
+.tile.tile-overdue {
+  outline: 1px dashed var(--color-warn);
+  outline-offset: -1px;
+}
+.tile.tile-overdue::after {
+  content: 'do uzupełnienia';
+  display: block;
+  font-size: 0.68rem;
+  color: var(--color-warn);
+}
+.kpi-hint {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--color-neutral-500);
+  font-size: 0.65rem;
+  cursor: help;
+  vertical-align: 1px;
+}
+.kpi-hint-text {
+  display: none;
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+  margin: 4px 0;
+}
+.kpi:has(.kpi-hint:focus) .kpi-hint-text,
+.kpi:has(.kpi-hint:hover) .kpi-hint-text {
+  display: block;
 }

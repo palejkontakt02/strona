@@ -209,6 +209,8 @@ export interface SetLog {
   warmup?: boolean;
   done?: boolean;
   label?: string;
+  /** Kompleks, np. „2+1” (reps to suma) — nie liczy się do e1RM. */
+  complex?: string;
 }
 
 export interface SessionExercise {

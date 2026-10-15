@@ -103,7 +103,7 @@ export function App() {
           ))}
         </div>
         <span className="grow" />
-        <button className="btn btn-primary btn-sm hide-mobile" onClick={() => setModal({ kind: 'appt' })}>
+        <button className="btn btn-primary btn-sm hide-mobile" onClick={() => setModal({ kind: 'appt', clientId: section === 'Klienci' ? (clientId ?? undefined) : undefined })}>
           <Icon name="plus" size={16} /> Dodaj wizytę
         </button>
         <button className="icon-btn show-mobile" aria-label="Ćwiczenia" title="Ćwiczenia" onClick={() => go('Ćwiczenia')}>
@@ -155,7 +155,7 @@ export function App() {
             <span>{s}</span>
           </button>
         ))}
-        <button className="fab" aria-label="Dodaj wizytę" onClick={() => setModal({ kind: 'appt' })}>
+        <button className="fab" aria-label="Dodaj wizytę" onClick={() => setModal({ kind: 'appt', clientId: section === 'Klienci' ? (clientId ?? undefined) : undefined })}>
           <Icon name="plus" size={26} />
         </button>
         {SECTIONS.slice(2, 4).map((s) => (

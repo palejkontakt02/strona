@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Empty, IconBtn } from '../components/ui';
 import { EXERCISE_CATEGORIES } from '../domain';
 import { useStore } from '../data/store';
-import { normalize, uid } from '../format';
+import { normalize, uid, nEx } from '../format';
 import { put } from '../data/db';
 import { missingFromAtlas } from '../data/atlas';
 import { useNav } from '../nav';
@@ -23,13 +23,13 @@ export function LibraryView() {
       <div className="page-head">
         <div>
           <h2>Biblioteka ćwiczeń</h2>
-          <p className="muted small">{db.library.length} ćwiczeń · podpowiadane przy tworzeniu planów i zapisie treningu</p>
+          <p className="muted small">{nEx(db.library.length)} · podpowiadane przy tworzeniu planów i zapisie treningu</p>
         </div>
         <div className="actions">
           {missing.length > 0 && (
             <button
               className="btn btn-secondary"
-              onClick={() => apply(missing.map(([name, cat]) => put('library', { id: uid(), name, cat })), `Dodano ${missing.length} ćwiczeń z atlasu.`)}
+              onClick={() => apply(missing.map(([name, cat]) => put('library', { id: uid(), name, cat })), `Dodano ${nEx(missing.length)} z atlasu.`)}
               title="Ćwiczenia siłowe, dwubojowe, plyometryczne, kondycyjne i rehabilitacyjne — nazwy po angielsku"
             >
               + Atlas ćwiczeń ({missing.length})

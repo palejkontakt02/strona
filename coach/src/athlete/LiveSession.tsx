@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
 import { clientById, extraPlanOf, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fmtDay } from '../format';
+import { fmtDay, nEx } from '../format';
 import { todayISO } from '../lib/dates';
 import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
@@ -147,7 +147,7 @@ export function LiveSession({
               <span className="eyebrow">Następny z planu</span>
               <h2>{nx.workout.name}</h2>
               <p className="muted small">
-                {nx.week.name} · {nx.workout.exercises.length} ćwiczeń
+                {nx.week.name} · {nEx(nx.workout.exercises.length)}
               </p>
               <button className="btn btn-primary btn-lg" onClick={() => start(nx.workout.id)}>
                 <Icon name="play" /> Start
@@ -181,7 +181,7 @@ export function LiveSession({
                       <span className="wo-tx">
                         <b>{k.name}</b>
                         <span className="muted small">
-                          {k.exercises.length} ćwiczeń{done[k.id] ? ` · ostatnio ${fmtDay(done[k.id])}` : ''}
+                          {nEx(k.exercises.length)}{done[k.id] ? ` · ostatnio ${fmtDay(done[k.id])}` : ''}
                         </span>
                       </span>
                       <span className="wo-go">Start</span>
@@ -202,7 +202,7 @@ export function LiveSession({
                     <span className="wo-tx">
                       <b>{k.name}</b>
                       <span className="muted small">
-                        {k.exercises.length} ćwiczeń{last ? ` · ostatnio ${fmtDay(last)}` : ''}
+                        {nEx(k.exercises.length)}{last ? ` · ostatnio ${fmtDay(last)}` : ''}
                       </span>
                     </span>
                     <span className="wo-go">Start</span>

@@ -70,28 +70,60 @@ export function Dashboard() {
                     <button className="link grow" onClick={() => c && openClient(c.id)}>
                       {c?.name ?? '—'}
                     </button>
-                    <span className="hide-mobile">
-                      <LocationTag id={a.locationId} short />
-                    </span>
+                    <LocationTag id={a.locationId} short />
                     <span className={a.status === 'planned' ? 'hide-mobile' : ''}>
                       <ApptStatusTag status={a.status} />
                     </span>
-                    {a.status === 'planned' ? (
+                    {a.status === 'planned' || (a.status === 'done' && !a.sessionId) ? (
                       <>
                         <button className="btn btn-primary btn-sm" onClick={() => startLive(a.clientId, a.id)} title="Prowadź trening na żywo, seria po serii">
                           <Icon name="play" size={14} /> Prowadź
                         </button>
                         <IconBtn icon="edit" label="Zapisz trening po fakcie" onClick={() => openModal({ kind: 'session', appt: a, clientId: a.clientId, date: a.date })} />
                       </>
+                    ) : a.sessionId && db.sessions.some((x) => x.id === a.sessionId) ? (
+                      <IconBtn icon="eye" label="Pokaż zapisany trening" onClick={() => openModal({ kind: 'session', session: db.sessions.find((x) => x.id === a.sessionId)! })} />
                     ) : (
                       <span className="btn-sm-placeholder" />
                     )}
+                    <IconBtn icon="cal" label="Szczegóły wizyty (odwołaj, nieobecność, zmiana)" onClick={() => openModal({ kind: 'appt', appt: a })} />
                   </li>
                 );
               })}
             </ul>
           )}
         </Card>
+
+        {(() => {
+          // zaplanowane wizyty z ostatnich 2 tygodni, które nie zostały rozliczone
+          const from = addDays(today, -14);
+          const overdueAppts = db.appointments.filter((a) => a.status === 'planned' && a.date < today && a.date >= from).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+          if (!overdueAppts.length) return null;
+          return (
+            <Card title={`Do uzupełnienia (${overdueAppts.length})`} className="span-2">
+              <p className="muted small">Minione wizyty bez zapisanego treningu — zapisz trening (zejdzie z pakietu / doliczy się klubowi) albo oznacz odwołanie.</p>
+              <ul className="rows">
+                {overdueAppts.slice(0, 8).map((a) => {
+                  const c = clientById(db, a.clientId);
+                  return (
+                    <li key={a.id} className="row">
+                      <span className="row-time">
+                        {fmtDay(a.date)} {a.time}
+                      </span>
+                      <button className="link grow" onClick={() => c && openClient(c.id)}>
+                        {c?.name ?? '—'}
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'session', appt: a, clientId: a.clientId, date: a.date })}>
+                        Zapisz trening
+                      </button>
+                      <IconBtn icon="cal" label="Szczegóły wizyty" onClick={() => openModal({ kind: 'appt', appt: a })} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          );
+        })()}
 
         <Card title={`Sygnały ostrzegawcze${alerts.length ? ` (${alerts.length})` : ''}`}>
           {alerts.length === 0 ? (
@@ -234,7 +266,7 @@ export function Dashboard() {
                       </button>
                       <div className="small muted">{s.workoutName || 'Trening'}</div>
                     </div>
-                    {s.srpe != null && s.duration != null && <span className="small muted nowrap">{s.srpe * s.duration} AU</span>}
+                    {s.srpe != null && s.duration != null && <span className="small muted nowrap" title="Obciążenie treningu = RPE × minuty (AU — jednostki umowne)">{s.srpe * s.duration} AU</span>}
                     <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
                   </li>
                 );

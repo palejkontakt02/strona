@@ -149,6 +149,16 @@ export function saveAppointment(appt: Appointment, repeatWeeks: number): Change[
   );
 }
 
+/** Zmiana godziny / czasu / miejsca w tej i kolejnych zaplanowanych wizytach serii. */
+export function updateSeries(db: Db, appt: Appointment): Change[] {
+  if (!appt.seriesId) return [put('appointments', appt)];
+  const later = db.appointments.filter((a) => a.seriesId === appt.seriesId && a.id !== appt.id && a.date > appt.date && a.status === 'planned');
+  return [
+    put('appointments', appt),
+    ...later.map((a) => put('appointments', { ...a, time: appt.time, duration: appt.duration, locationId: appt.locationId, location: appt.location })),
+  ];
+}
+
 /** Usunięcie wizyty albo całej przyszłej części serii. */
 export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolean): Change[] {
   if (!wholeSeries || !appt.seriesId) return [del('appointments', appt.id)];

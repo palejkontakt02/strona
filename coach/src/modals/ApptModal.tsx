@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, saveAppointment } from '../data/ops';
+import { clientById, deleteAppointment, saveAppointment, updateSeries } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtShort, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
@@ -48,7 +48,16 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     if (!clientId) return;
     if (duration.trim() && numIn(duration, 5, 600) == null) return toast('Czas wizyty: od 5 do 600 minut.');
     const n = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
-    await apply(saveAppointment(draft, n), n > 1 ? `Dodano ${n} wizyt (co tydzień).` : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
+    const seriesChanged = !!editing?.seriesId && (editing.time !== draft.time || (editing.duration ?? 60) !== draft.duration || editing.locationId !== draft.locationId);
+    const allNext = seriesChanged && (await ask('To wizyta cykliczna. Zmienić godzinę / czas / miejsce także w kolejnych zaplanowanych wizytach z tej serii?', { confirm: 'Ta i następne', danger: false }));
+    await apply(allNext ? updateSeries(db, draft) : saveAppointment(draft, n), n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
+    // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
+    if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
+      if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
+        openModal({ kind: 'session', appt: draft, clientId: draft.clientId, date: draft.date });
+        return;
+      }
+    }
     closeModal();
   };
 
@@ -147,6 +156,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
+        {editing?.seriesId && <p className="muted small field-wide">↻ Wizyta cykliczna (co tydzień). Zmianę godziny, czasu lub miejsca możesz zastosować do kolejnych wizyt z serii.</p>}
         {!editing && (
           <div className="field-wide check-row">
             <label className="check">

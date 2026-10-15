@@ -4,10 +4,11 @@ import { Icon } from '../components/ui';
 import type { Checkin, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { clientById, deleteSession, extraPlanOf, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fmtDay, fmtMonth, fnum, fx, plural } from '../format';
+import { put } from '../data/db';
+import { fmtDay, fmtMonth, fnum, fx, plural, nEx } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
-import { currentPlan, nextWorkout } from '../lib/plan';
+import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
 import { emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
@@ -102,10 +103,16 @@ export function AthleteApp({
     startFrom({ planId: plan.id, workoutId: id });
   };
   const undo = async (s: TrainingSession) => {
-    if (!(await ask(`Oznaczyć trening z ${fmtDay(s.date)} jako niewykonany? Zniknie z historii, a trening z planu wróci na listę do zrobienia.`, { confirm: 'Oznacz' }))) return;
+    if (!(await ask(`Oznaczyć trening z ${fmtDay(s.date)} jako niewykonany? Zapis ćwiczeń, serii i ciężarów zostanie usunięty, a trening z planu wróci na listę do zrobienia.`, { confirm: 'Usuń zapis' }))) return;
     const sp = sessionPayment(db, s);
     const removePayment = !!sp && mode === 'preview' && (await ask(`Usunąć też płatność „${paymentLabel(sp.payment)}” za ten trening?`, { confirm: 'Usuń płatność' }));
-    await apply(deleteSession(db, s.id, removePayment), 'Trening oznaczony jako niewykonany.');
+    const appts = db.appointments.filter((a) => a.sessionId === s.id);
+    await apply(deleteSession(db, s.id, removePayment));
+    // „Cofnij” przywraca zapis (i powiązaną wizytę) — na wypadek pomyłki
+    toast('Trening oznaczony jako niewykonany.', {
+      label: 'Cofnij',
+      run: () => void apply([put('sessions', s), ...appts.map((a) => put('appointments', a))], 'Przywrócono trening.'),
+    });
   };
   // Podopieczny cofa tylko swoje treningi (bez rozliczenia); trener w podglądzie — każdy.
   const canUndo = (s: TrainingSession) => mode === 'preview' || s.charge === 'brak';
@@ -255,7 +262,7 @@ function Home({
           <span className="eyebrow">Następny trening</span>
           <h2>{nx.workout.name}</h2>
           <p className="muted small">
-            {nx.week.name} · {nx.workout.exercises.length} ćwiczeń · jednostka {nx.index + 1} z {nx.total}
+            {nx.week.name} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
           </p>
           <button className="btn btn-primary btn-lg" onClick={() => onStart(nx.workout.id)}>
             <Icon name="play" /> Start
@@ -295,7 +302,7 @@ function Home({
             </div>
           </div>
         </section>
-        <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} />
+        <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} count={sessions.filter((s) => s.date.startsWith(today.slice(0, 7))).length} />
       </div>
 
       <Progress clientId={clientId} />
@@ -303,6 +310,7 @@ function Home({
       <Workouts plan={plan} extra={extra} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id, planId) => (planId === plan?.id ? onStart(id) : onStartFrom({ planId, workoutId: id }))} onTrainer={onTrainer} />
 
       <History
+        plain={!onTrainer}
         clientId={clientId}
         onEdit={onEdit}
         onRepeat={onRepeat}
@@ -339,12 +347,11 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
           <span className="muted">/ 5</span>
           {diff != null && (
             <span className={`tag ${diff >= 0 ? 'tag-ok' : diff > -0.5 ? 'tag-neutral' : 'tag-warn'}`}>
-              {diff >= 0 ? '+' : ''}
-              {fx(diff, 1)} vs Twoja norma ({fx(norm!, 1)})
+              {diff >= 0.25 ? 'lepiej niż zwykle' : diff > -0.25 ? 'jak zwykle' : diff > -0.5 ? 'trochę gorzej niż zwykle' : 'gorzej niż zwykle'}
             </span>
           )}
         </div>
-        <p className="muted small">{diff == null ? 'Norma pojawi się po kilku dniach wpisów.' : diff >= 0 ? 'Jesteś w formie — trenuj zgodnie z planem.' : diff > -0.5 ? 'Trochę poniżej normy — słuchaj RPE.' : 'Wyraźnie poniżej normy — rozważ lżejszy trening i daj znać trenerowi.'}</p>
+        <p className="muted small">{diff == null ? 'Porównanie z Twoim zwykłym samopoczuciem pojawi się po kilku dniach wpisów.' : diff >= 0 ? 'Jesteś w formie — trenuj zgodnie z planem.' : diff > -0.5 ? 'Trochę gorzej niż zwykle — nie forsuj ciężarów, jeśli serie idą ciężko.' : 'Wyraźnie poniżej normy — rozważ lżejszy trening i daj znać trenerowi.'}</p>
       </section>
     );
   }
@@ -392,13 +399,13 @@ function Ring({ value, max }: { value: number; max: number }) {
   );
 }
 
-function MonthCalendar({ dates, today }: { dates: Set<string>; today: string }) {
+function MonthCalendar({ dates, today, count }: { dates: Set<string>; today: string; count: number }) {
   const first = today.slice(0, 7) + '-01';
   const start = weekStart(first);
   const days: string[] = [];
   for (let d = start; days.length < 42; d = addDays(d, 1)) days.push(d);
   while (days.length > 35 && days[days.length - 7].slice(0, 7) !== first.slice(0, 7)) days.splice(-7);
-  const n = [...dates].filter((d) => d.startsWith(today.slice(0, 7))).length;
+  const n = count;
   return (
     <section className="acard">
       <div className="between">
@@ -427,6 +434,7 @@ function Progress({ clientId }: { clientId: string }) {
   const { db } = useStore();
   const sessions = sessionsOf(db, clientId);
   const [tab, setTab] = useState<'est' | 'dist'>('est');
+  const [showAll, setShowAll] = useState(false);
   const names = (() => {
     const cnt: Record<string, number> = {};
     for (const s of sessions) for (const e of s.exercises) if (exerciseE1(e) != null) cnt[e.name] = (cnt[e.name] || 0) + 1;
@@ -462,28 +470,33 @@ function Progress({ clientId }: { clientId: string }) {
     <section className="acard">
       <div className="seg seg-sm">
         <button className={tab === 'est' ? 'active' : ''} onClick={() => setTab('est')}>
-          Estymacja
+          Siła
         </button>
         <button className={tab === 'dist' ? 'active' : ''} onClick={() => setTab('dist')}>
-          Dystrybucja
+          Wysiłek
         </button>
       </div>
       {tab === 'est' ? (
         names.length === 0 ? (
-          <p className="muted small">Szacowane maksimum (e1RM) pojawi się po pierwszych treningach z ciężarem.</p>
+          <p className="muted small">Szacowany maksymalny ciężar pojawi się po pierwszych treningach z ciężarem.</p>
         ) : (
           <>
             <div className="between">
-              <span className="muted small">Szacowane 1RM</span>
+              <span className="muted small" title="Szacowany ciężar na 1 powtórzenie (e1RM), liczony z Twoich serii">Szacowany maks. ciężar (1 powt.)</span>
               <strong className="text-cyan">{fnum(series[series.length - 1]?.y)} kg</strong>
             </div>
             <LineChart label={`e1RM ${chosen}`} series={[{ label: chosen, pts: series, tone: 'cyan' }]} height={170} />
             <div className="chips">
-              {names.slice(0, 6).map((n) => (
+              {(showAll ? names : names.slice(0, 6)).map((n) => (
                 <button key={n} className={`chip ${n === chosen ? 'active' : ''}`} onClick={() => setEx(n)}>
                   {n}
                 </button>
               ))}
+              {names.length > 6 && (
+                <button className="chip" onClick={() => setShowAll(!showAll)}>
+                  {showAll ? 'Mniej' : `+${names.length - 6} więcej`}
+                </button>
+              )}
             </div>
           </>
         )
@@ -559,17 +572,22 @@ function Workouts({
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
   if (!plan && extraWorkouts.length === 0) return null;
   const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id)?.date; // sesje od najnowszej
+  // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
+  const seqIds = plan ? planSequence(plan).map((x) => x.workout.id) : [];
+  const nextIdx = nextId ? seqIds.indexOf(nextId) : -1;
   const item = (k: PlanWorkout, planId: string, isNext: boolean) => {
     const n = k.exercises.filter((e) => e.name).length;
     const dn = done(planId, k.id);
+    const idx = planId === plan?.id ? seqIds.indexOf(k.id) : -1;
+    const doneNow = !!dn && !isNext && (planId !== plan?.id || nextIdx < 0 || idx < nextIdx);
     return (
-      <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${dn ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
-        <span className="wo-st">{dn ? '✓' : isNext ? '▶' : ''}</span>
+      <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${doneNow ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
+        <span className="wo-st">{isNext ? '▶' : doneNow ? '✓' : ''}</span>
         <span className="wo-tx">
           <b>{k.name}</b>
           <span className="muted small">
-            {n ? `${n} ćwiczeń` : 'brak ćwiczeń'}
-            {dn ? ` · ${planId === extra?.id ? 'ostatnio' : 'zrobione'} ${fmtDay(dn)}` : isNext ? ' · następny' : ''}
+            {n ? `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}` : 'brak ćwiczeń'}
+            {isNext ? ` · następny — do zrobienia${dn ? ` (ostatnio ${fmtDay(dn)})` : ''}` : dn ? ` · ${doneNow && planId !== extra?.id ? 'zrobione' : 'ostatnio'} ${fmtDay(dn)}` : ''}
           </span>
         </span>
         <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>

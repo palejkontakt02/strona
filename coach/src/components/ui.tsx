@@ -19,10 +19,18 @@ export function Avatar({ name, size = 38 }: { name: string; size?: number }) {
   );
 }
 
-export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone }) {
+export function Kpi({ label, value, sub, tone, hint }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone; /** Wyjaśnienie pojęcia (np. ACWR) — dymek i znak „?”. */ hint?: string }) {
   return (
     <div className={`card kpi ${tone ? `kpi-${tone}` : ''}`}>
-      <div className="kpi-label">{label}</div>
+      <div className="kpi-label">
+        {label}
+        {hint && (
+          <span className="kpi-hint" title={hint} tabIndex={0} aria-label={hint}>
+            ?
+          </span>
+        )}
+      </div>
+      {hint && <div className="kpi-hint-text">{hint}</div>}
       <div className="kpi-value">{value}</div>
       {sub != null && <div className="kpi-sub">{sub}</div>}
     </div>

@@ -4,9 +4,10 @@ import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
 import { chargeProblem, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fmtDay, uid } from '../format';
+import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
-import { num, numIn, repsN } from '../lib/parse';
+import { num, numIn, repsN, sumReps } from '../lib/parse';
+import { recentE1 } from '../lib/strength';
 import {
   adHocExercise,
   appendExercise,
@@ -80,7 +81,7 @@ function elapsedMinutes(startedAt: number): string {
 }
 
 export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
-  const { db, apply, toast } = useStore();
+  const { db, apply, toast, ask } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
@@ -107,11 +108,28 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     window.scrollTo(0, 0);
   };
 
-  const onDone = (k: number, i: number) => {
-    const wasDone = run.ex[k].sets[i].done;
-    const res = completeSet(run.ex[k], i);
+  const onDone = async (k: number, i: number) => {
+    const ex = run.ex[k];
+    const s = ex.sets[i];
+    const wasDone = s.done;
+    if (wasDone) {
+      // cofnięcie serii zatrzymuje też odliczanie przerwy
+      update((r) => void (r.ex[k].sets = completeSet(r.ex[k], i).sets));
+      setRest(null);
+      setHintNext(null);
+      return;
+    }
+    if (s.rpe.trim() && numIn(s.rpe, 1, 10) == null) return toast('RPE: od 1 do 10 (jak ciężka była seria).');
+    const hasPrev = ex.sets.slice(0, i).some((x) => x.done && !x.warmup);
+    if (!s.warmup && !hasPrev && !s.reps.trim()) return toast('Wpisz liczbę powtórzeń.');
+    if (s.reps.trim() && !/\d/.test(s.reps)) return toast('Powtórzenia: wpisz liczbę.');
+    if (s.reps.trim() && sumReps(s.reps) === 0) return toast('Powtórzenia: co najmniej 1.');
+    const load = num(s.load);
+    if (load != null && load < 0) return toast('Ciężar nie może być ujemny.');
+    const best = recentE1(sessionsOf(db, client.id), ex.name);
+    if (load != null && (load > 400 || (best != null && load > best * 1.5)) && !(await ask(`${fnum(load)} kg to dużo więcej niż dotychczas${best ? ` (szacowane maks. ${fnum(best, 0)} kg)` : ''}. Na pewno?`, { confirm: 'Tak, zalicz', danger: false }))) return;
+    const res = completeSet(ex, i);
     const next = update((r) => void (r.ex[k].sets = res.sets));
-    if (wasDone) return;
     const br = blockRest(next, k, i);
     setHintNext(br.next ?? null);
     if (br.rest) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
@@ -120,7 +138,12 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
   const editing = run.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
 
   const save = async () => {
-    if (!finish || finish.srpe === '') return;
+    if (!finish) return;
+    if (finish.srpe === '') {
+      document.querySelector('.sheet .scale-11')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return toast('Zaznacz, jak ciężki był cały trening (0–10), żeby zapisać.');
+    }
+    if (trainer && !editing && finish.charge === 'pojedyncza' && numIn(finish.amount, 0.01, 1_000_000) == null) return toast('Wpisz kwotę za sesję (zł) albo zmień rozliczenie.');
     if (finish.duration.trim() && numIn(finish.duration, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
     const problem = trainer ? chargeProblem(db, finish.charge, finish.locationId) : null;
     if (problem) return toast(problem);
@@ -213,6 +236,11 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           </button>
         </div>
         {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
+        {s.warmup && !s.done && (
+          <button className="link small muted warm-remove" onClick={() => removeWarmup(k, i)}>
+            ✕ usuń tę serię wstępną
+          </button>
+        )}
       </div>
     );
   };
@@ -234,10 +262,14 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
       }
     });
-  const removeSet = (ks: number[]) =>
+  const removeSet = async (ks: number[]) => {
+    if (ks.some((k) => run.ex[k].sets[run.ex[k].sets.length - 1]?.done) && !(await ask('Usunąć ostatnią serię? Jest już zaliczona.', { confirm: 'Usuń serię' }))) return;
     update((r) => {
       for (const k of ks) if (r.ex[k].sets.length > 1) r.ex[k].sets.pop();
     });
+  };
+  /** Usuwa jedną serię wstępną (rozgrzewkę) — np. dodaną przez pomyłkę. */
+  const removeWarmup = (k: number, i: number) => update((r) => void r.ex[k].sets.splice(i, 1));
 
   const header = (k: number) => {
     const e = run.ex[k];
@@ -271,7 +303,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     return (
       <>
         {header(k)}
-        <div className="muted small">{e.rest && `przerwa ${e.rest}`}</div>
+        <div className="muted small">{e.rest && `przerwa ${fmtRest(e.rest)}`}</div>
         <button className="link small" onClick={() => addWarmup(k)}>
           + seria wstępna
         </button>
@@ -279,7 +311,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <span />
           <span>powt.</span>
           <span>kg</span>
-          <span>RPE</span>
+          <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />
         </div>
         {e.sets.map((s, i) => {
@@ -289,7 +321,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
               {s.first && !s.warmup && s.gdesc && (
                 <div className="ghead">
                   <b>{s.gdesc}</b>
-                  {s.rest && <span className="muted small">przerwa {s.rest}</span>}
+                  {s.rest && <span className="muted small">przerwa {fmtRest(s.rest)}</span>}
                 </div>
               )}
               {setRow(k, i, s.warmup ? 'W' : String(n))}
@@ -317,7 +349,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <span />
           <span>powt.</span>
           <span>kg</span>
-          <span>RPE</span>
+          <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />
         </div>
         {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`))}
@@ -354,6 +386,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         <p className="muted small">
           {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
+        {!trainer && doneSets === 0 && <p className="muted small rpe-legend">Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.</p>}
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
@@ -407,11 +440,18 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
             {editing ? 'Zapisz zmiany' : 'Zakończ trening'}
           </button>
         ) : (
+          <>
           <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
             następne ›
           </button>
+          </>
         )}
       </div>
+      {!last && (
+        <button className="btn btn-ghost btn-block finish-early" onClick={openFinish}>
+          {editing ? 'Zapisz zmiany' : 'Zakończ trening wcześniej'}
+        </button>
+      )}
       {!last && blocks[bi + 1] && (
         <div className="acard nextup">
           <span className="muted small">Dalej</span> {blockName(blocks[bi + 1])}
@@ -439,7 +479,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <div className="sheet" role="dialog" aria-modal="true" aria-label="Podsumowanie treningu">
             <h2>Podsumowanie</h2>
             <div className="scale-h">
-              <span>Jak ciężki był cały trening? (RPE sesji)</span>
+              <span>Jak ciężki był cały trening? (wymagane)</span>
               <span className="muted small">0 = odpoczynek · 10 = maksimum</span>
             </div>
             <div className="scale scale-11">
@@ -498,7 +538,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
                 )}
               </>
             )}
-            <button className="btn btn-primary btn-lg btn-block" disabled={finish.srpe === ''} onClick={save}>
+            <button className="btn btn-primary btn-lg btn-block" onClick={save}>
               {editing ? 'Zapisz zmiany' : 'Zapisz trening'}
             </button>
             <button className="btn btn-ghost btn-block" onClick={() => setFinish(null)}>
@@ -646,7 +686,7 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
 }
 
 function AddExercise({ onAdd, onCancel, canLink }: { onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean) => void; onCancel?: () => void; canLink?: boolean }) {
-  const { db } = useStore();
+  const { db, toast } = useStore();
   const [name, setName] = useState('');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8');
@@ -657,7 +697,11 @@ function AddExercise({ onAdd, onCancel, canLink }: { onAdd: (name: string, sets:
       className="acard add-form"
       onSubmit={(ev) => {
         ev.preventDefault();
-        if (name.trim()) onAdd(name.trim(), parseInt(sets, 10) || 3, reps, load.replace(',', '.'), linked);
+        if (!name.trim()) return;
+        const n = numIn(sets, 1, 20);
+        if (n == null || !Number.isInteger(n)) return toast('Serie: od 1 do 20.');
+        if (load.trim() && (num(load) == null || num(load)! < 0)) return toast('Ciężar: wpisz liczbę kg albo zostaw puste.');
+        onAdd(name.trim(), n, reps.trim() || '8', load.replace(',', '.'), linked);
       }}
     >
       <h3>Dodaj ćwiczenie</h3>

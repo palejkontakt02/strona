@@ -5,7 +5,7 @@ import type { Location } from '../domain';
 import { put, del } from '../data/db';
 import { useStore } from '../data/store';
 import { pln, uid } from '../format';
-import { clubMonths } from '../lib/club';
+import { clubMonths, clubOutstanding } from '../lib/club';
 import { num } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 
@@ -66,12 +66,14 @@ export function LocationModal({ m }: { m: Extract<ModalState, { kind: 'location'
             type="button"
             className="btn btn-ghost btn-danger-text"
             onClick={async () => {
-              const due = clubMonths(l, db.sessions).reduce((a, m) => a + m.due, 0);
+              // blokuje tylko należność za zakończone miesiące; bieżący miesiąc — ostrzeżenie
+              const due = clubOutstanding(l, db.sessions).amount;
               if (l.kind === 'klub' && due > 0)
                 return toast(`„${l.name}” ma jeszcze ${pln(due)} niewypłaconych należności. Najpierw oznacz wypłaty (Płatności → Od klubów), potem usuń klub.`);
+              const curDue = clubMonths(l, db.sessions).find((m) => m.current)?.due ?? 0;
               const billed = db.clients.filter((c) => c.billing === 'klub' && c.locationId === l.id).length;
               const used = db.appointments.some((a) => a.locationId === l.id) || db.sessions.some((s) => s.locationId === l.id) || billed > 0;
-              if (!(await ask(used ? `Usunąć „${l.name}”? Wizyty i treningi zostaną, ale stracą oznaczenie miejsca${billed ? `, a ${billed} ${billed === 1 ? 'klient rozliczany' : 'klientów rozliczanych'} przez ten klub trzeba będzie przepiąć` : ''}.` : `Usunąć „${l.name}”?`))) return;
+              if (!(await ask(`${used ? `Usunąć „${l.name}”? Wizyty i treningi zostaną, ale stracą oznaczenie miejsca${billed ? `, a ${billed} ${billed === 1 ? 'klient rozliczany' : 'klientów rozliczanych'} przez ten klub trzeba będzie przepiąć` : ''}.` : `Usunąć „${l.name}”?`}${curDue > 0 ? ` W tym miesiącu klub ma do wypłaty ${pln(curDue)} — ta kwota przestanie być widoczna.` : ''}`))) return;
               await apply([del('locations', l.id)], 'Miejsce usunięte.');
               back();
             }}
@@ -110,7 +112,7 @@ export function LocationModal({ m }: { m: Extract<ModalState, { kind: 'location'
           </div>
         </Field>
         {kind === 'klub' && (
-          <Field label="Klub wypłaca mi za trening (zł)" wide hint="Dotyczy klientów rozliczanych „przez klub”. Rozliczenia miesięczne znajdziesz w Płatności → Kluby.">
+          <Field label="Klub wypłaca mi za trening (zł)" wide hint="Dotyczy klientów rozliczanych „przez klub”. Rozliczenia miesięczne znajdziesz w Płatności → Od klubów.">
             <input className="input" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="np. 90" />
           </Field>
         )}

@@ -3,10 +3,11 @@ import { Field, IconBtn, Modal } from '../components/ui';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
 import { chargeProblem, clientById, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fnum, pln, uid } from '../format';
+import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
+import { buildRunExercise } from '../lib/run';
 import { num, numIn, repsN } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
@@ -54,6 +55,8 @@ interface SetDraft {
   rpe: string;
   warmup?: boolean;
   label?: string;
+  /** Docelowe RPE z planu (podpowiedź w polu). */
+  tRpe?: string;
 }
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
   log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? String(x.reps) : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label }));
@@ -121,13 +124,13 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     const r = parseWorkoutNote(paste ?? '');
     if (r.exercises.length === 0) return toast('Nie rozpoznano ćwiczeń. Format: nazwa ćwiczenia, pod nią serie, np. „4x100” albo „8x70kg RPE 8”.');
     const keep = rows.filter((x) => x.name.trim());
-    if (keep.length && !(await ask(`Zastąpić ${keep.length} wpisanych ćwiczeń tymi z notatki?`, { confirm: 'Zastąp', danger: false }))) return;
+    if (keep.length && !(await ask(`Zastąpić wpisane ćwiczenia (${keep.length}) tymi z notatki?`, { confirm: 'Zastąp', danger: false }))) return;
     setRows(r.exercises.map(toRow));
     setPlanRef({}); // trening z notatki — nie jednostka z planu
     if (r.date && !existing) setDate(r.date);
     if (!workoutName.trim() || keep.length) setWorkoutName(r.exercises.slice(0, 2).map((e) => e.name.replace(/\s*\(.*\)$/, '')).join(' + '));
     setPaste(null);
-    toast(`Wczytano ${r.exercises.length} ćwiczeń (${r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0)} serii)${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
+    toast(`Wczytano ${nEx(r.exercises.length)} (${r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0)} serii)${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
   };
   const [w, setW] = useState<Record<keyof Wellness, string>>({
     sleep: s(existing?.wellness?.sleep),
@@ -171,17 +174,16 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           notes: e.notes ?? '',
           hint: sug.why || undefined,
           linked: e.linked,
-          // każda seria z planu osobno (rozgrzewki oznaczone), ciężar: liczba z planu albo podpowiedź
-          series: e.groups.flatMap((g) =>
-            Array.from({ length: Math.min(20, Math.max(1, repsN(g.sets) ?? 1)) }, () => ({
-              key: uid(),
-              load: /^\d+([.,]\d+)?$/.test(g.load.trim()) ? g.load.trim() : g.type !== 'Rozgrzewka' && sug.load != null ? String(sug.load) : '',
-              reps: repsN(g.reps) != null ? String(repsN(g.reps)) : '',
-              rpe: '',
-              warmup: g.type === 'Rozgrzewka' || undefined,
-              label: g.type !== 'Robocze' ? g.type : undefined,
-            })),
-          ),
+          // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
+          series: buildRunExercise(e, history).sets.map((x) => ({
+            key: uid(),
+            load: x.load,
+            reps: x.reps,
+            rpe: '',
+            tRpe: x.tRpe || undefined,
+            warmup: x.warmup || undefined,
+            label: x.label && x.label !== 'Robocze' ? x.label : undefined,
+          })),
         };
       }),
     );
@@ -213,6 +215,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     if (!date) return toast('Podaj datę treningu.');
     if (duration.trim() && numIn(duration, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
     const problem = chargeProblem(db, effCharge, locationId);
+    if (num(srpe) == null && rows.some((r) => r.name.trim()) && !(await ask('Nie zaznaczono, jak ciężki był trening (sRPE) — nie wliczy się do obciążenia (ACWR). Zapisać mimo to?', { confirm: 'Zapisz bez sRPE', danger: false })))
+      return;
     if (problem) return toast(problem);
     const wellness: Wellness = {};
     for (const [k] of WELLNESS_ITEMS) {
@@ -399,7 +403,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                       </button>
                       <input className="input" inputMode="numeric" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Powtórzenia, seria ${k + 1}`} placeholder="powt." />
                       <input className="input" inputMode="decimal" value={x.load} onChange={(e) => upd({ load: e.target.value })} aria-label={`Ciężar, seria ${k + 1}`} placeholder="kg" />
-                      <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, seria ${k + 1}`} placeholder="RPE" />
+                      <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, seria ${k + 1}`} placeholder={x.tRpe ? `cel ${x.tRpe}` : 'RPE'} />
                       <IconBtn icon="trash" label={`Usuń serię ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
                     </div>
                   );

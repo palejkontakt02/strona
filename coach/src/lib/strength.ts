@@ -13,11 +13,11 @@ function rirOf(rpe: unknown, fallback: number): number {
  * e1RM wg Epleya z uwzględnieniem RIR: kg × (1 + (powt + RIR)/30).
  * powt + RIR = 1 → kg; powt + RIR > 15 → null (zbyt niepewne).
  */
-export function e1rmRPE(load: unknown, reps: unknown, rpe: unknown): number | null {
+export function e1rmRPE(load: unknown, reps: unknown, rpe: unknown, fallbackRir = 0): number | null {
   const l = num(load);
   const r = repsN(reps);
   if (!l || !r) return null;
-  const rir = rirOf(rpe, 0);
+  const rir = rirOf(rpe, fallbackRir);
   if (r + rir > 15) return null;
   return r + rir === 1 ? l : l * (1 + (r + rir) / 30);
 }
@@ -30,13 +30,13 @@ export function loadFor(e1: number, reps: unknown, rpe: unknown): number {
 }
 
 function workSets(e: SessionExercise): SetLog[] {
-  return (e.setsLog || []).filter((s) => !s.warmup && s.done !== false);
+  return (e.setsLog || []).filter((s) => !s.warmup && s.done !== false && !s.complex);
 }
 
 /** Najlepszy e1RM ćwiczenia w sesji: max z serii roboczych, a bez serii — z podsumowania. */
 export function exerciseE1(e: SessionExercise): number | null {
   const sets = workSets(e);
-  if (sets.length === 0) return e1rmRPE(e.load, e.reps, e.rpe);
+  if (sets.length === 0) return e.setsLog?.length || String(e.reps ?? '').includes('+') ? null : e1rmRPE(e.load, e.reps, e.rpe);
   let best: number | null = null;
   for (const s of sets) {
     const v = e1rmRPE(s.load, s.reps, s.rpe);
@@ -157,4 +157,26 @@ export function bestE1(sessions: TrainingSession[], name: string): number | null
       if (v != null && (best == null || v > best)) best = v;
     }
   return best;
+}
+
+/**
+ * e1RM do podpowiedzi ciężaru: najlepszy wynik z ostatnich `weeks` tygodni (licząc od ostatniego
+ * treningu tego ćwiczenia), serie bez RPE z zapasem 2 powtórzeń — lekki dzień techniczny nie zaniża podpowiedzi.
+ */
+export function recentE1(sessions: TrainingSession[], name: string, weeks = 6): number | null {
+  const withEx = sessions.filter((s) => s.exercises.some((e) => e.name === name));
+  if (!withEx.length) return null;
+  const last = withEx.reduce((a, s) => (s.date > a ? s.date : a), withEx[0].date);
+  const from = new Date(new Date(`${last}T12:00:00`).getTime() - weeks * 7 * 864e5).toISOString().slice(0, 10);
+  let best: number | null = null;
+  for (const s of withEx) {
+    if (s.date < from) continue;
+    for (const e of s.exercises) {
+      if (e.name !== name) continue;
+      const sets = workSets(e);
+      const vals = sets.length ? sets.map((x) => e1rmRPE(x.load, x.reps, x.rpe, 2)) : [String(e.reps ?? '').includes('+') ? null : e1rmRPE(e.load, e.reps, e.rpe, 2)];
+      for (const v of vals) if (v != null && (best == null || v > best)) best = v;
+    }
+  }
+  return best ?? bestE1(sessions, name);
 }

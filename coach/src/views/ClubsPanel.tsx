@@ -101,9 +101,9 @@ export function ClubsPanel() {
                             )}
                           </td>
                           <td className="actions">
-                            {m.due > 0 && !m.current && (
+                            {m.due > 0 && (
                               <button
-                                className="btn btn-secondary btn-sm"
+                                className={`btn btn-sm ${m.current ? 'btn-ghost' : 'btn-secondary'}`}
                                 onClick={() =>
                                   apply(
                                     [put('locations', { ...club, payouts: [...club.payouts, { id: uid(), month: m.month, amount: m.due, sessions: m.sessions, paidDate: today }] })],

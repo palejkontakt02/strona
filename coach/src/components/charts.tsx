@@ -72,7 +72,6 @@ export function LineChart({
 }) {
   const all = series.flatMap((s) => s.pts);
   if (all.length < 2) return <p className="empty">Za mało danych do wykresu.</p>;
-  const L = 40;
   const R = 12;
   const T = 12;
   const B = 24;
@@ -89,9 +88,11 @@ export function LineChart({
   const pad = (y1 - y0) * 0.08;
   y0 = minY ?? y0 - pad;
   y1 += pad;
+  const ticks = [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1];
+  // lewy margines pod najdłuższą etykietę osi Y (na telefonie tekst jest większy — patrz styles.css)
+  const L = Math.max(44, 14 + Math.max(...ticks.map((t) => format(t).length)) * 12);
   const X = (x: string) => L + (t1 === t0 ? (W - L - R) / 2 : ((new Date(x).getTime() - t0) / (t1 - t0)) * (W - L - R));
   const Y = (y: number) => T + (1 - (y - y0) / (y1 - y0)) * (height - T - B);
-  const ticks = [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1];
   const sortedX = [...new Set(all.map((p) => p.x))].sort();
   return (
     <figure className="chart-fig">

@@ -9,13 +9,16 @@ export function StartButtons({ onStart, onTrainer, label = 'Start' }: { onStart:
       </button>
     );
   return (
-    <div className="start-pair">
-      <button className="btn btn-primary btn-lg" onClick={onTrainer}>
-        <Icon name="play" /> Prowadź jako trener
-      </button>
-      <button className="btn btn-secondary btn-lg" onClick={onStart}>
-        Jako zawodnik
-      </button>
-    </div>
+    <>
+      {label !== 'Start' && <p className="muted small start-label">{label}</p>}
+      <div className="start-pair">
+        <button className="btn btn-primary btn-lg" onClick={onTrainer}>
+          <Icon name="play" /> Prowadź jako trener
+        </button>
+        <button className="btn btn-secondary btn-lg" onClick={onStart}>
+          Jako zawodnik
+        </button>
+      </div>
+    </>
   );
 }

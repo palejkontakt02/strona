@@ -16,7 +16,7 @@ import { BILLING_LABEL } from '../../components/location';
 
 export function ClientOverview({ client }: { client: Client }) {
   const { db } = useStore();
-  const { setClientTab } = useNav();
+  const { setClientTab, openModal } = useNav();
   const today = todayISO();
   const sessions = sessionsOf(db, client.id);
   const st = loadStats(sessions, today);
@@ -38,6 +38,7 @@ export function ClientOverview({ client }: { client: Client }) {
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
           label="ACWR"
+          hint="Obciążenie z ostatnich 7 dni względem średniej z 4 tygodni (obciążenie = RPE treningu × minuty). 0,8–1,3 — bezpiecznie, powyżej 1,5 — za szybki wzrost."
           value={st.acwr != null ? fx(st.acwr, 2) : '—'}
           sub={zone.label}
           tone={zone.level === 'red' ? 'danger' : zone.level === 'yellow' ? 'warn' : zone.level === 'green' ? 'ok' : undefined}
@@ -48,7 +49,18 @@ export function ClientOverview({ client }: { client: Client }) {
           sub={unpaid ? `do zapłaty ${pln(unpaid)}` : 'wszystko opłacone'}
           tone={pk && pk.left <= 2 && client.billing === 'pakiet' ? 'warn' : unpaid ? 'warn' : undefined}
         />
-        <Kpi label="Następna wizyta" value={next ? fmtDate(next.date) : '—'} sub={next ? `${next.time} · ${APPT_STATUS[next.status].label}` : 'brak w kalendarzu'} />
+        <Kpi
+          label="Następna wizyta"
+          value={next ? fmtDate(next.date) : '—'}
+          sub={
+            <>
+              {next ? `${next.time} · ${APPT_STATUS[next.status].label}` : 'brak w kalendarzu'}{' '}
+              <button className="link small" onClick={() => openModal({ kind: 'appt', clientId: client.id })}>
+                + zaplanuj
+              </button>
+            </>
+          }
+        />
       </div>
 
       <div className="two-col">

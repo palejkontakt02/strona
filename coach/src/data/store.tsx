@@ -16,7 +16,8 @@ interface AskState {
 interface StoreValue {
   db: Db;
   apply: (changes: Change[], message?: string) => Promise<void>;
-  toast: (message: string) => void;
+  /** Powiadomienie; z `action` — przycisk w powiadomieniu (np. „Cofnij”), dłużej widoczne. */
+  toast: (message: string, action?: { label: string; run: () => void }) => void;
   /** Własny dialog potwierdzenia (window.confirm bywa blokowany). */
   ask: (message: string, opts?: { confirm?: string; danger?: boolean }) => Promise<boolean>;
   reset: (mode: 'seed' | 'empty') => Promise<void>;
@@ -47,7 +48,7 @@ export function StoreProvider({
 }) {
   const [db, setDb] = useState<Db | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const [toasts, setToasts] = useState<{ id: number; text: string; action?: { label: string; run: () => void } }[]>([]);
   const [askState, setAsk] = useState<AskState | null>(null);
   const toastId = useRef(0);
 
@@ -88,10 +89,10 @@ export function StoreProvider({
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [cloud, load]);
 
-  const toast = useCallback((text: string) => {
+  const toast = useCallback((text: string, action?: { label: string; run: () => void }) => {
     const id = ++toastId.current;
-    setToasts((t) => [...t, { id, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+    setToasts((t) => [...t, { id, text, action }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 9000 : 3200);
   }, []);
 
   const apply = useCallback(
@@ -226,8 +227,19 @@ export function StoreProvider({
       {children}
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className="toast">
-            {t.text}
+          <div key={t.id} className={`toast ${t.action ? 'toast-action' : ''}`}>
+            <span>{t.text}</span>
+            {t.action && (
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => {
+                  t.action!.run();
+                  setToasts((x) => x.filter((y) => y.id !== t.id));
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>

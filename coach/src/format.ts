@@ -66,3 +66,18 @@ export function uid(): string {
 export function slugify(s: string): string {
   return normalize(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
+
+/** Przerwa czytelnie: „90” → „1:30 min”, „45” → „45 s”, „2:00” → „2:00 min”; inne zapisy bez zmian. */
+export function fmtRest(r?: string): string {
+  const t = String(r ?? '').trim();
+  if (/^\d+$/.test(t)) {
+    const n = parseInt(t, 10);
+    if (n <= 5) return `${n} min`;
+    return n < 60 ? `${n} s` : `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')} min`;
+  }
+  if (/^\d+:\d{2}$/.test(t)) return `${t} min`;
+  return t;
+}
+
+/** „1 ćwiczenie”, „3 ćwiczenia”, „5 ćwiczeń”. */
+export const nEx = (n: number) => `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}`;

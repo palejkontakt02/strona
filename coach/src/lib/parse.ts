@@ -48,3 +48,10 @@ export function numIn(v: unknown, min: number, max: number): number | null {
   const n = num(v);
   return n != null && n >= min && n <= max ? n : null;
 }
+
+/** Powtórzenia serii jako liczba; kompleks „2+1” → 3. */
+export function sumReps(v: unknown): number | null {
+  const t = String(v ?? '').replace(/\s/g, '');
+  if (/^\d+(\+\d+)+$/.test(t)) return t.split('+').reduce((a, x) => a + parseInt(x, 10), 0);
+  return numIn(t, 0, 10000);
+}

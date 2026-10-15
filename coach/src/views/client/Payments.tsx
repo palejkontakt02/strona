@@ -107,7 +107,7 @@ export function ClientPayments({ client }: { client: Client }) {
             <div className="row">
               <span className="grow muted">Stawki</span>
               <span className="small">
-                {[client.singleRate && `sesja ${pln(client.singleRate)}`, client.subRate && `abonament ${pln(client.subRate)}`, client.pkgPrice && `pakiet ${client.pkgSize ?? ''} × ${pln(client.pkgPrice)}`].filter(Boolean).join(' · ') || '—'}
+                {[client.singleRate && `sesja ${pln(client.singleRate)}`, client.subRate && `abonament ${pln(client.subRate)}`, client.pkgPrice && `pakiet ${client.pkgSize ?? ''} ${plural(client.pkgSize ?? 0, 'sesja', 'sesje', 'sesji')} za ${pln(client.pkgPrice)}`].filter(Boolean).join(' · ') || '—'}
               </span>
             </div>
           </div>

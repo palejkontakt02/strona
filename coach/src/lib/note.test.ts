@@ -58,7 +58,26 @@ describe('parseWorkoutNote', () => {
     ]);
     expect(r.exercises[0]).toMatchObject({ sets: '4', reps: '2+1', load: '60' });
     expect(r.exercises[0].notes).toContain('Kompleks 2+1');
-    expect(r.exercises[0].setsLog![2]).toEqual({ load: 70, reps: 3, rpe: 8 });
+    expect(r.exercises[0].setsLog![2]).toEqual({ load: 70, reps: 3, rpe: 8, complex: '2+1' });
     expect(r.exercises[2].setsLog!.map((s) => `${s.reps}x${s.load}`)).toEqual(['4x100', '4x105', '4x110', '8x90']);
+  });
+});
+
+describe('parseWorkoutNote — formaty zaawansowane', () => {
+  it('„3x5 @8” to 3 serie po 5 powtórzeń, nie 5 kg', () => {
+    expect(parseSetLine('3x5 @8')).toMatchObject({ count: 3, reps: 5, load: undefined, rpe: 8 });
+  });
+  it('nazwa i serie w jednej linii oraz czas', () => {
+    const r = parseWorkoutNote('Podciąganie 4x6\nPrzysiad 5x3x100\nDeska\n3x45s');
+    expect(r.skipped).toEqual([]);
+    expect(r.exercises.map((e) => [e.name, e.setsLog!.length, e.reps])).toEqual([
+      ['Podciąganie', 4, '6'],
+      ['Przysiad', 5, '3'],
+      ['Deska', 3, '45 s'],
+    ]);
+  });
+  it('kompleks oznaczony w seriach (nie liczy się do e1RM)', () => {
+    const r = parseWorkoutNote('Clean & Jerk\n2+1x60kg');
+    expect(r.exercises[0].setsLog![0]).toMatchObject({ reps: 3, load: 60, complex: '2+1' });
   });
 });

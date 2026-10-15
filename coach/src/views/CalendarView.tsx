@@ -134,7 +134,7 @@ function ApptTile({ a }: { a: Appointment }) {
   const clash = a.status === 'planned' && clashes(a, db.appointments).length > 0;
   return (
     <button
-      className={`tile tile-${a.status} ${clash ? 'tile-clash' : ''}`}
+      className={`tile tile-${a.status} ${clash ? 'tile-clash' : ''} ${a.status === 'planned' && a.date < todayISO() ? 'tile-overdue' : ''}`}
       style={hueStyle(a.clientId)}
       title={clash ? 'Kolizja z inną wizytą o tej porze' : undefined}
       onClick={() => openModal({ kind: 'appt', appt: a })}

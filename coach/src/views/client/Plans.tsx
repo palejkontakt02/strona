@@ -3,7 +3,7 @@ import type { Client, Plan } from '../../domain';
 import { clonePlan, extraPlanOf, plansOf, savePlan, sessionsOf } from '../../data/ops';
 import { del } from '../../data/db';
 import { useStore } from '../../data/store';
-import { fmtDate, uid } from '../../format';
+import { fmtDate, plural, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
 import { exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
@@ -80,7 +80,7 @@ export function ClientPlans({ client }: { client: Client }) {
             >
               <p className="muted small">
                 {p.startDate && `Start ${fmtDate(p.startDate)} · `}
-                {p.weeks.length} tyg. · {p.weeks.reduce((a, w) => a + w.workouts.length, 0)} jednostek
+                {p.weeks.length} tyg. · {(() => { const n = p.weeks.reduce((a, w) => a + w.workouts.length, 0); return `${n} ${plural(n, 'jednostka', 'jednostki', 'jednostek')}`; })()}
                 {nx && p.active && ` · następny: ${nx.workout.name} (${nx.week.name})`}
               </p>
               {p.notes && <p className="small pre">{p.notes}</p>}

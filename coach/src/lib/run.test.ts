@@ -222,8 +222,32 @@ describe('repeatRun', () => {
   it('copies exercises and loads, with nothing done and no edit link', () => {
     const s: TrainingSession = { id: 's1', clientId: 'c', date: '2026-10-13', charge: 'brak', workoutName: 'Dół', planId: 'p', workoutId: 'w', exercises: [{ name: 'Przysiad', label: 'A1', setsLog: [{ load: 100, reps: 5 }, { load: 100, reps: 5 }] }, { name: 'Plank', label: 'A2', sets: '2', reps: '45 s' }] };
     const r = repeatRun(s, '2026-10-14', 1000);
-    expect(r).toMatchObject({ date: '2026-10-14', startedAt: 1000, editSessionId: undefined, planId: 'p', workoutId: 'w', name: 'Dół' });
+    expect(r).toMatchObject({ date: '2026-10-14', startedAt: 1000, editSessionId: undefined, planId: '', workoutId: '', name: 'Dół' }); // powtórka nie przesuwa planu
     expect(r.ex.map((e) => [e.label, e.sets.length, e.sets.every((x) => !x.done)])).toEqual([['A1', 2, true], ['A2', 2, true]]);
     expect(r.ex[0].sets[0].load).toBe('100');
+  });
+});
+
+describe('poprawki z testów person', () => {
+  it('bez RPE następna seria bierze ten sam ciężar, bez komunikatu o RPE', () => {
+    const e = buildRunExercise(ex([g({ rpe: '' }), g({ rpe: '' }), g({ rpe: '' })]), []);
+    e.sets[0].load = '40';
+    e.sets[0].reps = '10';
+    const r = completeSet(e, 0);
+    expect(r.sets[1]).toMatchObject({ load: '40', sug: '' });
+  });
+  it('pusta seria przejmuje powtórzenia i ciężar z poprzedniej', () => {
+    const e = buildRunExercise(ex([g({ rpe: '', reps: '' }), g({ rpe: '', reps: '' })]), []);
+    e.sets[0] = { ...e.sets[0], load: '50', reps: '8', done: true };
+    const r = completeSet(e, 1);
+    expect(r.sets[1]).toMatchObject({ load: '50', reps: '8', done: true });
+  });
+  it('kompleks 2+1 zostaje opisany i liczy 3 powtórzenia', () => {
+    const e = buildRunExercise(ex([g({ reps: '2+1', load: '60', rpe: '' })]), []);
+    expect(e.sets[0].reps).toBe('2+1');
+    e.sets[0].done = true;
+    const out = runToExercises({ ...emptyRun('T', '2026-10-15'), ex: [e] })[0];
+    expect(out.setsLog![0]).toMatchObject({ reps: 3, load: 60, complex: '2+1' });
+    expect(out.notes).toContain('Kompleks 2+1');
   });
 });

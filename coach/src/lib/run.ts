@@ -1,7 +1,7 @@
 import type { PlanExercise, PlanWorkout, SetType, TrainingSession } from '../domain';
-import { num, numIn, parseRest, parseTempo, repsN } from './parse';
+import { num, numIn, parseRest, parseTempo, repsN, sumReps } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
-import { e1rmRPE, e1Series, loadFor, resolveLoad } from './strength';
+import { e1rmRPE, loadFor, recentE1, resolveLoad } from './strength';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
 export interface RunSet {
@@ -28,6 +28,8 @@ export interface RunSet {
 
 export interface RunExercise {
   name: string;
+  /** Id ćwiczenia w planie (zapis układu do planu po zmianie nazwy). */
+  planExId?: string;
   /** Oznaczenie z planu: „A” albo „B2” w bloku. */
   label?: string;
   /** Połączone z poprzednim w blok (superseria / obwód). */
@@ -60,8 +62,7 @@ const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;
 
 /** Ostatnie e1RM ćwiczenia z historii (jak w prototypie: ostatni punkt przebiegu). */
 function lastE1(history: TrainingSession[], name: string): number | null {
-  const s = e1Series(history, name);
-  return s.length ? s[s.length - 1].y : null;
+  return recentE1(history, name);
 }
 
 /**
@@ -82,7 +83,8 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
       if (rl.load != null) prev = rl.load;
       sets.push({
         load: rl.load != null ? String(rl.load) : '',
-        reps: String(repsN(g.reps) || ''),
+        // kompleks „2+1” zostaje tekstem (zapis liczy sumę powtórzeń)
+        reps: /^\s*\d+(\s*\+\s*\d+)+\s*$/.test(g.reps) ? g.reps.replace(/\s/g, '') : String(repsN(g.reps) || ''),
         rpe: '',
         done: false,
         warmup: g.type === 'Rozgrzewka',
@@ -101,6 +103,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
   const notes = String(e.notes || '');
   return {
     name: e.name,
+    planExId: e.id,
     linked: e.linked || undefined,
     rest: e.rest || '',
     tempo: parseTempo(notes),
@@ -141,7 +144,7 @@ export function adHocExercise(name: string, sets: number, reps: string, load: st
     tempo: null,
     tempoStr: '',
     notes: '',
-    sets: Array.from({ length: Math.max(1, sets) }, () => ({
+    sets: Array.from({ length: Math.min(20, Math.max(1, sets)) }, () => ({
       load,
       reps,
       rpe: '',
@@ -226,11 +229,22 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
   }
   const myR = s.tRpe;
   s.done = true;
+  // pusta seria przejmuje powtórzenia i ciężar z poprzedniej zaliczonej serii roboczej
+  const before = [...sets.slice(0, i)].reverse().find((x) => x.done && !x.warmup);
+  if (!s.warmup && before) {
+    if (!s.reps.trim()) s.reps = before.reps;
+    if (!s.load.trim()) s.load = before.load;
+  }
   if (!s.rpe && myR && !s.warmup) s.rpe = myR;
   if (s.warmup) return { sets, rest: null };
 
-  const e1 = e1rmRPE(s.load, s.reps, s.rpe || myR || 8);
   const j = sets.findIndex((x, k) => k > i && !x.done && !x.warmup);
+  // bez RPE (ani wpisanego, ani celu z planu) nie zgadujemy — następna seria bierze ten sam ciężar
+  if (!s.rpe && !myR) {
+    if (j > -1 && !sets[j].edited && !sets[j].load && !sets[j].spec) sets[j].load = s.load;
+    return { sets, rest: parseRest(s.rest || ex.rest) || 120 };
+  }
+  const e1 = e1rmRPE(s.load, sumReps(s.reps), s.rpe || myR);
   if (j > -1 && !sets[j].edited) {
     const nxt = sets[j];
     const spec = nxt.spec;
@@ -262,7 +276,10 @@ export function runToExercises(run: Run) {
   return run.ex.map((e) => {
     const log = e.sets
       .filter((s) => s.done)
-      .map((s) => ({ load: num(s.load) ?? undefined, reps: numIn(s.reps, 0, 10000) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label }));
+      .map((s) => {
+        const cx = /^\d+(\+\d+)+$/.test(s.reps.replace(/\s/g, '')) ? s.reps.replace(/\s/g, '') : undefined;
+        return { load: num(s.load) ?? undefined, reps: sumReps(s.reps) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx };
+      });
     const work = log.filter((s) => !s.warmup);
     const top = work[0];
     // Tekst powtórzeń z jednostką (np. „45 s”) zostaje w podsumowaniu.
@@ -275,7 +292,9 @@ export function runToExercises(run: Run) {
       load: top?.load != null ? String(top.load) : '',
       rpe: top?.rpe != null ? String(top.rpe) : '',
       rest: e.rest || undefined,
-      notes: e.notes.trim() || undefined,
+      notes: [e.tempoStr && !e.notes.includes(e.tempoStr) ? `Tempo ${e.tempoStr}` : '', e.notes.trim(), log.some((x) => x.complex) && !/kompleks/i.test(e.notes) ? `Kompleks ${log.find((x) => x.complex)!.complex}` : '']
+        .filter(Boolean)
+        .join(' · ') || undefined,
       setsLog: log,
     };
   }).filter((e) => e.setsLog.length > 0);
@@ -318,12 +337,14 @@ export function renameExercise(run: Run, k: number, patch: Partial<Pick<RunExerc
 export function applyRunLayout(workout: PlanWorkout, run: Run, newId: () => string): PlanWorkout {
   const pool = [...workout.exercises];
   const exercises = run.ex.map((e) => {
-    const i = pool.findIndex((p) => p.name === e.name);
+    const byId = e.planExId ? pool.findIndex((p) => p.id === e.planExId) : -1;
+    const i = byId >= 0 ? byId : pool.findIndex((p) => p.name === e.name);
     const base = i >= 0 ? pool.splice(i, 1)[0] : null;
     const groups = base
       ? base.groups
-      : e.sets.map((s) => ({ type: (s.warmup ? 'Rozgrzewka' : 'Robocze') as SetType, sets: '1', reps: s.reps, load: s.spec || s.load, rpe: s.tRpe || s.rpe }));
-    return { ...(base ?? { id: newId(), notes: '' }), name: e.name, rest: e.rest, linked: e.linked || undefined, groups };
+      : e.sets.map((s) => ({ type: (s.label ?? (s.warmup ? 'Rozgrzewka' : 'Robocze')) as SetType, sets: '1', reps: s.reps, load: s.spec || s.load, rpe: s.tRpe || s.rpe }));
+    const notes = base ? base.notes : [e.tempoStr && `Tempo ${e.tempoStr}`, e.notes].filter(Boolean).join(' · ');
+    return { ...(base ?? { id: newId() }), notes, name: e.name, rest: e.rest, linked: e.linked || undefined, groups };
   });
   return { ...workout, exercises };
 }
@@ -375,6 +396,9 @@ export function repeatRun(s: TrainingSession, date: string, now = Date.now()): R
   const r = sessionToRun(s, now);
   return {
     ...r,
+    // powtórka nie przesuwa postępu planu („następny trening” zostaje bez zmian)
+    planId: '',
+    workoutId: '',
     date,
     startedAt: now,
     editSessionId: undefined,
