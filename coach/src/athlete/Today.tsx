@@ -58,7 +58,7 @@ export function NoteToTrainer({ client }: { client: Client }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   return (
-    <section className="acard">
+    <section className="acard" id="do-trenera">
       <h3>Napisz do trenera</h3>
       <p className="muted small">Jak się czujesz, co bolało, pytanie o ćwiczenie — trener dostanie to na e-mail.</p>
       <textarea className="input" rows={3} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Twoja wiadomość…" aria-label="Wiadomość do trenera" />

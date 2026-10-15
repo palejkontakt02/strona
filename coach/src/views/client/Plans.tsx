@@ -94,7 +94,7 @@ export function ClientPlans({ client }: { client: Client }) {
                           <div className="plan-workout-head">
                             <strong>{k.name}</strong>
                             {done.has(k.id) ? <Tag tone="ok">✓ zrobione</Tag> : nx?.workout.id === k.id ? <Tag tone="accent">następny</Tag> : null}
-                            {k.exercises.some((e) => e.name) && (
+                            {k.exercises.some((e) => e.name) && nx?.workout.id === k.id && (
                               <span className="plan-workout-actions">
                                 <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: k.id })}>
                                   ▶ Prowadź

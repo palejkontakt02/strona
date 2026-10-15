@@ -11,19 +11,20 @@ import { sessionLoad, tonnage } from '../lib/load';
 import { num, repsN } from '../lib/parse';
 
 /** Najbliższe zaplanowane wizyty klienta. */
-export function Upcoming({ clientId }: { clientId: string }) {
+export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: number }) {
   const { db } = useStore();
   const today = todayISO();
   const next = db.appointments
     .filter((a) => a.clientId === clientId && a.status === 'planned' && a.date >= today)
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    .slice(0, 4);
+    ;
+  const [all, setAll] = useState(false);
   if (next.length === 0) return null;
   return (
     <section className="acard">
       <h3>Najbliższe treningi</h3>
       <ul className="rows">
-        {next.map((a) => (
+        {(all ? next.slice(0, 8) : next.slice(0, limit)).map((a) => (
           <li key={a.id} className="row">
             <span className="row-time">{a.time}</span>
             <div className="grow">
@@ -35,6 +36,11 @@ export function Upcoming({ clientId }: { clientId: string }) {
           </li>
         ))}
       </ul>
+      {next.length > limit && (
+        <button className="btn btn-ghost btn-sm" onClick={() => setAll(!all)}>
+          {all ? 'Mniej' : `Więcej (${Math.min(8, next.length) - limit})`}
+        </button>
+      )}
     </section>
   );
 }

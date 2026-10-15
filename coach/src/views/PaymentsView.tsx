@@ -9,15 +9,25 @@ import { useNav } from '../nav';
 import { ClubsPanel } from './ClubsPanel';
 
 const FILTERS = ['Wszystkie', 'Do zapłaty', 'Zaległe', 'Opłacone'] as const;
-const TYPES = ['Wszystkie typy', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
+const TYPES = ['Każdy typ', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
 const TYPE_KEY = { Pakiety: 'pakiet', Abonamenty: 'abonament', Sesje: 'pojedyncza' } as const;
 
 export function PaymentsView() {
   const { db, apply } = useStore();
   const { openClient, openModal } = useNav();
   const today = todayISO();
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Wszystkie');
-  const [type, setType] = useState<(typeof TYPES)[number]>('Wszystkie typy');
+  // domyślnie to, co trzeba ściągnąć; kafel „Zaległości” z Pulpitu otwiera od razu zaległe
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>(() => {
+    try {
+      const f = sessionStorage.getItem('payments-filter');
+      sessionStorage.removeItem('payments-filter');
+      if (f && (FILTERS as readonly string[]).includes(f)) return f as (typeof FILTERS)[number];
+    } catch {
+      /* bez sessionStorage */
+    }
+    return 'Do zapłaty';
+  });
+  const [type, setType] = useState<(typeof TYPES)[number]>('Każdy typ');
   const [q, setQ] = useState('');
   const [tab, setTab] = useState<'Od klientów' | 'Od klubów'>('Od klientów');
   const all = allPayments(db);
@@ -29,7 +39,7 @@ export function PaymentsView() {
     .filter((p) =>
       filter === 'Wszystkie' ? true : filter === 'Opłacone' ? p.status === 'paid' : filter === 'Zaległe' ? isOverdue(p, today) : p.status !== 'paid',
     )
-    .filter((p) => (type === 'Wszystkie typy' ? true : p.type === TYPE_KEY[type]))
+    .filter((p) => (type === 'Każdy typ' ? true : p.type === TYPE_KEY[type]))
     .filter((p) => normalize(p.client.name).includes(normalize(q.trim())));
 
   return (

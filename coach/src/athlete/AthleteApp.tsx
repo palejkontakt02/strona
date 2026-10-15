@@ -234,6 +234,9 @@ function Home({
             🔥 {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
           </span>
         )}
+        <a href="#do-trenera" className="btn btn-ghost btn-sm msg-link">
+          ✉ Napisz do trenera
+        </a>
       </header>
 
       {run ? (
@@ -284,10 +287,9 @@ function Home({
         </button>
       )}
 
-      <Upcoming clientId={clientId} />
-
       <TodayHabits client={client} />
       <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
+      <Upcoming clientId={clientId} limit={2} />
 
       <div className="ath-grid">
         <section className="acard">

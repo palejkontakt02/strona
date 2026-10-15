@@ -307,21 +307,6 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         </Field>
       </div>
 
-      <h4 className="form-section">Samopoczucie przed treningiem</h4>
-      <div className="wellness-grid">
-        {WELLNESS_ITEMS.map(([k, label]) => (
-          <div key={k} className="field">
-            <span>{label} (1–5)</span>
-            <Scale label={label} value={w[k]} onChange={(v) => setW({ ...w, [k]: v })} min={1} max={5} />
-          </div>
-        ))}
-        <Field label="Sen (h)">
-          <input className="input" inputMode="decimal" value={sleepH} onChange={(e) => setSleepH(e.target.value)} />
-        </Field>
-        <Field label="Tętno spocz.">
-          <input className="input" inputMode="numeric" value={rhr} onChange={(e) => setRhr(e.target.value)} />
-        </Field>
-      </div>
 
       <div className="between form-section">
         <h4>Ćwiczenia</h4>
@@ -426,6 +411,24 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           + Ćwiczenie
         </button>
       </div>
+
+      <details className="form-section wellness-details" open={Object.values(w).some(Boolean) || !!sleepH || !!rhr}>
+        <summary>Samopoczucie przed treningiem (opcjonalnie)</summary>
+      <div className="wellness-grid">
+        {WELLNESS_ITEMS.map(([k, label]) => (
+          <div key={k} className="field">
+            <span>{label} (1–5)</span>
+            <Scale label={label} value={w[k]} onChange={(v) => setW({ ...w, [k]: v })} min={1} max={5} />
+          </div>
+        ))}
+        <Field label="Sen (h)">
+          <input className="input" inputMode="decimal" value={sleepH} onChange={(e) => setSleepH(e.target.value)} />
+        </Field>
+        <Field label="Tętno spocz.">
+          <input className="input" inputMode="numeric" value={rhr} onChange={(e) => setRhr(e.target.value)} />
+        </Field>
+      </div>
+      </details>
 
       <h4 className="form-section">Po treningu</h4>
       <div className="form-grid form-grid-3">

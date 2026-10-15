@@ -30,7 +30,7 @@ export function BarChart({ pts, height = 180, label, format = (v: number) => Str
                 {format(p.y)}
               </text>
             )}
-            {(pts.length <= 12 || i % 2 === pts.length % 2) && (
+            {(pts.length <= 7 || i % 2 === (pts.length - 1) % 2) && (
               <text x={x + bw * 0.32} y={height - 6} className="chart-axis" textAnchor="middle">
                 {fmtShort(p.x)}
               </text>

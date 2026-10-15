@@ -62,7 +62,14 @@ export function ClientsView() {
                   <div className="client-card-body">
                     <div className="client-card-top">
                       <strong>{c.name}</strong>
-                      {alerts.length > 0 ? <Dot tone={red ? 'danger' : 'warn'} /> : <StatusTag status={c.status} />}
+                      <span className="row-inline">
+                        {(c.inbox ?? []).some((n) => !n.read) && (
+                          <Tag tone="warn">
+                            <span aria-label="nowe wiadomości">✉ {(c.inbox ?? []).filter((n) => !n.read).length}</span>
+                          </Tag>
+                        )}
+                        {alerts.length > 0 ? <Dot tone={red ? 'danger' : 'warn'} /> : <StatusTag status={c.status} />}
+                      </span>
                     </div>
                     <div className="muted small ellipsis">{[c.sport, c.goal].filter(Boolean).join(' · ')}</div>
                     <div className="muted small row-inline">

@@ -20,9 +20,26 @@ export function Avatar({ name, size = 38 }: { name: string; size?: number }) {
   );
 }
 
-export function Kpi({ label, value, sub, tone, hint }: { label: string; value: ReactNode; sub?: ReactNode; tone?: Tone; /** Wyjaśnienie pojęcia (np. ACWR) — dymek i znak „?”. */ hint?: string }) {
+export function Kpi({
+  label,
+  value,
+  sub,
+  tone,
+  hint,
+  onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  tone?: Tone;
+  /** Wyjaśnienie pojęcia (np. ACWR) — dymek i znak „?”. */
+  hint?: string;
+  /** Kafel klikalny — przejście do szczegółów. */
+  onClick?: () => void;
+}) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div className={`card kpi ${tone ? `kpi-${tone}` : ''}`}>
+    <Tag className={`card kpi ${tone ? `kpi-${tone}` : ''} ${onClick ? 'kpi-link' : ''}`} onClick={onClick} type={onClick ? 'button' : undefined}>
       <div className="kpi-label">
         {label}
         {hint && (
@@ -34,7 +51,7 @@ export function Kpi({ label, value, sub, tone, hint }: { label: string; value: R
       {hint && <div className="kpi-hint-text">{hint}</div>}
       <div className="kpi-value">{value}</div>
       {sub != null && <div className="kpi-sub">{sub}</div>}
-    </div>
+    </Tag>
   );
 }
 

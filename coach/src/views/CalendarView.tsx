@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon, Seg, Tag } from '../components/ui';
 import type { Appointment, AppointmentStatus, ISODate, TrainingSession } from '../domain';
 import { clientById } from '../data/ops';
@@ -32,6 +32,12 @@ export function CalendarView() {
   const [mode, setMode] = useState<Mode>('Tydzień');
   const [anchor, setAnchor] = useState<ISODate>(today);
   const [locSel, setLoc] = useState('');
+  // telefon: tydzień przewija się do wybranego dnia (domyślnie dziś), a nie od poniedziałku
+  useEffect(() => {
+    if (mode !== 'Tydzień' || !matchMedia('(max-width: 720px)').matches) return;
+    const el = document.querySelector<HTMLElement>(`.week-day[data-date="${anchor}"]`) ?? document.querySelector<HTMLElement>('.week-day.is-today');
+    if (el && el.previousElementSibling) el.scrollIntoView({ block: 'start' });
+  }, [mode, anchor]);
   // Filtr usuniętego miejsca nie może dalej ukrywać wizyt.
   const loc = db.locations.some((l) => l.id === locSel) ? locSel : '';
 
@@ -90,7 +96,7 @@ export function CalendarView() {
       {mode === 'Tydzień' ? (
         <div className="week">
           {Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => (
-            <section key={date} className={`week-day ${date === today ? 'is-today' : ''}`}>
+            <section key={date} data-date={date} className={`week-day ${date === today ? 'is-today' : ''}`}>
               <header>
                 <span className="first-cap">{fmtWeekday(date)}</span> <strong>{fmtShort(date)}</strong>
                 <button className="icon-btn icon-btn-sm" aria-label={`Dodaj wizytę ${fmtShort(date)}`} onClick={() => openModal({ kind: 'appt', date })}>

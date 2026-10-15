@@ -69,14 +69,15 @@ export function WorkoutList({ client }: { client: Client }) {
                 const dn = last(g.plan, k.id);
                 const isNext = !g.plan.extra && nx?.workout.id === k.id;
                 return (
-                  <li key={k.id} className="row wl-row">
+                  <li key={k.id} className={`row wl-row ${isNext ? 'is-next' : ''}`}>
                     <div className="grow">
                       <strong>{k.name}</strong>{' '}
                       {isNext ? <Tag tone="accent">następny</Tag> : dn ? <Tag tone="ok">✓ {fmtDate(dn)}</Tag> : null}
                       <div className="muted small">{n ? `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}` : 'brak ćwiczeń — dodaj je w edycji'}</div>
                     </div>
                     <span className="wl-actions">
-                      {n > 0 && (
+                      {/* start od razu przy następnym (i dodatkowych); pozostałe — z podglądu */}
+                      {n > 0 && (isNext || g.plan.extra) && (
                         <>
                           <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: g.plan.id, workoutId: k.id })}>
                             ▶ Prowadź
@@ -86,8 +87,8 @@ export function WorkoutList({ client }: { client: Client }) {
                           </button>
                         </>
                       )}
-                      <button className="btn btn-ghost btn-sm" onClick={() => setPreview({ workout: k, plan: g.plan })}>
-                        <Icon name="eye" size={15} /> Podgląd
+                      <button className="btn btn-ghost btn-sm" onClick={() => setPreview({ workout: k, plan: g.plan })} title="Ćwiczenia, serie i start jako trener lub podopieczny">
+                        <Icon name="eye" size={15} /> {isNext || g.plan.extra ? 'Podgląd' : 'Podgląd i start'}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => openModal({ kind: 'plan', plan: g.plan, focusWorkoutId: k.id })}>
                         <Icon name="edit" size={15} /> Edytuj

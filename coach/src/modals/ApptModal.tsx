@@ -79,6 +79,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
       title={editing ? 'Wizyta' : 'Nowa wizyta'}
       onClose={closeModal}
       onSubmit={save}
+      submitLabel="Zapisz wizytę"
       extraActions={
         editing && (
           <>
@@ -110,7 +111,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
                     openModal({ kind: 'session', appt: draft, clientId, date });
                   }}
                 >
-                  Zapisz po fakcie
+                  Zapisz trening
                 </button>
                 </>
               )

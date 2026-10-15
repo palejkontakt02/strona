@@ -3824,3 +3824,98 @@ h2 {
     transition: none;
   }
 }
+.week-day {
+  scroll-margin-top: calc(var(--topbar-h) + 12px);
+}
+.row-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.row-main .link {
+  max-width: 100%;
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .row .btn-sm {
+    padding-inline: var(--space-3);
+  }
+}
+.wellness-details summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-400);
+  padding: var(--space-2) 0;
+}
+.wellness-details[open] summary {
+  margin-bottom: var(--space-3);
+}
+@media (max-width: 600px) {
+  /* rozpisane serie mają własną tabelę — szare podsumowanie zbędne na telefonie */
+  .ex-row > .input.derived {
+    display: none;
+  }
+}
+@media (min-width: 601px) {
+  .set-edit-head,
+  .set-edit-row {
+    grid-template-columns: 34px repeat(3, minmax(0, 120px)) 36px;
+  }
+}
+.set-edit-head span {
+  text-align: center;
+}
+.wl-row.is-next {
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: var(--space-1) 0;
+}
+.today-head h3 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+  margin: 2px 0;
+}
+.msg-link {
+  margin-top: var(--space-2);
+}
+#do-trenera {
+  scroll-margin-top: 16px;
+}
+/* przegląd designu: drobne poprawki układu */
+.card-head {
+  min-height: 32px;
+}
+@media (min-width: 901px) {
+  .card-head .actions {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+}
+.dash-grid {
+  align-items: start;
+}
+:root[data-palette="mono"] .line-cyan polyline {
+  stroke-dasharray: 5 4;
+}
+:root[data-palette="mono"] {
+  --color-cyan: #8f9ba6;
+}
+@media (max-width: 600px) {
+  .seg {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg button {
+    flex: 0 0 auto;
+  }
+}

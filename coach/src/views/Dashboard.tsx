@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Avatar, Card, Dot, Empty, Icon, IconBtn, Kpi, Tag } from '../components/ui';
 import { allPayments, clientById, lastSessionDate, paymentLabel, sessionsOf, setPaymentStatus } from '../data/ops';
 import { useStore } from '../data/store';
@@ -15,6 +16,7 @@ export function Dashboard() {
   const { openClient, openModal, startLive, go } = useNav();
   const clubs = db.locations.filter((l) => l.kind === 'klub');
   const today = todayISO();
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
   const active = db.clients.filter((c) => c.status === 'aktywny');
 
   const todayAppts = db.appointments.filter((a) => a.date === today && a.status !== 'cancel').sort((a, b) => a.time.localeCompare(b.time));
@@ -53,7 +55,17 @@ export function Dashboard() {
         <Kpi label="Aktywni klienci" value={active.length} sub={`${db.clients.length} łącznie`} />
         <Kpi label="Treningi – 7 dni" value={week} sub={plural(week, 'trening', 'treningi', 'treningów')} />
         <Kpi label="Wpłaty w tym miesiącu" value={pln(paidThisMonth)} />
-        <Kpi label="Zaległości" value={pln(overdue.reduce((a, p) => a + p.amount, 0))} sub={overdue.length ? `${overdue.length} ${plural(overdue.length, 'płatność', 'płatności', 'płatności')} po terminie` : 'brak'} tone={overdue.length ? 'danger' : undefined} />
+        <Kpi
+          onClick={() => {
+            try {
+              sessionStorage.setItem('payments-filter', 'Zaległe');
+            } catch {
+              /* bez sessionStorage — zwykłe przejście */
+            }
+            go('Płatności');
+          }}
+          label="Zaległości"
+          value={pln(overdue.reduce((a, p) => a + p.amount, 0))} sub={overdue.length ? `${overdue.length} ${plural(overdue.length, 'płatność', 'płatności', 'płatności')} po terminie` : 'brak'} tone={overdue.length ? 'danger' : undefined} />
       </div>
 
       <div className="dash-grid">
@@ -67,10 +79,12 @@ export function Dashboard() {
                 return (
                   <li key={a.id} className="row">
                     <span className="row-time">{a.time}</span>
-                    <button className="link grow" onClick={() => c && openClient(c.id)}>
-                      {c?.name ?? '—'}
-                    </button>
-                    <LocationTag id={a.locationId} short />
+                    <div className="grow row-main">
+                      <button className="link ellipsis" onClick={() => c && openClient(c.id)}>
+                        {c?.name ?? '—'}
+                      </button>
+                      <LocationTag id={a.locationId} short />
+                    </div>
                     <span className={a.status === 'planned' ? 'hide-mobile' : ''}>
                       <ApptStatusTag status={a.status} />
                     </span>
@@ -94,6 +108,27 @@ export function Dashboard() {
           )}
         </Card>
 
+        {(() => {
+          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
+          if (!notes.length) return null;
+          return (
+            <Card title={`Wiadomości od podopiecznych (${notes.length})`} className="span-2">
+              <ul className="rows">
+                {notes.slice(0, 6).map(({ c, n }) => (
+                  <li key={n.id} className="row row-top">
+                    <div className="grow">
+                      <button className="link" onClick={() => openClient(c.id, 'Przegląd')}>
+                        {c.name}
+                      </button>
+                      <span className="muted small"> · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      <div className="small ellipsis-2">{n.text}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          );
+        })()}
         {(() => {
           // zaplanowane wizyty z ostatnich 2 tygodni, które nie zostały rozliczone
           const from = addDays(today, -14);
@@ -125,25 +160,38 @@ export function Dashboard() {
           );
         })()}
 
-        <Card title={`Sygnały ostrzegawcze${alerts.length ? ` (${alerts.length})` : ''}`}>
-          {alerts.length === 0 ? (
-            <Empty>Wszystko w normie.</Empty>
-          ) : (
-            <ul className="rows">
-              {alerts.map((a, i) => (
-                <li key={i} className="row row-top">
-                  <Dot tone={a.level === 'red' ? 'danger' : 'warn'} />
-                  <div className="grow">
-                    <button className="link" onClick={() => openClient(a.client.id, 'Monitoring')}>
-                      {a.client.name}
-                    </button>
-                    <div className="small muted">{a.text}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        {(() => {
+          // jedna pozycja na osobę (kilka sygnałów w jednej linii), czerwone najpierw
+          const groups = [...new Map(alerts.map((a) => [a.client.id, a.client])).values()]
+            .map((client) => ({ client, items: alerts.filter((a) => a.client.id === client.id) }))
+            .sort((a, b) => Number(b.items.some((x) => x.level === 'red')) - Number(a.items.some((x) => x.level === 'red')));
+          return (
+            <Card title={`Sygnały ostrzegawcze${groups.length ? ` (${groups.length})` : ''}`}>
+              {groups.length === 0 ? (
+                <Empty>Wszystko w normie.</Empty>
+              ) : (
+                <ul className="rows">
+                  {(showAllAlerts ? groups : groups.slice(0, 5)).map(({ client, items }) => (
+                    <li key={client.id} className="row row-top">
+                      <Dot tone={items.some((a) => a.level === 'red') ? 'danger' : 'warn'} />
+                      <div className="grow">
+                        <button className="link" onClick={() => openClient(client.id, 'Monitoring')}>
+                          {client.name}
+                        </button>
+                        <div className="small muted ellipsis-2">{items.map((a) => a.text).join(' · ')}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {groups.length > 5 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowAllAlerts(!showAllAlerts)}>
+                  {showAllAlerts ? 'Pokaż mniej' : `Pokaż wszystkie (${groups.length})`}
+                </button>
+              )}
+            </Card>
+          );
+        })()}
 
         <Card title="Do zapłaty">
           {due.length === 0 ? (
@@ -169,27 +217,6 @@ export function Dashboard() {
           )}
         </Card>
 
-        {(() => {
-          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
-          if (!notes.length) return null;
-          return (
-            <Card title={`Notatki od podopiecznych (${notes.length})`}>
-              <ul className="rows">
-                {notes.slice(0, 6).map(({ c, n }) => (
-                  <li key={n.id} className="row row-top">
-                    <div className="grow">
-                      <button className="link" onClick={() => openClient(c.id, 'Przegląd')}>
-                        {c.name}
-                      </button>
-                      <span className="muted small"> · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                      <div className="small ellipsis-2">{n.text}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          );
-        })()}
         {clubs.length > 0 && (
           <Card title="Rozliczenia z klubami" action={<button className="btn btn-ghost btn-sm" onClick={() => go('Płatności')}>Szczegóły</button>}>
             <ul className="rows">
