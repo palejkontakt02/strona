@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import type { Checkin, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
-import { clientById, deleteSession, extraPlanOf, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { clientById, deleteSession, extraPlanOf, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { put } from '../data/db';
+import { del, put } from '../data/db';
 import { fmtDay, fmtMonth, fnum, fx, plural, nEx } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
@@ -103,15 +103,23 @@ export function AthleteApp({
     startFrom({ planId: plan.id, workoutId: id });
   };
   const undo = async (s: TrainingSession) => {
-    if (!(await ask(`Oznaczyć trening z ${fmtDay(s.date)} jako niewykonany? Zapis ćwiczeń, serii i ciężarów zostanie usunięty, a trening z planu wróci na listę do zrobienia.`, { confirm: 'Usuń zapis' }))) return;
+    if (!(await ask(`Oznaczyć trening z ${fmtDay(s.date)} jako niewykonany? Zapis ćwiczeń, serii i ciężarów zostanie usunięty, a trening wróci na listę do zrobienia.`, { confirm: 'Usuń zapis' }))) return;
     const sp = sessionPayment(db, s);
     const removePayment = !!sp && mode === 'preview' && (await ask(`Usunąć też płatność „${paymentLabel(sp.payment)}” za ten trening?`, { confirm: 'Usuń płatność' }));
     const appts = db.appointments.filter((a) => a.sessionId === s.id);
-    await apply(deleteSession(db, s.id, removePayment));
+    const prevExtra = extraPlanOf(db, s.clientId);
+    // konto podopiecznego zapisuje tylko treningi — listę dodatkowych uzupełnia trener
+    const changes = mode === 'preview' ? undoSession(db, s.id, removePayment) : deleteSession(db, s.id, removePayment);
+    if (!(await apply(changes))) return;
+    const extraChange = changes.find((c) => c.op === 'put' && c.col === 'plans');
     // „Cofnij” przywraca zapis (i powiązaną wizytę) — na wypadek pomyłki
     toast('Trening oznaczony jako niewykonany.', {
       label: 'Cofnij',
-      run: () => void apply([put('sessions', s), ...appts.map((a) => put('appointments', a))], 'Przywrócono trening.'),
+      run: () =>
+        void apply(
+          [put('sessions', s), ...appts.map((a) => put('appointments', a)), ...(extraChange ? [prevExtra ? put('plans', prevExtra) : del('plans', (extraChange as { item: { id: string } }).item.id)] : [])],
+          'Przywrócono trening.',
+        ),
     });
   };
   // Podopieczny cofa tylko swoje treningi (bez rozliczenia); trener w podglądzie — każdy.

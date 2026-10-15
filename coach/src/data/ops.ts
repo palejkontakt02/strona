@@ -1,4 +1,4 @@
-import type { Appointment, Client, Payment, Plan, TrainingSession } from '../domain';
+import type { Appointment, Client, Payment, Plan, PlanWorkout, TrainingSession } from '../domain';
 import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
@@ -135,6 +135,47 @@ export function deleteSession(db: Db, id: string, removePayment = false): Change
     const { sessionId: _drop, ...rest } = a;
     changes.push(put('appointments', { ...rest, status: 'planned' }));
   }
+  return changes;
+}
+
+/** Zapis treningu jako jednostka do zrobienia (te same ćwiczenia i serie). */
+export function sessionToWorkout(s: TrainingSession): PlanWorkout {
+  return {
+    id: uid(),
+    name: s.workoutName?.trim() || `Trening z ${fmtDay(s.date)}`,
+    exercises: s.exercises
+      .filter((e) => e.name.trim())
+      .map((e) => ({
+        id: uid(),
+        name: e.name,
+        rest: e.rest,
+        notes: e.notes,
+        groups: e.setsLog?.length
+          ? e.setsLog.map((x) => ({
+              type: x.warmup ? ('Rozgrzewka' as const) : ('Robocze' as const),
+              sets: '1',
+              reps: x.complex ?? (x.reps != null ? String(x.reps) : ''),
+              load: x.load != null ? String(x.load) : '',
+              rpe: x.rpe != null ? String(x.rpe) : '',
+            }))
+          : [{ type: 'Robocze' as const, sets: e.sets || '1', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '' }],
+      })),
+  };
+}
+
+/**
+ * „Oznacz jako niewykonany”: usuwa zapis. Trening spoza planu wraca jako jednostka
+ * do „Dodatkowych treningów”, żeby nie zniknął z listy (trening z planu wraca sam).
+ */
+export function undoSession(db: Db, id: string, removePayment = false): Change[] {
+  const changes = deleteSession(db, id, removePayment);
+  const s = db.sessions.find((x) => x.id === id);
+  if (!s || (s.planId && db.plans.some((p) => p.id === s.planId)) || !s.exercises.some((e) => e.name.trim())) return changes;
+  const extra = extraPlanOf(db, s.clientId) ?? newExtraPlan(s.clientId);
+  const wo = sessionToWorkout(s);
+  if (extra.weeks.some((w) => w.workouts.some((k) => k.name === wo.name))) return changes; // już jest na liście
+  const weeks = extra.weeks.length ? extra.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
+  changes.push(put('plans', { ...extra, weeks: weeks.map((w, i) => (i === 0 ? { ...w, workouts: [...w.workouts, wo] } : w)) }));
   return changes;
 }
 
