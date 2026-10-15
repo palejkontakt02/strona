@@ -116,6 +116,8 @@ export interface Client {
   habitLog?: HabitDay[];
   /** Notatki od podopiecznego do trenera (wysyłane też e-mailem). */
   inbox?: ClientNote[];
+  /** Odpowiedzi trenera (wątek z wiadomościami podopiecznego). */
+  replies?: CoachReply[];
 }
 
 /** Kiedy zadanie obowiązuje: codziennie, w wybrane dni tygodnia (1 = pn … 7 = nd) albo dni miesiąca (1–31). */
@@ -145,6 +147,15 @@ export interface ClientNote {
   text: string;
   /** Trener przeczytał. */
   read?: boolean;
+  /** Dotyczy treningu (np. notatka z podsumowania). */
+  sessionId?: string;
+}
+
+/** Odpowiedź trenera na wiadomości podopiecznego (widoczna u podopiecznego). */
+export interface CoachReply {
+  id: string;
+  at: string;
+  text: string;
 }
 
 /* ---------- Plany ---------- */
@@ -257,6 +268,14 @@ export interface TrainingSession {
   /** Id jednostki (PlanWorkout) z planu. */
   workoutId?: string;
   exercises: SessionExercise[];
+  /** Kiedy zapisano (kolejność kilku treningów jednego dnia). */
+  createdAt?: string;
+  /** Zrobiony samodzielnie (tryb zawodnika), nie z trenerem. */
+  solo?: boolean;
+  /** Trener obejrzał trening/nagrania (ISO). */
+  reviewedAt?: string;
+  /** Komentarz trenera widoczny dla podopiecznego. */
+  coachNote?: string;
 }
 
 /* ---------- Kalendarz ---------- */

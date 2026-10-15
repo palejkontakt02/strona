@@ -26,7 +26,7 @@ export function TodayHabits({ client }: { client: Client }) {
           <span className="eyebrow">Na dziś</span>
           <h3>{!due.length ? 'Dziś wolne od zadań' : n === due.length ? 'Koło zamknięte! 🎉' : `Zostało ${due.length - n}`}</h3>
           <p className="muted small">
-            Zamknięte dni (ostatnie 7): {week.closed} z {week.active}
+            W ostatnich 7 dniach wszystko odhaczone w {week.closed} z {week.active} {plural(week.active, 'dnia', 'dni', 'dni')}
             {streak > 1 && ` · seria ${streak} ${plural(streak, 'dzień', 'dni', 'dni')}`}
           </p>
         </div>
@@ -61,6 +61,24 @@ export function NoteToTrainer({ client }: { client: Client }) {
     <section className="acard" id="do-trenera">
       <h3>Napisz do trenera</h3>
       <p className="muted small">Jak się czujesz, co bolało, pytanie o ćwiczenie — trener dostanie to na e-mail.</p>
+      {(() => {
+        const thread = [...(client.inbox ?? []).map((n) => ({ ...n, mine: true })), ...(client.replies ?? []).map((r) => ({ ...r, mine: false }))]
+          .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
+          .slice(0, 6);
+        if (!thread.length) return null;
+        return (
+          <ul className="ath-thread" aria-label="Rozmowa z trenerem">
+            {thread.map((n) => (
+              <li key={n.id} className={n.mine ? 'mine' : 'coach'}>
+                <span className="muted small">
+                  {n.mine ? 'Ty' : 'Trener'} · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <p>{n.text}</p>
+              </li>
+            ))}
+          </ul>
+        );
+      })()}
       <textarea className="input" rows={3} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Twoja wiadomość…" aria-label="Wiadomość do trenera" />
       <button
         className="btn btn-primary btn-block"

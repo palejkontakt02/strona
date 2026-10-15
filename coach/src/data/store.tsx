@@ -25,7 +25,7 @@ interface StoreValue {
   importDb: (db: Db) => Promise<void>;
   saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
   saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
-  sendClientNote: (clientId: string, text: string) => Promise<boolean>;
+  sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
   signOut?: () => void;
@@ -99,8 +99,8 @@ export function StoreProvider({
 
   const toast = useCallback((text: string, action?: { label: string; run: () => void }) => {
     const id = ++toastId.current;
-    setToasts((t) => [...t, { id, text, action }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 9000 : 3200);
+    setToasts((t) => [...t.slice(-1), { id, text, action }]); // najwyżej dwa naraz
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 9000 : Math.min(8000, 2600 + text.length * 45));
   }, []);
 
   /** Zapis zmian; zwraca false, gdy się nie udał (wtedy np. trening zostaje do ponownego zapisu). */
@@ -163,8 +163,8 @@ export function StoreProvider({
 
   /** Notatka od podopiecznego: zapis w aplikacji + e-mail do trenera. */
   const sendClientNote = useCallback(
-    async (clientId: string, text: string): Promise<boolean> => {
-      const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000) };
+    async (clientId: string, text: string, sessionId?: string): Promise<boolean> => {
+      const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000), ...(sessionId ? { sessionId } : {}) };
       const client = db?.clients.find((c) => c.id === clientId);
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note] } : c)) } : cur));
       let saved = true;

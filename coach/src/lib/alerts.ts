@@ -37,6 +37,18 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
       a.push({ level: 'yellow', text: `Wellness spadł do ${last}/25 (średnio ${Math.round(avg)})` });
   }
 
+  // check-in samopoczucia z ostatnich 2 dni (także bez treningu), jeśli nowszy niż ostatni trening z wellness
+  const ci = [...client.checkins].filter((c) => wellnessTotal(c) != null).sort((x, y) => y.date.localeCompare(x.date));
+  const lastCi = ci[0];
+  const twoDaysAgo = new Date(new Date(today + 'T12:00:00').getTime() - 2 * 86400000).toISOString().slice(0, 10);
+  if (lastCi && lastCi.date >= twoDaysAgo && (!ws.length || lastCi.date > ws[0].date)) {
+    const v = wellnessTotal(lastCi)!;
+    const prev = ci.slice(1, 8).map((c) => wellnessTotal(c)!);
+    const avg = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
+    if (v <= 12) a.push({ level: 'red', text: `Samopoczucie ${v}/25 (check-in ${fmtD(lastCi.date)})` });
+    else if (avg && v < avg * 0.8) a.push({ level: 'yellow', text: `Samopoczucie spadło do ${v}/25 (zwykle ${Math.round(avg)}) — check-in ${fmtD(lastCi.date)}` });
+  }
+
   const lp = desc.find((s) => s.pain != null);
   if (lp && lp.pain! >= 4)
     a.push({ level: lp.pain! >= 6 ? 'red' : 'yellow', text: `Ból ${lp.pain}/10 na treningu ${fmtD(lp.date)}` });

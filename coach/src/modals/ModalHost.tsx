@@ -6,6 +6,7 @@ import { ClientModal, DataModal, ExerciseModal, InjuryModal, MeasurementModal, P
 import { PlanEditor } from './PlanEditor';
 import { LocationModal, LocationsModal } from './LocationModals';
 import { SessionModal } from './SessionModal';
+import { ReviewModal } from './ReviewModal';
 
 export function ModalHost({ modal }: { modal: ModalState }) {
   const { db } = useStore();
@@ -24,6 +25,7 @@ export function ModalHost({ modal }: { modal: ModalState }) {
       </datalist>
       {modal.kind === 'appt' && <ApptModal m={modal} />}
       {modal.kind === 'session' && <SessionModal m={modal} />}
+      {modal.kind === 'review' && <ReviewModal m={modal} />}
       {modal.kind === 'plan' && <PlanEditor m={modal} />}
       {modal.kind === 'client' && <ClientModal m={modal} />}
       {modal.kind === 'measurement' && <MeasurementModal m={modal} />}

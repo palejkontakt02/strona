@@ -50,7 +50,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     const clean = structuredClone(p);
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
-    await apply(savePlan(db, clean), m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
+    await apply(savePlan(db, clean), clean.extra ? 'Dodatkowe treningi zapisane.' : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
     closeModal();
   };
 

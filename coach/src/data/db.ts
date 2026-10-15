@@ -46,6 +46,9 @@ export function normalizeDb(db: Partial<Db>): Db {
       inbox: Array.isArray(r.inbox)
         ? r.inbox.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ ...n, id: typeof n.id === 'string' ? n.id : `n${i}`, at: typeof n.at === 'string' ? n.at : '' }))
         : undefined,
+      replies: Array.isArray(r.replies)
+        ? r.replies.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ id: typeof n.id === 'string' ? n.id : `r${i}`, at: typeof n.at === 'string' ? n.at : '', text: n.text as string }))
+        : undefined,
     })),
     plans: clean<Plan>(db.plans, (r) => typeof r.clientId === 'string', (r) => ({
       ...r,

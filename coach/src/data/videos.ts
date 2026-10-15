@@ -1,5 +1,6 @@
 import { cloudMode } from './config';
 import { supabase } from './supabase';
+import type { TrainingSession } from '../domain';
 
 /**
  * Nagrania serii (technika). W chmurze: prywatny koszyk Supabase Storage „set-videos”
@@ -89,4 +90,33 @@ export async function deleteSetVideo(ref: string): Promise<void> {
   } catch {
     // brak sieci / pliku — nic więcej do zrobienia
   }
+}
+
+export interface SessionVideo {
+  video: string;
+  exercise: string;
+  /** Opis serii, np. „seria 2 · 5 × 100 kg”. */
+  label: string;
+}
+
+/** Nagrania w zapisanym treningu (kolejno: ćwiczenia, serie). */
+export function sessionVideos(s: TrainingSession): SessionVideo[] {
+  return s.exercises.flatMap((e) => {
+    let n = 0;
+    return (e.setsLog ?? []).flatMap((x) => {
+      if (!x.warmup) n++;
+      if (!x.video) return [];
+      const what = [x.reps != null && `${x.reps}`, x.load != null && `${String(x.load).replace('.', ',')} kg`].filter(Boolean).join(' × ');
+      return [{ video: x.video, exercise: e.name, label: `${x.warmup ? 'rozgrzewka' : `seria ${n}`}${what ? ` · ${what}` : ''}` }];
+    });
+  });
+}
+
+/** Trening z nagraniami, których trener jeszcze nie obejrzał. */
+export const needsReview = (s: TrainingSession) => !s.reviewedAt && s.exercises.some((e) => e.setsLog?.some((x) => x.video));
+
+/** Po porzuceniu treningu: kasuje nagrania, których nie ma w żadnym zapisanym treningu. */
+export function dropUnsavedVideos(refs: (string | undefined)[], sessions: TrainingSession[]) {
+  const kept = new Set(sessions.flatMap((s) => s.exercises.flatMap((e) => (e.setsLog ?? []).map((x) => x.video).filter(Boolean))));
+  for (const r of refs) if (r && !kept.has(r)) void deleteSetVideo(r);
 }

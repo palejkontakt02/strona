@@ -3,7 +3,8 @@ import { SessionSheet } from '../../athlete/History';
 import type { TrainingSession } from '../../domain';
 import { Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
-import { sessionsOf } from '../../data/ops';
+import { isSolo, sessionsOf } from '../../data/ops';
+import { needsReview, sessionVideos } from '../../data/videos';
 import { useStore } from '../../data/store';
 import { fmtDate, fnum } from '../../format';
 import { sessionLoad, tonnage } from '../../lib/load';
@@ -13,6 +14,19 @@ import { CHARGE_SHORT, LocationTag } from '../../components/location';
 import { WorkoutList } from './WorkoutList';
 
 
+/** Znaczniki przy zapisanym treningu: nagrania (nowe/obejrzane), samodzielnie, komentarz. */
+export function SessionBadges({ s }: { s: TrainingSession }) {
+  const { db } = useStore();
+  const n = sessionVideos(s).length;
+  return (
+    <>
+      {n > 0 && <Tag tone={needsReview(s) ? 'accent' : 'muted'}>{`🎥 ${n}${needsReview(s) ? ' · nowe' : ''}`}</Tag>}{' '}
+      {isSolo(db, s) && <Tag tone="muted">samodzielnie</Tag>}{' '}
+      {s.coachNote && <Tag tone="muted">💬</Tag>}
+    </>
+  );
+}
+
 export function ClientSessions({ client }: { client: Client }) {
   const { db } = useStore();
   const { openModal } = useNav();
@@ -21,8 +35,7 @@ export function ClientSessions({ client }: { client: Client }) {
   const [shown, setShown] = useState<TrainingSession | null>(null);
   return (
     <>
-      <WorkoutList client={client} />
-      <div className="toolbar section-gap">
+      <div className="toolbar">
         <h3>Zapisane treningi ({sessions.length})</h3>
         <div className="actions">
           <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
@@ -44,12 +57,17 @@ export function ClientSessions({ client }: { client: Client }) {
             return (
               <li key={s.id} className="row row-top">
                 <button className="grow sess-open" onClick={() => setShown(s)}>
-                  <strong>{s.workoutName || 'Trening'}</strong>
+                  <strong>{s.workoutName || 'Trening'}</strong> <SessionBadges s={s} />
                   <span className="muted small">
-                    {[fmtDate(s.date), s.duration != null && `${s.duration} min`, s.srpe != null && `RPE ${fnum(s.srpe)}`, ton ? `${fnum(ton, 0)} kg` : null].filter(Boolean).join(' · ')}
+                    {[fmtDate(s.date), s.duration != null && `${s.duration} min`, s.srpe != null && `RPE ${fnum(s.srpe)}`, s.pain != null && s.pain >= 4 && `ból ${s.pain}/10`, ton ? `${fnum(ton, 0)} kg` : null].filter(Boolean).join(' · ')}
                   </span>
+                  {s.notes && <span className="muted small ellipsis">„{s.notes}”</span>}
                 </button>
-                <IconBtn icon="eye" label="Podgląd treningu" onClick={() => setShown(s)} />
+                {sessionVideos(s).length > 0 ? (
+                  <IconBtn icon="play" label="Przejrzyj nagrania" onClick={() => openModal({ kind: 'review', sessionId: s.id })} />
+                ) : (
+                  <IconBtn icon="eye" label="Podgląd treningu" onClick={() => setShown(s)} />
+                )}
                 <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
               </li>
             );
@@ -79,7 +97,7 @@ export function ClientSessions({ client }: { client: Client }) {
                   <tr key={s.id} className="tr-click" onClick={(e) => !(e.target as HTMLElement).closest('button') && setShown(s)}>
                     <td className="nowrap">{fmtDate(s.date)}</td>
                     <td>
-                      {s.workoutName || 'Trening'} <LocationTag id={s.locationId} short />
+                      {s.workoutName || 'Trening'} <LocationTag id={s.locationId} short /> <SessionBadges s={s} />
                       {s.notes && <div className="muted small ellipsis" style={{ maxWidth: 260 }}>{s.notes}</div>}
                     </td>
                     <td className="num">{s.duration != null ? `${s.duration} min` : '—'}</td>
@@ -90,6 +108,7 @@ export function ClientSessions({ client }: { client: Client }) {
                     <td className="num">{s.pain != null ? <Tag tone={s.pain >= 6 ? 'danger' : s.pain >= 4 ? 'warn' : 'muted'}>{s.pain}/10</Tag> : '—'}</td>
                     <td className="hide-mobile muted small">{CHARGE_SHORT[s.charge]}</td>
                     <td className="actions">
+                      {sessionVideos(s).length > 0 && <IconBtn icon="play" label="Przejrzyj nagrania" onClick={() => openModal({ kind: 'review', sessionId: s.id })} />}
                       <IconBtn icon="eye" label="Podgląd treningu" onClick={() => setShown(s)} />
                       <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
                     </td>
@@ -101,6 +120,8 @@ export function ClientSessions({ client }: { client: Client }) {
         </div>
         </>
       )}
+      <div className="section-gap" />
+      <WorkoutList client={client} />
       {shown && (
         <SessionSheet
           s={shown}
@@ -108,6 +129,7 @@ export function ClientSessions({ client }: { client: Client }) {
           onEdit={() => (setShown(null), openModal({ kind: 'session', session: shown }))}
           onTrainer={shown.exercises.length ? () => startLive(client.id, undefined, undefined, { repeatSessionId: shown.id }) : undefined}
           onRepeat={shown.exercises.length ? () => startAthlete(client.id, { repeatSessionId: shown.id }) : undefined}
+          onReview={() => (setShown(null), openModal({ kind: 'review', sessionId: shown.id }))}
         />
       )}
     </>

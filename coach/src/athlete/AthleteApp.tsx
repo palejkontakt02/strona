@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import type { Checkin, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
+import { dropUnsavedVideos } from '../data/videos';
 import { clientById, deleteSession, extraPlanOf, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { del, put } from '../data/db';
-import { fmtDay, fmtMonth, fnum, fx, plural, nEx } from '../format';
+import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, repsN } from '../lib/parse';
 import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
@@ -17,7 +18,7 @@ import { Player } from './Player';
 import { WorkoutPreview } from './WorkoutPreview';
 import { NoteToTrainer, TodayHabits } from './Today';
 import { runFromStart, type RunStart } from './start';
-import { History, SessionSheet, Upcoming } from './History';
+import { History, SessionSheet, Upcoming, upcomingVisits } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
 export type RunKind = 'run' | 'live';
@@ -96,10 +97,13 @@ export function AthleteApp({
     if (typeof r === 'string') return toast(r);
     void replaceRun(r);
   };
-  const start = (workoutId?: string) => {
+  const start = async (workoutId?: string) => {
     if (!plan) return startOwn();
-    const id = workoutId ?? nextWorkout(plan, sessions)?.workout.id;
+    const nx = nextWorkout(plan, sessions);
+    const id = workoutId ?? nx?.workout.id;
     if (!id) return toast('Nie znaleziono treningu w planie.');
+    // trening spoza kolejki przesuwa „następny” — pytamy, żeby plan nie przeskoczył przez pomyłkę
+    if (nx && id !== nx.workout.id && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}). Po zapisie plan pójdzie dalej od wybranego. Zacząć mimo to?`, { confirm: 'Zacznij ten' }))) return;
     startFrom({ planId: plan.id, workoutId: id });
   };
   const undo = async (s: TrainingSession) => {
@@ -117,7 +121,13 @@ export function AthleteApp({
       label: 'Cofnij',
       run: () =>
         void apply(
-          [put('sessions', s), ...appts.map((a) => put('appointments', a)), ...(extraChange ? [prevExtra ? put('plans', prevExtra) : del('plans', (extraChange as { item: { id: string } }).item.id)] : [])],
+          [
+            put('sessions', s),
+            ...appts.map((a) => put('appointments', a)),
+            ...(extraChange ? [prevExtra ? put('plans', prevExtra) : del('plans', (extraChange as { item: { id: string } }).item.id)] : []),
+            // usunięta płatność wraca razem z treningiem
+            ...(removePayment && sp ? [put('clients', { ...(db.clients.find((c) => c.id === sp.client.id) ?? sp.client), payments: [...(db.clients.find((c) => c.id === sp.client.id) ?? sp.client).payments.filter((p) => p.id !== sp.payment.id), sp.payment] })] : []),
+          ],
           'Przywrócono trening.',
         ),
     });
@@ -175,7 +185,10 @@ export function AthleteApp({
           onUndo={undo}
           canUndo={canUndo}
           onResume={() => setScreen('run')}
-          onDiscard={() => setRun(null)}
+          onDiscard={() => {
+            if (run) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
+            setRun(null);
+          }}
         />
       )}
     </div>
@@ -228,6 +241,11 @@ function Home({
   const ws = weekStart(today);
   const thisWeek = sessions.filter((s) => s.date >= ws).length;
   const goal = client.daysPerWeek || 2;
+  const visit = upcomingVisits(db.appointments, clientId)[0];
+  const visitText = visit && `${visit.date === today ? 'dziś' : fmtLong(visit.date)}, ${visit.time}`;
+  const loc = visit && db.locations.find((l) => l.id === visit.locationId)?.name;
+  // wizyta dziś albo jutro → ten trening zwykle robi się z trenerem
+  const withTrainer = !!visit && visit.date <= addDays(today, 1);
 
   return (
     <div className="ath-home fade">
@@ -242,15 +260,52 @@ function Home({
             🔥 {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
           </span>
         )}
-        <a href="#do-trenera" className="btn btn-ghost btn-sm msg-link">
-          ✉ Napisz do trenera
-        </a>
+        {(() => {
+          const lastReply = (client.replies ?? []).reduce((a, r) => (r.at > a ? r.at : a), '');
+          const lastMine = (client.inbox ?? []).reduce((a, n) => (n.at > a ? n.at : a), '');
+          const fresh = !!lastReply && lastReply > lastMine;
+          return (
+            <a href="#do-trenera" className={`btn btn-sm msg-link ${fresh ? 'btn-primary' : 'btn-ghost'}`}>
+              {fresh ? '✉ Nowa odpowiedź trenera' : '✉ Napisz do trenera'}
+            </a>
+          );
+        })()}
       </header>
 
-      {run ? (
+      {visit && (
+        <section className="acard next-visit" aria-label="Następna wizyta">
+          <span className="eyebrow">Następna wizyta z trenerem</span>
+          <strong className="next-visit-when first-cap">{visitText}</strong>
+          {loc && <span className="muted">{loc}</span>}
+        </section>
+      )}
+
+      {run?.editSessionId && (
+        <section className="acard">
+          <span className="eyebrow">Poprawki zapisanego treningu</span>
+          <h3>{run.name} · {fmtDay(run.date)}</h3>
+          <div className="actions">
+            <button className="btn btn-secondary" onClick={onResume}>
+              Wróć do poprawek
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={async () => {
+                if (await ask('Anulować poprawki? Zapisany trening (z nagraniami) zostanie bez zmian.', { confirm: 'Anuluj poprawki' })) onDiscard();
+              }}
+            >
+              Anuluj poprawki
+            </button>
+          </div>
+        </section>
+      )}
+      {run && !run.editSessionId ? (
         <section className="acard acard-hero">
           <span className="eyebrow">W trakcie</span>
           <h2>{run.name}</h2>
+          {run.workoutId && sessions.some((x) => x.planId === run.planId && x.workoutId === run.workoutId && x.date === run.date) && (
+            <p className="small warn-text">Ten trening jest już zapisany dziś (np. z trenerem). Jeśli to ten sam — porzuć ten, żeby nie było dwóch zapisów.</p>
+          )}
           <p className="muted small">
             {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {run.date !== todayISO() ? `${fmtDay(run.date)}, ` : ''}{new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
           </p>
@@ -273,10 +328,11 @@ function Home({
           <span className="eyebrow">Następny trening</span>
           <h2>{nx.workout.name}</h2>
           <p className="muted small">
-            {nx.week.name} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
+            {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
           </p>
-          <button className="btn btn-primary btn-lg" onClick={() => onStart(nx.workout.id)}>
-            <Icon name="play" /> Start
+          {withTrainer && <p className="small">Ten trening zrobicie razem na wizycie ({visitText}). Start tylko, jeśli ćwiczysz dziś sam(a).</p>}
+          <button className={`btn ${withTrainer ? 'btn-secondary' : 'btn-primary'} btn-lg`} onClick={() => onStart(nx.workout.id)}>
+            <Icon name="play" /> {withTrainer ? 'Start samodzielnie' : 'Start'}
           </button>
         </section>
       ) : (
@@ -333,6 +389,15 @@ function Home({
   );
 }
 
+/** Opis końców skali (1 … 5), żeby nie trzeba było zgadywać kierunku. */
+const ENDS: Record<string, string> = {
+  sleep: '1 źle spałem/am · 5 świetnie',
+  energy: '1 brak sił · 5 pełno energii',
+  muscle: '1 bardzo obolałe · 5 świeże',
+  stress: '1 duży stres · 5 spokój',
+  mood: '1 kiepski · 5 świetny',
+};
+
 function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof clientById>>; onSave: (c: Checkin) => void }) {
   const { db } = useStore();
   const today = todayISO();
@@ -370,10 +435,13 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
   return (
     <section className="acard">
       <h3>Jak się dziś czujesz?</h3>
-      <p className="muted small">1 = bardzo źle · 5 = świetnie (przy stresie: 5 = brak stresu)</p>
+      <p className="muted small">Im wyżej, tym lepiej: 1 = źle · 5 = świetnie</p>
       {WELLNESS_ITEMS.map(([k, label]) => (
         <div key={k} className="checkin-row">
-          <span>{label}</span>
+          <span>
+            {label}
+            <span className="muted small checkin-ends">{ENDS[k]}</span>
+          </span>
           <div className="scale scale-5" role="radiogroup" aria-label={label}>
             {[1, 2, 3, 4, 5].map((v) => (
               <button key={v} type="button" role="radio" aria-checked={w[k] === v} className={w[k] === v ? 'active' : ''} onClick={() => setW({ ...w, [k]: v })} aria-label={`${label} ${v}`}>
@@ -393,6 +461,7 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
       >
         Zapisz
       </button>
+      {!complete && <p className="muted small center">Zaznacz odpowiedź w każdym z {WELLNESS_ITEMS.length} wierszy ({WELLNESS_ITEMS.filter(([k]) => w[k] != null).length}/{WELLNESS_ITEMS.length}).</p>}
     </section>
   );
 }

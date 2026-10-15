@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Avatar, Card, Dot, Empty, Icon, IconBtn, Kpi, Tag } from '../components/ui';
-import { allPayments, clientById, lastSessionDate, paymentLabel, sessionsOf, setPaymentStatus } from '../data/ops';
+import { allPayments, clientById, lastSessionDate, paymentLabel, sessionsOf } from '../data/ops';
+import { put } from '../data/db';
+import { needsReview, sessionVideos } from '../data/videos';
+import { markPaid } from '../data/payActions';
 import { useStore } from '../data/store';
 import { ago, fmtDate, fmtDay, fmtLong, plural, pln } from '../format';
 import { clientAlerts } from '../lib/alerts';
@@ -12,7 +15,7 @@ import { LocationTag, locStyle } from '../components/location';
 import { clubAmount, clubOutstanding, clubSessions } from '../lib/club';
 
 export function Dashboard() {
-  const { db, apply } = useStore();
+  const { db, apply, toast } = useStore();
   const { openClient, openModal, startLive, go } = useNav();
   const clubs = db.locations.filter((l) => l.kind === 'klub');
   const today = todayISO();
@@ -90,8 +93,8 @@ export function Dashboard() {
                     </span>
                     {a.status === 'planned' || (a.status === 'done' && !a.sessionId) ? (
                       <>
-                        <button className="btn btn-primary btn-sm" onClick={() => startLive(a.clientId, a.id)} title="Prowadź trening na żywo, seria po serii">
-                          <Icon name="play" size={14} /> Prowadź
+                        <button className="btn btn-primary btn-sm" onClick={() => startLive(a.clientId, a.id)} title="Prowadź trening na żywo, seria po serii" aria-label="Prowadź trening">
+                          <Icon name="play" size={14} /> <span className="hide-xs">Prowadź</span>
                         </button>
                         <IconBtn icon="edit" label="Zapisz trening po fakcie" onClick={() => openModal({ kind: 'session', appt: a, clientId: a.clientId, date: a.date })} />
                       </>
@@ -122,9 +125,54 @@ export function Dashboard() {
                       </button>
                       <span className="muted small"> · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                       <div className="small ellipsis-2">{n.text}</div>
+                      <div className="row-links">
+                        <button className="link small" onClick={() => openClient(c.id, 'Przegląd')}>
+                          Odpowiedz ›
+                        </button>
+                        {n.sessionId && db.sessions.some((x) => x.id === n.sessionId) && (
+                          <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: n.sessionId! })}>
+                            Zobacz trening ›
+                          </button>
+                        )}
+                        <button className="link small muted" onClick={() => apply([put('clients', { ...c, inbox: (c.inbox ?? []).map((x) => (x.id === n.id ? { ...x, read: true } : x)) })])}>
+                          ✓ Przeczytane
+                        </button>
+                      </div>
                     </div>
                   </li>
                 ))}
+              </ul>
+              {notes.length > 6 && <p className="muted small">I jeszcze {notes.length - 6} — otwórz podopiecznego, by zobaczyć wszystkie.</p>}
+            </Card>
+          );
+        })()}
+        {(() => {
+          // nagrania serii, których trener jeszcze nie obejrzał (ostatnie 30 dni)
+          const from = addDays(today, -30);
+          const todo = db.sessions.filter((x) => x.date >= from && needsReview(x)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+          if (!todo.length) return null;
+          return (
+            <Card title={`Nagrania do obejrzenia (${todo.length})`} className="span-2">
+              <ul className="rows">
+                {todo.slice(0, 8).map((x) => {
+                  const c = clientById(db, x.clientId);
+                  const n = sessionVideos(x).length;
+                  return (
+                    <li key={x.id} className="row">
+                      <span className="row-time">{fmtDay(x.date)}</span>
+                      <div className="grow row-main">
+                        <b className="ellipsis">{c?.name ?? '—'}</b>
+                        <span className="muted small ellipsis">
+                          {x.workoutName || 'Trening'} · 🎥 {n}
+                          {x.notes ? ' · ma notatkę' : ''}
+                        </span>
+                      </div>
+                      <button className="btn btn-primary btn-sm" onClick={() => openModal({ kind: 'review', sessionId: x.id })}>
+                        <Icon name="play" size={14} /> <span className="hide-xs">Obejrzyj</span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           );
@@ -210,7 +258,7 @@ export function Dashboard() {
                   </div>
                   <strong className="nowrap">{pln(p.amount)}</strong>
                   {isOverdue(p, today) && <Tag tone="danger">Zaległe</Tag>}
-                  <IconBtn icon="check" label="Oznacz opłacone" onClick={() => apply([setPaymentStatus(p.client, p.id, true, today)], 'Oznaczono jako opłacone.')} />
+                  <IconBtn icon="check" label="Oznacz opłacone" onClick={() => void markPaid({ apply, toast }, p.client, p.id, today)} />
                 </li>
               ))}
             </ul>

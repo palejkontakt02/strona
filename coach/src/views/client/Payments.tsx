@@ -2,6 +2,7 @@ import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { put } from '../../data/db';
 import { paymentLabel, sessionsOf, setPaymentStatus } from '../../data/ops';
+import { markPaid } from '../../data/payActions';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, pln } from '../../format';
 import { isOverdue, overPackage, packageStatus } from '../../lib/billing';
@@ -38,7 +39,7 @@ export function Barbell({ left, size }: { left: number; size: number }) {
 }
 
 export function ClientPayments({ client }: { client: Client }) {
-  const { db, apply, ask } = useStore();
+  const { db, apply, ask, toast } = useStore();
   const { openModal } = useNav();
   const today = todayISO();
   const pk = packageStatus(client, sessionsOf(db, client.id));
@@ -143,7 +144,7 @@ export function ClientPayments({ client }: { client: Client }) {
                         Cofnij
                       </button>
                     ) : (
-                      <button className="btn btn-secondary btn-sm" onClick={() => apply([setPaymentStatus(client, p.id, true, today)], 'Oznaczono jako opłacone.')}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => void markPaid({ apply, toast }, client, p.id, today)}>
                         Oznacz opłacone
                       </button>
                     )}

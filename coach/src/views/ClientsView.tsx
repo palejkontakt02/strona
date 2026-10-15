@@ -5,6 +5,7 @@ import { Avatar, Dot, Icon, Seg, Tag, type Tone } from '../components/ui';
 import type { ClientStatus } from '../domain';
 import { lastSessionDate, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
+import { needsReview } from '../data/videos';
 import { ago, ageOf, normalize } from '../format';
 import { clientAlerts } from '../lib/alerts';
 import { todayISO } from '../lib/dates';
@@ -63,6 +64,14 @@ export function ClientsView() {
                     <div className="client-card-top">
                       <strong>{c.name}</strong>
                       <span className="row-inline">
+                        {(() => {
+                          const n = db.sessions.filter((x) => x.clientId === c.id && needsReview(x)).length;
+                          return n > 0 ? (
+                            <Tag tone="accent">
+                              <span aria-label="nagrania do obejrzenia">🎥 {n}</span>
+                            </Tag>
+                          ) : null;
+                        })()}
                         {(c.inbox ?? []).some((n) => !n.read) && (
                           <Tag tone="warn">
                             <span aria-label="nowe wiadomości">✉ {(c.inbox ?? []).filter((n) => !n.read).length}</span>

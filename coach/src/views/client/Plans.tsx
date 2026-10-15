@@ -5,7 +5,7 @@ import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
-import { exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
+import { doneInPass, exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanSets } from '../../components/sets';
 import { extraWithNewWorkout } from './WorkoutList';
@@ -49,7 +49,7 @@ export function ClientPlans({ client }: { client: Client }) {
       <div className="stack">
         {plans.map((p) => {
           const nx = nextWorkout(p, sessions);
-          const done = new Set(sessions.filter((s) => s.planId === p.id).map((s) => s.workoutId));
+          const done = doneInPass(p, sessions);
           return (
             <Card
               key={p.id}
@@ -93,7 +93,7 @@ export function ClientPlans({ client }: { client: Client }) {
                         <div key={k.id} className={`plan-workout ${done.has(k.id) ? 'is-done' : ''} ${nx?.workout.id === k.id ? 'is-next' : ''}`}>
                           <div className="plan-workout-head">
                             <strong>{k.name}</strong>
-                            {done.has(k.id) ? <Tag tone="ok">✓ zrobione</Tag> : nx?.workout.id === k.id ? <Tag tone="accent">następny</Tag> : null}
+                            {nx?.workout.id === k.id ? <Tag tone="accent">następny</Tag> : done.has(k.id) ? <Tag tone="ok">✓ zrobione</Tag> : null}
                             {k.exercises.some((e) => e.name) && nx?.workout.id === k.id && (
                               <span className="plan-workout-actions">
                                 <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: k.id })}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Empty, Kpi, Seg, Tag } from '../components/ui';
 import { allPayments, paymentLabel, setPaymentStatus } from '../data/ops';
+import { markPaid } from '../data/payActions';
 import { useStore } from '../data/store';
 import { fmtDate, normalize, pln } from '../format';
 import { isOverdue } from '../lib/billing';
@@ -13,7 +14,7 @@ const TYPES = ['Każdy typ', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
 const TYPE_KEY = { Pakiety: 'pakiet', Abonamenty: 'abonament', Sesje: 'pojedyncza' } as const;
 
 export function PaymentsView() {
-  const { db, apply } = useStore();
+  const { db, apply, toast } = useStore();
   const { openClient, openModal } = useNav();
   const today = todayISO();
   // domyślnie to, co trzeba ściągnąć; kafel „Zaległości” z Pulpitu otwiera od razu zaległe
@@ -108,7 +109,7 @@ export function PaymentsView() {
                         Cofnij
                       </button>
                     ) : (
-                      <button className="btn btn-secondary btn-sm" onClick={() => apply([setPaymentStatus(p.client, p.id, true, today)], 'Oznaczono jako opłacone.')}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => void markPaid({ apply, toast }, p.client, p.id, today)}>
                         Oznacz opłacone
                       </button>
                     )}

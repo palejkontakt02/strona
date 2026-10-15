@@ -18,6 +18,7 @@ export type ModalState =
   | { kind: 'injury'; clientId: string; injury?: Client['injuryLog'][number] }
   | { kind: 'exercise'; exercise?: LibraryExercise }
   | { kind: 'plan'; plan: Plan; isNew?: boolean; /** Rozwiń tydzień z tą jednostką. */ focusWorkoutId?: string }
+  | { kind: 'review'; sessionId: string }
   | { kind: 'data' }
   | { kind: 'locations' }
   | { kind: 'location'; location?: Location };

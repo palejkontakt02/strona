@@ -72,6 +72,21 @@ export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (Pl
   return { ...nx, total: seq.length };
 }
 
+/** Jednostki zrobione w bieżącym przejściu planu (przed „następną”) — dalsze to poprzednie przejście. */
+export function doneInPass(plan: Plan | null, sessions: TrainingSession[]): Set<string> {
+  const out = new Set<string>();
+  if (!plan) return out;
+  const nx = nextWorkout(plan, sessions);
+  const seq = planSequence(plan).map((x) => x.workout.id);
+  const ni = nx ? seq.indexOf(nx.workout.id) : -1;
+  for (const s of sessions) {
+    if (s.planId !== plan.id || !s.workoutId) continue;
+    const i = seq.indexOf(s.workoutId);
+    if (i >= 0 && (ni < 0 || i < ni)) out.add(s.workoutId);
+  }
+  return out;
+}
+
 /** Podsumowanie ćwiczenia z serii (zgodność z widokami listy): liczba serii roboczych i parametry pierwszej. */
 export function exerciseSummary(groups: SetGroup[]): { sets: string; reps: string; rpe: string; load: string } {
   const work = groups.filter((g) => g.type !== 'Rozgrzewka');

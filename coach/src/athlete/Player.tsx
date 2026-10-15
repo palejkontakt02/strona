@@ -87,7 +87,7 @@ function elapsedMinutes(startedAt: number): string {
 }
 
 export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
-  const { db, apply, toast, ask } = useStore();
+  const { db, apply, toast, ask, sendClientNote } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
@@ -114,10 +114,15 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     window.scrollTo(0, 0);
   };
 
+  const lastTick = useRef<{ at: number; key: string }>({ at: 0, key: '' });
   const onDone = async (k: number, i: number) => {
     const ex = run.ex[k];
     const s = ex.sets[i];
     const wasDone = s.done;
+    // drugie dotknięcie tuż po pierwszym (układ się przesunął) nie zalicza kolejnej serii
+    const key = `${k}-${i}`;
+    if (Date.now() - lastTick.current.at < 600 && lastTick.current.key !== key) return;
+    lastTick.current = { at: Date.now(), key };
     if (wasDone) {
       // cofnięcie serii zatrzymuje też odliczanie przerwy
       update((r) => void (r.ex[k].sets = completeSet(r.ex[k], i).sets));
@@ -130,6 +135,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     if (!s.warmup && !hasPrev && !s.reps.trim()) return toast('Wpisz liczbę powtórzeń.');
     if (s.reps.trim() && !/\d/.test(s.reps)) return toast('Powtórzenia: wpisz liczbę.');
     if (s.reps.trim() && sumReps(s.reps) === 0) return toast('Powtórzenia: co najmniej 1.');
+    if (s.load.trim() && !/^\s*-?\d+([.,]\d+)?\s*(kg)?\s*$/i.test(s.load)) return toast(`Ciężar „${s.load.trim()}” — wpisz samą liczbę, np. 42,5.`);
     const load = num(s.load);
     if (load != null && load < 0) return toast('Ciężar nie może być ujemny.');
     const best = recentE1(sessionsOf(db, client.id), ex.name);
@@ -138,7 +144,8 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     const next = update((r) => void (r.ex[k].sets = res.sets));
     const br = blockRest(next, k, i);
     setHintNext(br.next ?? null);
-    if (br.rest) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
+    // po ostatniej serii całego treningu nie ma już przerwy — tylko „Zakończ”
+    if (br.rest && !next.ex.every((e) => e.sets.every((x) => x.done))) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
   };
 
   const editing = run.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
@@ -189,15 +196,46 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       planId: run.planId,
       workoutId: run.workoutId,
       exercises: runToExercises(run),
+      solo: trainer ? undefined : true,
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
-    const { changes, message } = saveSession(db, { session, isNew: true, appointmentId, matchAppointment: trainer, amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
+    // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
+    let apptId = appointmentId;
+    const appt = apptId ? db.appointments.find((a) => a.id === apptId) : undefined;
+    if (appt && appt.date !== session.date) {
+      if (await ask(`Ta wizyta jest ${fmtDay(appt.date)}, a trening zapisuje się z datą ${fmtDay(session.date)}. Zapisać z datą wizyty (${fmtDay(appt.date)})?`, { confirm: `Tak, ${fmtDay(appt.date)}` })) session.date = appt.date;
+      else apptId = undefined;
+    }
+    const { changes, message } = saveSession(db, { session, isNew: true, appointmentId: apptId, matchAppointment: trainer && !(appointmentId && !apptId), amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
     if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪'))) return; // trening zostaje — można ponowić zapis
+    // notatka z podsumowania trafia też do wiadomości trenera (z odnośnikiem do treningu)
+    if (!trainer && session.notes) void sendClientNote(client.id, `Po treningu „${session.workoutName || 'Trening'}”: ${session.notes}`, session.id);
     setFinish(null);
     onSaved();
   };
 
-  const openFinish = () => {
+  /** Przed podsumowaniem: nagrania na niezaliczonych seriach i trening skończony dużo wcześniej. */
+  const openFinish = async () => {
+    const open = run.ex.flatMap((e, k) => e.sets.map((x, i) => ({ x, k, i }))).filter(({ x }) => !x.done);
+    const withVideo = open.filter(({ x }) => x.video);
+    let added = 0;
+    if (withVideo.length) {
+      const yes = await ask(
+        `${withVideo.length === 1 ? 'Jedna seria z nagraniem nie jest zaliczona' : `${withVideo.length} serie z nagraniem nie są zaliczone`} (brak ✓). Zapisują się tylko zaliczone serie — zaliczyć ${withVideo.length === 1 ? 'ją' : 'je'}, żeby nagranie zostało?`,
+        { confirm: 'Zalicz z nagraniem' },
+      );
+      if (yes) {
+        update((r) => withVideo.forEach(({ k, i }) => (r.ex[k].sets[i].done = true)));
+        added = withVideo.filter(({ x }) => !x.warmup).length;
+      }
+      else if (!(await ask('Zakończyć bez tych serii? Ich nagrania nie zostaną zapisane.', { confirm: 'Zakończ bez nich', danger: true }))) return;
+    }
+    const total = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup).length, 0);
+    const done = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup && x.done).length, 0) + added;
+    if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane.`, { confirm: 'Zakończ' }))) return;
+    showFinish();
+  };
+  const showFinish = () => {
     const charge = defaultCharge(client, sessionsOf(db, client.id));
     if (editing) {
       setFinish({
@@ -250,12 +288,12 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         </div>
         {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
         {s.warmup && !s.done && (
-          <button className="link small muted warm-remove" onClick={() => removeWarmup(k, i)}>
+          <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
             ✕ usuń tę serię wstępną
           </button>
         )}
         {!s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
-          <button className="link small muted warm-remove" onClick={() => removeWarmup(k, i)}>
+          <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, num) : removeWarmup(k, i))}>
             ✕ usuń tę serię
           </button>
         )}
@@ -298,7 +336,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
   const removeAt = async (k: number, i: number, num: string) => {
     const s = run.ex[k].sets[i];
     const what = [s.reps && `${s.reps} powt.`, s.load && `${s.load} kg`].filter(Boolean).join(' × ');
-    if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''} — ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}`, { confirm: 'Usuń serię' }))) return;
+    if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''} — ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}${s.video ? ' Jej nagranie też zniknie.' : ''}`, { confirm: 'Usuń serię' }))) return;
     removeWarmup(k, i);
   };
 
@@ -419,7 +457,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         <p className="muted small">
           {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
-        {!trainer && doneSets === 0 && <p className="muted small rpe-legend">Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.</p>}
+        {!trainer && <p className="muted small rpe-legend" style={doneSets === 0 ? undefined : { visibility: 'hidden' }} aria-hidden={doneSets > 0}>Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.</p>}
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
@@ -432,9 +470,13 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           />
         ))}
       </div>
-      <div className="muted small upper">
-        {block.length > 1 ? 'Blok' : 'Ćwiczenie'} {bi + 1} z {blocks.length}
-      </div>
+      {blocks.length > 0 ? (
+        <div className="muted small upper">
+          {block.length > 1 ? 'Blok' : 'Ćwiczenie'} {bi + 1} z {blocks.length}
+        </div>
+      ) : (
+        <p className="muted">Dodaj pierwsze ćwiczenie przyciskiem poniżej.</p>
+      )}
 
       {block.length > 0 && (
         <section className="acard">
@@ -475,7 +517,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           ‹ poprzednie
         </button>
         {last ? (
-          <button className="btn btn-primary btn-lg" onClick={openFinish}>
+          <button className="btn btn-primary btn-lg" onClick={() => void openFinish()}>
             {editing ? 'Zapisz zmiany' : 'Zakończ trening'}
           </button>
         ) : (
@@ -487,7 +529,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         )}
       </div>
       {!last && (
-        <button className="btn btn-ghost btn-block finish-early" onClick={openFinish}>
+        <button className="btn btn-ghost btn-block finish-early" onClick={() => void openFinish()}>
           {editing ? 'Zapisz zmiany' : 'Zakończ trening wcześniej'}
         </button>
       )}

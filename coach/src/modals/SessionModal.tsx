@@ -4,6 +4,7 @@ import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
 import { chargeProblem, clientById, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
+import { deleteSetVideo, sessionVideos } from '../data/videos';
 import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
@@ -257,7 +258,10 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   };
 
   const remove = async () => {
-    if (!existing || !(await ask('Usunąć ten trening? Powiązana wizyta wróci do „zaplanowanej”.'))) return;
+    if (!existing) return;
+    const vids = sessionVideos(existing);
+    const linked = db.appointments.some((a) => a.sessionId === existing.id);
+    if (!(await ask(`Usunąć ten trening?${linked ? ' Powiązana wizyta wróci do „zaplanowanej”.' : ''}${vids.length ? ` Usunięte zostaną też nagrania (${vids.length}).` : ''}`, { confirm: 'Usuń trening', danger: true }))) return;
     const sp = sessionPayment(db, existing);
     const removePayment =
       !!sp &&
@@ -265,7 +269,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         `Za ten trening jest płatność ${pln(sp.payment.amount)} (${sp.payment.status === 'paid' ? 'opłacona' : 'do zapłaty'}). Usunąć ją też?`,
         { confirm: 'Usuń płatność' },
       ));
-    await apply(deleteSession(db, existing.id, removePayment), removePayment ? 'Trening i płatność usunięte.' : 'Trening usunięty.');
+    if (!(await apply(deleteSession(db, existing.id, removePayment), removePayment ? 'Trening i płatność usunięte.' : 'Trening usunięty.'))) return;
+    vids.forEach((v) => void deleteSetVideo(v.video));
     closeModal();
   };
 

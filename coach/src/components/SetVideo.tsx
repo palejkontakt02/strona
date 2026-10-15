@@ -5,7 +5,7 @@ import { Sheet } from './Sheet';
 import { Icon } from './ui';
 
 /** Odtwarzacz nagrania serii (arkusz od dołu). `onRemove` — przycisk usunięcia nagrania. */
-export function VideoViewer({ video, title, onClose, onRemove }: { video: string; title: string; onClose: () => void; onRemove?: () => void }) {
+export function VideoViewer({ video, title, onClose, onRemove, onReplace }: { video: string; title: string; onClose: () => void; onRemove?: () => void; onReplace?: () => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
@@ -33,14 +33,23 @@ export function VideoViewer({ video, title, onClose, onRemove }: { video: string
       {err ? (
         <p className="muted">Nie udało się wczytać nagrania: {err}</p>
       ) : src ? (
-        <video className="set-video" src={src} controls playsInline autoPlay muted />
+        <video className="set-video" src={src} controls playsInline autoPlay muted onError={() => setErr('ten plik nie daje się odtworzyć — nagraj ponownie')} />
       ) : (
         <p className="muted">Wczytywanie nagrania…</p>
       )}
-      {onRemove && (
-        <button className="btn btn-ghost btn-sm" onClick={onRemove}>
-          <Icon name="trash" size={16} /> Usuń nagranie
-        </button>
+      {(onReplace || onRemove) && (
+        <div className="actions">
+          {onReplace && (
+            <button className="btn btn-secondary btn-sm" onClick={onReplace}>
+              <Icon name="cam" size={16} /> Nagraj ponownie
+            </button>
+          )}
+          {onRemove && (
+            <button className="btn btn-ghost btn-sm" onClick={onRemove}>
+              <Icon name="trash" size={16} /> Usuń nagranie
+            </button>
+          )}
+        </div>
       )}
     </Sheet>
   );
@@ -63,7 +72,12 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
   const pick = async (file: File | undefined) => {
     if (!file) return;
     const problem = videoProblem(file);
-    if (problem) return toast(problem);
+    if (problem) {
+      // długi komunikat — okno do przeczytania zamiast znikającego paska
+      await ask(problem, { confirm: 'Rozumiem' });
+      if (input.current) input.current.value = '';
+      return;
+    }
     setBusy(true);
     try {
       const ref = await saveSetVideo(file, clientId);
@@ -96,6 +110,10 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
           video={video}
           title={title}
           onClose={() => setOpen(false)}
+          onReplace={() => {
+            setOpen(false);
+            input.current?.click();
+          }}
           onRemove={async () => {
             if (!(await ask('Usunąć nagranie tej serii?', { confirm: 'Usuń nagranie' }))) return;
             setOpen(false);
@@ -123,7 +141,7 @@ export function VideoChip({ video, title }: { video: string; title: string }) {
           setOpen(true);
         }}
       >
-        ▶
+        ▶ Film
       </button>
       {open && <VideoViewer video={video} title={title} onClose={() => setOpen(false)} />}
     </>

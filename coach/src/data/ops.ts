@@ -6,9 +6,19 @@ import { del, put, type Change, type Db } from './db';
 
 /* ---------- selektory ---------- */
 
+/** Trening zrobiony samodzielnie (stare zapisy: bez rozliczenia i bez wizyty). */
+export function isSolo(db: Db, s: TrainingSession): boolean {
+  return s.solo ?? (s.charge === 'brak' && !db.appointments.some((a) => a.sessionId === s.id));
+}
+
 /** Treningi klienta od najnowszego. */
 export function sessionsOf(db: Db, clientId: string): TrainingSession[] {
-  return db.sessions.filter((s) => s.clientId === clientId).sort((a, b) => b.date.localeCompare(a.date));
+  // w tym samym dniu nowszy zapis (dalej w tablicy) wyżej
+  return db.sessions
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.clientId === clientId)
+    .sort((a, b) => b.s.date.localeCompare(a.s.date) || (b.s.createdAt ?? '').localeCompare(a.s.createdAt ?? '') || b.i - a.i)
+    .map(({ s }) => s);
 }
 
 export function lastSessionDate(db: Db, clientId: string): string | null {
@@ -76,6 +86,7 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
   let message = 'Trening zapisany.';
   let session = withClubRate(db, s.session);
   if (!s.isNew) return { changes: [put('sessions', session)], message };
+  session = { ...session, createdAt: session.createdAt ?? new Date().toISOString() };
   const changes: Change[] = [];
 
   const appt =
@@ -171,9 +182,14 @@ export function undoSession(db: Db, id: string, removePayment = false): Change[]
   const changes = deleteSession(db, id, removePayment);
   const s = db.sessions.find((x) => x.id === id);
   if (!s || (s.planId && db.plans.some((p) => p.id === s.planId)) || !s.exercises.some((e) => e.name.trim())) return changes;
-  const extra = extraPlanOf(db, s.clientId) ?? newExtraPlan(s.clientId);
   const wo = sessionToWorkout(s);
-  if (extra.weeks.some((w) => w.workouts.some((k) => k.name === wo.name))) return changes; // już jest na liście
+  // powtórka jednostki z planu — wraca sama przez plan, nie dublujemy jej w dodatkowych
+  if (s.workoutName && plansOf(db, s.clientId).some((p) => p.weeks.some((w) => w.workouts.some((k) => k.name === s.workoutName)))) return changes;
+  const extra = extraPlanOf(db, s.clientId) ?? newExtraPlan(s.clientId);
+  const sig = (k: { exercises: { name: string }[] }) => k.exercises.map((e) => e.name.trim().toLowerCase()).join('|');
+  const same = extra.weeks.flatMap((w) => w.workouts).filter((k) => k.name === wo.name);
+  if (same.some((k) => sig(k) === sig(wo))) return changes; // ten sam trening już jest na liście
+  if (same.length) wo.name = `${wo.name} (${fmtDay(s.date)})`;
   const weeks = extra.weeks.length ? extra.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
   changes.push(put('plans', { ...extra, weeks: weeks.map((w, i) => (i === 0 ? { ...w, workouts: [...w.workouts, wo] } : w)) }));
   return changes;

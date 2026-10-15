@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Ring } from '../../components/ring';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
-import type { Client, Habit, HabitSchedule } from '../../domain';
+import type { Client, CoachReply, Habit, HabitSchedule } from '../../domain';
+import { useNav } from '../../nav';
 import { put } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDay, plural, uid } from '../../format';
@@ -120,17 +121,17 @@ export function ClientHabits({ client }: { client: Client }) {
               <Ring value={pct(week.done, week.total)} label={`7 dni: ${Math.round(pct(week.done, week.total) * 100)}%`}>
                 <b>{Math.round(pct(week.done, week.total) * 100)}%</b>
               </Ring>
-              <span className="muted small">7 dni</span>
+              <span className="muted small">ostatnie 7 dni</span>
             </div>
             <div>
               <Ring value={pct(month.done, month.total)} label={`30 dni: ${Math.round(pct(month.done, month.total) * 100)}%`}>
                 <b>{Math.round(pct(month.done, month.total) * 100)}%</b>
               </Ring>
-              <span className="muted small">30 dni</span>
+              <span className="muted small">ostatnie 30 dni</span>
             </div>
           </div>
           <p className="muted small center">
-            Zamknięte dni (ostatnie 7): {week.closed} z {week.active} · seria {streak} {plural(streak, 'dzień', 'dni', 'dni')}
+            % = odhaczone zadania. Dni ze wszystkim odhaczonym (ostatnie 7): {week.closed} z {week.active} · seria {streak} {plural(streak, 'dzień', 'dni', 'dni')} z rzędu
           </p>
           <div className="habit-days" role="group" aria-label="Ostatnie 14 dni">
             {rangeProgress(client.habits, client.habitLog, today, 14).perDay.map((d) => (
@@ -180,32 +181,60 @@ export function ClientHabits({ client }: { client: Client }) {
 }
 
 /** Notatki od podopiecznego (trafiają też na e-mail trenera). */
+/** Wątek z podopiecznym: jego wiadomości i odpowiedzi trenera (podopieczny widzi odpowiedzi u siebie). */
 export function ClientInbox({ client }: { client: Client }) {
   const { apply } = useStore();
-  const notes = [...(client.inbox ?? [])].reverse();
-  const unread = notes.filter((n) => !n.read).length;
-  if (!notes.length) return null;
+  const { openModal } = useNav();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const thread = [
+    ...(client.inbox ?? []).map((n) => ({ ...n, mine: false })),
+    ...(client.replies ?? []).map((r) => ({ ...r, mine: true, read: true, sessionId: undefined as string | undefined })),
+  ].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  const unread = (client.inbox ?? []).filter((n) => !n.read).length;
+  if (!thread.length) return null;
+  const readAll = () => (client.inbox ?? []).map((n) => ({ ...n, read: true }));
+  const reply = async () => {
+    if (!text.trim()) return;
+    setBusy(true);
+    const r: CoachReply = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000) };
+    if (await apply([put('clients', { ...client, inbox: readAll(), replies: [...(client.replies ?? []), r].slice(-200) })], 'Odpowiedź wysłana — podopieczny zobaczy ją w aplikacji.')) setText('');
+    setBusy(false);
+  };
   return (
     <Card
       title={
         <>
-          Notatki od podopiecznego {unread > 0 && <Tag tone="warn">{unread} nowe</Tag>}
+          Wiadomości {unread > 0 && <Tag tone="warn">{unread} nowe</Tag>}
         </>
       }
       action={
         unread > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={() => apply([put('clients', { ...client, inbox: (client.inbox ?? []).map((n) => ({ ...n, read: true })) })])}>
+          <button className="btn btn-ghost btn-sm" onClick={() => apply([put('clients', { ...client, inbox: readAll() })])}>
             Oznacz przeczytane
           </button>
         )
       }
     >
+      <div className="reply-box">
+        <textarea className="input" rows={2} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={`Odpowiedz ${client.name.split(' ')[0]}…`} aria-label="Odpowiedź dla podopiecznego" />
+        <button className="btn btn-primary btn-sm" disabled={!text.trim() || busy} onClick={() => void reply()}>
+          Wyślij odpowiedź
+        </button>
+      </div>
       <ul className="rows">
-        {notes.slice(0, 20).map((n) => (
-          <li key={n.id} className={`row row-top note ${n.read ? '' : 'is-new'}`}>
+        {thread.slice(0, 30).map((n) => (
+          <li key={n.id} className={`row row-top note ${n.mine ? 'note-mine' : n.read ? '' : 'is-new'}`}>
             <div className="grow">
-              <div className="muted small">{new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="muted small">
+                {n.mine ? 'Ty' : client.name.split(' ')[0]} · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </div>
               <p className="pre">{n.text}</p>
+              {n.sessionId && (
+                <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: n.sessionId! })}>
+                  Zobacz ten trening ›
+                </button>
+              )}
             </div>
           </li>
         ))}

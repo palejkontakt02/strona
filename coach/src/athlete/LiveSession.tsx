@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
 import { clientById, extraPlanOf, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
+import { dropUnsavedVideos } from '../data/videos';
 import { fmtDay, nEx } from '../format';
 import { todayISO } from '../lib/dates';
-import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
+import { currentPlan, doneInPass, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { loadRun, storeRun } from './AthleteApp';
 import { Player } from './Player';
@@ -54,6 +55,16 @@ export function LiveSession({
     if (typeof r === 'string') return void toast(r);
     void (async () => {
       if (run && run.ex.some((e) => e.sets.some((x) => x.done)) && !(await ask('Masz rozpoczęty trening z tym podopiecznym. Porzucić go i zacząć wybrany?', { confirm: 'Tak' }))) return;
+      // ten sam trening podopieczny już zaczął sam — przejmujemy jego serie
+      const own = loadRun(clientId);
+      if (own && !own.editSessionId && own.workoutId && own.workoutId === r.workoutId && own.ex.some((e) => e.sets.some((x) => x.done))) {
+        if (await ask(`${client?.name.split(' ')[0] ?? 'Podopieczny'} zaczął już ten trening (${own.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0)} serii). Przejąć i kontynuować od tego miejsca?`, { confirm: 'Przejmij' })) {
+          storeRun(clientId, null);
+          setRun(own);
+          window.scrollTo(0, 0);
+          return;
+        }
+      }
       setRun(r);
       window.scrollTo(0, 0);
     })();
@@ -79,6 +90,7 @@ export function LiveSession({
   };
   const done: Record<string, string> = {};
   for (const s of sessions) if (plan && s.planId === plan.id && s.workoutId && !done[s.workoutId]) done[s.workoutId] = s.date; // sesje od najnowszej
+  const inPass = doneInPass(plan ?? null, sessions);
 
   const start = (workoutId: string | null) => {
     if (!workoutId || !plan) {
@@ -125,7 +137,10 @@ export function LiveSession({
               return;
             }
             const started = run.ex.some((e) => e.sets.some((s) => s.done));
-            if (!started || (await ask('Porzucić ten trening i wybrać inny? Zaliczone serie nie zostaną zapisane.', { confirm: 'Porzuć' }))) setRun(null);
+            if (!started || (await ask('Porzucić ten trening i wybrać inny? Zaliczone serie nie zostaną zapisane.', { confirm: 'Porzuć' }))) {
+              dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
+              setRun(null);
+            }
           }}
           onSaved={() => {
             if (!editing) storeRun(clientId, null, 'live');
@@ -142,6 +157,32 @@ export function LiveSession({
               {nx && ` · następny: ${nx.workout.name}`}
             </p>
           </header>
+          {(() => {
+            // podopieczny zaczął trening sam (ten sam telefon/podgląd) — przejęcie zamiast drugiego zapisu
+            const own = loadRun(clientId);
+            if (!own || own.editSessionId) return null;
+            const d = own.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0);
+            const t = own.ex.reduce((a, e) => a + e.sets.length, 0);
+            return (
+              <section className="acard acard-warn">
+                <span className="eyebrow">{client.name.split(' ')[0]} ma rozpoczęty trening</span>
+                <h2>{own.name}</h2>
+                <p className="muted small">
+                  {d} z {t} serii · rozpoczęty {fmtDay(own.date)}. Przejmij go, żeby nie powstały dwa zapisy.
+                </p>
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={() => {
+                    storeRun(clientId, null);
+                    setRun({ ...own, appointmentId: own.appointmentId ?? appointmentId });
+                    window.scrollTo(0, 0);
+                  }}
+                >
+                  Przejmij i prowadź
+                </button>
+              </section>
+            );
+          })()}
           {nx && (
             <section className="acard acard-hero">
               <span className="eyebrow">Następny z planu</span>
@@ -176,8 +217,8 @@ export function LiveSession({
                 <div key={w.id}>
                   <div className="wk-label">{w.name}</div>
                   {w.workouts.map((k) => (
-                    <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${done[k.id] ? 'done' : ''}`} disabled={!k.exercises.length} onClick={() => start(k.id)}>
-                      <span className="wo-st">{done[k.id] ? '✓' : nx?.workout.id === k.id ? '▶' : ''}</span>
+                    <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${inPass.has(k.id) && nx?.workout.id !== k.id ? 'done' : ''}`} disabled={!k.exercises.length} onClick={() => start(k.id)}>
+                      <span className="wo-st">{nx?.workout.id === k.id ? '▶' : inPass.has(k.id) ? '✓' : ''}</span>
                       <span className="wo-tx">
                         <b>{k.name}</b>
                         <span className="muted small">

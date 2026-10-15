@@ -248,3 +248,46 @@ create policy set_videos_client_insert on storage.objects for insert to authenti
 drop policy if exists set_videos_client_delete on storage.objects;
 create policy set_videos_client_delete on storage.objects for delete to authenticated
   using (bucket_id = 'set-videos' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+-- 13. Przegląd treningów przez trenera i wiadomości powiązane z treningiem.
+--     Podopieczny nie ustawia ani nie zmienia „obejrzane” (reviewedAt) i komentarza trenera (coachNote);
+--     notatka z podsumowania treningu trafia do wiadomości z odnośnikiem do treningu (sessionId).
+create or replace function public.guard_client_session() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare k text;
+begin
+  if is_trainer() then return new; end if;
+  if tg_op = 'INSERT' then
+    new.data := (new.data - 'clubRate' - 'paymentId' - 'reviewedAt' - 'coachNote') || jsonb_build_object('charge', 'brak');
+  else
+    -- poprawki klienta: serie, notatki, odczucia tak; rozliczenie, data, miejsce, podopieczny, ocena trenera — bez zmian
+    foreach k in array array['charge', 'date', 'locationId', 'clubRate', 'paymentId', 'clientId', 'id', 'reviewedAt', 'coachNote'] loop
+      if old.data ? k then
+        new.data := jsonb_set(new.data, array[k], old.data -> k);
+      else
+        new.data := new.data - k;
+      end if;
+    end loop;
+    new.id := old.id;
+    new.client_id := old.client_id;
+  end if;
+  return new;
+end $$;
+
+create or replace function public.add_client_note(p_client_id text, p_note jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare txt text := left(coalesce(p_note ->> 'text', ''), 2000);
+begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if length(trim(txt)) = 0 then raise exception 'Pusta notatka'; end if;
+  update clients
+  set data = jsonb_set(data, '{inbox}',
+        coalesce((select jsonb_agg(n) from (select n from jsonb_array_elements(coalesce(data -> 'inbox', '[]'::jsonb)) n offset greatest(0, jsonb_array_length(coalesce(data -> 'inbox', '[]'::jsonb)) - 199)) t), '[]'::jsonb)
+        || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+             'id', left(coalesce(p_note ->> 'id', md5(random()::text)), 40), 'at', now(), 'text', txt,
+             'sessionId', left(p_note ->> 'sessionId', 40))))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+notify pgrst, 'reload schema';

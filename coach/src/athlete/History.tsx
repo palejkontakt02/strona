@@ -1,9 +1,10 @@
 import { VideoChip } from '../components/SetVideo';
+import { needsReview, sessionVideos } from '../data/videos';
 import { useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
-import type { TrainingSession } from '../domain';
-import { sessionsOf } from '../data/ops';
+import type { Appointment, TrainingSession } from '../domain';
+import { isSolo, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { StartButtons } from './StartButtons';
 import { fmtDay, fmtLong, fnum, nEx } from '../format';
@@ -12,13 +13,20 @@ import { sessionLoad, tonnage } from '../lib/load';
 import { num, repsN } from '../lib/parse';
 
 /** Najbliższe zaplanowane wizyty klienta. */
+/** Zaplanowane wizyty, które jeszcze się nie skończyły (dzisiejsze po czasie trwania już nie). */
+export function upcomingVisits(appts: Appointment[], clientId: string, now = new Date()): Appointment[] {
+  const today = todayISO();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t: string) => (parseInt(t.slice(0, 2), 10) || 0) * 60 + (parseInt(t.slice(3, 5), 10) || 0);
+  return appts
+    .filter((a) => a.clientId === clientId && a.status === 'planned' && (a.date > today || (a.date === today && toMin(a.time) + (a.duration || 60) > mins)))
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+}
+
 export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: number }) {
   const { db } = useStore();
   const today = todayISO();
-  const next = db.appointments
-    .filter((a) => a.clientId === clientId && a.status === 'planned' && a.date >= today)
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    ;
+  const next = upcomingVisits(db.appointments, clientId);
   const [all, setAll] = useState(false);
   if (next.length === 0) return null;
   return (
@@ -81,7 +89,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                   <span className="muted small">
                     {nEx(s.exercises.length)}
                     {s.duration ? ` · ${s.duration} min` : ''}
-                    {s.srpe != null ? ` · RPE ${s.srpe}` : ''}
+                    {s.srpe != null ? (plain ? ` · wysiłek ${s.srpe}/10` : ` · RPE ${s.srpe}`) : ''}
                   </span>
                 </span>
                 <span className="wo-go">›</span>
@@ -100,7 +108,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
           plain={plain}
           s={open}
           onClose={() => setOpen(null)}
-          onEdit={onEdit && (() => (setOpen(null), onEdit(open)))}
+          onEdit={onEdit && (!canUndo || canUndo(open)) ? () => (setOpen(null), onEdit(open)) : undefined}
           onRepeat={onRepeat && (() => (setOpen(null), onRepeat(open)))}
           onTrainer={onTrainer && (() => (setOpen(null), onTrainer(open)))}
           onUndo={onUndo && (!canUndo || canUndo(open)) ? () => (setOpen(null), onUndo(open)) : undefined}
@@ -118,6 +126,7 @@ export function SessionSheet({
   onRepeat,
   onTrainer,
   onUndo,
+  onReview,
 }: {
   plain?: boolean;
   s: TrainingSession;
@@ -126,8 +135,12 @@ export function SessionSheet({
   onRepeat?: () => void;
   onTrainer?: () => void;
   onUndo?: () => void;
+  /** Trener: przegląd nagrań i komentarz. */
+  onReview?: () => void;
 }) {
+  const { db } = useStore();
   const ton = tonnage(s);
+  const nVid = sessionVideos(s).length;
   const load = sessionLoad(s);
   return (
     <Sheet label={`Trening ${fmtDay(s.date)}`} onClose={onClose}>
@@ -140,7 +153,20 @@ export function SessionSheet({
             Zamknij
           </button>
         </div>
+        {s.coachNote && (
+          <div className="coach-note">
+            <span className="eyebrow">Komentarz trenera</span>
+            <p>{s.coachNote}</p>
+          </div>
+        )}
+        {onReview && (
+          <button className={`btn ${needsReview(s) ? 'btn-primary' : 'btn-secondary'} btn-block`} onClick={onReview}>
+            {nVid ? `🎥 Przejrzyj nagrania (${nVid})` : '💬 Komentarz dla podopiecznego'}
+            {s.reviewedAt ? ' · obejrzane ✓' : ''}
+          </button>
+        )}
         <div className="hist-stats">
+          <span className="tag tag-neutral">{isSolo(db, s) ? 'samodzielnie' : 'z trenerem'}</span>
           {s.duration != null && (
             <span>
               <b>{s.duration}</b> min
@@ -175,13 +201,13 @@ export function SessionSheet({
                     {e.label && <span className="ex-label">{e.label}</span>} {e.name}
                   </b>
                 </div>
-                {work.length > 0 ? (
+                {work.length + warm.length > 0 ? (
                   <div className="hist-sets">
                     {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
                         {x.reps ?? '?'} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
-                        {x.rpe != null && <i> @{fnum(x.rpe)}</i>}
+                        {x.rpe != null && <i>{plain ? ` · trudność ${fnum(x.rpe)}/10` : ` @${fnum(x.rpe)}`}</i>}
                         {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}
                       </span>
                     ))}
