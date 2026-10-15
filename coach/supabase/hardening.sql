@@ -224,3 +224,27 @@ drop trigger if exists guard_client_owned on public.clients;
 create trigger guard_client_owned before update on public.clients
   for each row execute function public.guard_client_owned();
 notify pgrst, 'reload schema';
+
+-- 12. Nagrania serii (wideo techniki) — prywatny koszyk Storage „set-videos”.
+--     Folder = id podopiecznego; trener widzi i usuwa wszystko, podopieczny tylko swój folder.
+--     Limit 50 MB na plik (darmowy plan; w płatnym można podnieść file_size_limit).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('set-videos', 'set-videos', false, 52428800, array['video/*'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists set_videos_trainer on storage.objects;
+create policy set_videos_trainer on storage.objects for all to authenticated
+  using (bucket_id = 'set-videos' and public.is_trainer())
+  with check (bucket_id = 'set-videos' and public.is_trainer());
+
+drop policy if exists set_videos_client_read on storage.objects;
+create policy set_videos_client_read on storage.objects for select to authenticated
+  using (bucket_id = 'set-videos' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+drop policy if exists set_videos_client_insert on storage.objects;
+create policy set_videos_client_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'set-videos' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+drop policy if exists set_videos_client_delete on storage.objects;
+create policy set_videos_client_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'set-videos' and (storage.foldername(name))[1] in (select public.my_client_ids()));

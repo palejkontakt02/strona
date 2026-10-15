@@ -1797,8 +1797,8 @@ i.line-muted {
 }
 .sgrid {
   display: grid;
-  grid-template-columns: 36px 1fr 1fr 1fr 52px;
-  gap: var(--space-3);
+  grid-template-columns: 32px 1fr 1fr 1fr 40px 52px;
+  gap: var(--space-2);
   align-items: center;
   margin-top: var(--space-3);
 }
@@ -3425,7 +3425,7 @@ h2 {
 .set-edit-head,
 .set-edit-row {
   display: grid;
-  grid-template-columns: 34px repeat(3, minmax(0, 1fr)) 36px;
+  grid-template-columns: 34px repeat(3, minmax(0, 1fr)) 36px 36px;
   gap: 6px;
   align-items: center;
 }
@@ -3863,7 +3863,7 @@ h2 {
 @media (min-width: 601px) {
   .set-edit-head,
   .set-edit-row {
-    grid-template-columns: 34px repeat(3, minmax(0, 120px)) 36px;
+    grid-template-columns: 34px repeat(3, minmax(0, 120px)) 36px 36px;
   }
 }
 .set-edit-head span {
@@ -3932,4 +3932,56 @@ h2 {
 }
 .sgrid.warm .sn-btn {
   color: var(--color-warn);
+}
+
+/* nagrania serii */
+.cam-btn {
+  height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--color-neutral-800);
+  background: transparent;
+  color: var(--color-neutral-400);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.cam-btn.has {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.cam-btn:disabled {
+  opacity: 0.7;
+}
+.cam-spin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: cam-spin 0.8s linear infinite;
+}
+@keyframes cam-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.set-video {
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 12px;
+  background: #000;
+  margin: var(--space-3) 0;
+}
+.set-chip .chip-vid {
+  border: 0;
+  background: none;
+  padding: 0 0 0 4px;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+}
+.set-edit-row .cam-btn {
+  height: 36px;
+  border-radius: 8px;
 }

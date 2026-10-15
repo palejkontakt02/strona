@@ -213,6 +213,8 @@ export interface SetLog {
   label?: string;
   /** Kompleks, np. „2+1” (reps to suma) — nie liczy się do e1RM. */
   complex?: string;
+  /** Nagranie serii: „sb:<ścieżka w Storage>” albo „idb:<id>” (nagranie na tym urządzeniu). */
+  video?: string;
 }
 
 export interface SessionExercise {

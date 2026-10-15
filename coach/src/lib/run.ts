@@ -24,6 +24,8 @@ export interface RunSet {
   tRpe: string;
   spec: string;
   rest: string;
+  /** Nagranie serii (odnośnik jak w SetLog.video). */
+  video?: string;
 }
 
 export interface RunExercise {
@@ -278,7 +280,7 @@ export function runToExercises(run: Run) {
       .filter((s) => s.done)
       .map((s) => {
         const cx = /^\d+(\+\d+)+$/.test(s.reps.replace(/\s/g, '')) ? s.reps.replace(/\s/g, '') : undefined;
-        return { load: num(s.load) ?? undefined, reps: sumReps(s.reps) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx };
+        return { load: num(s.load) ?? undefined, reps: sumReps(s.reps) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx, video: s.video };
       });
     const work = log.filter((s) => !s.warmup);
     const top = work[0];
@@ -364,6 +366,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
           rpe: x.rpe != null ? String(x.rpe) : '',
           warmup: !!x.warmup,
           label: x.label as SetType | undefined,
+          video: x.video,
         }))
       : Array.from({ length: repsN(e.sets) || 1 }, () => ({ ...base, load: e.load ?? '', reps: e.reps ?? '', rpe: e.rpe ?? '', warmup: false }));
     const m = e.label?.match(/^[A-Z]+(\d+)$/);
@@ -402,6 +405,6 @@ export function repeatRun(s: TrainingSession, date: string, now = Date.now()): R
     date,
     startedAt: now,
     editSessionId: undefined,
-    ex: r.ex.map((e) => ({ ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0 })) })),
+    ex: r.ex.map((e) => ({ ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0, video: undefined })) })),
   };
 }

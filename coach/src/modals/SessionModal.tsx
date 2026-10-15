@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal } from '../components/ui';
+import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
 import { chargeProblem, clientById, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -57,12 +58,13 @@ interface SetDraft {
   label?: string;
   /** Docelowe RPE z planu (podpowiedź w polu). */
   tRpe?: string;
+  video?: string;
 }
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
-  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? String(x.reps) : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label }));
+  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? String(x.reps) : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video }));
 const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
   d
-    .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim())
+    .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video)
     .map((x) => {
       const out: NonNullable<SessionExercise['setsLog']>[number] = {};
       const load = num(x.load);
@@ -73,6 +75,7 @@ const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
       if (rpe != null) out.rpe = rpe;
       if (x.warmup) out.warmup = true;
       if (x.label) out.label = x.label;
+      if (x.video) out.video = x.video;
       return out;
     });
 /** Podsumowanie ćwiczenia z serii: liczba serii roboczych, powtórzenia i ciężar pierwszej z nich. */
@@ -377,6 +380,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   <span>kg</span>
                   <span>RPE</span>
                   <span />
+                  <span />
                 </div>
                 {r.series.map((x, k) => {
                   const upd = (patch: Partial<SetDraft>) => setSeries(i, (d) => d.map((y, m) => (m === k ? { ...y, ...patch } : y)));
@@ -389,6 +393,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                       <input className="input" inputMode="numeric" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Powtórzenia, seria ${k + 1}`} placeholder="powt." />
                       <input className="input" inputMode="decimal" value={x.load} onChange={(e) => upd({ load: e.target.value })} aria-label={`Ciężar, seria ${k + 1}`} placeholder="kg" />
                       <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, seria ${k + 1}`} placeholder={x.tRpe ? `cel ${x.tRpe}` : 'RPE'} />
+                      {clientId ? <SetVideoButton clientId={clientId} video={x.video} title={`${r.name || 'Ćwiczenie'} · seria ${k + 1}`} onChange={(video) => upd({ video })} /> : <span />}
                       <IconBtn icon="trash" label={`Usuń serię ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
                     </div>
                   );

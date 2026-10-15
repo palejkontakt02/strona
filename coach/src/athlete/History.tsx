@@ -1,3 +1,4 @@
+import { VideoChip } from '../components/SetVideo';
 import { useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
@@ -176,11 +177,12 @@ export function SessionSheet({
                 </div>
                 {work.length > 0 ? (
                   <div className="hist-sets">
-                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}</span>}
+                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
                         {x.reps ?? '?'} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
                         {x.rpe != null && <i> @{fnum(x.rpe)}</i>}
+                        {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}
                       </span>
                     ))}
                   </div>

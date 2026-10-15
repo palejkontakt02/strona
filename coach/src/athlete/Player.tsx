@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { useDialog } from '../components/useDialog';
 import { IconBtn } from '../components/ui';
+import { SetVideoButton } from '../components/SetVideo';
 import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
 import { chargeProblem, savePlan, saveSession, sessionsOf } from '../data/ops';
@@ -242,6 +243,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Powtórzenia, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
+          <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />
           <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(k, i)}>
             ✓
           </button>
@@ -275,7 +277,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       for (const k of ks) {
         const sets = r.ex[k].sets;
         const src = sets[sets.length - 1];
-        while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false });
+        while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false, video: undefined });
       }
     });
   const removeSet = async (ks: number[]) => {
@@ -342,6 +344,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <span>kg</span>
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />
+          <span />
         </div>
         {e.sets.map((s, i) => {
           if (!s.warmup) n++;
@@ -379,6 +382,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           <span>powt.</span>
           <span>kg</span>
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
+          <span />
           <span />
         </div>
         {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`))}
