@@ -53,10 +53,10 @@ export function LoginScreen() {
     <Screen title={mode === 'login' ? 'Zaloguj się' : mode === 'signup' ? 'Załóż konto' : 'Nowe hasło'}>
       {mode !== 'reset' && (
         <div className="seg">
-          <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
+          <button type="button" className={mode === 'login' ? 'active' : ''} aria-pressed={mode === 'login'} onClick={() => setMode('login')}>
             Logowanie
           </button>
-          <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>
+          <button type="button" className={mode === 'signup' ? 'active' : ''} aria-pressed={mode === 'signup'} onClick={() => setMode('signup')}>
             Nowe konto
           </button>
         </div>

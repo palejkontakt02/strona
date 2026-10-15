@@ -1,4 +1,5 @@
 import { PlanSets } from '../components/sets';
+import { Sheet } from '../components/Sheet';
 import type { PlanWorkout } from '../domain';
 import { fmtDay } from '../format';
 import { exerciseLabels } from '../lib/plan';
@@ -28,8 +29,7 @@ export function WorkoutPreview({
 }) {
   const labels = exerciseLabels(workout.exercises);
   return (
-    <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={workout.name}>
+    <Sheet label={workout.name} onClose={onClose}>
         <div className="between">
           <div>
             <span className="eyebrow">{[extra ? 'poza planem' : 'trening z planu', done ? `wykonany ${fmtDay(done)}` : 'jeszcze niewykonany'].join(' · ')}</span>
@@ -58,7 +58,6 @@ export function WorkoutPreview({
             ))}
         </div>
         {onStart && <StartButtons onStart={onStart} onTrainer={onTrainer} />}
-      </div>
-    </div>
+      </Sheet>
   );
 }

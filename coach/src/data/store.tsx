@@ -3,6 +3,7 @@ import type { Checkin, ClientNote } from '../domain';
 import { uid } from '../format';
 import { withDay } from '../lib/habits';
 import { emailTrainer } from './mail';
+import { useDialog } from '../components/useDialog';
 import { applyChanges, type Change, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
 
@@ -264,21 +265,7 @@ export function StoreProvider({
           </div>
         ))}
       </div>
-      {askState && (
-        <div className="modal-backdrop ask-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
-          <div className="card modal modal-sm" role="alertdialog" aria-modal="true">
-            <p className="ask-text">{askState.message}</p>
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => close(false)}>
-                Anuluj
-              </button>
-              <button className={askState.danger ? 'btn btn-danger' : 'btn btn-primary'} autoFocus onClick={() => close(true)}>
-                {askState.confirm}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {askState && <AskDialog state={askState} onClose={close} />}
     </Ctx.Provider>
   );
 }
@@ -287,4 +274,27 @@ export function useStore(): StoreValue {
   const v = useContext(Ctx);
   if (!v) throw new Error('useStore poza StoreProvider');
   return v;
+}
+
+/** Okno potwierdzenia: przy usuwaniu fokus startuje na „Anuluj”, Escape anuluje. */
+function AskDialog({ state, onClose }: { state: AskState; onClose: (ok: boolean) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialog(ref, () => onClose(false), state.danger ? '.ask-cancel' : '.ask-ok');
+  return (
+    <div className="modal-backdrop ask-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose(false)}>
+      <div ref={ref} className="card modal modal-sm" role="alertdialog" aria-modal="true" aria-describedby="ask-text" tabIndex={-1}>
+        <p className="ask-text" id="ask-text">
+          {state.message}
+        </p>
+        <div className="modal-actions">
+          <button className="btn btn-ghost ask-cancel" onClick={() => onClose(false)}>
+            Anuluj
+          </button>
+          <button className={`${state.danger ? 'btn btn-danger' : 'btn btn-primary'} ask-ok`} onClick={() => onClose(true)}>
+            {state.confirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

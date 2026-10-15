@@ -3729,3 +3729,98 @@ h2 {
 .kpi:has(.kpi-hint:hover) .kpi-hint-text {
   display: block;
 }
+
+/* ---------- dostępność (przegląd WCAG) ---------- */
+@media (max-width: 900px) {
+  /* ≥ 16 px w polach — iOS nie powiększa ekranu przy dotknięciu */
+  .input,
+  .input-sm,
+  .input-xs,
+  .input.ex-notes,
+  select.input,
+  textarea.input {
+    font-size: 16px;
+  }
+  .scale {
+    gap: 6px;
+  }
+  .scale button {
+    height: 44px;
+    font-size: 1rem;
+  }
+  .scale-11 {
+    flex-wrap: wrap;
+  }
+  .scale-11 button {
+    flex: 1 0 calc((100% - 5 * 6px) / 6);
+    height: 44px;
+  }
+  .month-item {
+    font-size: 0.72rem;
+  }
+}
+@media (max-width: 600px) {
+  .icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .icon-btn-sm {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .btn-sm {
+    min-height: 44px;
+  }
+  .seg button {
+    min-height: 44px;
+  }
+  .chip {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+  .segs button {
+    height: 44px;
+    background-size: 100% 6px;
+  }
+}
+/* przygaszone elementy: kolor zamiast przezroczystości (kontrast ≥ 4,5:1) */
+.month-item.tile-done {
+  opacity: 1;
+  color: var(--color-neutral-400);
+}
+.month-more,
+.month-cell.other .month-num {
+  color: var(--color-neutral-400);
+  opacity: 1;
+}
+.mini-day.other {
+  opacity: 1;
+  color: var(--color-neutral-500);
+}
+.plan-workout.is-done {
+  opacity: 1;
+}
+.plan-workout.is-done .plan-workout-head strong,
+.plan-workout.is-done .set-chip {
+  color: var(--color-neutral-300);
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade,
+  .modal-backdrop,
+  .sheet,
+  .toast {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+  .btn {
+    transition: none;
+  }
+}

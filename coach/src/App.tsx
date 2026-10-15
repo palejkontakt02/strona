@@ -98,7 +98,7 @@ export function App() {
         </button>
         <div className="nav-links">
           {SECTIONS.map((s) => (
-            <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
+            <button key={s} className={section === s ? 'active' : ''} aria-current={section === s ? 'page' : undefined} onClick={() => go(s)}>
               {s}
             </button>
           ))}
@@ -154,7 +154,7 @@ export function App() {
 
       <nav className="bottombar" aria-label="Menu">
         {SECTIONS.slice(0, 2).map((s) => (
-          <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
+          <button key={s} className={section === s ? 'active' : ''} aria-current={section === s ? 'page' : undefined} onClick={() => go(s)}>
             <Icon name={ICON[s]} size={20} />
             <span>{s}</span>
           </button>
@@ -163,7 +163,7 @@ export function App() {
           <Icon name="plus" size={26} />
         </button>
         {SECTIONS.slice(2, 4).map((s) => (
-          <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}>
+          <button key={s} className={section === s ? 'active' : ''} aria-current={section === s ? 'page' : undefined} onClick={() => go(s)}>
             <Icon name={ICON[s]} size={20} />
             <span>{s}</span>
           </button>

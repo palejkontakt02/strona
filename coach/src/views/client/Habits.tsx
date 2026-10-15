@@ -117,13 +117,13 @@ export function ClientHabits({ client }: { client: Client }) {
               <span className="muted small">dziś</span>
             </div>
             <div>
-              <Ring value={pct(week.done, week.total)}>
+              <Ring value={pct(week.done, week.total)} label={`7 dni: ${Math.round(pct(week.done, week.total) * 100)}%`}>
                 <b>{Math.round(pct(week.done, week.total) * 100)}%</b>
               </Ring>
               <span className="muted small">7 dni</span>
             </div>
             <div>
-              <Ring value={pct(month.done, month.total)}>
+              <Ring value={pct(month.done, month.total)} label={`30 dni: ${Math.round(pct(month.done, month.total) * 100)}%`}>
                 <b>{Math.round(pct(month.done, month.total) * 100)}%</b>
               </Ring>
               <span className="muted small">30 dni</span>
@@ -132,11 +132,11 @@ export function ClientHabits({ client }: { client: Client }) {
           <p className="muted small center">
             Zamknięte dni (ostatnie 7): {week.closed} z {week.active} · seria {streak} {plural(streak, 'dzień', 'dni', 'dni')}
           </p>
-          <div className="habit-days" aria-label="Ostatnie 14 dni">
+          <div className="habit-days" role="group" aria-label="Ostatnie 14 dni">
             {rangeProgress(client.habits, client.habitLog, today, 14).perDay.map((d) => (
               <div key={d.date} title={`${fmtDay(d.date)}: ${d.done}/${d.total}`} className={d.total ? '' : 'off'}>
-                <Ring value={d.total ? d.done / d.total : 0} size={26} stroke={4} />
-                <span>{new Date(`${d.date}T12:00:00`).getDate()}</span>
+                <Ring value={d.total ? d.done / d.total : 0} size={26} stroke={4} label={`${fmtDay(d.date)}: ${d.done} z ${d.total}`} />
+                <span aria-hidden="true">{new Date(`${d.date}T12:00:00`).getDate()}</span>
               </div>
             ))}
           </div>

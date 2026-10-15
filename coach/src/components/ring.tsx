@@ -5,7 +5,7 @@ export function Ring({ value, size = 96, stroke = 10, children, label }: { value
   const c = 2 * Math.PI * r;
   return (
     <div className={`ring ${v >= 1 ? 'is-closed' : ''}`} style={{ width: size, height: size }} role="img" aria-label={label ?? `${Math.round(v * 100)}%`}>
-      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
         <circle className="ring-track" cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} fill="none" />
         {v > 0 && (
           <circle

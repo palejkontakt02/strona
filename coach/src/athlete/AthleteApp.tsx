@@ -364,9 +364,9 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
       {WELLNESS_ITEMS.map(([k, label]) => (
         <div key={k} className="checkin-row">
           <span>{label}</span>
-          <div className="scale scale-5">
+          <div className="scale scale-5" role="radiogroup" aria-label={label}>
             {[1, 2, 3, 4, 5].map((v) => (
-              <button key={v} type="button" className={w[k] === v ? 'active' : ''} onClick={() => setW({ ...w, [k]: v })} aria-label={`${label} ${v}`}>
+              <button key={v} type="button" role="radio" aria-checked={w[k] === v} className={w[k] === v ? 'active' : ''} onClick={() => setW({ ...w, [k]: v })} aria-label={`${label} ${v}`}>
                 {v}
               </button>
             ))}
@@ -469,10 +469,10 @@ function Progress({ clientId }: { clientId: string }) {
   return (
     <section className="acard">
       <div className="seg seg-sm">
-        <button className={tab === 'est' ? 'active' : ''} onClick={() => setTab('est')}>
+        <button className={tab === 'est' ? 'active' : ''} aria-pressed={tab === 'est'} onClick={() => setTab('est')}>
           Siła
         </button>
-        <button className={tab === 'dist' ? 'active' : ''} onClick={() => setTab('dist')}>
+        <button className={tab === 'dist' ? 'active' : ''} aria-pressed={tab === 'dist'} onClick={() => setTab('dist')}>
           Wysiłek
         </button>
       </div>
@@ -488,7 +488,7 @@ function Progress({ clientId }: { clientId: string }) {
             <LineChart label={`e1RM ${chosen}`} series={[{ label: chosen, pts: series, tone: 'cyan' }]} height={170} />
             <div className="chips">
               {(showAll ? names : names.slice(0, 6)).map((n) => (
-                <button key={n} className={`chip ${n === chosen ? 'active' : ''}`} onClick={() => setEx(n)}>
+                <button key={n} className={`chip ${n === chosen ? 'active' : ''}`} aria-pressed={n === chosen} onClick={() => setEx(n)}>
                   {n}
                 </button>
               ))}

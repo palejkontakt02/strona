@@ -398,7 +398,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   const workNo = r.series!.slice(0, k + 1).filter((y) => !y.warmup).length;
                   return (
                     <div key={x.key} className={`set-edit-row ${x.warmup ? 'warm' : ''}`}>
-                      <button type="button" className="set-no" title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
+                      <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Seria ${k + 1}: rozgrzewka` : `Seria ${k + 1}: robocza`} title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                         {x.warmup ? 'R' : workNo}
                       </button>
                       <input className="input" inputMode="numeric" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Powtórzenia, seria ${k + 1}`} placeholder="powt." />
@@ -412,7 +412,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   <button type="button" className="link small" onClick={() => setSeries(i, (d) => [...d, blankSet(d[d.length - 1])])}>
                     + seria
                   </button>
-                  <span className="muted small">numer serii → rozgrzewka</span>
+                  <span className="muted small">dotknij numeru serii, by oznaczyć rozgrzewkę</span>
                 </div>
               </div>
             ) : (

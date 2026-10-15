@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Sheet } from '../components/Sheet';
+import { useDialog } from '../components/useDialog';
 import { IconBtn } from '../components/ui';
 import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
@@ -74,6 +76,9 @@ interface Finish {
   locationId: string;
 }
 
+/** Płynne przewijanie, chyba że użytkownik wyłączył animacje. */
+const smoothScroll = (): ScrollBehavior => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+
 /** Czas od startu; po kilku godzinach (trening wznowiony następnego dnia) zostawia pole puste do wpisania. */
 function elapsedMinutes(startedAt: number): string {
   const m = Math.round((Date.now() - startedAt) / 60000);
@@ -140,7 +145,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
   const save = async () => {
     if (!finish) return;
     if (finish.srpe === '') {
-      document.querySelector('.sheet .scale-11')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.querySelector('.sheet .scale-11')?.scrollIntoView({ behavior: smoothScroll(), block: 'center' });
       return toast('Zaznacz, jak ciężki był cały trening (0–10), żeby zapisać.');
     }
     if (trainer && !editing && finish.charge === 'pojedyncza' && numIn(finish.amount, 0.01, 1_000_000) == null) return toast('Wpisz kwotę za sesję (zł) albo zmień rozliczenie.');
@@ -390,7 +395,13 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
-          <button key={i} aria-label={`${i + 1}: ${blockName(b)}`} className={b.every((k) => run.ex[k].sets.every((s) => s.done)) ? 'on' : i === bi ? 'cur' : ''} onClick={() => go(i)} />
+          <button
+            key={i}
+            aria-label={`${i + 1}: ${blockName(b)}${b.every((k) => run.ex[k].sets.every((s) => s.done)) ? ', zaliczone' : ''}`}
+            aria-current={i === bi ? 'step' : undefined}
+            className={b.every((k) => run.ex[k].sets.every((s) => s.done)) ? 'on' : i === bi ? 'cur' : ''}
+            onClick={() => go(i)}
+          />
         ))}
       </div>
       <div className="muted small upper">
@@ -468,15 +479,14 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
           onAdd={() => {
             setLayoutOpen(false);
             setAdding(true);
-            setTimeout(() => document.querySelector('.add-form')?.scrollIntoView({ behavior: 'smooth' }), 50);
+            setTimeout(() => document.querySelector('.add-form')?.scrollIntoView({ behavior: smoothScroll() }), 50);
           }}
         />
       )}
       {tempoOpen && tempoEx?.tempo && <Tempo name={tempoEx.name} phases={tempoEx.tempo} reps={repsN(tempoEx.sets.find((s) => !s.done)?.reps) || 5} onClose={() => setTempoOpen(false)} />}
 
       {finish && (
-        <div className="sheet-bg" onMouseDown={(ev) => ev.target === ev.currentTarget && setFinish(null)}>
-          <div className="sheet" role="dialog" aria-modal="true" aria-label="Podsumowanie treningu">
+        <Sheet label="Podsumowanie treningu" onClose={() => setFinish(null)}>
             <h2>Podsumowanie</h2>
             <div className="scale-h">
               <span>Jak ciężki był cały trening? (wymagane)</span>
@@ -544,8 +554,7 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
             <button className="btn btn-ghost btn-block" onClick={() => setFinish(null)}>
               Wróć do ćwiczeń
             </button>
-          </div>
-        </div>
+          </Sheet>
       )}
     </div>
   );
@@ -572,9 +581,9 @@ function RestBar({ rest, setRest }: { rest: { end: number; total: number }; setR
       <div className="rb-fill" style={{ width: `${100 - (left / rest.total) * 100}%` }} />
       <span>Przerwa</span>
       <b>{fmtSec(left)}</b>
-      <button onClick={() => setRest({ ...rest, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
-      <button onClick={() => setRest({ end: rest.end + 15000, total: rest.total + 15 })}>+15</button>
-      <button onClick={() => setRest(null)}>Pomiń</button>
+      <button aria-label="Skróć przerwę o 15 sekund" onClick={() => setRest({ ...rest, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
+      <button aria-label="Wydłuż przerwę o 15 sekund" onClick={() => setRest({ end: rest.end + 15000, total: rest.total + 15 })}>+15</button>
+      <button aria-label="Pomiń przerwę" onClick={() => setRest(null)}>Pomiń</button>
     </div>
   );
 }
@@ -588,6 +597,8 @@ const PHASES = [
 
 /** Metronom tempa: fazy z zapisu „3-1-X-0”, licznik powtórzeń, sygnał dźwiękowy na każdą fazę. */
 function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [number, number, number, number]; reps: number; onClose: () => void }) {
+  const tempoRef = useRef<HTMLDivElement>(null);
+  useDialog(tempoRef, onClose);
   const [ph, setPh] = useState<number[]>([...phases]);
   const [reps, setReps] = useState(reps0);
   const [state, setState] = useState({ running: false, rep: 0, phase: 0, t0: 0 });
@@ -628,7 +639,7 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
   const finished = !state.running && state.rep >= reps;
 
   return (
-    <div className="tempo-ov" role="dialog" aria-modal="true" aria-label="Metronom tempa">
+    <div ref={tempoRef} className="tempo-ov" role="dialog" aria-modal="true" aria-label="Metronom tempa" tabIndex={-1}>
       <div className="between">
         <b>{name}</b>
         <button className="link" onClick={onClose}>
@@ -762,8 +773,7 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
   };
 
   return (
-    <div className="sheet-bg" onMouseDown={(ev) => ev.target === ev.currentTarget && onClose()}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Układ treningu">
+    <Sheet label="Układ treningu" onClose={onClose}>
         <div className="between">
           <h2>Układ treningu</h2>
           <button className="btn btn-primary btn-sm" onClick={onClose}>
@@ -779,15 +789,15 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
               <input className="input layout-rest" value={e.rest} placeholder="Przerwa" onChange={(ev) => setRun(renameExercise(run, k, { rest: ev.target.value }))} aria-label={`Przerwa ${e.label}`} />
               <span className="layout-actions">
                 {k > 0 && (
-                  <button className={`chain ${e.linked ? 'on' : ''}`} aria-pressed={!!e.linked} title={e.linked ? 'Rozłącz z poprzednim' : 'Połącz z poprzednim (superseria / obwód)'} onClick={() => setRun(toggleLink(run, k))}>
+                  <button className={`chain ${e.linked ? 'on' : ''}`} aria-pressed={!!e.linked} aria-label={e.linked ? `Rozłącz ${e.name} z poprzednim` : `Połącz ${e.name} z poprzednim w superserię`} title={e.linked ? 'Rozłącz z poprzednim' : 'Połącz z poprzednim (superseria / obwód)'} onClick={() => setRun(toggleLink(run, k))}>
                     ⛓
                   </button>
                 )}
-                <IconBtn icon="up" label="W górę" onClick={() => setRun(moveExercise(run, k, -1))} />
-                <IconBtn icon="chevD" label="W dół" onClick={() => setRun(moveExercise(run, k, 1))} />
+                <IconBtn icon="up" label={`W górę: ${e.name}`} onClick={() => setRun(moveExercise(run, k, -1))} />
+                <IconBtn icon="chevD" label={`W dół: ${e.name}`} onClick={() => setRun(moveExercise(run, k, 1))} />
                 <IconBtn
                   icon="trash"
-                  label="Usuń ćwiczenie"
+                  label={`Usuń ćwiczenie ${e.name}`}
                   danger
                   onClick={async () => {
                     const done = e.sets.some((x) => x.done);
@@ -806,7 +816,6 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
             Zapisz ten układ także w planie
           </button>
         )}
-      </div>
-    </div>
+      </Sheet>
   );
 }

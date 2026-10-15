@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
 import type { TrainingSession } from '../domain';
 import { sessionsOf } from '../data/ops';
@@ -122,8 +123,7 @@ export function SessionSheet({
   const ton = tonnage(s);
   const load = sessionLoad(s);
   return (
-    <div className="sheet-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={`Trening ${fmtDay(s.date)}`}>
+    <Sheet label={`Trening ${fmtDay(s.date)}`} onClose={onClose}>
         <div className="between">
           <div>
             <span className="eyebrow first-cap">{fmtLong(s.date)}</span>
@@ -212,7 +212,6 @@ export function SessionSheet({
             </button>
           )}
         </div>
-      </div>
-    </div>
+      </Sheet>
   );
 }
