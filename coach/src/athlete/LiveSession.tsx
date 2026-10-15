@@ -142,6 +142,15 @@ export function LiveSession({
               setRun(null);
             }
           }}
+          onCancel={() => {
+            if (!editing) {
+              dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
+              storeRun(clientId, null, 'live');
+            }
+            setRun(null);
+            toast(editing ? 'Poprawki anulowane.' : 'Trening anulowany.');
+            onExit();
+          }}
           onSaved={() => {
             if (!editing) storeRun(clientId, null, 'live');
             setRun(null);

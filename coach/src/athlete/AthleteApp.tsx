@@ -168,6 +168,13 @@ export function AthleteApp({
             setScreen('home');
             window.scrollTo(0, 0);
           }}
+          onCancel={() => {
+            if (!run.editSessionId) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
+            setRun(null);
+            setScreen('home');
+            window.scrollTo(0, 0);
+            toast(run.editSessionId ? 'Poprawki anulowane.' : 'Trening anulowany.');
+          }}
         />
       ) : (
         <Home

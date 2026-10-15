@@ -4142,3 +4142,6 @@ body.athlete-mode .toasts {
 .card + .kpi-grid {
   margin-top: var(--space-4);
 }
+.cancel-run {
+  margin-top: var(--space-2);
+}

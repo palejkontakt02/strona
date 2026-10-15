@@ -11,6 +11,7 @@ interface AskState {
   message: string;
   confirm: string;
   danger: boolean;
+  cancel?: string;
   resolve: (ok: boolean) => void;
 }
 
@@ -20,7 +21,7 @@ interface StoreValue {
   /** Powiadomienie; z `action` — przycisk w powiadomieniu (np. „Cofnij”), dłużej widoczne. */
   toast: (message: string, action?: { label: string; run: () => void }) => void;
   /** Własny dialog potwierdzenia (window.confirm bywa blokowany). */
-  ask: (message: string, opts?: { confirm?: string; danger?: boolean }) => Promise<boolean>;
+  ask: (message: string, opts?: { confirm?: string; danger?: boolean; cancel?: string }) => Promise<boolean>;
   reset: (mode: 'seed' | 'empty') => Promise<void>;
   importDb: (db: Db) => Promise<void>;
   saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
@@ -187,9 +188,9 @@ export function StoreProvider({
   );
 
   const ask = useCallback(
-    (message: string, opts: { confirm?: string; danger?: boolean } = {}) =>
+    (message: string, opts: { confirm?: string; danger?: boolean; cancel?: string } = {}) =>
       new Promise<boolean>((resolve) =>
-        setAsk({ message, confirm: opts.confirm ?? 'Usuń', danger: opts.danger ?? true, resolve }),
+        setAsk({ message, confirm: opts.confirm ?? 'Usuń', danger: opts.danger ?? true, cancel: opts.cancel, resolve }),
       ),
     [],
   );
@@ -288,7 +289,7 @@ function AskDialog({ state, onClose }: { state: AskState; onClose: (ok: boolean)
         </p>
         <div className="modal-actions">
           <button className="btn btn-ghost ask-cancel" onClick={() => onClose(false)}>
-            Anuluj
+            {state.cancel ?? 'Anuluj'}
           </button>
           <button className={`${state.danger ? 'btn btn-danger' : 'btn btn-primary'} ask-ok`} onClick={() => onClose(true)}>
             {state.confirm}

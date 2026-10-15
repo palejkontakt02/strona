@@ -63,6 +63,8 @@ interface Props {
   /** `trainer` — trener prowadzi trening 1:1 (rozliczenie przy zapisie, wizyta → odbyta). */
   mode?: 'athlete' | 'trainer';
   homeLabel?: string;
+  /** Anulowanie rozpoczętego treningu (nic się nie zapisuje). */
+  onCancel?: () => void;
   appointmentId?: string;
 }
 
@@ -86,7 +88,7 @@ function elapsedMinutes(startedAt: number): string {
   return m > 0 && m <= 240 ? String(m) : '';
 }
 
-export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
+export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
   const { db, apply, toast, ask, sendClientNote } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
@@ -531,6 +533,20 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
       {!last && (
         <button className="btn btn-ghost btn-block finish-early" onClick={() => void openFinish()}>
           {editing ? 'Zapisz zmiany' : 'Zakończ trening wcześniej'}
+        </button>
+      )}
+      {onCancel && (
+        <button
+          className="btn btn-ghost btn-block btn-danger-text cancel-run"
+          onClick={async () => {
+            const n = run.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0);
+            const msg = editing
+              ? 'Anulować poprawki? Zapisany trening zostanie bez zmian.'
+              : `Anulować ten trening? ${n ? `Zaliczone serie (${n}) i nagrania nie zostaną zapisane.` : 'Nic nie zostanie zapisane.'}`;
+            if (await ask(msg, { confirm: editing ? 'Anuluj poprawki' : 'Anuluj trening', danger: true, cancel: editing ? 'Wróć do poprawek' : 'Wróć do treningu' })) onCancel();
+          }}
+        >
+          ✕ {editing ? 'Anuluj poprawki' : 'Anuluj trening'}
         </button>
       )}
       {!last && blocks[bi + 1] && (
