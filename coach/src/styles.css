@@ -3919,3 +3919,17 @@ h2 {
     flex: 0 0 auto;
   }
 }
+.sgrid .sn-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  height: 48px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sgrid.warm .sn-btn {
+  color: var(--color-warn);
+}

@@ -232,7 +232,13 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     return (
       <div key={`${k}-${i}`}>
         <div className={`sgrid ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${hintNext === k && !s.done ? 'is-next' : ''}`}>
-          <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
+          {run.ex[k].sets.length > 1 ? (
+            <button className="sn sn-btn" onClick={() => removeAt(k, i, num)} aria-label={`Usuń serię ${num}, ${run.ex[k].name}`} title="Usuń tę serię">
+              {label ? <span className="ex-label">{label}</span> : num}
+            </button>
+          ) : (
+            <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
+          )}
           <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Powtórzenia, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
@@ -244,6 +250,11 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
         {s.warmup && !s.done && (
           <button className="link small muted warm-remove" onClick={() => removeWarmup(k, i)}>
             ✕ usuń tę serię wstępną
+          </button>
+        )}
+        {!s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
+          <button className="link small muted warm-remove" onClick={() => removeWarmup(k, i)}>
+            ✕ usuń tę serię
           </button>
         )}
       </div>
@@ -274,7 +285,20 @@ export function Player({ client, run, setRun, onHome, onSaved, mode = 'athlete',
     });
   };
   /** Usuwa jedną serię wstępną (rozgrzewkę) — np. dodaną przez pomyłkę. */
-  const removeWarmup = (k: number, i: number) => update((r) => void r.ex[k].sets.splice(i, 1));
+  const removeWarmup = (k: number, i: number) =>
+    update((r) => {
+      const sets = r.ex[k].sets;
+      const [gone] = sets.splice(i, 1);
+      // nagłówek grupy („Robocze 3 × 2”) przechodzi na następną serię tej grupy
+      if (gone?.first && sets[i] && sets[i].gi === gone.gi) sets[i].first = true;
+    });
+  /** Dowolna seria do usunięcia — dotknięcie numeru serii. */
+  const removeAt = async (k: number, i: number, num: string) => {
+    const s = run.ex[k].sets[i];
+    const what = [s.reps && `${s.reps} powt.`, s.load && `${s.load} kg`].filter(Boolean).join(' × ');
+    if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''} — ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}`, { confirm: 'Usuń serię' }))) return;
+    removeWarmup(k, i);
+  };
 
   const header = (k: number) => {
     const e = run.ex[k];
