@@ -10,13 +10,15 @@ export function sessionLoad(s: TrainingSession): number | null {
 /** Tonaż = Σ serie × powt. × kg (z setsLog bez rozgrzewek, jeśli jest). */
 export function tonnage(s: TrainingSession): number {
   return s.exercises.reduce((acc, e) => {
+    // jednostronne: powtórzenia na stronę × 2 strony
+    const sides = e.perSide ? 2 : 1;
     if (e.setsLog && e.setsLog.length) {
-      return acc + e.setsLog.filter((x) => !x.warmup).reduce((b, x) => b + (x.load || 0) * (x.reps || 0), 0);
+      return acc + sides * e.setsLog.filter((x) => !x.warmup).reduce((b, x) => b + (x.load || 0) * (x.reps || 0), 0);
     }
     const st = repsN(e.sets);
     const r = repsN(e.reps);
     const l = num(e.load);
-    return acc + (st && r && l ? st * r * l : 0);
+    return acc + (st && r && l ? sides * st * r * l : 0);
   }, 0);
 }
 

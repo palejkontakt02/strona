@@ -356,6 +356,15 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </a>
           )}
         </div>
+        <button
+          type="button"
+          className={`side-toggle ${e.perSide ? 'on' : ''}`}
+          aria-pressed={!!e.perSide}
+          onClick={() => update((r) => void (r.ex[k].perSide = !r.ex[k].perSide || undefined))}
+          title="Ćwiczenie na jedną stronę: wpisuj powtórzenia na każdą stronę"
+        >
+          ↔ {e.perSide ? 'Na każdą stronę — powt. na stronę' : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
+        </button>
         {(e.tempo || e.notes) && (
           <div className="muted small">
             {e.tempo && `tempo ${e.tempoStr}`}
@@ -380,7 +389,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         </button>
         <div className="sgrid sgrid-head">
           <span />
-          <span>powt.</span>
+          <span>{e.perSide ? 'powt./str.' : 'powt.'}</span>
           <span>kg</span>
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />

@@ -200,13 +200,14 @@ export function SessionSheet({
                   <b>
                     {e.label && <span className="ex-label">{e.label}</span>} {e.name}
                   </b>
+                  {e.perSide && <span className="muted small">na każdą stronę</span>}
                 </div>
                 {work.length + warm.length > 0 ? (
                   <div className="hist-sets">
                     {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
-                        {x.reps ?? '?'} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
+                        {x.reps ?? '?'}{e.perSide ? '/str.' : ''} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
                         {x.rpe != null && <i>{plain ? ` · trudność ${fnum(x.rpe)}/10` : ` @${fnum(x.rpe)}`}</i>}
                         {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}
                       </span>

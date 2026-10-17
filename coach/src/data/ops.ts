@@ -161,6 +161,7 @@ export function sessionToWorkout(s: TrainingSession): PlanWorkout {
         name: e.name,
         rest: e.rest,
         notes: e.notes,
+        perSide: e.perSide,
         groups: e.setsLog?.length
           ? e.setsLog.map((x) => ({
               type: x.warmup ? ('Rozgrzewka' as const) : ('Robocze' as const),

@@ -69,3 +69,15 @@ describe('wizyty i alerty', () => {
     expect(clientAlerts(c, [], '2026-10-15').some((a) => a.level === 'red' && a.text.includes('Samopoczucie 5/25'))).toBe(true);
   });
 });
+
+describe('ćwiczenia na stronę', () => {
+  it('rozpoznaje po nazwie i liczy tonaż ×2', async () => {
+    const { perSideByName } = await import('./run');
+    const { tonnage } = await import('./load');
+    expect(perSideByName('Wiosłowanie hantlem jednorącz')).toBe(true);
+    expect(perSideByName('Bułgarskie przysiady')).toBe(true);
+    expect(perSideByName('Przysiad ze sztangą')).toBe(false);
+    const s = sess({ exercises: [{ name: 'Wykroki', perSide: true, setsLog: [{ reps: 8, load: 20 }] }] });
+    expect(tonnage(s)).toBe(320);
+  });
+});

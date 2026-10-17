@@ -9,7 +9,7 @@ import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
-import { buildRunExercise } from '../lib/run';
+import { perSideByName, buildRunExercise } from '../lib/run';
 import { num, numIn, repsN } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
@@ -32,6 +32,8 @@ interface ExRow {
   hint?: string;
   /** W bloku z poprzednim ćwiczeniem (superseria / obwód). */
   linked?: boolean;
+  /** Powtórzenia na każdą stronę. */
+  perSide?: boolean;
 }
 
 /** Blok odczytany z oznaczenia: „B2”, „C3” → połączone z poprzednim. */
@@ -91,7 +93,7 @@ const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
   return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label) });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -178,6 +180,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           notes: e.notes ?? '',
           hint: sug.why || undefined,
           linked: e.linked,
+          perSide: e.perSide ?? (perSideByName(e.name) || undefined),
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
           series: buildRunExercise(e, history).sets.map((x) => ({
             key: uid(),
@@ -250,6 +253,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         rest: r.rest || undefined,
         notes: r.notes || undefined,
         setsLog: r.series ? toLog(r.series) : undefined,
+        perSide: r.perSide || undefined,
       })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: m.appt?.id, amount: num(amount) ?? undefined, paidNow });
@@ -377,6 +381,9 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             </span>
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {r.hint && !r.series && <span className="ex-hint">Podpowiedź: {r.hint}</span>}
+            <button type="button" className={`side-toggle ${r.perSide ? 'on' : ''}`} aria-pressed={!!r.perSide} onClick={() => setRow(i, { perSide: !r.perSide || undefined })}>
+              ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
+            </button>
             {r.series ? (
               <div className="set-edit">
                 <div className="set-edit-head">

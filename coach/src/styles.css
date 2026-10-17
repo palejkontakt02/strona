@@ -4145,3 +4145,24 @@ body.athlete-mode .toasts {
 .cancel-run {
   margin-top: var(--space-2);
 }
+.side-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px dashed var(--color-neutral-700, var(--color-neutral-800));
+  background: transparent;
+  color: var(--color-neutral-400);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.side-toggle.on {
+  border-style: solid;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}

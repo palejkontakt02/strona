@@ -1,3 +1,4 @@
+import { perSideByName } from '../lib/run';
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
@@ -179,6 +180,9 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       />
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
+                    <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
+                      ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
+                    </button>
                     <div className="pe-sets">
                       <div className="pe-set pe-set-head">
                         <span>#</span>

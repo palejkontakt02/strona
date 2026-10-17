@@ -41,7 +41,14 @@ export interface RunExercise {
   tempoStr: string;
   notes: string;
   video?: string;
+  /** Powtórzenia na każdą stronę (jednostronne). */
+  perSide?: boolean;
   sets: RunSet[];
+}
+
+/** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
+export function perSideByName(name: string): boolean {
+  return /jednorącz|jednonóż|jednonoż|na (jedną )?(nogę|rękę|stronę)|bułgarsk|wykrok|single[- ]?(arm|leg)|one[- ]?(arm|leg)|unilateral|split squat|lunge|step[- ]?up|pistol|copenhagen|suitcase|side plank|deska bokiem|pallof/i.test(name);
 }
 
 export interface Run {
@@ -112,6 +119,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     tempoStr: (notes.match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
     notes: notes.replace(/tempo/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, ''),
     video,
+    perSide: e.perSide ?? (perSideByName(e.name) || undefined),
     sets,
   };
 }
@@ -142,6 +150,7 @@ export function buildRun(
 export function adHocExercise(name: string, sets: number, reps: string, load: string, rest = '2:00'): RunExercise {
   return {
     name,
+    perSide: perSideByName(name) || undefined,
     rest,
     tempo: null,
     tempoStr: '',
@@ -298,6 +307,7 @@ export function runToExercises(run: Run) {
         .filter(Boolean)
         .join(' · ') || undefined,
       setsLog: log,
+      perSide: e.perSide || undefined,
     };
   }).filter((e) => e.setsLog.length > 0);
 }
@@ -377,6 +387,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       tempo: parseTempo(e.notes),
       tempoStr: (String(e.notes || '').match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
       notes: e.notes ?? '',
+      perSide: e.perSide || undefined,
       sets,
     };
   });

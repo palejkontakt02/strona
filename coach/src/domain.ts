@@ -185,6 +185,8 @@ export interface PlanExercise {
   rest?: string;
   /** Uwagi, w tym tempo, np. „3-1-X-0”. */
   notes?: string;
+  /** Ćwiczenie jednostronne: powtórzenia liczone na każdą stronę (rękę/nogę). */
+  perSide?: boolean;
   groups: SetGroup[];
 }
 
@@ -241,6 +243,8 @@ export interface SessionExercise {
   notes?: string;
   /** Serie zapisane pojedynczo (tryb zawodnika). */
   setsLog?: SetLog[];
+  /** Powtórzenia na każdą stronę (ćwiczenie jednostronne). */
+  perSide?: boolean;
 }
 
 export interface TrainingSession {
