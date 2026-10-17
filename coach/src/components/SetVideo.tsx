@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../data/store';
-import { deleteSetVideo, saveSetVideo, videoProblem, videoUrl } from '../data/videos';
+import { deleteSetVideo, saveSetVideo, VIDEO_MAX_MB, videoProblem, videoUrl } from '../data/videos';
 import { Sheet } from './Sheet';
 import { canRecordInApp, VideoRecorder } from './VideoRecorder';
+import { shrinkVideo } from './videoShrink';
 import { Icon } from './ui';
 
 /** Odtwarzacz nagrania serii (arkusz od dołu). `onRemove` — przycisk usunięcia nagrania. */
@@ -74,8 +75,23 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
   // bez nagrania: wybór „nagraj w aplikacji” (pełna jakość) albo galeria; stara przeglądarka — od razu galeria
   const add = () => (canRecordInApp() ? setChoose(true) : input.current?.click());
 
+  const [shrink, setShrink] = useState<number | null>(null);
   const pick = async (file: File | undefined) => {
     if (!file) return;
+    // za duży film z galerii: przekodowanie w telefonie do limitu w wysokiej jakości zamiast odrzucenia
+    if (!videoProblem(file, true) && file.size > VIDEO_MAX_MB * 1024 * 1024 && canRecordInApp()) {
+      setShrink(0);
+      try {
+        const small = await shrinkVideo(file, (VIDEO_MAX_MB - 2) * 1024 * 1024, (p) => setShrink(p));
+        if (small && small.size <= VIDEO_MAX_MB * 1024 * 1024) file = small;
+      } catch (e) {
+        setShrink(null);
+        await ask(`Nie udało się zmniejszyć nagrania: ${(e as Error).message}.`, { confirm: 'Rozumiem' });
+        if (input.current) input.current.value = '';
+        return;
+      }
+      setShrink(null);
+    }
     const problem = videoProblem(file);
     if (problem) {
       // długi komunikat — okno do przeczytania zamiast znikającego paska
@@ -109,7 +125,17 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
       >
         {busy ? <span className="cam-spin" /> : <Icon name={video ? 'play' : 'cam'} size={18} />}
       </button>
-      <input ref={input} type="file" accept="video/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      <input ref={input} type="file" accept="video/*,video/quicktime,video/mp4,.mov,.mp4,.m4v" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      {shrink != null && (
+        <Sheet label="Przygotowanie nagrania" onClose={() => undefined}>
+          <h3>Przygotowuję nagranie…</h3>
+          <p className="muted small">Film jest większy niż {VIDEO_MAX_MB} MB — zapisuję go w wysokiej jakości w limicie. Nie zamykaj aplikacji.</p>
+          <div className="progress" role="progressbar" aria-valuenow={Math.round(shrink * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <span style={{ width: `${Math.round(shrink * 100)}%` }} />
+          </div>
+          <p className="center">{Math.round(shrink * 100)}%</p>
+        </Sheet>
+      )}
       {choose && (
         <Sheet label="Dodaj nagranie" onClose={() => setChoose(false)}>
           <h3>{title}</h3>
@@ -132,7 +158,9 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
             >
               Wybierz z galerii / aparatu telefonu
             </button>
-            <p className="muted small">Film z galerii telefon zwykle zmniejsza przy wysyłaniu przez przeglądarkę. Nagranie w aplikacji zapisuje się w 1080p bez dodatkowej kompresji.</p>
+            <p className="muted small">
+              Film z galerii: jeśli w okienku wyboru na iPhonie widzisz u góry <b>Opcje</b>, wybierz tam <b>Bieżący</b> / oryginał zamiast „Najbardziej zgodny” — telefon nie zmniejszy jakości. Za duży film aplikacja sama zapisze w wysokiej jakości w limicie {VIDEO_MAX_MB} MB.
+            </p>
           </div>
         </Sheet>
       )}

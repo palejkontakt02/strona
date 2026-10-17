@@ -43,8 +43,9 @@ function extOf(file: File): string {
 }
 
 /** Sprawdza plik przed wysłaniem; zwraca komunikat błędu albo null. */
-export function videoProblem(file: File): string | null {
+export function videoProblem(file: File, sizeOk = false): string | null {
   if (!file.type.startsWith('video/') && !/\.(mov|mp4|m4v|webm)$/i.test(file.name)) return 'To nie jest plik wideo.';
+  if (sizeOk) return null;
   if (file.size > VIDEO_MAX_MB * 1024 * 1024)
     return `Nagranie ma ${Math.round(file.size / 1024 / 1024)} MB — limit to ${VIDEO_MAX_MB} MB. Nagraj krótszy fragment (sama seria) albo w niższej jakości (Ustawienia → Aparat → Nagrywanie wideo → 1080p).`;
   return null;

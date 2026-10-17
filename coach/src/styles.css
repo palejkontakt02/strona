@@ -4219,3 +4219,16 @@ body.athlete-mode .toasts {
   width: 64px;
   height: 64px;
 }
+.progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-neutral-800);
+  overflow: hidden;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.25s linear;
+}

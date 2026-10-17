@@ -7,7 +7,7 @@ import { Icon } from './ui';
 export const canRecordInApp = () => typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
 /** Format nagrania: MP4 (iPhone, nowy Chrome), inaczej WebM. */
-function pickMime(): string {
+export function pickMime(): string {
   const opts = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
   return opts.find((m) => MediaRecorder.isTypeSupported?.(m)) ?? '';
 }
