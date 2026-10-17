@@ -4166,3 +4166,10 @@ body.athlete-mode .toasts {
   color: var(--color-accent);
   font-weight: 600;
 }
+.extra-card .plan-workout-head {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.extra-card .plan-workout-head > strong {
+  flex: 1 1 auto;
+}

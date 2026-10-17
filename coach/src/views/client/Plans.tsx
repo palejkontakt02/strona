@@ -37,6 +37,11 @@ export function ClientPlans({ client }: { client: Client }) {
   const lastDone = (id: string) => sessions.find((s) => s.planId === extra?.id && s.workoutId === id)?.date;
   const addExtra = () => openModal({ kind: 'plan', plan: extraWithNewWorkout(client.id, extra), isNew: !extra });
 
+  const removeExtra = async (id: string, name: string) => {
+    if (!extra || !(await ask(`Usunąć „${name}” z dodatkowych treningów? Zapisane wcześniej treningi zostają w historii.`, { confirm: 'Usuń trening' }))) return;
+    await apply(savePlan(db, { ...extra, weeks: extra.weeks.map((w) => ({ ...w, workouts: w.workouts.filter((k) => k.id !== id) })) }), `Usunięto „${name}”.`);
+  };
+
   return (
     <>
       <div className="toolbar">
@@ -150,6 +155,10 @@ export function ClientPlans({ client }: { client: Client }) {
                 <div className="plan-workout-head">
                   <strong>{k.name}</strong>
                   {lastDone(k.id) && <Tag tone="ok">ostatnio {fmtDate(lastDone(k.id)!)}</Tag>}
+                  <span className="row-inline">
+                    <IconBtn icon="edit" label={`Edytuj ${k.name}`} onClick={() => openModal({ kind: 'plan', plan: extra!, focusWorkoutId: k.id })} />
+                    <IconBtn icon="trash" label={`Usuń ${k.name}`} danger onClick={() => void removeExtra(k.id, k.name)} />
+                  </span>
                   {k.exercises.some((e) => e.name) ? (
                     <span className="plan-workout-actions">
                       <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
