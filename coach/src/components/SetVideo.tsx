@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../data/store';
 import { deleteSetVideo, saveSetVideo, videoProblem, videoUrl } from '../data/videos';
 import { Sheet } from './Sheet';
+import { canRecordInApp, VideoRecorder } from './VideoRecorder';
 import { Icon } from './ui';
 
 /** Odtwarzacz nagrania serii (arkusz od dołu). `onRemove` — przycisk usunięcia nagrania. */
@@ -68,6 +69,10 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  const [choose, setChoose] = useState(false);
+  const [recording, setRecording] = useState(false);
+  // bez nagrania: wybór „nagraj w aplikacji” (pełna jakość) albo galeria; stara przeglądarka — od razu galeria
+  const add = () => (canRecordInApp() ? setChoose(true) : input.current?.click());
 
   const pick = async (file: File | undefined) => {
     if (!file) return;
@@ -100,11 +105,47 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
         disabled={busy}
         aria-label={busy ? 'Wysyłanie nagrania' : video ? `Nagranie: ${title}` : `Dodaj nagranie: ${title}`}
         title={video ? 'Zobacz nagranie' : 'Nagraj lub dodaj film'}
-        onClick={() => (video ? setOpen(true) : input.current?.click())}
+        onClick={() => (video ? setOpen(true) : add())}
       >
         {busy ? <span className="cam-spin" /> : <Icon name={video ? 'play' : 'cam'} size={18} />}
       </button>
       <input ref={input} type="file" accept="video/*" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      {choose && (
+        <Sheet label="Dodaj nagranie" onClose={() => setChoose(false)}>
+          <h3>{title}</h3>
+          <div className="video-choice">
+            <button
+              className="btn btn-primary btn-lg btn-block"
+              onClick={() => {
+                setChoose(false);
+                setRecording(true);
+              }}
+            >
+              <Icon name="cam" /> Nagraj w aplikacji — najlepsza jakość
+            </button>
+            <button
+              className="btn btn-secondary btn-block"
+              onClick={() => {
+                setChoose(false);
+                input.current?.click();
+              }}
+            >
+              Wybierz z galerii / aparatu telefonu
+            </button>
+            <p className="muted small">Film z galerii telefon zwykle zmniejsza przy wysyłaniu przez przeglądarkę. Nagranie w aplikacji zapisuje się w 1080p bez dodatkowej kompresji.</p>
+          </div>
+        </Sheet>
+      )}
+      {recording && (
+        <VideoRecorder
+          title={title}
+          onClose={() => setRecording(false)}
+          onDone={(file) => {
+            setRecording(false);
+            void pick(file);
+          }}
+        />
+      )}
       {open && video && (
         <VideoViewer
           video={video}
@@ -112,7 +153,7 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
           onClose={() => setOpen(false)}
           onReplace={() => {
             setOpen(false);
-            input.current?.click();
+            add();
           }}
           onRemove={async () => {
             if (!(await ask('Usunąć nagranie tej serii?', { confirm: 'Usuń nagranie' }))) return;
