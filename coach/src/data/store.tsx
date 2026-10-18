@@ -140,8 +140,8 @@ export function StoreProvider({
       try {
         await repo.saveCheckin(clientId, checkin);
         toast('Dzięki! Zapisano samopoczucie.');
-      } catch {
-        toast('Nie udało się zapisać samopoczucia — sprawdź połączenie.');
+      } catch (e) {
+        toast((e as Error).message === 'DB_OUTDATED' ? 'Samopoczucie nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 7 w hardening.sql).' : 'Nie udało się zapisać samopoczucia — sprawdź połączenie.');
         void load();
       }
     },
@@ -192,8 +192,8 @@ export function StoreProvider({
       habitQueue.current = job.catch(() => undefined);
       try {
         await job;
-      } catch {
-        toast('Nie udało się zapisać — sprawdź połączenie.');
+      } catch (e) {
+        toast((e as Error).message === 'DB_OUTDATED' ? 'Odhaczenie nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 10 w hardening.sql).' : 'Nie udało się zapisać — sprawdź połączenie.');
         void load();
       }
     },

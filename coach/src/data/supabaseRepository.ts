@@ -73,6 +73,10 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
     async saveHabitDay(clientId: string, date: string, done: string[]) {
       const { error } = await supabase.rpc('save_habit_day', { p_client_id: clientId, p_date: date, p_done: done });
       if (error) throw error;
+      // kontrola: stara wersja funkcji w bazie bywa cofana przez strażnika profilu — wtedy zapis „znika”
+      const { data } = await supabase.from('clients').select('data').eq('id', clientId).maybeSingle();
+      const log = ((data as { data?: { habitLog?: { date: string; done: string[] }[] } } | null)?.data?.habitLog ?? []).find((d) => d.date === date)?.done ?? [];
+      if (data && (log.length !== done.length || done.some((x) => !log.includes(x)))) throw new Error('DB_OUTDATED');
     },
 
     async addClientNote(clientId: string, note: ClientNote) {
@@ -93,6 +97,9 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
     async saveCheckin(clientId: string, checkin: Checkin) {
       const { error } = await supabase.rpc('save_checkin', { p_client_id: clientId, p_checkin: checkin });
       if (error) throw error;
+      const { data } = await supabase.from('clients').select('data').eq('id', clientId).maybeSingle();
+      const saved = ((data as { data?: { checkins?: { date: string }[] } } | null)?.data?.checkins ?? []).some((c) => c.date === checkin.date);
+      if (data && !saved) throw new Error('DB_OUTDATED');
     },
   };
 }
