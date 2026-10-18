@@ -173,7 +173,7 @@ export function ClientProfile({ client }: { client: Client }) {
   const injuries = [...client.injuryLog].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <>
+    <div className="stack profile-stack">
       <AccountStatusCard client={client} />
       <ClientIntakeCard client={client} />
       <ClientHealth client={client} />
@@ -240,6 +240,6 @@ export function ClientProfile({ client }: { client: Client }) {
           </button>
         </div>
       </Card>
-    </>
+    </div>
   );
 }

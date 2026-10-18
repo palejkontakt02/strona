@@ -4432,3 +4432,31 @@ body.athlete-mode .toasts {
 .reply-box .btn:disabled {
   opacity: 0.45;
 }
+/* profil klienta: oddech między kartami i w środku kart */
+.profile-stack {
+  gap: var(--space-6);
+}
+.profile-stack > .card {
+  margin: 0;
+}
+.profile-stack .card-head {
+  margin-bottom: var(--space-4);
+}
+.profile-stack .card > p.muted.small:first-of-type {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+.profile-stack .form-grid {
+  row-gap: var(--space-4);
+}
+.parq {
+  gap: 0;
+  margin: var(--space-4) 0 var(--space-6);
+}
+.parq-row {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.parq-row:last-child {
+  border-bottom: 0;
+}
