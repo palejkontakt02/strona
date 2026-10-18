@@ -10,7 +10,7 @@ import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
 import { perSideByName, buildRunExercise } from '../lib/run';
-import { num, numIn, repsN } from '../lib/parse';
+import { num, numIn, repsN, sidesOf, timeUnit } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
 import { WELLNESS_ITEMS } from '../lib/wellness';
@@ -64,14 +64,19 @@ interface SetDraft {
   video?: string;
 }
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
-  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? String(x.reps) : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video }));
+  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video }));
 const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
   d
     .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video)
     .map((x) => {
       const out: NonNullable<SessionExercise['setsLog']>[number] = {};
       const load = num(x.load);
-      const reps = numIn(x.reps, 0, 10000);
+      // „30 s”, „2 min” — seria na czas; „30/20” — lewa/prawa
+      const unit = timeUnit(x.reps);
+      const lr = sidesOf(x.reps);
+      const reps = lr ? lr[0] : unit ? repsN(x.reps) : numIn(x.reps, 0, 10000);
+      if (unit) out.unit = unit;
+      if (lr && lr[1] !== lr[0]) out.repsR = lr[1];
       const rpe = numIn(x.rpe, 0, 10);
       if (load != null) out.load = load;
       if (reps != null) out.reps = reps;
@@ -182,7 +187,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           linked: e.linked,
           perSide: e.perSide ?? (perSideByName(e.name) || undefined),
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
-          series: buildRunExercise(e, history).sets.map((x) => ({
+          series: buildRunExercise(e, history, undefined, client?.tests ?? []).sets.map((x) => ({
             key: uid(),
             load: x.load,
             reps: x.reps,

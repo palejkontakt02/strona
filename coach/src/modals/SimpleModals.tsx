@@ -60,6 +60,7 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
       title="Nowy pomiar"
       onClose={closeModal}
       onSubmit={async () => {
+        if (date > todayISO()) return toast('Data pomiaru jest w przyszłości — sprawdź datę.');
         const meas: Measurement = { id: uid(), date, note: note.trim() || undefined };
         let any = false;
         for (const [k] of MEASURE_FIELDS) {
@@ -92,7 +93,8 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
 }
 
 /* ---------- test ---------- */
-const lowerByName = (n: string) => /\(s\)|czas|sprint|timed|tętno/i.test(n);
+// mniej = lepiej tylko dla testów na szybkość/czas wykonania; utrzymanie pozycji (stanie na 1 nodze, deska, wytrzymałość) — więcej = lepiej
+const lowerByName = (n: string) => !/stani|utrzym|deska|plank|wytrzym|hold|izometr|balans|równowag|wall sit|sorensen/i.test(n) && /\(s\)|czas|sprint|timed|tętno|tug|505|t-test|bieg/i.test(n);
 
 export function TestModal({ m }: { m: Extract<ModalState, { kind: 'test' }> }) {
   const { apply, toast } = useStore();
@@ -120,7 +122,8 @@ export function TestModal({ m }: { m: Extract<ModalState, { kind: 'test' }> }) {
       onSubmit={async () => {
         if (!name.trim()) return;
         if (num(value) == null && !value.trim() && (L == null || P == null)) return toast('Wpisz wynik albo obie strony.');
-        const t: TestResult = { id: uid(), date, name: name.trim(), value: num(value) ?? (value.trim() || undefined), unit: unit.trim() || undefined, note: note.trim() || undefined };
+        const t: TestResult = { id: uid(), date, name: name.trim(), // „138/86” (ciśnienie) i inne zapisy z ukośnikiem zostają tekstem, nie są ucinane do pierwszej liczby
+          value: /\d\s*\/\s*\d/.test(value) ? value.trim() : num(value) ?? (value.trim() || undefined), unit: unit.trim() || undefined, note: note.trim() || undefined };
         if (L != null) t.left = L;
         if (P != null) t.right = P;
         if (lsi != null) t.lsi = lsi;
@@ -324,7 +327,7 @@ export function InjuryModal({ m }: { m: Extract<ModalState, { kind: 'injury' }> 
         <Field label="Uraz" wide>
           <input className="input" value={f.name} onChange={set('name')} required autoFocus />
         </Field>
-        <Field label="Data">
+        <Field label="Data początku (urazu / rozpoznania)">
           <input className="input" type="date" value={f.date} onChange={set('date')} required />
         </Field>
         <Field label="Strona">
@@ -339,6 +342,7 @@ export function InjuryModal({ m }: { m: Extract<ModalState, { kind: 'injury' }> 
           <select className="input" value={f.status} onChange={set('status')}>
             <option value="aktywny">aktywny</option>
             <option value="w rehabilitacji">w rehabilitacji</option>
+            <option value="przewlekły">przewlekły (stabilny)</option>
             <option value="wyleczony">wyleczony</option>
           </select>
         </Field>

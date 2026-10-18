@@ -25,6 +25,6 @@ export function runFromStart(db: Db, clientId: string, st: RunStart, date: strin
   if (!plan || !step) return 'Nie znaleziono treningu w planie.';
   if (!step.workout.exercises.some((e) => e.name)) return 'Ten trening nie ma jeszcze ćwiczeń.';
   const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
-  const r = buildRun(plan, step.week.name, step.workout, sessions, videos, date);
+  const r = buildRun(plan, step.week.name, step.workout, sessions, videos, date, Date.now(), db.clients.find((c) => c.id === clientId)?.tests ?? []);
   return plan.extra ? { ...r, planName: 'Trening dodatkowy', weekName: '' } : r;
 }

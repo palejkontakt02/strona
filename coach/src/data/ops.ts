@@ -1,4 +1,4 @@
-import type { Appointment, Client, Payment, Plan, PlanWorkout, TrainingSession } from '../domain';
+import type { Appointment, Client, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
@@ -250,16 +250,72 @@ export function clonePlan(plan: Plan, name: string): Plan {
   };
 }
 
-export function cloneWeek(w: Plan['weeks'][number], name: string): Plan['weeks'][number] {
+export function cloneWeek(w: Plan['weeks'][number], name: string, mode: Progression = 'none'): Plan['weeks'][number] {
   return {
     id: uid(),
     name,
     workouts: w.workouts.map((k) => ({
       ...k,
       id: uid(),
-      exercises: k.exercises.map((e) => ({ ...e, id: uid(), groups: e.groups.map((g) => ({ ...g })) })),
+      exercises: k.exercises.map((e) => {
+        let groups = e.groups.map((g) => progressGroup(g, mode));
+        // deload przy seriach rozpisanych pojedynczo: jedna seria robocza mniej
+        const work = groups.filter((g) => g.type !== 'Rozgrzewka');
+        if (mode === 'deload' && work.length > 1 && work.every((g) => !g.sets || g.sets === '1')) {
+          const last = groups.lastIndexOf(work[work.length - 1]);
+          groups = groups.filter((_, i) => i !== last);
+        }
+        return { ...e, id: uid(), groups };
+      }),
     })),
   };
+}
+
+/** Nazwa kolejnego tygodnia: „Tydzień 1” → „Tydzień N+1” (N = najwyższy numer w planie); inaczej „(kopia)”. */
+export function nextWeekName(weeks: { name: string }[], name: string): string {
+  const m = name.match(/^(\D*?)(\d+)(\D*)$/);
+  if (!m) return `${name} (kopia)`;
+  const nums = weeks.map((w) => w.name.match(/^(\D*?)(\d+)/)).filter((x): x is RegExpMatchArray => !!x && x[1] === m[1]).map((x) => parseInt(x[2], 10));
+  return `${m[1]}${Math.max(parseInt(m[2], 10), ...nums) + 1}`;
+}
+
+export type Progression = 'none' | 'load2' | 'load5' | 'rep' | 'rpe' | 'deload';
+export const PROGRESSIONS: [Progression, string][] = [
+  ['none', 'bez zmian'],
+  ['load2', '+2,5% ciężaru'],
+  ['load5', '+5% ciężaru'],
+  ['rep', '+1 powtórzenie'],
+  ['rpe', '+0,5 RPE'],
+  ['deload', 'deload (−1 seria, −10%, RPE −2)'],
+];
+
+const r25 = (v: number) => Math.round(v / 2.5) * 2.5;
+const fmtN = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
+
+/** Seria planu po progresji (kg, % 1RM, powtórzenia, RPE); zapis względny („-10%”) zostaje. */
+export function progressGroup(g: SetGroup, mode: Progression): SetGroup {
+  if (mode === 'none' || g.type === 'Rozgrzewka') return { ...g };
+  const out = { ...g };
+  const kg = /^\s*\d+(?:[.,]\d+)?\s*(kg)?\s*$/i.test(g.load) ? parseFloat(g.load.replace(',', '.')) : null;
+  const pct = g.load.match(/^\s*(\d+(?:[.,]\d+)?)\s*%\s*$/);
+  const pctV = pct ? parseFloat(pct[1].replace(',', '.')) : null;
+  const rpe = g.rpe ? parseFloat(g.rpe.replace(',', '.')) : null;
+  if (mode === 'load2' || mode === 'load5') {
+    const f = mode === 'load2' ? 0.025 : 0.05;
+    if (kg != null) out.load = fmtN(Math.max(r25(kg * (1 + f)), kg + 2.5));
+    else if (pctV != null) out.load = `${fmtN(pctV + f * 100)}%`;
+  } else if (mode === 'rep') {
+    if (/^\d+$/.test(g.reps.trim())) out.reps = String(parseInt(g.reps, 10) + 1);
+  } else if (mode === 'rpe') {
+    if (rpe != null) out.rpe = fmtN(Math.min(10, rpe + 0.5));
+  } else if (mode === 'deload') {
+    const n = parseInt(g.sets || '1', 10);
+    if (Number.isFinite(n) && n > 1) out.sets = String(n - 1);
+    if (kg != null) out.load = fmtN(r25(kg * 0.9));
+    else if (pctV != null) out.load = `${fmtN(pctV - 10)}%`;
+    if (rpe != null) out.rpe = fmtN(Math.max(5, rpe - 2));
+  }
+  return out;
 }
 
 /* ---------- płatności ---------- */

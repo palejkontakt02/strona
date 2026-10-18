@@ -311,3 +311,23 @@ begin
   return new;
 end $$;
 notify pgrst, 'reload schema';
+
+-- 15. Dane tylko dla trenera: wywiad zdrowotny (PAR-Q, leki, zgoda lekarza, przeciwwskazania),
+--     prywatne notatki i notatki z wizyt. Osobna tabela — podopieczny nie ma do niej żadnego dostępu.
+create table if not exists public.trainer_notes (
+  id text primary key,
+  client_id text not null,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.trainer_notes enable row level security;
+drop policy if exists trainer_all on public.trainer_notes;
+create policy trainer_all on public.trainer_notes for all to authenticated
+  using (public.is_trainer()) with check (public.is_trainer());
+alter table public.trainer_notes drop constraint if exists trainer_notes_shape;
+alter table public.trainer_notes add constraint trainer_notes_shape check (
+  jsonb_typeof(data) = 'object' and data ->> 'id' = id and data ->> 'clientId' = client_id
+);
+revoke all on public.trainer_notes from anon;
+grant select, insert, update, delete on public.trainer_notes to authenticated;
+notify pgrst, 'reload schema';

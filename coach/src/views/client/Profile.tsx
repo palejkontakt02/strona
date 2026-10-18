@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { ClientHealth } from './Health';
+import { useEffect, useRef, useState } from 'react';
 import { Card, Empty, Field, IconBtn, Tag } from '../../components/ui';
 import type { Billing, Client, ClientStatus } from '../../domain';
 import { del, put } from '../../data/db';
@@ -105,7 +106,7 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
   );
 }
 
-const INJ_TONE = { aktywny: 'danger', 'w rehabilitacji': 'warn', wyleczony: 'ok' } as const;
+const INJ_TONE = { aktywny: 'danger', 'w rehabilitacji': 'warn', przewlekły: 'muted', wyleczony: 'ok' } as const;
 
 export function ClientProfile({ client }: { client: Client }) {
   const { db, apply, ask } = useStore();
@@ -117,11 +118,27 @@ export function ClientProfile({ client }: { client: Client }) {
     setDirty(true);
   };
 
-  const save = async () => {
+  const save = async (quiet = false) => {
     if (!d.name.trim()) return;
-    await apply([put('clients', fromDraft(client, d))], 'Zapisano zmiany.');
+    await apply([put('clients', fromDraft(client, d))], quiet ? undefined : 'Zapisano zmiany.');
     setDirty(false);
   };
+  // autozapis: chwilę po ostatniej zmianie i przy wyjściu z zakładki (zmiany nie giną po przejściu do „Przegląd”)
+  const latest = useRef({ d, dirty, client, apply });
+  latest.current = { d, dirty, client, apply };
+  useEffect(() => {
+    if (!dirty) return;
+    const t = window.setTimeout(() => void save(true), 1500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, dirty]);
+  useEffect(
+    () => () => {
+      const { d: dd, dirty: dt, client: c, apply: ap } = latest.current;
+      if (dt && dd.name.trim()) void ap([put('clients', fromDraft(c, dd))], 'Zapisano zmiany w profilu.');
+    },
+    [],
+  );
 
   const exportData = () => {
     const data = {
@@ -146,6 +163,7 @@ export function ClientProfile({ client }: { client: Client }) {
         ...db.plans.filter((p) => p.clientId === client.id).map((p) => del('plans', p.id)),
         ...db.sessions.filter((s) => s.clientId === client.id).map((s) => del('sessions', s.id)),
         ...db.appointments.filter((a) => a.clientId === client.id).map((a) => del('appointments', a.id)),
+        ...db.trainer_notes.filter((n) => n.clientId === client.id).map((n) => del('trainer_notes', n.id)),
       ],
       'Podopieczny usunięty.',
     );
@@ -157,6 +175,7 @@ export function ClientProfile({ client }: { client: Client }) {
   return (
     <>
       <AccountStatusCard client={client} />
+      <ClientHealth client={client} />
       <form
         className="card"
         onSubmit={(e) => {
@@ -167,7 +186,7 @@ export function ClientProfile({ client }: { client: Client }) {
         <div className="card-head">
           <h4>Dane zawodnika</h4>
           <button type="submit" className="btn btn-primary btn-sm" disabled={!dirty}>
-            {dirty ? 'Zapisz zmiany' : 'Zapisano'}
+            {dirty ? 'Zapisz teraz' : 'Zapisano ✓'}
           </button>
         </div>
         <ClientFields d={d} set={set} />

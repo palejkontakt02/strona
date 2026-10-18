@@ -338,6 +338,11 @@ function Home({
             {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
           </p>
           {withTrainer && <p className="small">Ten trening zrobicie razem na wizycie ({visitText}). Start tylko, jeśli ćwiczysz dziś sam(a).</p>}
+          {(() => {
+            const ci = client.checkins.find((c) => c.date === today);
+            const r = readiness(ci);
+            return r != null && r <= 2.5 ? <p className="small warn-text">Gorsze samopoczucie dziś ({fx(r, 1)}/5) — zrób lżej: mniej serii albo ciężar o RPE niżej. Ból lub zawroty głowy → nie trenuj i napisz do trenera.</p> : null;
+          })()}
           <button className={`btn ${withTrainer ? 'btn-secondary' : 'btn-primary'} btn-lg`} onClick={() => onStart(nx.workout.id)}>
             <Icon name="play" /> {withTrainer ? 'Start samodzielnie' : 'Start'}
           </button>
@@ -378,6 +383,7 @@ function Home({
         <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} count={sessions.filter((s) => s.date.startsWith(today.slice(0, 7))).length} />
       </div>
 
+      <BodyProgress client={client} />
       <Progress clientId={clientId} />
 
       <Workouts plan={plan} extra={extra} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id, planId) => (planId === plan?.id ? onStart(id) : onStartFrom({ planId, workoutId: id }))} onTrainer={onTrainer} />
@@ -512,6 +518,41 @@ function MonthCalendar({ dates, today, count }: { dates: Set<string>; today: str
           </span>
         ))}
       </div>
+    </section>
+  );
+}
+
+/** Pomiary ciała dla podopiecznego: waga i obwody — zmiana od pierwszego pomiaru i przebieg. */
+function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof clientById>> }) {
+  const ms = [...client.measurements].sort((a, b) => a.date.localeCompare(b.date));
+  const field = ms.some((m) => m.weight != null) ? 'weight' : ms.some((m) => m.waist != null) ? 'waist' : null;
+  if (!field || ms.filter((m) => m[field] != null).length < 1) return null;
+  const vals = ms.filter((m) => m[field] != null);
+  const first = vals[0][field]!;
+  const last = vals[vals.length - 1][field]!;
+  const d = last - first;
+  const waist = ms.filter((m) => m.waist != null);
+  const wd = waist.length >= 2 ? waist[waist.length - 1].waist! - waist[0].waist! : null;
+  return (
+    <section className="acard">
+      <h3>Twoje ciało</h3>
+      <div className="body-kpis">
+        <div>
+          <span className="muted small">{field === 'weight' ? 'Waga' : 'Talia'}</span>
+          <strong className="big">
+            {fnum(last)} {field === 'weight' ? 'kg' : 'cm'}
+          </strong>
+          {vals.length >= 2 && <span className={`small ${d < 0 ? 'ok-text' : ''}`}>{`${d > 0 ? '+' : ''}${fnum(d)} od ${fmtDay(vals[0].date)}`}</span>}
+        </div>
+        {field === 'weight' && wd != null && (
+          <div>
+            <span className="muted small">Talia</span>
+            <strong className="big">{fnum(waist[waist.length - 1].waist!)} cm</strong>
+            <span className={`small ${wd < 0 ? 'ok-text' : ''}`}>{`${wd > 0 ? '+' : ''}${fnum(wd)} cm`}</span>
+          </div>
+        )}
+      </div>
+      {vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />}
     </section>
   );
 }

@@ -55,3 +55,17 @@ export function sumReps(v: unknown): number | null {
   if (/^\d+(\+\d+)+$/.test(t)) return t.split('+').reduce((a, x) => a + parseInt(x, 10), 0);
   return numIn(t, 0, 10000);
 }
+
+/** Jednostka czasu w zapisie powtórzeń: „30 s”, „45sek”, „2 min” → 's' / 'min'; inaczej null. */
+export function timeUnit(v: unknown): 's' | 'min' | null {
+  const t = String(v ?? '').trim();
+  if (/\d\s*(min|minut\w*|')$/i.test(t)) return 'min';
+  if (/\d\s*(s|sek\w*|sec\w*|")$/i.test(t)) return 's';
+  return null;
+}
+
+/** Lewa/prawa strona: „30/20” → [30, 20]; jedna liczba → null. */
+export function sidesOf(v: unknown): [number, number] | null {
+  const m = String(v ?? '').match(/^\s*(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*[a-ząćęłńóśźż".']*\s*$/i);
+  return m ? [num(m[1])!, num(m[2])!] : null;
+}

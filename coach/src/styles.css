@@ -4232,3 +4232,82 @@ body.athlete-mode .toasts {
   background: var(--color-accent);
   transition: width 0.25s linear;
 }
+.sgrid .lr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  min-width: 0;
+}
+.sgrid .lr input {
+  min-width: 0;
+  padding-inline: 2px;
+}
+.hold-start {
+  margin: 2px 0 0 40px;
+}
+.restbar.holdbar .rb-fill {
+  background: color-mix(in srgb, var(--color-ok) 45%, transparent);
+}
+.prevhint {
+  margin: 2px 0 0 40px;
+  font-size: 0.78rem;
+  color: var(--color-neutral-400);
+}
+/* pasek przerwy nie zasłania przycisków na dole ekranu treningu */
+.player:has(.restbar) {
+  padding-bottom: 110px;
+}
+.parq {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--space-3) 0;
+}
+.parq-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+.parq-row .seg {
+  flex: 0 0 auto;
+}
+@media (max-width: 600px) {
+  .parq-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+.report-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-2);
+}
+.body-kpis {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+.body-kpis > div {
+  display: flex;
+  flex-direction: column;
+}
+.ok-text {
+  color: var(--ok-fg, var(--color-ok));
+}
+.toolbar .actions {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.toolbar .actions select {
+  max-width: 240px;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .toolbar .actions select {
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+}

@@ -35,7 +35,7 @@ describe('completeSet autoregulation', () => {
     let sets = r.sets;
     sets[1] = { ...sets[1], load: '92.5' }; // zawodnik wpisał inny ciężar, ale nie oznaczył edycji
     let res = completeSet({ ...r, sets }, 0);
-    expect(res.sets[0].rpe).toBe('8');
+    expect(res.sets[0].rpe).toBe(''); // cel RPE nie jest wpisywany jako wynik
     expect(res.sets[1].load).toBe('90');
     expect(res.sets[1].sug).toBe('-10% od poprzedniej serii (100 kg)');
     expect(res.rest).toBe(120);

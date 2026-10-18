@@ -8,6 +8,7 @@ import { useStore } from '../data/store';
 import { needsReview } from '../data/videos';
 import { ago, ageOf, normalize } from '../format';
 import { clientAlerts } from '../lib/alerts';
+import { healthFlags, trainerNotesOf } from './client/Health';
 import { todayISO } from '../lib/dates';
 import { CLIENT_TABS, useNav } from '../nav';
 import { ClientOverview } from './client/Overview';
@@ -54,7 +55,7 @@ export function ClientsView() {
         </div>
         <ul className="client-list">
           {list.map((c) => {
-            const alerts = c.status === 'aktywny' ? clientAlerts(c, sessionsOf(db, c.id), today) : [];
+            const alerts = c.status === 'aktywny' ? clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health)) : [];
             const red = alerts.some((a) => a.level === 'red');
             return (
               <li key={c.id}>

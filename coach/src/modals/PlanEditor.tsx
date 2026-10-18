@@ -2,7 +2,7 @@ import { perSideByName } from '../lib/run';
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
-import { cloneWeek, savePlan } from '../data/ops';
+import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, type Progression } from '../data/ops';
 import { useStore } from '../data/store';
 import { uid } from '../format';
 import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
@@ -96,17 +96,27 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
               </span>
             )}
             <span className="grow" />
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                const copy = cloneWeek(p.weeks[wi], `${p.weeks[wi].name} (kopia)`);
-                upd((d) => void d.weeks.splice(wi + 1, 0, copy));
+            <select
+              className="input input-sm dup-week"
+              value=""
+              aria-label="Duplikuj tydzień"
+              onChange={(ev) => {
+                const mode = ev.target.value as Progression;
+                if (!mode) return;
+                const name = nextWeekName(p.weeks, p.weeks[wi].name);
+                const copy = cloneWeek(p.weeks[wi], name, mode);
+                // „Tydzień N+1” na końcu planu; kopia bez numeru — zaraz za oryginałem
+                upd((d) => void d.weeks.splice(name.endsWith('(kopia)') ? wi + 1 : d.weeks.length, 0, copy));
                 setOpen((o) => new Set([...o, copy.id]));
               }}
             >
-              Duplikuj tydzień
-            </button>
+              <option value="">Duplikuj tydzień…</option>
+              {PROGRESSIONS.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {v === 'none' ? 'Kopia bez zmian' : `Kopia: ${l}`}
+                </option>
+              ))}
+            </select>
             <IconBtn
               icon="trash"
               label="Usuń tydzień"

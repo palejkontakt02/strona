@@ -100,7 +100,7 @@ export function LiveSession({
     const step = planSequence(plan).find((x) => x.workout.id === workoutId);
     if (!step) return toast('Nie znaleziono treningu w planie.');
     const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
-    setRun(buildRun(plan, step.week.name, step.workout, sessions, videos, todayISO()));
+    setRun(buildRun(plan, step.week.name, step.workout, sessions, videos, todayISO(), Date.now(), client.tests));
     window.scrollTo(0, 0);
   };
 

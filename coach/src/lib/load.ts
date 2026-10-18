@@ -13,9 +13,11 @@ export function tonnage(s: TrainingSession): number {
     // jednostronne: powtórzenia na stronę × 2 strony
     const sides = e.perSide ? 2 : 1;
     if (e.setsLog && e.setsLog.length) {
-      return acc + sides * e.setsLog.filter((x) => !x.warmup).reduce((b, x) => b + (x.load || 0) * (x.reps || 0), 0);
+      // serie na czas bez tonażu; różny wynik na stronę (30/20) — suma obu stron
+      return acc + e.setsLog.filter((x) => !x.warmup && !x.unit).reduce((b, x) => b + (x.load || 0) * (x.repsR != null ? (x.reps || 0) + x.repsR : sides * (x.reps || 0)), 0);
     }
     const st = repsN(e.sets);
+    if (/\d\s*(s|sek|min)\b/i.test(String(e.reps ?? ''))) return acc;
     const r = repsN(e.reps);
     const l = num(e.load);
     return acc + (st && r && l ? sides * st * r * l : 0);
@@ -54,7 +56,10 @@ export function loadStats(sessions: TrainingSession[], at: ISODate = todayISO())
     return t;
   };
   const acute = sumRange(0, 6);
-  const chronic = sumRange(0, 27) / 4;
+  // przewlekłe: średnia tygodniowa z tylu tygodni, ile faktycznie jest danych (max 4) — inaczej ACWR zawyżony na starcie
+  const spanDays = days.length ? Math.round((new Date(`${at}T12:00:00`).getTime() - new Date(`${days[0]}T12:00:00`).getTime()) / 864e5) + 1 : 0;
+  const weeks = Math.min(4, Math.max(1, spanDays / 7));
+  const chronic = sumRange(0, 27) / weeks;
   const enough = days.length > 0 && days[0] <= addDays(at, -21);
   const week = Array.from({ length: 7 }, (_, i) => dl[addDays(at, -i)] || 0);
   const mean = week.reduce((a, b) => a + b, 0) / 7;

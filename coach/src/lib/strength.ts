@@ -30,7 +30,7 @@ export function loadFor(e1: number, reps: unknown, rpe: unknown): number {
 }
 
 function workSets(e: SessionExercise): SetLog[] {
-  return (e.setsLog || []).filter((s) => !s.warmup && s.done !== false && !s.complex);
+  return (e.setsLog || []).filter((s) => !s.warmup && s.done !== false && !s.complex && !s.unit); // serie na czas nie liczą się do siły
 }
 
 /** Najlepszy e1RM ćwiczenia w sesji: max z serii roboczych, a bez serii — z podsumowania. */
@@ -179,4 +179,22 @@ export function recentE1(sessions: TrainingSession[], name: string, weeks = 6): 
     }
   }
   return best ?? bestE1(sessions, name);
+}
+
+/**
+ * Maks. z testu („1RM przysiad”, „Back Squat 1RM”, „max wyciskanie”) dla ćwiczenia z planu:
+ * najnowszy wynik testu, którego nazwa (bez „1RM/max/kg”) zawiera się w nazwie ćwiczenia.
+ */
+export function testedMax(tests: { name: string; date: string; value?: number | string }[], exercise: string): { value: number; date: string } | null {
+  const ex = exercise.toLowerCase();
+  let best: { value: number; date: string } | null = null;
+  for (const t of tests) {
+    if (!/\b(1\s*rm|rm|max|maks)/i.test(t.name)) continue;
+    const key = t.name.toLowerCase().replace(/\b(1\s*rm|rm|max|maks\w*|test)\b|\(.*?\)|kg|[:–-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const v = typeof t.value === 'number' ? t.value : parseFloat(String(t.value ?? '').replace(',', '.'));
+    if (!key || !Number.isFinite(v) || v <= 0) continue;
+    if (!ex.includes(key) && !key.split(' ').every((w) => w.length > 2 && ex.includes(w))) continue;
+    if (!best || t.date > best.date) best = { value: v, date: t.date };
+  }
+  return best;
 }

@@ -81,3 +81,14 @@ describe('parseWorkoutNote — formaty zaawansowane', () => {
     expect(r.exercises[0].setsLog![0]).toMatchObject({ reps: 3, load: 60, complex: '2+1' });
   });
 });
+
+describe('serie na czas i na stronę', () => {
+  it('3x30s i 3x6/str', () => {
+    const r = parseWorkoutNote('Deska bokiem\n3x30s\nBird dog\n3x6/str');
+    expect(r.exercises.map((e) => e.name)).toEqual(['Deska bokiem', 'Bird dog']);
+    expect(r.exercises[0].setsLog![0]).toMatchObject({ reps: 30, unit: 's' });
+    expect(r.exercises[1].perSide).toBe(true);
+    expect(r.exercises[1].setsLog!.length).toBe(3);
+    expect(r.exercises[1].setsLog![0].reps).toBe(6);
+  });
+});

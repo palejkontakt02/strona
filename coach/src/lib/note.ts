@@ -81,9 +81,14 @@ export function parseWorkoutNote(text: string): ParsedNote {
       cur = { name: inline[1].replace(/[:–-]\s*$/, '').trim(), setsLog: [] };
     }
     const isInline = !!inline && cur?.name === inline[1].replace(/[:–-]\s*$/, '').trim() && cur.setsLog.length === 0;
-    let s = parseSetLine(isInline ? inline![2] : line);
+    // „3x6/str”, „3x30s na stronę” — ćwiczenie na każdą stronę
+    const sideRe = /\s*(\/\s*str(?:onę|\.)?|na\s+(?:każdą\s+)?str(?:onę|\.)?|\/\s*nog[ęa]|na\s+nogę)\s*/i;
+    const setPart = (isInline ? inline![2] : line);
+    const sided = sideRe.test(setPart);
+    let s = parseSetLine(sided ? setPart.replace(sideRe, ' ').trim() : setPart);
+    if (s && sided && cur) cur.perSide = true;
     // w jednej linii z nazwą „4x6” (bez kg, mała liczba) czyta się jak serie × powtórzenia
-    if (s && isInline && !/kg/i.test(inline![2]) && s.count === 1 && s.load != null && Number.isInteger(s.load) && s.load <= 30 && !s.repsText.includes('+'))
+    if (s && (isInline || sided) && !/kg/i.test(setPart) && s.count === 1 && s.load != null && Number.isInteger(s.load) && s.load <= 30 && !s.repsText.includes('+'))
       s = { count: s.reps, repsText: String(s.load), reps: s.load, load: undefined, rpe: s.rpe };
     if (s) {
       if (!cur) {
@@ -92,7 +97,8 @@ export function parseWorkoutNote(text: string): ParsedNote {
       }
       if (s.repsText.includes('+') && !complex) complex = s.repsText;
       if (s.timed && !timed) timed = s.repsText;
-      for (let i = 0; i < Math.min(s.count, 20); i++) cur.setsLog.push({ load: s.load, reps: s.reps, rpe: s.rpe, complex: s.repsText.includes('+') ? s.repsText : undefined });
+      const unit = s.timed ? (/\bm$/.test(s.repsText) ? 'min' : 's') : undefined;
+      for (let i = 0; i < Math.min(s.count, 20); i++) cur.setsLog.push({ load: s.load, reps: s.reps, rpe: s.rpe, unit, complex: s.repsText.includes('+') ? s.repsText : undefined });
       continue;
     }
     flush();

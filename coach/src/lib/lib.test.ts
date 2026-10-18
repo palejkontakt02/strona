@@ -168,8 +168,9 @@ describe('load monitoring', () => {
     ss.push(sess({ date: TODAY, srpe: 10, duration: 60 }));
     const st = loadStats(ss, TODAY);
     expect(st.acute).toBe(900);
-    expect(st.chronic).toBe((900 + 600 * 3) / 4);
-    expect(st.acwr).toBeCloseTo(900 / 675, 6);
+    // dane z 24 dni → średnia z 24/7 tygodnia, nie z 4
+    expect(st.chronic).toBeCloseTo((900 + 600 * 3) / (24 / 7), 6);
+    expect(st.acwr).toBeCloseTo(900 / ((900 + 600 * 3) / (24 / 7)), 6);
     const mean = 900 / 7;
     const sd = Math.sqrt(((600 - mean) ** 2 + (300 - mean) ** 2 + 5 * mean ** 2) / 7);
     expect(st.monotony).toBeCloseTo(mean / sd, 6);

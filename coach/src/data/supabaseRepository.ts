@@ -2,7 +2,9 @@ import type { Checkin, ClientNote } from '../domain';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
 
-const TABLES: Collection[] = ['clients', 'plans', 'sessions', 'appointments', 'library', 'locations'];
+const TABLES: Collection[] = ['clients', 'plans', 'sessions', 'appointments', 'library', 'locations', 'trainer_notes'];
+/** Tabele dodane później (SQL może nie być jeszcze uruchomiony) — brak tabeli nie blokuje aplikacji. */
+const OPTIONAL: Collection[] = ['trainer_notes'];
 const PAGE = 1000;
 
 type Row = { id: string; data: unknown; client_id?: string; email?: string | null; updated_at?: string };
@@ -10,7 +12,7 @@ type Row = { id: string; data: unknown; client_id?: string; email?: string | nul
 function toRow(col: Collection, item: { id: string } & Record<string, unknown>): Row {
   const row: Row = { id: item.id, data: item, updated_at: new Date().toISOString() };
   if (col === 'clients') row.email = typeof item.email === 'string' && item.email ? item.email.trim().toLowerCase() : null;
-  if (col === 'plans' || col === 'sessions' || col === 'appointments') row.client_id = String(item.clientId);
+  if (col === 'plans' || col === 'sessions' || col === 'appointments' || col === 'trainer_notes') row.client_id = String(item.clientId);
   return row;
 }
 
@@ -18,6 +20,7 @@ async function selectAll(table: Collection): Promise<unknown[]> {
   const out: unknown[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase.from(table).select('data').range(from, from + PAGE - 1);
+    if (error && OPTIONAL.includes(table)) return out;
     if (error) throw error;
     out.push(...(data ?? []).map((r) => (r as { data: unknown }).data));
     if (!data || data.length < PAGE) break;
@@ -48,6 +51,7 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
         // Klient zapisuje tylko swoje treningi (rozliczenie pilnuje baza: hardening.sql); wizyt nie zmienia.
         if (role === 'client' && ch.col !== 'sessions') continue;
         const { error } = await supabase.from(ch.col).upsert(row);
+        if (error && OPTIONAL.includes(ch.col) && /does not exist|schema cache|relation/i.test(error.message)) throw new Error('Brak tabeli trainer_notes — uruchom w Supabase sekcję 15 z hardening.sql.');
         if (error) throw error;
       }
     },
@@ -55,6 +59,7 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
     async replaceAll(next: Db) {
       for (const t of TABLES) {
         const { error } = await supabase.from(t).delete().neq('id', '');
+        if (error && OPTIONAL.includes(t)) continue;
         if (error) throw error;
         const rows = (next[t] as unknown as ({ id: string } & Record<string, unknown>)[]).map((item) => toRow(t, item));
         for (let i = 0; i < rows.length; i += 500) {

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, saveAppointment, updateSeries } from '../data/ops';
+import { clientById, deleteAppointment, saveAppointment, sessionsOf, updateSeries } from '../data/ops';
+import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
 import { fmtShort, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
@@ -26,6 +27,9 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const [note, setNote] = useState(editing?.note ?? '');
   const [status, setStatus] = useState<AppointmentStatus>(editing?.status ?? 'planned');
   const [repeat, setRepeat] = useState(false);
+  const cl = clientById(db, clientId);
+  const pk = cl ? packageStatus(cl, sessionsOf(db, cl.id)) : null;
+  const [charged, setCharged] = useState(!!editing && !!cl?.noShowCharges?.includes(editing.id));
   const [weeks, setWeeks] = useState('8');
 
   const draft: Appointment = {
@@ -50,7 +54,11 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const n = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
     const seriesChanged = !!editing?.seriesId && (editing.time !== draft.time || (editing.duration ?? 60) !== draft.duration || editing.locationId !== draft.locationId);
     const allNext = seriesChanged && (await ask('To wizyta cykliczna. Zmienić godzinę / czas / miejsce także w kolejnych zaplanowanych wizytach z tej serii?', { confirm: 'Ta i następne', danger: false }));
-    await apply(allNext ? updateSeries(db, draft) : saveAppointment(draft, n), n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
+    // nieobecność / późne odwołanie: opcjonalnie 1 trening z pakietu
+    const chargeNow = charged && (draft.status === 'noshow' || draft.status === 'cancel');
+    const wasCharged = !!cl?.noShowCharges?.includes(draft.id);
+    const chargeChange = cl && chargeNow !== wasCharged ? [put('clients', { ...cl, noShowCharges: chargeNow ? [...(cl.noShowCharges ?? []), draft.id] : (cl.noShowCharges ?? []).filter((x) => x !== draft.id) })] : [];
+    await apply([...(allNext ? updateSeries(db, draft) : saveAppointment(draft, n)), ...chargeChange], n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
       if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
@@ -153,6 +161,14 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
               ))}
             </select>
           </Field>
+        )}
+        {editing && (status === 'noshow' || status === 'cancel') && pk && (
+          <label className="check field-wide">
+            <input type="checkbox" checked={charged} onChange={(e) => setCharged(e.target.checked)} /> Pobierz 1 trening z pakietu (nieobecność / późne odwołanie)
+          </label>
+        )}
+        {!editing && repeat && pk && pk.left < repeatN && (
+          <p className="small warn-text field-wide">Pakiet: zostało {pk.left} {pk.left === 1 ? 'trening' : 'treningów'}, a dodajesz {repeatN} wizyt — przypomnij o nowym pakiecie.</p>
         )}
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />

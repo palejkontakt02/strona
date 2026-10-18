@@ -16,7 +16,8 @@ export function packageStatus(client: Client, sessions: TrainingSession[]): Pack
   const pays = client.payments.filter((p) => p.type === 'pakiet');
   if (pays.length === 0) return null;
   const total = pays.reduce((a, p) => a + (p.sessions || 0), 0);
-  const used = sessions.filter((s) => s.charge === 'pakiet').length;
+  // + nieobecności / późne odwołania pobrane z pakietu
+  const used = sessions.filter((s) => s.charge === 'pakiet').length + (client.noShowCharges?.length ?? 0);
   const last = [...pays].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
   return { total, used, left: total - used, size: last.sessions || 0 };
 }

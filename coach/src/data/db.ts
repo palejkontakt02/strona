@@ -1,4 +1,4 @@
-import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Plan, TrainingSession } from '../domain';
+import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Plan, TrainerNotes, TrainingSession } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -7,6 +7,8 @@ export interface Db {
   appointments: Appointment[];
   library: LibraryExercise[];
   locations: Location[];
+  /** Tylko trener: wywiad zdrowotny i prywatne notatki (osobna tabela w bazie). */
+  trainer_notes: TrainerNotes[];
 }
 
 type Rec = Record<string, unknown>;
@@ -65,6 +67,7 @@ export function normalizeDb(db: Partial<Db>): Db {
     })),
     library: clean<LibraryExercise>(db.library, (r) => typeof r.name === 'string'),
     locations: clean<Location>(db.locations, (r) => typeof r.name === 'string', (r) => ({ ...r, payouts: arr(r.payouts).filter(isRec) })),
+    trainer_notes: clean<TrainerNotes>(db.trainer_notes, (r) => typeof r.clientId === 'string', (r) => ({ ...r, visits: arr(r.visits).filter((v) => isRec(v) && typeof v.text === 'string') })),
   };
 }
 

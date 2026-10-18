@@ -17,8 +17,8 @@ const fmtD = (iso: ISODate) =>
  * wellness ≤ 12/25 lub spadek > 20% vs średnia 4 poprzednich; ból ≥ 4 (≥ 6 czerwony);
  * aktywne urazy; LSI < 90% (< 80% czerwony) z najnowszego wyniku każdego testu.
  */
-export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO()): Alert[] {
-  const a: Alert[] = [];
+export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO(), extra: Alert[] = []): Alert[] {
+  const a: Alert[] = [...extra];
   const st = loadStats(sessions, today);
   if (st.acwr != null && st.acwr > 1.5) a.push({ level: 'red', text: `ACWR ${fx(st.acwr, 2)} – gwałtowny wzrost obciążeń` });
   else if (st.acwr != null && st.acwr > 1.3)
@@ -26,7 +26,9 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
   if (st.monotony != null && st.monotony > 2)
     a.push({ level: 'yellow', text: `Monotonia ${fx(st.monotony, 1)} – mało zróżnicowane obciążenia` });
 
-  const desc = [...sessions].sort((x, y) => y.date.localeCompare(x.date));
+  // ból i samopoczucie: tylko świeże dane (14 dni) — stary wynik nie świeci miesiącami
+  const since = new Date(new Date(today + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
+  const desc = [...sessions].sort((x, y) => y.date.localeCompare(x.date)).filter((s) => s.date >= since);
   const ws = desc.filter((s) => wellnessTotal(s.wellness) != null);
   if (ws.length) {
     const last = wellnessTotal(ws[0].wellness)!;
@@ -53,7 +55,8 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
   if (lp && lp.pain! >= 4)
     a.push({ level: lp.pain! >= 6 ? 'red' : 'yellow', text: `Ból ${lp.pain}/10 na treningu ${fmtD(lp.date)}` });
 
-  const inj = client.injuryLog.filter((i) => i.status !== 'wyleczony');
+  // stan przewlekły (stabilny) nie świeci ciągle — jest w profilu
+  const inj = client.injuryLog.filter((i) => i.status === 'aktywny' || i.status === 'w rehabilitacji');
   if (inj.length) a.push({ level: 'yellow', text: `Aktywne urazy: ${inj.map((i) => i.name).join(', ')}` });
 
   const latest: Record<string, Client['tests'][number]> = {};

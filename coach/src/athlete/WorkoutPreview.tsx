@@ -1,3 +1,4 @@
+import { perSideByName } from '../lib/run';
 import { PlanSets } from '../components/sets';
 import { Sheet } from '../components/Sheet';
 import type { PlanWorkout } from '../domain';
@@ -52,7 +53,7 @@ export function WorkoutPreview({
                 <b>
                   <span className="ex-label">{labels[i]}</span> {e.name}
                 </b>
-                <PlanSets groups={e.groups} />
+                <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} />
                 <div className="muted small">{[e.rest && `przerwa ${e.rest}`, e.notes].filter(Boolean).join(' · ')}</div>
               </div>
             ))}

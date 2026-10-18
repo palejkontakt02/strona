@@ -1,7 +1,7 @@
-import type { PlanExercise, PlanWorkout, SetType, TrainingSession } from '../domain';
-import { num, numIn, parseRest, parseTempo, repsN, sumReps } from './parse';
+import type { PlanExercise, PlanWorkout, SetType, TestResult, TrainingSession } from '../domain';
+import { num, numIn, parseRest, parseTempo, repsN, sidesOf, sumReps, timeUnit } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
-import { e1rmRPE, loadFor, recentE1, resolveLoad } from './strength';
+import { e1rmRPE, loadFor, recentE1, resolveLoad, testedMax } from './strength';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
 export interface RunSet {
@@ -26,6 +26,10 @@ export interface RunSet {
   rest: string;
   /** Nagranie serii (odnośnik jak w SetLog.video). */
   video?: string;
+  /** Seria na czas (sekundy / minuty). */
+  unit?: 's' | 'min';
+  /** Ta sama seria na poprzednim treningu, np. „12 × 14 kg”. */
+  prev?: string;
 }
 
 export interface RunExercise {
@@ -79,10 +83,18 @@ function lastE1(history: TrainingSession[], name: string): number | null {
  * wg zapisu (kg / % e1RM / ±% od poprzedniego bloku / z RPE). Back-off/Robocze liczone
  * od ostatniej serii poprzedniego bloku; Drop set kaskadowo seria po serii.
  */
-export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string): RunExercise {
-  const e1 = lastE1(history, e.name);
+export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string, tests: TestResult[] = []): RunExercise {
+  // %1RM: test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
+  const tm = testedMax(tests, e.name);
+  const lastDate = history.filter((s) => s.exercises.some((x) => x.name === e.name)).reduce((a, s) => (s.date > a ? s.date : a), '');
+  const e1 = tm && tm.date >= lastDate ? tm.value : lastE1(history, e.name) ?? tm?.value ?? null;
   const sets: RunSet[] = [];
   let prev: number | null = null;
+  // ostatni zapis tego ćwiczenia — podpowiedź „poprzednio” przy każdej serii roboczej
+  const lastLog = [...history].sort((a, b) => b.date.localeCompare(a.date)).flatMap((s) => s.exercises.filter((x) => x.name === e.name && x.setsLog?.length))[0]?.setsLog?.filter((x) => !x.warmup) ?? [];
+  const prevText = (x: (typeof lastLog)[number] | undefined) =>
+    x && x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}${x.load != null ? ` × ${String(x.load).replace('.', ',')} kg` : ''}${x.rpe != null ? ` @${String(x.rpe).replace('.', ',')}` : ''}` : undefined;
+  let workIdx = 0;
   mergeGroups(e.groups).forEach((g, gi) => {
     const cnt = repsN(g.sets) || 1;
     const range = /\d\s*[-–]\s*\d/.test(String(g.sets || ''));
@@ -94,6 +106,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
         load: rl.load != null ? String(rl.load) : '',
         // kompleks „2+1” zostaje tekstem (zapis liczy sumę powtórzeń)
         reps: /^\s*\d+(\s*\+\s*\d+)+\s*$/.test(g.reps) ? g.reps.replace(/\s/g, '') : String(repsN(g.reps) || ''),
+        unit: timeUnit(g.reps) ?? undefined,
         rpe: '',
         done: false,
         warmup: g.type === 'Rozgrzewka',
@@ -106,6 +119,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
         tRpe: g.rpe || '',
         spec: g.load || '',
         rest: g.rest || '',
+        prev: g.type === 'Rozgrzewka' ? undefined : prevText(lastLog[workIdx++]),
       });
     }
   });
@@ -117,7 +131,8 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     rest: e.rest || '',
     tempo: parseTempo(notes),
     tempoStr: (notes.match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
-    notes: notes.replace(/tempo/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, ''),
+    // słowo „tempo” usuwamy tylko razem z zapisem tempa (np. „tempo 3-1-X-0”), nie z innych uwag
+    notes: TEMPO_RE.test(notes) ? notes.replace(/tempo\s*:?\s*/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, '') : notes.trim(),
     video,
     perSide: e.perSide ?? (perSideByName(e.name) || undefined),
     sets,
@@ -132,6 +147,7 @@ export function buildRun(
   videos: Record<string, string | undefined>,
   today: string,
   now = Date.now(),
+  tests: TestResult[] = [],
 ): Run {
   return {
     planId: plan.id,
@@ -142,7 +158,7 @@ export function buildRun(
     date: today,
     startedAt: now,
     idx: 0,
-    ex: withLabels(workout.exercises.filter((e) => e.name).map((e) => buildRunExercise(e, history, videos[e.name]))),
+    ex: withLabels(workout.exercises.filter((e) => e.name).map((e) => buildRunExercise(e, history, videos[e.name], tests))),
   };
 }
 
@@ -246,7 +262,7 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
     if (!s.reps.trim()) s.reps = before.reps;
     if (!s.load.trim()) s.load = before.load;
   }
-  if (!s.rpe && myR && !s.warmup) s.rpe = myR;
+  // puste RPE zostaje puste — cel z planu to nie wynik (inaczej zawyża e1RM i „zgodność”)
   if (s.warmup) return { sets, rest: null };
 
   const j = sets.findIndex((x, k) => k > i && !x.done && !x.warmup);
@@ -289,12 +305,18 @@ export function runToExercises(run: Run) {
       .filter((s) => s.done)
       .map((s) => {
         const cx = /^\d+(\+\d+)+$/.test(s.reps.replace(/\s/g, '')) ? s.reps.replace(/\s/g, '') : undefined;
-        return { load: num(s.load) ?? undefined, reps: sumReps(s.reps) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx, video: s.video };
+        const unit = s.unit ?? timeUnit(s.reps) ?? undefined;
+        const lr = e.perSide ? sidesOf(s.reps) : null;
+        // różny wynik na stronę (30/20): reps = lewa, repsR = prawa; ten sam — jedna liczba
+        const reps = lr ? lr[0] : unit ? repsN(s.reps) ?? undefined : sumReps(s.reps) ?? undefined;
+        const repsR = lr && lr[1] !== lr[0] ? lr[1] : undefined;
+        return { load: num(s.load) ?? undefined, reps, repsR, unit, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx, video: s.video };
       });
     const work = log.filter((s) => !s.warmup);
     const top = work[0];
     // Tekst powtórzeń z jednostką (np. „45 s”) zostaje w podsumowaniu.
-    const topRaw = e.sets.find((x) => x.done && !x.warmup)?.reps.trim();
+    const topSet = e.sets.find((x) => x.done && !x.warmup);
+    const topRaw = topSet && (topSet.unit && !timeUnit(topSet.reps) ? `${topSet.reps.trim()} ${topSet.unit}` : topSet.reps.trim());
     return {
       name: e.name,
       label: e.label,
@@ -372,11 +394,12 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       ? e.setsLog.map((x) => ({
           ...base,
           load: x.load != null ? String(x.load) : '',
-          reps: x.reps != null ? String(x.reps) : '',
+          reps: x.reps != null ? (x.repsR != null ? `${x.reps}/${x.repsR}` : String(x.reps)) : '',
           rpe: x.rpe != null ? String(x.rpe) : '',
           warmup: !!x.warmup,
           label: x.label as SetType | undefined,
           video: x.video,
+          unit: x.unit,
         }))
       : Array.from({ length: repsN(e.sets) || 1 }, () => ({ ...base, load: e.load ?? '', reps: e.reps ?? '', rpe: e.rpe ?? '', warmup: false }));
     const m = e.label?.match(/^[A-Z]+(\d+)$/);

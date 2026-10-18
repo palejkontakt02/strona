@@ -7,9 +7,10 @@ import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, TrainingSession } from '../domain';
 import { chargeProblem, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
+import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
-import { num, numIn, repsN, sumReps } from '../lib/parse';
+import { num, numIn, repsN, sidesOf, sumReps } from '../lib/parse';
 import { recentE1 } from '../lib/strength';
 import {
   adHocExercise,
@@ -24,6 +25,7 @@ import {
   runToExercises,
   toggleLink,
   type Run,
+  type RunExercise,
   type RunSet,
 } from '../lib/run';
 
@@ -85,12 +87,14 @@ const smoothScroll = (): ScrollBehavior => (matchMedia('(prefers-reduced-motion:
 /** Czas od startu; po kilku godzinach (trening wznowiony następnego dnia) zostawia pole puste do wpisania. */
 function elapsedMinutes(startedAt: number): string {
   const m = Math.round((Date.now() - startedAt) / 60000);
-  return m > 0 && m <= 240 ? String(m) : '';
+  // kilka minut = trening uzupełniany po fakcie — puste pole zamiast zaniżonego czasu (i obciążenia)
+  return m >= 10 && m <= 240 ? String(m) : '';
 }
 
 export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
-  const { db, apply, toast, ask, sendClientNote } = useStore();
+  const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
+  const [hold, setHold] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
   const [adding, setAdding] = useState(run.ex.length === 0);
@@ -194,11 +198,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       pain: finish.pain === '' ? undefined : Number(finish.pain),
       notes: finish.notes.trim() || undefined,
       wellness: check ? { sleep: check.sleep, energy: check.energy, muscle: check.muscle, stress: check.stress, mood: check.mood } : undefined,
-      locationId: (trainer ? finish.locationId : client.locationId) || undefined,
+      // samodzielnie (np. w domu) — bez miejsca klubu, żeby nie liczyło się do rozliczeń z klubem
+      locationId: (trainer ? finish.locationId : undefined) || undefined,
       planId: run.planId,
       workoutId: run.workoutId,
       exercises: runToExercises(run),
-      solo: trainer ? undefined : true,
+      solo: !trainer,
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
@@ -211,7 +216,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const { changes, message } = saveSession(db, { session, isNew: true, appointmentId: apptId, matchAppointment: trainer && !(appointmentId && !apptId), amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
     if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪'))) return; // trening zostaje — można ponowić zapis
     // notatka z podsumowania trafia też do wiadomości trenera (z odnośnikiem do treningu)
-    if (!trainer && session.notes) void sendClientNote(client.id, `Po treningu „${session.workoutName || 'Trening'}”: ${session.notes}`, session.id);
+    // zadanie dzienne o tej samej nazwie co trening (np. „Ćwiczenia na kręgosłup”) odhacza się samo
+    if (!trainer) {
+      const key = (t: string) => t.toLowerCase().replace(/[^a-ząćęłńóśźż0-9 ]/g, '').trim();
+      const wn = key(session.workoutName || '');
+      const done = doneOn(client.habitLog, session.date);
+      const match = dueOn(client.habits, session.date).filter((h) => !done.includes(h.id) && wn.length >= 4 && (key(h.title).includes(wn) || wn.includes(key(h.title))));
+      if (match.length) void saveHabitDay(client.id, session.date, [...done, ...match.map((h) => h.id)]);
+    }
+    // ból ≥5/10 po treningu samodzielnym: trener dostaje informację od razu (z notatką, jeśli jest)
+    const hurt = !trainer && session.pain != null && session.pain >= 5;
+    if (hurt || (!trainer && session.notes))
+      void sendClientNote(
+        client.id,
+        `${hurt ? `Ból ${session.pain}/10 po treningu` : 'Po treningu'} „${session.workoutName || 'Trening'}”${session.notes ? `: ${session.notes}` : ''}`,
+        session.id,
+      );
+    if (hurt) void ask(`Ból ${session.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
     setFinish(null);
     onSaved();
   };
@@ -280,7 +301,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           ) : (
             <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
           )}
-          <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Powtórzenia, ${run.ex[k].name}, seria ${num}`} />
+          {run.ex[k].perSide ? (
+            // na stronę: osobno lewa i prawa (różny wynik, np. 30/20 s)
+            <span className="lr">
+              {(() => {
+                const [l, r] = sidesOf(s.reps)?.map(String) ?? [s.reps, s.reps];
+                const set = (nl: string, nr: string) => setSet(k, i, { reps: nl === nr ? nl : `${nl}/${nr}` });
+                return (
+                  <>
+                    <input inputMode="numeric" value={l} placeholder="L" onChange={(ev) => set(ev.target.value, r)} aria-label={`Lewa strona, ${run.ex[k].name}, seria ${num}`} />
+                    <input inputMode="numeric" value={r} placeholder="P" onChange={(ev) => set(l, ev.target.value)} aria-label={`Prawa strona, ${run.ex[k].name}, seria ${num}`} />
+                  </>
+                );
+              })()}
+            </span>
+          ) : (
+            <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+          )}
           <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
           <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
           <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />
@@ -289,6 +326,19 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </button>
         </div>
         {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
+        {s.prev && !s.sug && <div className="prevhint">poprzednio: {s.prev}</div>}
+        {s.unit && !s.done && (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) > 0 && (
+          <button
+            className="link small hold-start"
+            onClick={() => {
+              const sec = (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) * (s.unit === 'min' ? 60 : 1);
+              setHold({ end: Date.now() + sec * 1000, total: sec });
+            }}
+          >
+            ⏱ Odliczaj {s.reps.split('/')[0]} {s.unit === 'min' ? 'min' : 's'}
+            {run.ex[k].perSide ? ' (jedna strona)' : ''}
+          </button>
+        )}
         {s.warmup && !s.done && (
           <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
             ✕ usuń tę serię wstępną
@@ -389,7 +439,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         </button>
         <div className="sgrid sgrid-head">
           <span />
-          <span>{e.perSide ? 'powt./str.' : 'powt.'}</span>
+          <span>{repsHead(e)}</span>
           <span>kg</span>
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />
@@ -428,7 +478,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {ks.map((k) => header(k))}
         <div className="sgrid sgrid-head">
           <span />
-          <span>powt.</span>
+          <span>powt. / czas</span>
           <span>kg</span>
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           <span />
@@ -448,6 +498,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
   return (
     <div className="player fade">
+      {trainer &&
+        (() => {
+          // trener prowadzi trening: przeciwwskazania i ograniczenia z wywiadu (podopieczny tego nie widzi)
+          const h = db.trainer_notes.find((n) => n.clientId === client.id)?.health;
+          const txt = [h?.contraindications, h?.restrictions, h?.meds && `leki: ${h.meds}`].filter(Boolean).join(' · ');
+          return txt ? (
+            <div className="coach-note health-bar" role="note">
+              <span className="eyebrow">Uwaga z wywiadu</span>
+              <p>{txt}</p>
+            </div>
+          ) : null;
+        })()}
       <div className="between">
         <button className="btn btn-ghost btn-sm" onClick={onHome}>
           {homeLabel}
@@ -564,7 +626,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         </div>
       )}
 
-      {rest && <RestBar rest={rest} setRest={setRest} />}
+      {rest && !hold && <RestBar rest={rest} setRest={setRest} />}
+      {hold && <RestBar rest={hold} setRest={setHold} label="Trzymaj" endText="Koniec — zalicz serię ✓" />}
       {layoutOpen && (
         <LayoutSheet
           canSavePlan={trainer}
@@ -607,7 +670,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </div>
             <label className="field">
               <span>Czas treningu (min)</span>
-              <input className="input" inputMode="numeric" value={finish.duration} onChange={(ev) => setFinish({ ...finish, duration: ev.target.value })} />
+              <input className="input" inputMode="numeric" value={finish.duration} placeholder="np. 60" onChange={(ev) => setFinish({ ...finish, duration: ev.target.value })} />
             </label>
             <label className="field">
               <span>{trainer ? 'Notatki z treningu' : 'Notatka dla trenera'}</span>
@@ -655,7 +718,14 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   );
 }
 
-function RestBar({ rest, setRest }: { rest: { end: number; total: number }; setRest: (r: { end: number; total: number } | null) => void }) {
+/** Nagłówek kolumny powtórzeń: „powt.”, „sek.”, „min”, z „/str.” dla ćwiczeń na stronę (L | P). */
+function repsHead(e: RunExercise): string {
+  const u = e.sets.find((x) => !x.warmup)?.unit;
+  const base = u === 's' ? 'sek.' : u === 'min' ? 'min' : 'powt.';
+  return e.perSide ? (u ? `${base} L|P` : 'L | P') : base;
+}
+
+function RestBar({ rest, setRest, label = 'Przerwa', endText = 'Koniec przerwy – następna seria!' }: { rest: { end: number; total: number }; setRest: (r: { end: number; total: number } | null) => void; label?: string; endText?: string }) {
   const { toast } = useStore();
   const [, tick] = useState(0);
   const left = Math.max(0, Math.round((rest.end - Date.now()) / 1000));
@@ -667,14 +737,14 @@ function RestBar({ rest, setRest }: { rest: { end: number; total: number }; setR
     if (left <= 0) {
       vibrate([200, 100, 200]);
       beep(880, 0.25);
-      toast('Koniec przerwy – następna seria!');
+      toast(endText);
       setRest(null);
     }
-  }, [left, setRest, toast]);
+  }, [left, setRest, toast, endText]);
   return (
-    <div className="restbar" role="timer" aria-label="Przerwa">
+    <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
       <div className="rb-fill" style={{ width: `${100 - (left / rest.total) * 100}%` }} />
-      <span>Przerwa</span>
+      <span>{label}</span>
       <b>{fmtSec(left)}</b>
       <button aria-label="Skróć przerwę o 15 sekund" onClick={() => setRest({ ...rest, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
       <button aria-label="Wydłuż przerwę o 15 sekund" onClick={() => setRest({ end: rest.end + 15000, total: rest.total + 15 })}>+15</button>

@@ -7,6 +7,7 @@ import { markPaid } from '../data/payActions';
 import { useStore } from '../data/store';
 import { ago, fmtDate, fmtDay, fmtLong, plural, pln } from '../format';
 import { clientAlerts } from '../lib/alerts';
+import { healthFlags, trainerNotesOf } from './client/Health';
 import { isOverdue, packageStatus, PACKAGE_WARN_AT } from '../lib/billing';
 import { addDays, daysBetween, todayISO } from '../lib/dates';
 import { useNav } from '../nav';
@@ -30,7 +31,7 @@ export function Dashboard() {
   const overdue = payments.filter((p) => isOverdue(p, today));
   const due = payments.filter((p) => p.status !== 'paid').sort((a, b) => (a.dueDate || a.date).localeCompare(b.dueDate || b.date));
 
-  const alerts = active.flatMap((c) => clientAlerts(c, sessionsOf(db, c.id), today).map((a) => ({ ...a, client: c })));
+  const alerts = active.flatMap((c) => clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health)).map((a) => ({ ...a, client: c })));
   alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === 'red' ? -1 : 1));
 
   const packages = active
@@ -40,7 +41,8 @@ export function Dashboard() {
 
   const idle = active
     .map((c) => ({ c, last: lastSessionDate(db, c.id) }))
-    .filter((x) => !x.last || daysBetween(x.last, today) >= 10)
+    // nowy podopieczny bez treningów, ale z zaplanowaną wizytą, nie jest „nieaktywny”
+    .filter((x) => (!x.last ? !db.appointments.some((a) => a.clientId === x.c.id && a.status === 'planned' && a.date >= today) : daysBetween(x.last, today) >= 10))
     .sort((a, b) => (a.last || '').localeCompare(b.last || ''));
 
   const recent = [...db.sessions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);

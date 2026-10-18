@@ -81,3 +81,43 @@ describe('ćwiczenia na stronę', () => {
     expect(tonnage(s)).toBe(320);
   });
 });
+
+describe('progresja tygodnia i maks z testu', () => {
+  it('nazwa kolejnego tygodnia i progresja serii', async () => {
+    const { nextWeekName, progressGroup, cloneWeek } = await import('../data/ops');
+    expect(nextWeekName([{ name: 'Tydzień 1' }, { name: 'Tydzień 2' }], 'Tydzień 1')).toBe('Tydzień 3');
+    expect(nextWeekName([{ name: 'Baza' }], 'Baza')).toBe('Baza (kopia)');
+    const g = { type: 'Robocze' as const, sets: '1', reps: '5', load: '100', rpe: '7' };
+    expect(progressGroup(g, 'load2').load).toBe('102,5');
+    expect(progressGroup({ ...g, load: '75%' }, 'load5').load).toBe('80%');
+    expect(progressGroup(g, 'rep').reps).toBe('6');
+    expect(progressGroup(g, 'deload')).toMatchObject({ load: '90', rpe: '5' });
+    const w = cloneWeek({ id: 'w', name: 'T1', workouts: [{ id: 'k', name: 'A', exercises: [{ id: 'e', name: 'Przysiad', groups: [g, g, g] }] }] }, 'T2', 'deload');
+    expect(w.workouts[0].exercises[0].groups.length).toBe(2);
+  });
+  it('1RM z testu', async () => {
+    const { testedMax } = await import('./strength');
+    const tests = [{ name: '1RM przysiad', date: '2026-10-01', value: 132 }, { name: '1RM przysiad', date: '2026-10-10', value: 140 }, { name: 'CMJ', date: '2026-10-10', value: 42 }];
+    expect(testedMax(tests, 'Przysiad ze sztangą')?.value).toBe(140);
+    expect(testedMax(tests, 'Wyciskanie leżąc')).toBeNull();
+    const { buildRunExercise } = await import('./run');
+    const r = buildRunExercise({ id: 'e', name: 'Przysiad ze sztangą', groups: [{ type: 'Robocze', sets: '1', reps: '4', load: '80%', rpe: '' }] }, [], undefined, tests as never);
+    expect(r.sets[0].load).toBe('112.5');
+  });
+});
+
+describe('serie na czas i lewa/prawa', () => {
+  it('jednostka i strony trafiają do zapisu', async () => {
+    const { buildRunExercise, runToExercises } = await import('./run');
+    const ex = buildRunExercise({ id: 'e', name: 'Deska bokiem', perSide: true, notes: 'tempo umiarkowane', groups: [{ type: 'Robocze', sets: '2', reps: '30 s', load: '', rpe: '' }] }, []);
+    expect(ex.sets[0]).toMatchObject({ reps: '30', unit: 's' });
+    expect(ex.notes).toBe('tempo umiarkowane');
+    ex.sets[0] = { ...ex.sets[0], reps: '30/20', done: true };
+    ex.sets[1] = { ...ex.sets[1], reps: '25', done: true };
+    const out = runToExercises({ planId: '', workoutId: '', name: 'x', planName: '', weekName: '', date: '2026-10-18', startedAt: 0, idx: 0, ex: [ex] } as never);
+    expect(out[0].setsLog[0]).toMatchObject({ reps: 30, repsR: 20, unit: 's' });
+    expect(out[0].setsLog[1]).toMatchObject({ reps: 25, unit: 's' });
+    expect(out[0].setsLog[1].repsR).toBeUndefined();
+    expect(out[0].reps).toBe('30/20 s');
+  });
+});

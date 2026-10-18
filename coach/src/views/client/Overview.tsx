@@ -1,3 +1,4 @@
+import { printReport } from '../../lib/print';
 import { ClientHabits, ClientInbox } from './Habits';
 import { Card, Dot, Empty, Kpi } from '../../components/ui';
 import type { Client } from '../../domain';
@@ -5,6 +6,7 @@ import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { ago, fmtDate, fx, pln } from '../../format';
 import { clientAlerts } from '../../lib/alerts';
+import { healthFlags, trainerNotesOf } from './Health';
 import { packageStatus } from '../../lib/billing';
 import { addDays, todayISO } from '../../lib/dates';
 import { acwrZone, loadStats } from '../../lib/load';
@@ -21,7 +23,7 @@ export function ClientOverview({ client }: { client: Client }) {
   const sessions = sessionsOf(db, client.id);
   const st = loadStats(sessions, today);
   const zone = acwrZone(st.acwr);
-  const alerts = clientAlerts(client, sessions, today);
+  const alerts = clientAlerts(client, sessions, today, healthFlags(trainerNotesOf(db.trainer_notes, client.id).health));
   const pk = packageStatus(client, sessions);
   const last4w = sessions.filter((s) => s.date > addDays(today, -28)).length;
   const next = db.appointments
@@ -33,6 +35,25 @@ export function ClientOverview({ client }: { client: Client }) {
 
   return (
     <>
+      {(() => {
+        const h = trainerNotesOf(db.trainer_notes, client.id).health;
+        const txt = [h?.contraindications, h?.restrictions].filter(Boolean).join(' · ');
+        return txt ? (
+          <div className="coach-note" role="note">
+            <span className="eyebrow">Unikać / ograniczenia (z wywiadu)</span>
+            <p>{txt}</p>
+          </div>
+        ) : null;
+      })()}
+      <div className="report-row">
+        <button
+          className="btn btn-ghost btn-sm"
+          title="Raport treningowy do druku / PDF — np. dla lekarza lub fizjoterapeuty"
+          onClick={() => printReport(client, sessions, { plan: currentPlan(plansOf(db, client.id)) })}
+        >
+          🖨 Raport dla lekarza / fizjo
+        </button>
+      </div>
       <ClientInbox client={client} />
       <div className="kpi-grid">
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
@@ -46,7 +67,7 @@ export function ClientOverview({ client }: { client: Client }) {
         <Kpi
           label={client.billing === 'pakiet' || (!client.billing && pk) ? 'Pakiet' : 'Rozliczenie'}
           value={pk && (client.billing === 'pakiet' || !client.billing) ? (pk.left < 0 ? `${-pk.left} ponad` : `zostało ${pk.left}`) : BILLING_LABEL[client.billing ?? 'brak']}
-          sub={unpaid ? `do zapłaty ${pln(unpaid)}` : 'wszystko opłacone'}
+          sub={unpaid ? `do zapłaty ${pln(unpaid)}` : (client.billing === 'pakiet' || !client.billing) && !pk ? 'brak wykupionego pakietu' : 'wszystko opłacone'}
           tone={pk && pk.left <= 2 && client.billing === 'pakiet' ? 'warn' : unpaid ? 'warn' : undefined}
         />
         <Kpi

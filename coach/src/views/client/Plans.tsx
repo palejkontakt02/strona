@@ -1,5 +1,7 @@
+import { perSideByName } from '../../lib/run';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
+import { printPlan } from '../../lib/print';
 import { clonePlan, extraPlanOf, plansOf, savePlan, sessionsOf } from '../../data/ops';
 import { del } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -46,9 +48,36 @@ export function ClientPlans({ client }: { client: Client }) {
     <>
       <div className="toolbar">
         <h3>Plany treningowe</h3>
-        <button className="btn btn-primary" onClick={() => openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true })}>
-          + Nowy plan
-        </button>
+        <div className="actions">
+          {(() => {
+            // gotowy plan innego podopiecznego jako szablon (kopia — oryginał zostaje bez zmian)
+            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra);
+            if (!others.length) return null;
+            return (
+              <select
+                className="input input-sm"
+                value=""
+                aria-label="Skopiuj plan od innego podopiecznego"
+                onChange={(e) => {
+                  const src = others.find((x) => x.id === e.target.value);
+                  if (!src) return;
+                  const copy = { ...clonePlan(src, src.name), clientId: client.id, active: plans.length === 0 };
+                  void apply(savePlan(db, copy), `Skopiowano plan „${src.name}” — możesz go dopasować.`);
+                }}
+              >
+                <option value="">Plan od innego podopiecznego…</option>
+                {others.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} — {db.clients.find((c) => c.id === x.clientId)?.name ?? ''}
+                  </option>
+                ))}
+              </select>
+            );
+          })()}
+          <button className="btn btn-primary" onClick={() => openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true })}>
+            + Nowy plan
+          </button>
+        </div>
       </div>
       {plans.length === 0 && <Empty>Ten podopieczny nie ma jeszcze planu treningowego.</Empty>}
       <div className="stack">
@@ -72,6 +101,9 @@ export function ClientPlans({ client }: { client: Client }) {
                   )}
                   <IconBtn icon="edit" label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })} />
                   <IconBtn icon="copy" label="Duplikuj plan" onClick={() => apply(savePlan(db, clonePlan(p, `${p.name} (kopia)`)), 'Plan zduplikowany.')} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
+                    🖨 Drukuj
+                  </button>
                   <IconBtn
                     icon="trash"
                     label="Usuń plan"
@@ -119,7 +151,7 @@ export function ClientPlans({ client }: { client: Client }) {
                                   <span>
                                     <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                                   </span>
-                                  <PlanSets groups={e.groups} />
+                                  <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} />
                                 </li>
                               ))}
                             </ul>
@@ -179,7 +211,7 @@ export function ClientPlans({ client }: { client: Client }) {
                         <span>
                           <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                         </span>
-                        <PlanSets groups={e.groups} />
+                        <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} />
                       </li>
                     ))}
                   </ul>

@@ -518,7 +518,7 @@ export function createSeed(today = todayISO()): Db {
   const n = sessions.filter((x) => x.charge === 'klub' && x.locationId === energy.id && x.date.startsWith(old)).length;
   if (n) energy.payouts.push({ id: uid(), month: old, amount: n * (energy.clubRate ?? 0), sessions: n, paidDate: addDays(old + '-01', 38) });
 
-  return { clients, plans, sessions, appointments, library, locations };
+  return { clients, plans, sessions, appointments, library, locations, trainer_notes: [] };
 }
 
 /** Pusta baza (start bez danych przykładowych) — zostawia bibliotekę ćwiczeń. */
@@ -530,5 +530,6 @@ export function createEmpty(): Db {
     appointments: [],
     library: [...LIBRARY, ...missingFromAtlas(LIBRARY.map(([n]) => n))].map(([name, cat]) => ({ id: uid(), name, cat })),
     locations: [{ id: uid(), name: 'Studio (własne)', kind: 'własne', hue: 165, payouts: [] }],
+    trainer_notes: [],
   };
 }

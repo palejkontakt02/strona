@@ -54,6 +54,13 @@ export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: nu
   );
 }
 
+/** Seria jako tekst: „8 × 45 kg”, „8/str. × 20 kg”, „30/25 s” (lewa/prawa), „45 s”. */
+export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number }, perSide?: boolean): string {
+  const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : `${fnum(x.reps)}${perSide ? '/str.' : ''}`;
+  const main = x.unit ? `${r} ${x.unit === 'min' ? 'min' : 's'}${x.repsR != null ? ' (L/P)' : ''}` : x.repsR != null ? `${r} (L/P)` : r;
+  return x.load != null ? `${main} × ${fnum(x.load)} kg` : x.unit ? main : `${main} × —`;
+}
+
 /** Historia odbytych treningów ze szczegółami serii. */
 interface HistoryActions {
   onEdit?: (s: TrainingSession) => void;
@@ -204,10 +211,10 @@ export function SessionSheet({
                 </div>
                 {work.length + warm.length > 0 ? (
                   <div className="hist-sets">
-                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => `${x.reps ?? '?'}×${fnum(x.load)}`).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
+                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => setText(x, e.perSide)).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
-                        {x.reps ?? '?'}{e.perSide ? '/str.' : ''} × {x.load != null ? `${fnum(x.load)} kg` : '—'}
+                        {setText(x, e.perSide)}
                         {x.rpe != null && <i>{plain ? ` · trudność ${fnum(x.rpe)}/10` : ` @${fnum(x.rpe)}`}</i>}
                         {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}
                       </span>

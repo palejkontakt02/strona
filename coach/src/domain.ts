@@ -73,7 +73,8 @@ export interface Injury {
   name: string;
   date: ISODate;
   side?: string;
-  status: 'aktywny' | 'w rehabilitacji' | 'wyleczony';
+  /** „przewlekły” — stan stabilny na stałe (np. zwyrodnienie), bez ciągłego alertu. */
+  status: 'aktywny' | 'w rehabilitacji' | 'przewlekły' | 'wyleczony';
   returnDate?: ISODate;
   note?: string;
 }
@@ -116,6 +117,8 @@ export interface Client {
   habitLog?: HabitDay[];
   /** Notatki od podopiecznego do trenera (wysyłane też e-mailem). */
   inbox?: ClientNote[];
+  /** Wizyty (nieobecność / późne odwołanie) pobrane z pakietu — id wizyt. */
+  noShowCharges?: string[];
   /** Odpowiedzi trenera (wątek z wiadomościami podopiecznego). */
   replies?: CoachReply[];
 }
@@ -230,6 +233,10 @@ export interface SetLog {
   complex?: string;
   /** Nagranie serii: „sb:<ścieżka w Storage>” albo „idb:<id>” (nagranie na tym urządzeniu). */
   video?: string;
+  /** Seria na czas: `reps` to sekundy albo minuty (np. deska 30 s). */
+  unit?: 's' | 'min';
+  /** Ćwiczenie na stronę z różnym wynikiem: `reps` = lewa, `repsR` = prawa. */
+  repsR?: number;
 }
 
 export interface SessionExercise {
@@ -348,4 +355,41 @@ export interface Location {
   /** Stawka, którą klub wypłaca trenerowi za jeden trening (zł). */
   clubRate?: number;
   payouts: ClubPayout[];
+}
+
+/* ---------- Dane tylko dla trenera (osobna tabela, podopieczny ich nie widzi) ---------- */
+
+/** Wywiad zdrowotny: PAR-Q, choroby, leki, zgoda lekarza, przeciwwskazania. */
+export interface HealthIntake {
+  /** Odpowiedzi PAR-Q (klucz pytania → tak/nie). */
+  parq?: Record<string, boolean>;
+  conditions?: string;
+  meds?: string;
+  /** Ciśnienie spoczynkowe, np. „135/85”. */
+  bp?: string;
+  /** Zgoda / zalecenia lekarza lub fizjoterapeuty. */
+  clearanceBy?: string;
+  clearanceDate?: ISODate;
+  restrictions?: string;
+  /** Czego unikać na treningu (widoczne dla trenera przy prowadzeniu treningu). */
+  contraindications?: string;
+  /** Kiedy wypełniony / zaktualizowany wywiad. */
+  updated?: ISODate;
+}
+
+/** Notatka z wizyty (prywatna, np. w formacie S/O/A/P). */
+export interface ClinicalNote {
+  id: string;
+  date: ISODate;
+  text: string;
+}
+
+export interface TrainerNotes {
+  /** = id podopiecznego. */
+  id: string;
+  clientId: string;
+  health?: HealthIntake;
+  /** Prywatne notatki trenera. */
+  notes?: string;
+  visits?: ClinicalNote[];
 }
