@@ -331,3 +331,53 @@ alter table public.trainer_notes add constraint trainer_notes_shape check (
 revoke all on public.trainer_notes from anon;
 grant select, insert, update, delete on public.trainer_notes to authenticated;
 notify pgrst, 'reload schema';
+
+-- 16. Pomiary wpisywane przez podopiecznego (waga, obwody) — lista selfMeasurements, zapis przez funkcję.
+--     Trener ich nie nadpisze (może tylko ukryć flagą „hidden”), podopieczny nie zmieni niczego innego w profilu.
+create or replace function public.add_measurement(p_client_id text, p_meas jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare m jsonb := '{}'::jsonb; k text; v numeric;
+begin
+  perform set_config('fitowa.rpc', '1', true);
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if coalesce(p_meas ->> 'date', '') !~ '^\d{4}-\d{2}-\d{2}$' or (p_meas ->> 'date')::date > current_date + 1 then raise exception 'Zła data'; end if;
+  foreach k in array array['weight', 'waist', 'hips', 'chest', 'arm', 'thigh'] loop
+    if jsonb_typeof(p_meas -> k) = 'number' then
+      v := (p_meas ->> k)::numeric;
+      if v <= 0 or v > 400 then raise exception 'Zła wartość: %', k; end if;
+      m := m || jsonb_build_object(k, v);
+    end if;
+  end loop;
+  if m = '{}'::jsonb then raise exception 'Pusty pomiar'; end if;
+  m := m || jsonb_build_object('id', left(coalesce(p_meas ->> 'id', md5(random()::text)), 40), 'date', p_meas ->> 'date', 'by', 'client')
+         || case when length(coalesce(p_meas ->> 'note', '')) > 0 then jsonb_build_object('note', left(p_meas ->> 'note', 300)) else '{}'::jsonb end;
+  update clients
+  set data = jsonb_set(data, '{selfMeasurements}', coalesce(data -> 'selfMeasurements', '[]'::jsonb) || jsonb_build_array(m)),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.add_measurement from public, anon;
+grant execute on function public.add_measurement to authenticated;
+
+create or replace function public.guard_client_owned() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := new.data || jsonb_build_object(
+    'habitLog', coalesce(old.data -> 'habitLog', '[]'::jsonb),
+    'checkins', coalesce(old.data -> 'checkins', '[]'::jsonb),
+    'inbox', coalesce((
+      select jsonb_agg(o
+        || case when exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'inbox', '[]'::jsonb)) n
+                             where n ->> 'id' = o ->> 'id' and (n ->> 'read')::boolean is true) then '{"read": true}'::jsonb else '{}'::jsonb end
+        || case when exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'inbox', '[]'::jsonb)) n
+                             where n ->> 'id' = o ->> 'id' and (n ->> 'hidden')::boolean is true) then '{"hidden": true}'::jsonb else '{}'::jsonb end)
+      from jsonb_array_elements(coalesce(old.data -> 'inbox', '[]'::jsonb)) o), '[]'::jsonb),
+    'selfMeasurements', coalesce((
+      select jsonb_agg(o
+        || case when exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'selfMeasurements', '[]'::jsonb)) n
+                             where n ->> 'id' = o ->> 'id' and (n ->> 'hidden')::boolean is true) then '{"hidden": true}'::jsonb else '{}'::jsonb end)
+      from jsonb_array_elements(coalesce(old.data -> 'selfMeasurements', '[]'::jsonb)) o), '[]'::jsonb));
+  return new;
+end $$;
+notify pgrst, 'reload schema';

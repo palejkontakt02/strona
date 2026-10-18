@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
-import type { Checkin, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
+import { Sheet } from '../components/Sheet';
+import type { Checkin, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
-import { clientById, deleteSession, extraPlanOf, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { allMeasurements, clientById, deleteSession, extraPlanOf, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { del, put } from '../data/db';
-import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx } from '../format';
+import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
-import { num, repsN } from '../lib/parse';
+import { num, numIn, repsN } from '../lib/parse';
 import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
 import { emptyRun, sessionToRun, type Run } from '../lib/run';
 import { e1Series, exerciseE1, records } from '../lib/strength';
@@ -522,38 +523,113 @@ function MonthCalendar({ dates, today, count }: { dates: Set<string>; today: str
   );
 }
 
-/** Pomiary ciała dla podopiecznego: waga i obwody — zmiana od pierwszego pomiaru i przebieg. */
+/** Pomiary ciała dla podopiecznego: waga i obwody — zmiana od pierwszego pomiaru, przebieg i własny wpis. */
 function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof clientById>> }) {
-  const ms = [...client.measurements].sort((a, b) => a.date.localeCompare(b.date));
+  const [adding, setAdding] = useState(false);
+  const ms = allMeasurements(client).sort((a, b) => a.date.localeCompare(b.date));
   const field = ms.some((m) => m.weight != null) ? 'weight' : ms.some((m) => m.waist != null) ? 'waist' : null;
-  if (!field || ms.filter((m) => m[field] != null).length < 1) return null;
-  const vals = ms.filter((m) => m[field] != null);
-  const first = vals[0][field]!;
-  const last = vals[vals.length - 1][field]!;
-  const d = last - first;
+  const vals = field ? ms.filter((m) => m[field] != null) : [];
   const waist = ms.filter((m) => m.waist != null);
   const wd = waist.length >= 2 ? waist[waist.length - 1].waist! - waist[0].waist! : null;
   return (
     <section className="acard">
-      <h3>Twoje ciało</h3>
-      <div className="body-kpis">
-        <div>
-          <span className="muted small">{field === 'weight' ? 'Waga' : 'Talia'}</span>
-          <strong className="big">
-            {fnum(last)} {field === 'weight' ? 'kg' : 'cm'}
-          </strong>
-          {vals.length >= 2 && <span className={`small ${d < 0 ? 'ok-text' : ''}`}>{`${d > 0 ? '+' : ''}${fnum(d)} od ${fmtDay(vals[0].date)}`}</span>}
-        </div>
-        {field === 'weight' && wd != null && (
-          <div>
-            <span className="muted small">Talia</span>
-            <strong className="big">{fnum(waist[waist.length - 1].waist!)} cm</strong>
-            <span className={`small ${wd < 0 ? 'ok-text' : ''}`}>{`${wd > 0 ? '+' : ''}${fnum(wd)} cm`}</span>
-          </div>
-        )}
+      <div className="between">
+        <h3>Twoje ciało</h3>
+        <button className="btn btn-secondary btn-sm" onClick={() => setAdding(true)}>
+          + Dodaj pomiar
+        </button>
       </div>
-      {vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />}
+      {!field || !vals.length ? (
+        <p className="muted small">Wpisuj wagę i obwody (np. raz w tygodniu, rano na czczo) — zobaczysz tu zmianę, a trener dostanie pomiar.</p>
+      ) : (
+        <>
+          <div className="body-kpis">
+            <div>
+              <span className="muted small">{field === 'weight' ? 'Waga' : 'Talia'}</span>
+              <strong className="big">
+                {fnum(vals[vals.length - 1][field]!)} {field === 'weight' ? 'kg' : 'cm'}
+              </strong>
+              {vals.length >= 2 &&
+                (() => {
+                  const d = vals[vals.length - 1][field]! - vals[0][field]!;
+                  return <span className={`small ${d < 0 ? 'ok-text' : ''}`}>{`${d > 0 ? '+' : ''}${fnum(d)} od ${fmtDay(vals[0].date)}`}</span>;
+                })()}
+            </div>
+            {field === 'weight' && wd != null && (
+              <div>
+                <span className="muted small">Talia</span>
+                <strong className="big">{fnum(waist[waist.length - 1].waist!)} cm</strong>
+                <span className={`small ${wd < 0 ? 'ok-text' : ''}`}>{`${wd > 0 ? '+' : ''}${fnum(wd)} cm`}</span>
+              </div>
+            )}
+          </div>
+          {vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />}
+        </>
+      )}
+      {adding && <AddMeasurement client={client} onClose={() => setAdding(false)} />}
     </section>
+  );
+}
+
+const SELF_FIELDS: ['weight' | 'waist' | 'hips' | 'chest' | 'arm' | 'thigh', string, string, number, number][] = [
+  ['weight', 'Waga', 'kg', 25, 300],
+  ['waist', 'Talia (w pępku)', 'cm', 40, 200],
+  ['hips', 'Biodra', 'cm', 50, 200],
+  ['chest', 'Klatka', 'cm', 50, 200],
+  ['arm', 'Ramię', 'cm', 15, 70],
+  ['thigh', 'Udo', 'cm', 30, 100],
+];
+
+function AddMeasurement({ client, onClose }: { client: NonNullable<ReturnType<typeof clientById>>; onClose: () => void }) {
+  const { addMeasurement, toast } = useStore();
+  const [date, setDate] = useState(todayISO());
+  const [v, setV] = useState<Record<string, string>>({});
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (date > todayISO()) return toast('Data pomiaru nie może być w przyszłości.');
+    const m: Measurement = { id: uid(), date, note: note.trim() || undefined };
+    for (const [k, label, , min, max] of SELF_FIELDS) {
+      if (!v[k]?.trim()) continue;
+      const n = numIn(v[k], min, max);
+      if (n == null) return toast(`${label}: wpisz liczbę od ${min} do ${max}.`);
+      (m as unknown as Record<string, number>)[k] = n;
+    }
+    if (!SELF_FIELDS.some(([k]) => m[k] != null)) return toast('Wpisz przynajmniej wagę albo jeden obwód.');
+    setBusy(true);
+    if (await addMeasurement(client.id, m)) onClose();
+    setBusy(false);
+  };
+  return (
+    <Sheet label="Nowy pomiar" onClose={onClose}>
+      <div className="between">
+        <h3>Nowy pomiar</h3>
+        <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      </div>
+      <div className="form-grid">
+        <label className="field">
+          <span>Data</span>
+          <input className="input" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        {SELF_FIELDS.map(([k, label, unit]) => (
+          <label key={k} className="field">
+            <span>
+              {label} ({unit})
+            </span>
+            <input className="input" inputMode="decimal" value={v[k] ?? ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+          </label>
+        ))}
+        <label className="field field-wide">
+          <span>Notatka (opcjonalnie)</span>
+          <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. rano, na czczo" />
+        </label>
+      </div>
+      <button className="btn btn-primary btn-block" disabled={busy} onClick={() => void save()}>
+        {busy ? 'Zapisuję…' : 'Zapisz pomiar'}
+      </button>
+    </Sheet>
   );
 }
 

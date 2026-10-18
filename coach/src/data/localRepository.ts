@@ -73,6 +73,10 @@ export function createLocalRepository(): Repository {
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, habitLog: withDay(c.habitLog, date, done) } : c)) };
       persist();
     },
+    async addMeasurement(clientId, m) {
+      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, selfMeasurements: [...(c.selfMeasurements ?? []), m].slice(-500) } : c)) };
+      persist();
+    },
     async addClientNote(clientId, note) {
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
       persist();

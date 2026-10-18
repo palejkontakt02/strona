@@ -53,6 +53,9 @@ export interface Measurement {
   thigh?: number;
   bf?: number;
   note?: string;
+  /** Pomiar wpisany przez podopiecznego; trener może go ukryć. */
+  by?: 'client';
+  hidden?: boolean;
 }
 
 export interface TestResult {
@@ -117,6 +120,8 @@ export interface Client {
   habitLog?: HabitDay[];
   /** Notatki od podopiecznego do trenera (wysyłane też e-mailem). */
   inbox?: ClientNote[];
+  /** Pomiary wpisane przez podopiecznego (zapis przez funkcję w bazie). */
+  selfMeasurements?: Measurement[];
   /** Wizyty (nieobecność / późne odwołanie) pobrane z pakietu — id wizyt. */
   noShowCharges?: string[];
   /** Odpowiedzi trenera (wątek z wiadomościami podopiecznego). */

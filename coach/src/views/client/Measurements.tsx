@@ -1,3 +1,4 @@
+import { allMeasurements } from '../../data/ops';
 import { useState } from 'react';
 import { LineChart } from '../../components/charts';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
@@ -31,7 +32,7 @@ export function testValue(t: TestResult) {
 export function ClientMeasurements({ client }: { client: Client }) {
   const { apply, ask } = useStore();
   const { openModal } = useNav();
-  const ms = [...client.measurements].sort((a, b) => b.date.localeCompare(a.date));
+  const ms = allMeasurements(client).sort((a, b) => b.date.localeCompare(a.date));
   const weight = ms.find((m) => m.weight != null)?.weight ?? null;
   const [field, setField] = useState<(typeof MEASURE_FIELDS)[number][0]>('weight');
   const pts = ms.filter((m) => m[field] != null).map((m) => ({ x: m.date, y: m[field]! }));
@@ -49,7 +50,9 @@ export function ClientMeasurements({ client }: { client: Client }) {
     : [];
 
   const removeMeasurement = async (id: string) => {
-    if (await ask('Usunąć ten pomiar?')) await apply([put('clients', { ...client, measurements: client.measurements.filter((m) => m.id !== id) })], 'Pomiar usunięty.');
+    if (!(await ask('Usunąć ten pomiar?'))) return;
+    // pomiar od podopiecznego tylko ukrywamy (baza nie pozwala trenerowi nadpisać jego wpisów)
+    await apply([put('clients', { ...client, measurements: client.measurements.filter((m) => m.id !== id), selfMeasurements: client.selfMeasurements?.map((m) => (m.id === id ? { ...m, hidden: true } : m)) })], 'Pomiar usunięty.');
   };
   const removeTest = async (id: string) => {
     if (await ask('Usunąć ten wynik testu?')) await apply([put('clients', { ...client, tests: client.tests.filter((t) => t.id !== id) })], 'Wynik usunięty.');
@@ -93,7 +96,7 @@ export function ClientMeasurements({ client }: { client: Client }) {
               <tbody>
                 {ms.map((m) => (
                   <tr key={m.id} title={m.note}>
-                    <td className="nowrap">{fmtDate(m.date)}</td>
+                    <td className="nowrap">{fmtDate(m.date)}{m.by === 'client' && <span className="muted small"> · podopieczny</span>}</td>
                     {MEASURE_FIELDS.map(([k]) => (
                       <td key={k} className="num">
                         {fnum(m[k])}

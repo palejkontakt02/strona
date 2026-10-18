@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Checkin, ClientNote } from '../domain';
+import type { Checkin, ClientNote, Measurement } from '../domain';
 import { uid } from '../format';
 import { withDay } from '../lib/habits';
 import { emailTrainer } from './mail';
@@ -25,6 +25,7 @@ interface StoreValue {
   reset: (mode: 'seed' | 'empty') => Promise<void>;
   importDb: (db: Db) => Promise<void>;
   saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
+  addMeasurement: (clientId: string, m: Measurement) => Promise<boolean>;
   saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
   sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
@@ -145,6 +146,24 @@ export function StoreProvider({
     [repo, toast, load],
   );
 
+  /** Pomiar od podopiecznego (waga, obwody) — osobna lista, zapis przez funkcję w bazie. */
+  const addMeasurement = useCallback(
+    async (clientId: string, m: Measurement) => {
+      const item: Measurement = { ...m, by: 'client' };
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, selfMeasurements: [...(c.selfMeasurements ?? []), item] } : c)) } : cur));
+      try {
+        await repo.addMeasurement(clientId, item);
+        toast('Pomiar zapisany — trener go zobaczy.');
+        return true;
+      } catch {
+        toast('Nie udało się zapisać pomiaru — sprawdź połączenie.');
+        void load();
+        return false;
+      }
+    },
+    [repo, toast, load],
+  );
+
   // odhaczenia zapisywane po kolei — szybkie stuknięcia nie wyprzedzają się w sieci
   const habitQueue = useRef<Promise<unknown>>(Promise.resolve());
   const saveHabitDay = useCallback(
@@ -215,8 +234,8 @@ export function StoreProvider({
   );
 
   const value = useMemo(
-    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, saveHabitDay, sendClientNote, cloud, signOut } : null),
-    [db, apply, toast, ask, reset, importDb, saveCheckin, saveHabitDay, sendClientNote, cloud, signOut],
+    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveHabitDay, sendClientNote, cloud, signOut } : null),
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveHabitDay, sendClientNote, cloud, signOut],
   );
   if (loadError)
     return (

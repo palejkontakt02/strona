@@ -1,10 +1,15 @@
-import type { Appointment, Client, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
+import type { Appointment, Client, Measurement, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
 import { del, put, type Change, type Db } from './db';
 
 /* ---------- selektory ---------- */
+
+/** Wszystkie pomiary: trenera i wpisane przez podopiecznego (bez ukrytych). */
+export function allMeasurements(c: Client): Measurement[] {
+  return [...c.measurements, ...(c.selfMeasurements ?? []).filter((m) => !m.hidden)];
+}
 
 /** Trening zrobiony samodzielnie (stare zapisy: bez rozliczenia i bez wizyty). */
 export function isSolo(db: Db, s: TrainingSession): boolean {

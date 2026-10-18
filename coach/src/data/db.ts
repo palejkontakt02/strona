@@ -1,4 +1,4 @@
-import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Plan, TrainerNotes, TrainingSession } from '../domain';
+import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Measurement, Plan, TrainerNotes, TrainingSession } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -32,6 +32,7 @@ export function normalizeDb(db: Partial<Db>): Db {
         .filter((p) => isRec(p) && isDate(p.date))
         .map((p) => ({ type: 'pojedyncza', status: 'due', ...(p as Rec), amount: typeof (p as Rec).amount === 'number' ? (p as Rec).amount : 0 })),
       measurements: arr(r.measurements).filter(isRec),
+      selfMeasurements: Array.isArray(r.selfMeasurements) ? r.selfMeasurements.filter((m) => isRec(m) && isDate(m.date)) : undefined,
       tests: arr(r.tests).filter(isRec),
       injuryLog: arr(r.injuryLog).filter(isRec),
       checkins: arr(r.checkins).filter((c) => isRec(c) && isDate(c.date)),
@@ -110,4 +111,6 @@ export interface Repository {
   saveHabitDay(clientId: string, date: string, done: string[]): Promise<void>;
   /** Notatka od podopiecznego do trenera. */
   addClientNote(clientId: string, note: ClientNote): Promise<void>;
+  /** Pomiar wpisany przez podopiecznego. */
+  addMeasurement(clientId: string, m: Measurement): Promise<void>;
 }
