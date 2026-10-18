@@ -4460,3 +4460,6 @@ body.athlete-mode .toasts {
 .parq-row:last-child {
   border-bottom: 0;
 }
+.sgrid.cardio {
+  grid-template-columns: 32px repeat(4, minmax(0, 1fr)) 52px;
+}

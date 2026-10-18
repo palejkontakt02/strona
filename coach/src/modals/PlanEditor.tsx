@@ -1,4 +1,4 @@
-import { perSideByName } from '../lib/run';
+import { cardioByName, perSideByName } from '../lib/run';
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
@@ -192,6 +192,9 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       />
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
+                    <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => void (x.cardio = !(x.cardio ?? cardioByName(x.name))))}>
+                      🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio — Powt. = czas (min), Ciężar = dystans (km)' : 'Cardio?'}
+                    </button>
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
@@ -199,8 +202,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       <div className="pe-set pe-set-head">
                         <span>#</span>
                         <span>Typ</span>
-                        <span>Powt.</span>
-                        <span>Ciężar</span>
+                        <span>{e.cardio ?? cardioByName(e.name) ? 'Czas (min)' : 'Powt.'}</span>
+                        <span>{e.cardio ?? cardioByName(e.name) ? 'Dystans (km)' : 'Ciężar'}</span>
                         <span>RPE</span>
                         <span />
                       </div>

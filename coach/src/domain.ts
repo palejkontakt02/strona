@@ -199,6 +199,8 @@ export interface PlanExercise {
   notes?: string;
   /** Ćwiczenie jednostronne: powtórzenia liczone na każdą stronę (rękę/nogę). */
   perSide?: boolean;
+  /** Cardio: w seriach „powt.” = czas (min), „ciężar” = dystans (km). */
+  cardio?: boolean;
   groups: SetGroup[];
 }
 
@@ -244,6 +246,9 @@ export interface SetLog {
   unit?: 's' | 'min';
   /** Ćwiczenie na stronę z różnym wynikiem: `reps` = lewa, `repsR` = prawa. */
   repsR?: number;
+  /** Cardio: dystans (km) i średnie tętno (ud./min). */
+  dist?: number;
+  hr?: number;
 }
 
 export interface SessionExercise {
@@ -261,6 +266,8 @@ export interface SessionExercise {
   setsLog?: SetLog[];
   /** Powtórzenia na każdą stronę (ćwiczenie jednostronne). */
   perSide?: boolean;
+  /** Cardio: odcinki z czasem, dystansem i tętnem. */
+  cardio?: boolean;
 }
 
 export interface TrainingSession {

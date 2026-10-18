@@ -55,7 +55,9 @@ export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: nu
 }
 
 /** Seria jako tekst: „8 × 45 kg”, „8/str. × 20 kg”, „30/25 s” (lewa/prawa), „45 s”. */
-export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number }, perSide?: boolean): string {
+export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number; dist?: number; hr?: number }, perSide?: boolean): string {
+  // cardio: „20 min · 3,2 km · 145 ud./min”
+  if (x.dist != null || x.hr != null) return [x.reps != null && `${fnum(x.reps)} min`, x.dist != null && `${fnum(x.dist)} km`, x.hr != null && `${fnum(x.hr)} ud./min`].filter(Boolean).join(' · ');
   const u = x.unit ? ` ${x.unit === 'min' ? 'min' : 's'}` : '';
   const side = perSide && x.repsR == null ? '/str.' : '';
   const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : fnum(x.reps);
@@ -176,6 +178,18 @@ export function SessionSheet({
         )}
         <div className="hist-stats">
           <span className="tag tag-neutral">{isSolo(db, s) ? 'samodzielnie' : 'z trenerem'}</span>
+          {(() => {
+            // suma cardio w treningu
+            const logs = s.exercises.filter((e) => e.cardio).flatMap((e) => e.setsLog ?? []);
+            if (!logs.length) return null;
+            const min = logs.reduce((a, x) => a + (x.reps ?? 0), 0);
+            const km = logs.reduce((a, x) => a + (x.dist ?? 0), 0);
+            return (
+              <span>
+                🫀 <b>{fnum(min)}</b> min cardio{km ? ` · ${fnum(km)} km` : ''}
+              </span>
+            );
+          })()}
           {s.duration != null && (
             <span>
               <b>{s.duration}</b> min
@@ -210,6 +224,7 @@ export function SessionSheet({
                     {e.label && <span className="ex-label">{e.label}</span>} {e.name}
                   </b>
                   {e.perSide && <span className="muted small">na każdą stronę</span>}
+                  {e.cardio && <span className="muted small">cardio</span>}
                 </div>
                 {work.length + warm.length > 0 ? (
                   <div className="hist-sets">

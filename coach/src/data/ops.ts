@@ -167,12 +167,14 @@ export function sessionToWorkout(s: TrainingSession): PlanWorkout {
         rest: e.rest,
         notes: e.notes,
         perSide: e.perSide,
+        cardio: e.cardio,
         groups: e.setsLog?.length
           ? e.setsLog.map((x) => ({
               type: x.warmup ? ('Rozgrzewka' as const) : ('Robocze' as const),
               sets: '1',
               reps: x.complex ?? (x.reps != null ? String(x.reps) : ''),
-              load: x.load != null ? String(x.load) : '',
+              // cardio: „ciężar” w planie = dystans (km)
+              load: e.cardio ? (x.dist != null ? String(x.dist) : '') : x.load != null ? String(x.load) : '',
               rpe: x.rpe != null ? String(x.rpe) : '',
             }))
           : [{ type: 'Robocze' as const, sets: e.sets || '1', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '' }],

@@ -34,6 +34,7 @@ interface ExRow {
   linked?: boolean;
   /** Powtórzenia na każdą stronę. */
   perSide?: boolean;
+  cardio?: boolean;
 }
 
 /** Blok odczytany z oznaczenia: „B2”, „C3” → połączone z poprzednim. */
@@ -62,9 +63,12 @@ interface SetDraft {
   /** Docelowe RPE z planu (podpowiedź w polu). */
   tRpe?: string;
   video?: string;
+  /** Cardio (zachowane przy poprawkach). */
+  dist?: number;
+  hr?: number;
 }
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
-  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video }));
+  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video, dist: x.dist, hr: x.hr }));
 const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
   d
     .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video)
@@ -84,6 +88,8 @@ const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
       if (x.warmup) out.warmup = true;
       if (x.label) out.label = x.label;
       if (x.video) out.video = x.video;
+      if (x.dist != null) out.dist = x.dist;
+      if (x.hr != null) out.hr = x.hr;
       return out;
     });
 /** Podsumowanie ćwiczenia z serii: liczba serii roboczych, powtórzenia i ciężar pierwszej z nich. */
@@ -98,7 +104,7 @@ const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
   return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -259,6 +265,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         notes: r.notes || undefined,
         setsLog: r.series ? toLog(r.series) : undefined,
         perSide: r.perSide || undefined,
+        cardio: r.cardio || undefined,
       })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: m.appt?.id, amount: num(amount) ?? undefined, paidNow });

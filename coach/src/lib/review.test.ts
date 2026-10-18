@@ -135,3 +135,23 @@ describe('poprawki z weryfikacji', () => {
     expect(setText({ reps: 8, load: 20 }, true)).toBe('8/str. × 20 kg');
   });
 });
+
+describe('cardio', () => {
+  it('plan cardio → odcinki z czasem i dystansem; zapis z tętnem', async () => {
+    const { buildRunExercise, runToExercises, cardioByName } = await import('./run');
+    const { setText } = await import('../athlete/History');
+    const { tonnage } = await import('./load');
+    expect(cardioByName('Bieżnia')).toBe(true);
+    expect(cardioByName('Wiosłowanie sztangą')).toBe(false);
+    const ex = buildRunExercise({ id: 'e', name: 'Rower stacjonarny', groups: [{ type: 'Robocze', sets: '2', reps: '10 min', load: '5', rpe: '6' }] }, []);
+    expect(ex.cardio).toBe(true);
+    expect(ex.sets[0]).toMatchObject({ reps: '10', unit: 'min', dist: '5', load: '' });
+    expect(buildRunExercise({ id: 'f', name: 'Bieżnia', groups: [{ type: 'Robocze', sets: '1', reps: '20', load: '3,5', rpe: '' }] }, []).sets[0].dist).toBe('3,5');
+    ex.sets[0] = { ...ex.sets[0], done: true, hr: '142', rpe: '6' };
+    const out = runToExercises({ planId: '', workoutId: '', name: 'x', planName: '', weekName: '', date: '2026-10-18', startedAt: 0, idx: 0, ex: [ex] } as never);
+    expect(out[0].cardio).toBe(true);
+    expect(out[0].setsLog[0]).toMatchObject({ reps: 10, unit: 'min', dist: 5, hr: 142, rpe: 6 });
+    expect(setText(out[0].setsLog[0])).toBe('10 min · 5 km · 142 ud./min');
+    expect(tonnage({ id: 's', clientId: 'c', date: '2026-10-18', charge: 'brak', exercises: out } as never)).toBe(0);
+  });
+});

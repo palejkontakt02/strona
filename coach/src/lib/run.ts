@@ -30,6 +30,9 @@ export interface RunSet {
   unit?: 's' | 'min';
   /** Ta sama seria na poprzednim treningu, np. „12 × 14 kg”. */
   prev?: string;
+  /** Cardio: dystans (km) i tętno. */
+  dist?: string;
+  hr?: string;
 }
 
 export interface RunExercise {
@@ -47,7 +50,14 @@ export interface RunExercise {
   video?: string;
   /** Powtórzenia na każdą stronę (jednostronne). */
   perSide?: boolean;
+  /** Cardio: wiersz = odcinek (min, km, tętno, RPE). */
+  cardio?: boolean;
   sets: RunSet[];
+}
+
+/** Nazwy aktywności cardio (domyślnie tryb cardio, da się przełączyć). */
+export function cardioByName(name: string): boolean {
+  return /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|marsz|spacer|nordic|pływani|skakank|schody|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name);
 }
 
 /** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
@@ -83,7 +93,17 @@ function lastE1(history: TrainingSession[], name: string): number | null {
  * wg zapisu (kg / % e1RM / ±% od poprzedniego bloku / z RPE). Back-off/Robocze liczone
  * od ostatniej serii poprzedniego bloku; Drop set kaskadowo seria po serii.
  */
+/** Dystans z planu cardio: „3”, „3 km”, „800 m” → km jako tekst. */
+function distOf(v: string | undefined): string {
+  const t = String(v ?? '').trim();
+  const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(km|m)?$/i);
+  if (!m) return '';
+  const n = parseFloat(m[1].replace(',', '.'));
+  return String(m[2]?.toLowerCase() === 'm' ? n / 1000 : n).replace('.', ',');
+}
+
 export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string, tests: TestResult[] = []): RunExercise {
+  const cardio = e.cardio ?? cardioByName(e.name);
   // %1RM: test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
   const tm = testedMax(tests, e.name);
   const lastDate = history.filter((s) => s.exercises.some((x) => x.name === e.name)).reduce((a, s) => (s.date > a ? s.date : a), '');
@@ -137,8 +157,9 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     // słowo „tempo” usuwamy tylko razem z zapisem tempa (np. „tempo 3-1-X-0”), nie z innych uwag
     notes: TEMPO_RE.test(notes) ? notes.replace(/tempo\s*:?\s*/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, '') : notes.trim(),
     video,
-    perSide: e.perSide ?? (perSideByName(e.name) || undefined),
-    sets,
+    perSide: cardio ? undefined : e.perSide ?? (perSideByName(e.name) || undefined),
+    cardio: cardio || undefined,
+    sets: cardio ? sets.map((x) => ({ ...x, unit: 'min' as const, load: '', dist: distOf(mergeGroups(e.groups)[x.gi ?? 0]?.load), prev: undefined })) : sets,
   };
 }
 
@@ -166,6 +187,19 @@ export function buildRun(
 }
 
 /** Nowe ćwiczenie dodane w trakcie treningu (poza planem). */
+/** Cardio dodane w trakcie: N odcinków po X min (i opcjonalnie dystans). */
+export function adHocCardio(name: string, bouts: number, minutes: string, km: string, rest = ''): RunExercise {
+  return {
+    name,
+    cardio: true,
+    rest,
+    tempo: null,
+    tempoStr: '',
+    notes: '',
+    sets: Array.from({ length: Math.min(20, Math.max(1, bouts)) }, () => ({ load: '', reps: minutes, unit: 'min' as const, dist: km, hr: '', rpe: '', done: false, warmup: false, sug: '', edited: true, tRpe: '', spec: '', rest })),
+  };
+}
+
 export function adHocExercise(name: string, sets: number, reps: string, load: string, rest = '2:00'): RunExercise {
   return {
     name,
@@ -308,6 +342,8 @@ export function runToExercises(run: Run) {
       .filter((s) => s.done)
       .map((s) => {
         const cx = /^\d+(\+\d+)+$/.test(s.reps.replace(/\s/g, '')) ? s.reps.replace(/\s/g, '') : undefined;
+        if (e.cardio)
+          return { reps: repsN(s.reps) ?? undefined, unit: 'min' as const, dist: num(s.dist) ?? undefined, hr: numIn(s.hr, 30, 240) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, video: s.video };
         const unit = s.unit ?? timeUnit(s.reps) ?? undefined;
         const lr = e.perSide ? sidesOf(s.reps) : null;
         // różny wynik na stronę (30/20): reps = lewa, repsR = prawa; ten sam — jedna liczba
@@ -333,6 +369,7 @@ export function runToExercises(run: Run) {
         .join(' · ') || undefined,
       setsLog: log,
       perSide: e.perSide || undefined,
+      cardio: e.cardio || undefined,
     };
   }).filter((e) => e.setsLog.length > 0);
 }
@@ -403,6 +440,8 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
           label: x.label as SetType | undefined,
           video: x.video,
           unit: x.unit,
+          dist: x.dist != null ? String(x.dist).replace('.', ',') : undefined,
+          hr: x.hr != null ? String(x.hr) : undefined,
         }))
       : Array.from({ length: repsN(e.sets) || 1 }, () => ({ ...base, load: e.load ?? '', reps: e.reps ?? '', rpe: e.rpe ?? '', warmup: false }));
     const m = e.label?.match(/^[A-Z]+(\d+)$/);
@@ -414,6 +453,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       tempoStr: (String(e.notes || '').match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
       notes: e.notes ?? '',
       perSide: e.perSide || undefined,
+      cardio: e.cardio || undefined,
       sets,
     };
   });
