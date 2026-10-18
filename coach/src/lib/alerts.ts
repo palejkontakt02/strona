@@ -51,7 +51,9 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
     else if (avg && v < avg * 0.8) a.push({ level: 'yellow', text: `Samopoczucie spadło do ${v}/25 (zwykle ${Math.round(avg)}) — check-in ${fmtD(lastCi.date)}` });
   }
 
-  const lp = desc.find((s) => s.pain != null);
+  // najwyższy ból z 7 dni (dzień bez bólu po treningu z bólem 7/10 nie gasi sygnału), inaczej ostatni zapisany
+  const weekAgo = new Date(new Date(today + 'T12:00:00').getTime() - 7 * 86400000).toISOString().slice(0, 10);
+  const lp = desc.filter((s) => s.pain != null && s.date >= weekAgo).reduce<(typeof desc)[number] | undefined>((m, s) => (!m || s.pain! > m.pain! ? s : m), undefined) ?? desc.find((s) => s.pain != null);
   if (lp && lp.pain! >= 4)
     a.push({ level: lp.pain! >= 6 ? 'red' : 'yellow', text: `Ból ${lp.pain}/10 na treningu ${fmtD(lp.date)}` });
 

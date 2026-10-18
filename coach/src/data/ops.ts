@@ -3,6 +3,8 @@ import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
 import { addDays } from '../lib/dates';
+import { parseDur, parseKm } from '../lib/running';
+import { cardioByName } from '../lib/run';
 import { del, put, type Change, type Db } from './db';
 
 /* ---------- selektory ---------- */
@@ -56,7 +58,8 @@ export interface ExtraState {
 export function extraState(k: PlanWorkout, extraId: string | undefined, sessions: TrainingSession[], today: ISODate): ExtraState {
   const done = sessions.filter((s) => s.planId === extraId && s.workoutId === k.id).sort((a, b) => b.date.localeCompare(a.date));
   if (!k.date) return { state: 'open', date: done[0]?.date };
-  const hit = done.find((s) => s.date >= addDays(k.date!, -1));
+  const since = k.assignedAt && k.assignedAt <= k.date ? k.assignedAt : addDays(k.date, -1);
+  const hit = done.find((s) => s.date >= since);
   if (hit) return { state: 'done', date: hit.date };
   return { state: k.date < today ? 'overdue' : 'due', date: k.date };
 }
@@ -120,7 +123,8 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
 
   const appt =
     db.appointments.find((a) => a.id === s.appointmentId) ??
-    (s.matchAppointment === false ? undefined : db.appointments.find((a) => a.clientId === session.clientId && a.date === session.date && a.status === 'planned'));
+    // trening samodzielny nie „zjada” zaplanowanej wizyty z trenerem tego dnia
+    (s.matchAppointment === false || session.solo ? undefined : db.appointments.find((a) => a.clientId === session.clientId && a.date === session.date && a.status === 'planned'));
   if (appt) changes.push(put('appointments', { ...appt, status: 'done', sessionId: session.id }));
 
   const client = clientById(db, session.clientId);
@@ -178,6 +182,11 @@ export function deleteSession(db: Db, id: string, removePayment = false): Change
   return changes;
 }
 
+const clock = (min: number) => {
+  const t = Math.round(min * 60);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+
 /** Zapis treningu jako jednostka do zrobienia (te same ćwiczenia i serie). */
 export function sessionToWorkout(s: TrainingSession): PlanWorkout {
   return {
@@ -194,12 +203,16 @@ export function sessionToWorkout(s: TrainingSession): PlanWorkout {
         cardio: e.cardio,
         groups: e.setsLog?.length
           ? e.setsLog.map((x) => ({
-              type: x.warmup ? ('Rozgrzewka' as const) : ('Robocze' as const),
+              type: x.warmup ? ('Rozgrzewka' as const) : x.label === 'Schłodzenie' || x.label === 'Przerwa' ? x.label : ('Robocze' as const),
               sets: '1',
-              reps: x.complex ?? (x.reps != null ? String(x.reps) : ''),
+              // seria na czas zostaje na czas („60 s”), lewa/prawa jako „30/20”; cardio: czas jak w zegarku (3:05)
+              reps: e.cardio
+                ? x.reps != null ? (Number.isInteger(x.reps) ? String(x.reps) : clock(x.reps)) : ''
+                : x.complex ?? (x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : ''),
               // cardio: „ciężar” w planie = dystans (km)
-              load: e.cardio ? (x.dist != null ? String(x.dist) : '') : x.load != null ? String(x.load) : '',
-              rpe: x.rpe != null ? String(x.rpe) : '',
+              load: e.cardio ? (x.dist != null ? String(x.dist).replace('.', ',') : '') : x.load != null ? String(x.load) : '',
+              // wynik RPE biegu to nie cel na następny raz
+              rpe: !e.cardio && x.rpe != null ? String(x.rpe) : '',
             }))
           : [{ type: 'Robocze' as const, sets: e.sets || '1', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '' }],
       })),
@@ -223,7 +236,7 @@ export function undoSession(db: Db, id: string, removePayment = false): Change[]
   if (same.some((k) => sig(k) === sig(wo))) return changes; // ten sam trening już jest na liście
   if (same.length) wo.name = `${wo.name} (${fmtDay(s.date)})`;
   const weeks = extra.weeks.length ? extra.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
-  changes.push(put('plans', { ...extra, weeks: weeks.map((w, i) => (i === 0 ? { ...w, workouts: [...w.workouts, wo] } : w)) }));
+  changes.push(put('plans', { ...extra, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, wo] } : w)) }));
   return changes;
 }
 
@@ -289,6 +302,8 @@ export function cloneWeek(w: Plan['weeks'][number], name: string, mode: Progress
       ...k,
       id: uid(),
       exercises: k.exercises.map((e) => {
+        // bieg / cardio: progresja objętości odcinków (czas, dystans, powtórzenia), nie kilogramów
+        if (e.cardio ?? cardioByName(e.name)) return { ...e, id: uid(), groups: e.groups.map((g) => progressCardio(g, mode)) };
         let groups = e.groups.map((g) => progressGroup(g, mode));
         // deload przy seriach rozpisanych pojedynczo: jedna seria robocza mniej
         const work = groups.filter((g) => g.type !== 'Rozgrzewka');
@@ -322,6 +337,45 @@ export const PROGRESSIONS: [Progression, string][] = [
 
 const r25 = (v: number) => Math.round(v / 2.5) * 2.5;
 const fmtN = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
+
+/**
+ * Odcinek biegu po progresji: +5% / +10% czasu lub dystansu części głównej (zasada ok. 10% tygodniowo),
+ * +1 powtórzenie odcinków, +0,5 RPE, deload: −30% objętości i jedno powtórzenie mniej.
+ * Rozgrzewka, schłodzenie i trucht zostają bez zmian.
+ */
+export function progressCardio(g: SetGroup, mode: Progression): SetGroup {
+  if (mode === 'none' || g.type !== 'Robocze') return { ...g };
+  const out = { ...g };
+  const n = parseInt(g.sets || '1', 10) || 1;
+  const scale = (f: number) => {
+    const d = parseDur(g.reps);
+    if (d != null) out.reps = fmtMin(d * f);
+    const km = parseKm(g.load);
+    // w metrach zostaje w metrach (co 50 m), w km — co 0,1 km
+    const meters = /\d\s*m$/i.test(g.load.trim()) || (km != null && !/km/i.test(g.load) && parseFloat(g.load.replace(',', '.')) >= 100);
+    if (km != null) out.load = meters || km < 1 ? `${Math.round((km * f * 1000) / 50) * 50} m` : fmtN(Math.round(km * f * 10) / 10);
+  };
+  const rpe = g.rpe ? parseFloat(g.rpe.replace(',', '.')) : null;
+  if (mode === 'load2') scale(1.05);
+  else if (mode === 'load5') scale(1.1);
+  else if (mode === 'rep') {
+    if (n > 1) out.sets = String(n + 1);
+    else scale(1.1);
+  } else if (mode === 'rpe') {
+    if (rpe != null) out.rpe = fmtN(Math.min(10, rpe + 0.5));
+  } else if (mode === 'deload') {
+    if (n > 2) out.sets = String(n - 1);
+    else scale(0.7);
+    if (rpe != null) out.rpe = fmtN(Math.max(2, rpe - 1));
+  }
+  return out;
+}
+
+/** Minuty do zapisu w planie: pełne „44”, z sekundami „3:15”. */
+function fmtMin(min: number): string {
+  const s = Math.round(min * 60 / 5) * 5;
+  return s % 60 === 0 ? String(s / 60) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 /** Seria planu po progresji (kg, % 1RM, powtórzenia, RPE); zapis względny („-10%”) zostaje. */
 export function progressGroup(g: SetGroup, mode: Progression): SetGroup {

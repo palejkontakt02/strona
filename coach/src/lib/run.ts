@@ -98,11 +98,8 @@ function lastE1(history: TrainingSession[], name: string): number | null {
  */
 /** Dystans z planu cardio: „3”, „3 km”, „800 m” → km jako tekst. */
 function distOf(v: string | undefined): string {
-  const t = String(v ?? '').trim();
-  const m = t.match(/^(\d+(?:[.,]\d+)?)\s*(km|m)?$/i);
-  if (!m) return '';
-  const n = parseFloat(m[1].replace(',', '.'));
-  return String(m[2]?.toLowerCase() === 'm' ? n / 1000 : n).replace('.', ',');
+  const km = parseKm(v);
+  return km != null ? String(km).replace('.', ',') : '';
 }
 
 /** Opis bloku odcinków: „6 × 800 m · Z5”, „Rozgrzewka 15 min · Z2”. */
@@ -112,7 +109,7 @@ function cardioDesc(g: { type: string; sets?: string; reps: string; load: string
   const km = parseKm(g.load);
   const d = parseDur(g.reps);
   const what = [km != null && fmtKm(km), d != null && (Number.isInteger(d) ? `${d} min` : fmtClock(d))].filter(Boolean).join(' / ');
-  const head = g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' ? `${g.type} ` : n > 1 ? `${n} × ` : '';
+  const head = (g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' ? `${g.type} ` : g.type === 'Przerwa' ? 'Trucht / marsz ' : '') + (n > 1 ? `${n} × ` : '');
   return `${head}${what || 'odcinek'}${g.pace ? ` · ${g.pace}` : ''}`;
 }
 
@@ -349,8 +346,10 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
       const base = prev || nl;
       const diff = base ? Math.round(((nl - base) / base) * 100) : 0;
       nxt.load = String(nl);
-      const cmp = num(s.rpe)! < num(tr)! ? 'niżej' : num(s.rpe)! > num(tr)! ? 'wyżej' : 'zgodne';
-      nxt.sug = diff === 0 ? 'Utrzymaj ciężar – RPE zgodne z celem' : `${diff > 0 ? '+' : ''}${diff}% vs poprzednia seria (RPE ${cmp} / cel ${tr})`;
+      // bez wpisanego RPE porównujemy tylko do celu (nie zgadujemy „niżej / wyżej”)
+      const got = num(s.rpe);
+      const cmp = got == null ? null : got < num(tr)! ? 'niżej' : got > num(tr)! ? 'wyżej' : 'zgodne';
+      nxt.sug = diff === 0 ? (cmp ? 'Utrzymaj ciężar – RPE zgodne z celem' : `Utrzymaj ciężar (cel RPE ${tr})`) : `${diff > 0 ? '+' : ''}${diff}% vs poprzednia seria (${cmp ? `RPE ${cmp} / ` : 'wg '}cel ${tr})`;
     }
   }
   return { sets, rest: parseRest(s.rest || ex.rest) || 120 };
@@ -368,11 +367,11 @@ export function runToExercises(run: Run) {
           return {
             reps: d != null ? Math.round(d * 100) / 100 : undefined,
             unit: 'min' as const,
-            dist: num(s.dist) ?? undefined,
+            dist: parseKm(s.dist) ?? undefined,
             hr: numIn(s.hr, 30, 240) ?? undefined,
             rpe: numIn(s.rpe, 0, 10) ?? undefined,
             warmup: s.warmup || undefined,
-            label: s.label === 'Schłodzenie' || s.warmup ? s.label : undefined,
+            label: s.label === 'Schłodzenie' || s.label === 'Przerwa' || s.warmup ? s.label : undefined,
             video: s.video,
           };
         }
@@ -383,7 +382,8 @@ export function runToExercises(run: Run) {
         const repsR = lr && lr[1] !== lr[0] ? lr[1] : undefined;
         return { load: num(s.load) ?? undefined, reps, repsR, unit, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx, video: s.video };
       });
-    const work = log.filter((s) => !s.warmup);
+    // cardio: schłodzenie i trucht między seriami to nie odcinki robocze
+    const work = log.filter((s) => !s.warmup && !(e.cardio && 'label' in s && (s.label === 'Schłodzenie' || s.label === 'Przerwa')));
     const top = work[0];
     // Tekst powtórzeń z jednostką (np. „45 s”) zostaje w podsumowaniu.
     const topSet = e.sets.find((x) => x.done && !x.warmup);
@@ -514,6 +514,7 @@ export function repeatRun(s: TrainingSession, date: string, now = Date.now()): R
     date,
     startedAt: now,
     editSessionId: undefined,
-    ex: r.ex.map((e) => ({ ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0, video: undefined })) })),
+    // cardio: tętno i RPE z poprzedniego razu to nie wynik tego treningu
+    ex: r.ex.map((e) => ({ ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0, video: undefined, ...(e.cardio ? { hr: '', rpe: '' } : {}) })) })),
   };
 }

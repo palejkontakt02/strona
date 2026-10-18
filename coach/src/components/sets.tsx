@@ -14,12 +14,13 @@ function CardioSets({ groups }: { groups: SetGroup[] }) {
         const d = parseDur(g.reps);
         const km = parseKm(g.load);
         const what = [km != null ? fmtKm(km) : g.load, d != null ? fmtDur(d) : g.reps].filter(Boolean).join(' / ') || '?';
-        const tag = g.type === 'Rozgrzewka' ? 'R.' : g.type === 'Schłodzenie' ? 'S.' : n > 1 ? `${n} ×` : '';
+        const tag = (g.type === 'Rozgrzewka' ? 'R. ' : g.type === 'Schłodzenie' ? 'S. ' : g.type === 'Przerwa' ? 'trucht ' : '') + (n > 1 ? `${n} ×` : '');
         return (
-          <span key={j} className={`set-chip ${g.type === 'Robocze' ? '' : 'warm'}`} title={g.type === 'Robocze' ? 'Odcinek' : g.type}>
+          <span key={j} className={`set-chip ${g.type === 'Robocze' ? '' : 'warm'}`} title={g.type === 'Robocze' ? 'Odcinek' : g.type === 'Przerwa' ? 'Trucht / marsz' : g.type}>
             {tag && <i>{tag}</i>} {what}
             {g.pace && <i> · {g.pace}</i>}
             {g.rpe && <i> @{g.rpe}</i>}
+            {g.rest && n > 1 && <i> · p. {g.rest}</i>}
           </span>
         );
       })}

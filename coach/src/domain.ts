@@ -180,7 +180,7 @@ export interface CoachReply {
 
 /* ---------- Plany ---------- */
 
-export const SET_TYPES = ['Rozgrzewka', 'Top set', 'Robocze', 'Back-off', 'Drop set', 'AMRAP', 'Schłodzenie'] as const;
+export const SET_TYPES = ['Rozgrzewka', 'Top set', 'Robocze', 'Back-off', 'Drop set', 'AMRAP', 'Schłodzenie', 'Przerwa'] as const;
 export type SetType = (typeof SET_TYPES)[number];
 
 /**
@@ -219,6 +219,8 @@ export interface PlanWorkout {
   name: string;
   /** Trening dodatkowy zadany na konkretny dzień (podopieczny widzi go „na dziś / jutro”). */
   date?: ISODate;
+  /** Kiedy zadano na ten dzień — trening zrobiony od tego dnia (także wcześniej niż termin) liczy się jako wykonany. */
+  assignedAt?: ISODate;
   exercises: PlanExercise[];
 }
 

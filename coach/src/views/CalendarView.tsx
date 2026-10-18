@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon, Seg, Tag } from '../components/ui';
 import type { Appointment, AppointmentStatus, ISODate, Plan, PlanWorkout, TrainingSession } from '../domain';
-import { clientById, extraState, type ExtraState } from '../data/ops';
+import { clientById, extraState, isSolo, type ExtraState } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtMonth, fmtShort, fmtWeekday } from '../format';
 import { clashes, clientHue } from '../lib/calendar';
@@ -180,7 +180,7 @@ function SessionTile({ s }: { s: TrainingSession }) {
       <LocationTag id={s.locationId} short />
       <span className="tile-status">
         {s.workoutName || 'Trening'}
-        {s.solo ? ' · samodzielnie' : ''}
+        {isSolo(db, s) ? ' · samodzielnie' : ''}
       </span>
     </button>
   );

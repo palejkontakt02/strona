@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, Field, IconBtn, Tag } from '../../components/ui';
 import type { Client, HealthIntake, TrainerNotes } from '../../domain';
 import { put } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDay, uid } from '../../format';
-import { todayISO } from '../../lib/dates';
+import { addDays, todayISO } from '../../lib/dates';
 import { INTAKE, intakeProgress, parqYesCount, type Intake } from '../../lib/intake';
 import { useNav } from '../../nav';
 
@@ -28,7 +28,10 @@ export function healthFlags(h: HealthIntake | undefined, intake?: Intake): { lev
   const out: { level: 'red' | 'yellow'; text: string }[] = [];
   const yes = Math.max(PARQ.filter(([k]) => h?.parq?.[k]).length, parqYesCount(intake));
   if (yes && !h?.clearanceDate) out.push({ level: 'red', text: `PAR-Q: ${yes}× „tak”${parqYesCount(intake) ? ' (ankieta podopiecznego)' : ''} — brak zgody lekarza w wywiadzie` });
-  if (h?.updated && h.updated < new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok — zaktualizuj' });
+  // zgoda lekarza jest starsza niż zmiana ankiety z „tak” — trzeba sprawdzić, czy dalej obowiązuje
+  else if (h?.clearanceDate && parqYesCount(intake) && (intake?.updatedAt ?? '').slice(0, 10) > h.clearanceDate)
+    out.push({ level: 'red', text: `PAR-Q: ankieta zmieniona ${fmtDay(intake!.updatedAt!.slice(0, 10))} (${parqYesCount(intake)}× „tak”) — po zgodzie lekarza z ${fmtDay(h.clearanceDate)}; sprawdź, czy zgoda jest aktualna` });
+  if (h?.updated && h.updated < addDays(todayISO(), -365)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok — zaktualizuj' });
   return out;
 }
 
@@ -114,15 +117,34 @@ export function ClientHealth({ client }: { client: Client }) {
     setH((x) => ({ ...x, ...patch }));
     setDirty(true);
   };
+  /** Rekord do zapisu; data wywiadu zmienia się tylko, gdy zmieniły się pola wywiadu (nie przy notatce z wizyty). */
+  const record = (hh: HealthIntake, nn: string, base: TrainerNotes, extra: Partial<TrainerNotes> = {}): TrainerNotes => {
+    const changed = JSON.stringify({ ...hh, updated: undefined }) !== JSON.stringify({ ...(base.health ?? {}), updated: undefined });
+    return { ...base, health: { ...hh, updated: changed || !base.health?.updated ? todayISO() : base.health.updated }, notes: nn.trim() || undefined, ...extra };
+  };
   const save = (extra: Partial<TrainerNotes> = {}, msg = 'Zapisano wywiad (widzisz go tylko Ty).') =>
-    apply([put('trainer_notes', { ...rec, health: { ...h, updated: todayISO() }, notes: notes.trim() || undefined, ...extra })], msg).then((ok) => ok && setDirty(false));
-  // zapis przy wyjściu z karty, jeśli coś zmieniono
+    apply([put('trainer_notes', record(h, notes, rec, extra))], msg).then((ok) => {
+      if (ok) setDirty(false);
+      return ok;
+    });
+  // autozapis 2 s po zmianie
   useEffect(() => {
     if (!dirty) return;
     const t = window.setTimeout(() => void save({}, 'Zapisano wywiad.'), 2000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [h, notes, dirty]);
+  // wyjście z karty przed autozapisem — zapis od razu (inaczej zmiana by przepadła)
+  const latest = useRef({ h, notes, dirty, rec, apply });
+  latest.current = { h, notes, dirty, rec, apply };
+  useEffect(
+    () => () => {
+      const l = latest.current;
+      if (l.dirty) void l.apply([put('trainer_notes', record(l.h, l.notes, l.rec))], 'Zapisano wywiad.');
+    },
+    // karta klienta montuje się od nowa przy zmianie podopiecznego — tylko odmontowanie
+    [],
+  );
 
   const yes = PARQ.filter(([k]) => h.parq?.[k]).length;
   const visits = [...(rec.visits ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
@@ -225,7 +247,7 @@ export function ClientHealth({ client }: { client: Client }) {
             className={`btn btn-sm ${visit.trim() ? 'btn-primary' : 'btn-ghost'}`}
             disabled={!visit.trim()}
             onClick={() =>
-              void save({ visits: [...(rec.visits ?? []), { id: uid(), date: todayISO(), text: visit.trim().slice(0, 4000) }] }, 'Notatka z wizyty zapisana.').then(() => setVisit(''))
+              void save({ visits: [...(rec.visits ?? []), { id: uid(), date: todayISO(), text: visit.trim().slice(0, 4000) }] }, 'Notatka z wizyty zapisana.').then((ok) => ok && setVisit(''))
             }
           >
             Dodaj notatkę

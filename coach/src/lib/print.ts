@@ -1,6 +1,7 @@
 import type { Client, Plan, TrainingSession } from '../domain';
 import { exerciseLabels } from './plan';
 import { buildRunExercise } from './run';
+import { addDays, todayISO } from './dates';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const kg = (v: string) => (v ? `${v.replace('.', ',')} kg` : '');
@@ -56,7 +57,7 @@ export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[
             const run = buildRunExercise(e, sessions, undefined, client.tests);
             // bieg / cardio: bloki odcinków („Rozgrzewka 15 min · Z2”, „6 × 800 m · Z5”)
             const sets = run.cardio
-              ? run.sets.filter((x) => x.first).map((x) => `<span class="done"></span>${esc(x.gdesc)}`).join('<br>')
+              ? run.sets.filter((x) => x.first).map((x) => `<span class="done"></span>${esc(x.gdesc)}${x.rest ? ` · przerwa ${esc(x.rest)}` : ''}`).join('<br>')
               : run.sets
               .map((x) => `<span class="done"></span>${x.warmup ? 'R: ' : ''}${esc(x.reps || '?')}${x.unit ? ` ${x.unit}` : ''}${run.perSide ? '/str.' : ''}${x.load ? ` × ${esc(kg(x.load))}` : ''}${x.tRpe ? ` @${esc(x.tRpe)}` : ''}`)
               .join('&nbsp;&nbsp; ');
@@ -70,7 +71,7 @@ export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[
   });
   openPrint(
     `${plan.name} — ${client.name}`,
-    `<h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · wydruk ${fmtD(new Date().toISOString().slice(0, 10))}</div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}${parts.join('')}`,
+    `<h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · wydruk ${fmtD(todayISO())}</div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}${parts.join('')}`,
   );
 }
 
@@ -80,7 +81,7 @@ export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[
  */
 export function printReport(client: Client, sessions: TrainingSession[], opts: { plan?: Plan | null; comment?: string; weeks?: number } = {}) {
   const weeks = opts.weeks ?? 8;
-  const from = new Date(Date.now() - weeks * 7 * 864e5).toISOString().slice(0, 10);
+  const from = addDays(todayISO(), -weeks * 7);
   const recent = sessions.filter((s) => s.date >= from).sort((a, b) => a.date.localeCompare(b.date));
   // średnia z faktycznego okresu (krótsza współpraca niż 8 tyg. → mniej tygodni)
   const firstDate = recent[0]?.date ?? from;
@@ -90,7 +91,7 @@ export function printReport(client: Client, sessions: TrainingSession[], opts: {
   const inj = client.injuryLog.filter((i) => i.status !== 'wyleczony');
   const body = `
     <h1>Raport z treningów</h1>
-    <div class="muted">${esc(client.name)} · okres ${fmtD(recent.length ? firstDate : from)} – ${fmtD(new Date().toISOString().slice(0, 10))}</div>
+    <div class="muted">${esc(client.name)} · okres ${fmtD(recent.length ? firstDate : from)} – ${fmtD(todayISO())}</div>
     <div class="box note">Raport treningowy przygotowany przez trenera — nie jest dokumentacją medyczną ani diagnozą.</div>
     ${client.goal ? `<p><b>Cel:</b> ${esc(client.goal)}</p>` : ''}
     ${inj.length ? `<p><b>Urazy / stany:</b> ${inj.map((i) => `${esc(i.name)}${i.side ? ` (${esc(i.side)})` : ''} — ${esc(i.status)} od ${fmtD(i.date)}`).join('; ')}</p>` : ''}
@@ -105,7 +106,7 @@ export function printReport(client: Client, sessions: TrainingSession[], opts: {
     <table><tr><th>Data</th><th>Trening</th><th>Ćwiczenia</th></tr>${recent
       .slice(-10)
       .reverse()
-      .map((s) => `<tr><td>${fmtD(s.date)}</td><td>${esc(s.workoutName || 'Trening')}${s.solo ? ' <span class="muted">(samodzielnie)</span>' : ''}</td><td>${s.exercises.map((e) => esc(e.name)).join(', ')}</td></tr>`)
+      .map((s) => `<tr><td>${fmtD(s.date)}</td><td>${esc(s.workoutName || 'Trening')}${(s.solo ?? s.charge === 'brak') ? ' <span class="muted">(samodzielnie)</span>' : ''}</td><td>${s.exercises.map((e) => esc(e.name)).join(', ')}</td></tr>`)
       .join('')}</table>
     ${opts.comment ? `<h2>Komentarz trenera</h2><div class="box">${esc(opts.comment)}</div>` : ''}
     <p class="muted" style="margin-top:24px">Trener: ____________________</p>`;

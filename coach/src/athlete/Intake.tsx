@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Client } from '../domain';
 import { useStore } from '../data/store';
-import { INTAKE, intakeProgress, type Intake, type IntakeField } from '../lib/intake';
+import { INTAKE, INTAKE_PARQ, intakeProgress, type Intake, type IntakeField } from '../lib/intake';
 
 const DRAFT = (id: string) => `fitowa-intake-draft:${id}`;
 
@@ -53,7 +53,10 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     } catch {
       // nic
     }
-    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? 'Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).' : 'Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.');
+    // nowe „tak” w pytaniach zdrowotnych (PAR-Q) — wprost w wiadomości do trenera
+    const newYes = INTAKE_PARQ.filter((k) => clean[k] === 'tak' && client.intake?.answers[k] !== 'tak').map((k) => INTAKE[0].fields.find((f) => f.key === k)?.label ?? k);
+    const warn = client.intake?.completedAt && newYes.length ? ` UWAGA — nowe „tak” w pytaniach o zdrowie: ${newYes.join(' · ')}` : '';
+    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}` : 'Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.');
     else toast('Ankieta zapisana.');
     onClose();
   };

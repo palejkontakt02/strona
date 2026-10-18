@@ -1,5 +1,6 @@
 import { cardioByName, perSideByName } from '../lib/run';
-import { RUN_TEMPLATES, ZONES } from '../lib/running';
+import { emptyRunExercise, RUN_TEMPLATES } from '../lib/running';
+import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 
 const CARDIO_TYPES: SetType[] = ['Rozgrzewka', 'Robocze', 'Schłodzenie'];
 import { useState } from 'react';
@@ -8,6 +9,7 @@ import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGrou
 import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, type Progression } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
+import { todayISO } from '../lib/dates';
 import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
@@ -32,6 +34,7 @@ const newExercise = (): PlanExercise => ({ id: uid(), name: '', rest: '2:00', no
 export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) {
   const { db, apply, ask, toast } = useStore();
   const { closeModal } = useNav();
+  const client = db.clients.find((c) => c.id === m.plan.clientId);
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
   // Rozwinięty tylko pierwszy tydzień — reszta na kliknięcie (długie plany).
@@ -60,8 +63,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
     const focused = clean.weeks.flatMap((w) => w.workouts).find((k) => k.id === m.focusWorkoutId);
-    await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
-    closeModal();
+    // przy błędzie zapisu edytor zostaje otwarty — zmiany nie przepadają
+    if (await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.')) closeModal();
   };
 
   const close = async () => {
@@ -102,18 +105,9 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       <p className="muted small">
         Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
         Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
-        Bieg: „🏃 + Bieg…” wstawia gotową jednostkę; odcinek = czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), cel to strefa (<code>Z2</code>, <code>OWB1</code>, <code>BC3</code>) albo tempo (<code>5:30</code>), przerwa np. <code>2:00 trucht</code>.
+        Bieg: „🏃 + Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
       </p>
-      <datalist id="run-zones">
-        {ZONES.map((z) => (
-          <option key={z.z} value={z.z}>
-            {z.name}
-          </option>
-        ))}
-        {['OWB1', 'OWB2', 'BC1', 'BC2', 'BC3'].map((v) => (
-          <option key={v} value={v} />
-        ))}
-      </datalist>
+      <RunTargetList />
 
       {p.weeks.map((week, wi) => (
         <section key={week.id} className="pe-week">
@@ -168,7 +162,14 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 {p.extra && (
                   <label className="pe-date pe-date-row" title="Podopieczny zobaczy ten trening na górze ekranu w wybranym dniu">
                     <span className="muted small">{k.date ? 'na dzień' : 'bez terminu · na dzień'}</span>
-                    <input className="input input-sm" type="date" value={k.date ?? ''} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label="Na dzień (puste = bez terminu)" />
+                    <input className="input input-sm" type="date" value={k.date ?? ''} onChange={(e) =>
+                        upd((d) => {
+                          const w = findWorkout(d, wi, ki);
+                          w.date = e.target.value || undefined;
+                          // nowy termin = nowe zadanie (wcześniejsze wykonania tego treningu się nie liczą)
+                          w.assignedAt = w.date ? todayISO() : undefined;
+                        })
+                      } aria-label="Na dzień (puste = bez terminu)" />
                   </label>
                 )}
                 <IconBtn
@@ -201,14 +202,17 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                   <div className={`pe-ex ${inBlock ? 'in-block' : ''}`}>
                     <div className="pe-ex-head">
                       <span className="ex-label">{labels[ei]}</span>
-                      <input className="input" list="lib-exercises" value={e.name} placeholder="Ćwiczenie" onChange={(ev) => setEx((x) => void (x.name = ev.target.value))} aria-label="Ćwiczenie" />
-                      <span className="muted small pe-rest-lbl">przerwa</span>
+                      <input className="input" list="lib-exercises" value={e.name} placeholder="Ćwiczenie" onChange={(ev) => setEx((x) => {
+                        x.name = ev.target.value;
+                        if (x.cardio == null && cardioByName(x.name) && x.rest === '2:00') x.rest = '';
+                      })} aria-label="Ćwiczenie" />
+                      {!(e.cardio ?? cardioByName(e.name)) || e.rest ? <><span className="muted small pe-rest-lbl">przerwa</span>
                       <input
                         className="input pe-rest"
                         value={e.rest ?? ''}
                         placeholder={inBlock && all[ei + 1]?.linked ? 'Przejście' : 'Przerwa'}
                         title={inBlock ? (all[ei + 1]?.linked ? 'Czas przejścia do następnego ćwiczenia bloku (puste = od razu)' : 'Przerwa po całej rundzie bloku') : 'Przerwa między seriami'}
-                        onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" />
+                        onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" /></> : <span className="grow" />}
                       <span className="muted small nowrap">{setCountLabel(e.groups)}</span>
                       <IconBtn
                         icon="up"
@@ -230,7 +234,11 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       />
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
-                    <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => void (x.cardio = !(x.cardio ?? cardioByName(x.name))))}>
+                    <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => {
+                      x.cardio = !(x.cardio ?? cardioByName(x.name));
+                      // bieg: przerwy są przy odcinkach — domyślne „2:00” siłowe by się wliczało
+                      if (x.cardio && x.rest === '2:00') x.rest = '';
+                    })}>
                       🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
                     </button>
 {!(e.cardio ?? cardioByName(e.name)) && (
@@ -240,6 +248,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     )}
                     {(() => {
                       const cardio = !!(e.cardio ?? cardioByName(e.name));
+                      if (cardio) return <RunBuilder groups={e.groups} onChange={(gs) => setEx((x) => void (x.groups = gs))} profile={client?.run} dob={client?.dob} />;
                       return (
                     <div className="pe-sets">
                       <div className={`pe-set pe-set-head ${cardio ? 'cardio' : ''}`}>
@@ -255,7 +264,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         <div key={gi} className={`pe-set ${cardio ? 'cardio' : ''} ${g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' ? 'is-warmup' : ''}`}>
                           <span className="muted small">{gi + 1}</span>
                           <select className="input" value={g.type} onChange={(ev) => setEx((x) => void (x.groups[gi].type = ev.target.value as SetType))} aria-label="Typ serii">
-                            {(cardio ? CARDIO_TYPES : SET_TYPES.filter((t) => t !== 'Schłodzenie')).map((t) => (
+                            {(cardio ? CARDIO_TYPES : SET_TYPES.filter((t) => t !== 'Schłodzenie' && t !== 'Przerwa')).map((t) => (
                               <option key={t} value={t}>
                                 {cardio && t === 'Robocze' ? 'Odcinek' : t}
                               </option>
@@ -297,14 +306,16 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                   value=""
                   aria-label="Dodaj bieg z szablonu"
                   onChange={(ev) => {
-                    const t = RUN_TEMPLATES.find((x) => x.id === ev.target.value);
-                    if (t) upd((d) => void findWorkout(d, wi, ki).exercises.push(t.make()));
+                    const v = ev.target.value;
+                    const t = RUN_TEMPLATES.find((x) => x.id === v);
+                    if (t || v === 'custom') upd((d) => void findWorkout(d, wi, ki).exercises.push(t ? t.make() : emptyRunExercise()));
                   }}
                 >
                   <option value="">🏃 + Bieg…</option>
+                  <option value="custom">Własny — ułożę odcinki</option>
                   {RUN_TEMPLATES.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} — {t.hint}
+                      Szablon: {t.name} — {t.hint}
                     </option>
                   ))}
                 </select>

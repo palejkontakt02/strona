@@ -4566,3 +4566,79 @@ body.athlete-mode .toasts {
   margin-top: var(--space-2);
   max-width: 220px;
 }
+
+/* kreator biegu */
+.rb {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.rb-seg {
+  border: 1px solid var(--color-divider);
+  border-left: 3px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+.rb-seg.rb-R,
+.rb-seg.rb-S {
+  border-left-color: var(--color-neutral-500, #777);
+}
+.rb-seg.rb-P {
+  border-left-style: dashed;
+}
+.rb-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.rb-top select {
+  max-width: 220px;
+}
+.rb-no {
+  font-weight: 600;
+  min-width: 18px;
+  color: var(--color-neutral-400);
+}
+.rb-reps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rb-reps .input {
+  width: 52px;
+  text-align: center;
+}
+.rb-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.rb-grid .rb-rest {
+  grid-column: 1 / -1;
+}
+.rb-grid .field > span {
+  font-size: 0.72rem;
+}
+@media (max-width: 640px) {
+  .rb-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rb-tgt {
+  margin: 0;
+}
+.rb-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.rb-add select {
+  max-width: 160px;
+}
+.rb-total {
+  margin: 0;
+}

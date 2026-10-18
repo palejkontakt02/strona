@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtClock, fmtDur, fmtKm, paceText, parseDur, parseKm, RUN_TEMPLATES, runTotals, targetText, zoneOf } from './running';
+import { fmtClock, fmtDur, fmtKm, paceText, parseDur, parseKm, planRunTotals, racePace, recoverySec, RUN_TEMPLATES, runTotals, targetText, zoneOf } from './running';
 import { buildRunExercise, cardioByName, runToExercises, sessionToRun } from './run';
 
 describe('bieganie', () => {
@@ -56,5 +56,39 @@ describe('bieganie', () => {
     expect(t.km).toBeCloseTo(4.8, 5);
     expect(t.pace).toBe('3:51/km');
     expect(sessionToRun(s).ex[0].sets[1].reps).toBe('3:05');
+  });
+  it('cel: tętno, tempo startowe, zakres tempa', () => {
+    expect(targetText('140–150')).toBe('tętno 140–150 ud./min');
+    expect(targetText('<145')).toBe('tętno poniżej 145 ud./min');
+    expect(targetText('5:20-5:40')).toBe('5:20–5:40/km');
+    expect(targetText('10K', { t5k: '25:00' })).toBe('tempo 10 km · ~5:13/km');
+    expect(targetText('HM')).toBe('tempo półmaratonu');
+    expect(racePace(5, { t5k: '25:00' })).toBeCloseTo(5, 5);
+  });
+  it('przerwa: czas odliczany, dystans bez odliczania', () => {
+    expect(recoverySec('2:00 trucht')).toBe(120);
+    expect(recoverySec('90 s')).toBe(90);
+    expect(recoverySec('90')).toBe(90);
+    expect(recoverySec('1 min marsz')).toBe(60);
+    expect(recoverySec('200 m trucht')).toBeNull();
+    expect(recoverySec('')).toBe(0);
+    expect(recoverySec('zbieg truchtem')).toBe(0);
+  });
+  it('suma planowanego biegu: odcinki, przerwy, brakujące z tempa', () => {
+    const groups = [
+      { type: 'Rozgrzewka' as const, sets: '1', reps: '15', load: '', rpe: '', pace: '6:00' },
+      { type: 'Robocze' as const, sets: '6', reps: '', load: '800 m', rpe: '', pace: '4:00', rest: '200 m trucht' },
+      { type: 'Schłodzenie' as const, sets: '1', reps: '10', load: '2', rpe: '' },
+    ];
+    const t = planRunTotals(groups);
+    expect(t.km).toBeCloseTo(2.5 + 4.8 + 1 + 2, 5);
+    expect(t.min).toBeCloseTo(15 + 19.2 + 10, 5);
+    expect(t.approx).toBe(true);
+  });
+  it('czas i przerwy w zapisie biegaczy (5\'30, 45.30, 1h 05, 1 min 30 s)', () => {
+  const d = (x: string) => { const v = parseDur(x); return v == null ? null : Math.round(v * 60); };
+  expect([d('45'), d('3:05'), d("5'30"), d('45.30'), d('3,05'), d('2,5'), d('1h'), d('1h 05'), d('1 min 30 s'), d('90 s'), d('1:20:00'), d('45-50')]).toEqual([2700, 185, 330, 2730, 185, 150, 3600, 3900, 90, 90, 4800, null]);
+  expect([recoverySec('2:00 trucht'), recoverySec("1'30 marsz"), recoverySec('1 min 30 s'), recoverySec('90 s'), recoverySec('8'), recoverySec('2'), recoverySec('200 m trucht'), recoverySec('zbieg truchtem'), recoverySec('1 min marsz')]).toEqual([120, 90, 90, 90, 8, 120, null, 0, 60]);
+  expect([targetText('5.30'), targetText("5'30"), targetText('5:20-5:40 /km')]).toEqual(['5:30/km', '5:30/km', '5:20–5:40/km']);
   });
 });

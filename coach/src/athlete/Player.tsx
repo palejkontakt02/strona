@@ -4,7 +4,8 @@ import { useDialog } from '../components/useDialog';
 import { IconBtn } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import { ChargeSelect, LocationSelect } from '../components/location';
-import type { Billing, Client, PlanExercise, TrainingSession } from '../domain';
+import type { Billing, Client, PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
+import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 import { chargeProblem, isSolo, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { doneOn, dueOn } from '../lib/habits';
@@ -12,7 +13,7 @@ import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { num, numIn, repsN, sidesOf, sumReps } from '../lib/parse';
 import { recentE1 } from '../lib/strength';
-import { fmtDur, paceText, parseDur, parseKm, RUN_TEMPLATES, targetText } from '../lib/running';
+import { emptyRunExercise, fmtDur, paceText, parseDur, parseKm, recoverySec, targetText } from '../lib/running';
 import {
   adHocCardio,
   adHocExercise,
@@ -146,13 +147,17 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if (!s.reps.trim() && !(s.dist ?? '').trim()) return toast('Wpisz czas (min albo m:ss) albo dystans (km).');
       const d = parseDur(s.reps);
       if (s.reps.trim() && (d == null || d < 0.05 || d > 1440)) return toast('Czas: minuty (np. 20) albo minuty:sekundy (np. 3:05).');
-      if ((s.dist ?? '').trim() && numIn(s.dist, 0.01, 500) == null) return toast('Dystans: liczba km (np. 3,5).');
+      if ((s.dist ?? '').trim() && (parseKm(s.dist) ?? 0) > 300) return toast('Dystans: km (np. 3,5) albo metry (np. 400 m).');
+      if ((s.dist ?? '').trim() && parseKm(s.dist) == null) return toast('Dystans: km (np. 3,5) albo metry (np. 400 m).');
       if ((s.hr ?? '').trim() && numIn(s.hr, 30, 240) == null) return toast('Tętno: od 30 do 240.');
       const next = update((r) => void (r.ex[k].sets[i].done = true));
-      const br = blockRest(run, k, i);
-      // po ostatnim odcinku i przed schłodzeniem bez przerwy
+      // przerwa po powtórzeniu (z odcinka albo całego biegu) — tylko między powtórzeniami tego samego odcinka
       const nextSet = run.ex[k].sets[i + 1];
-      if (br.rest && run.ex[k].rest && nextSet && nextSet.label !== 'Schłodzenie' && !next.ex.every((e) => e.sets.every((x) => x.done))) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
+      const rec = recoverySec(s.rest || ex.rest);
+      // kolejne powtórzenie tego samego odcinka (bez numeru bloku — ten sam rodzaj, nie rozgrzewka)
+      const sameBlock = !!nextSet && !nextSet.done && (s.gi != null ? nextSet.gi === s.gi : !s.warmup && !nextSet.warmup && nextSet.label === s.label);
+      if (sameBlock && (rec === null || (rec === 0 && (s.rest || ex.rest)))) toast(`Teraz: ${s.rest || ex.rest}`);
+      else if (sameBlock && rec && !next.ex.every((e) => e.sets.every((x) => x.done))) setRest({ end: Date.now() + rec * 1000, total: rec });
       return;
     }
     const hasPrev = ex.sets.slice(0, i).some((x) => x.done && !x.warmup);
@@ -200,6 +205,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if (updated.exercises.length === 0) return toast('Zostaw przynajmniej jedną zaliczoną serię (✓).');
       const { changes } = saveSession(db, { session: updated, isNew: false });
       if (!(await apply(changes, 'Zapisano zmiany w treningu.'))) return; // trening zostaje — można ponowić zapis
+      // ból podniesiony do ≥5 przy poprawce — trener dostaje informację tak samo jak przy pierwszym zapisie
+      if (!trainer && updated.pain != null && updated.pain >= 5 && (editing.pain ?? 0) < 5) {
+        void sendClientNote(client.id, `Ból ${updated.pain}/10 po treningu „${updated.workoutName || 'Trening'}”${updated.notes ? `: ${updated.notes}` : ''}`, updated.id);
+        void ask(`Ból ${updated.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
+      }
       setFinish(null);
       onSaved();
       return;
@@ -226,7 +236,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
-    let apptId = appointmentId;
+    let apptId = finish.solo ? undefined : appointmentId;
     const appt = apptId ? db.appointments.find((a) => a.id === apptId) : undefined;
     if (appt && appt.date !== session.date) {
       if (await ask(`Ta wizyta jest ${fmtDay(appt.date)}, a trening zapisuje się z datą ${fmtDay(session.date)}. Zapisać z datą wizyty (${fmtDay(appt.date)})?`, { confirm: `Tak, ${fmtDay(appt.date)}` })) session.date = appt.date;
@@ -293,6 +303,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       });
       return;
     }
+    const solo = !trainer && !db.appointments.some((a) => a.clientId === client.id && a.date === run.date && a.status !== 'cancel' && a.status !== 'noshow');
     setFinish({
       srpe: '',
       pain: '',
@@ -303,7 +314,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       paidNow: true,
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
       // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem
-      solo: !trainer && !db.appointments.some((a) => a.clientId === client.id && a.date === run.date && a.status !== 'cancel' && a.status !== 'noshow'),
+      solo,
     });
   };
 
@@ -521,7 +532,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </div>
         )}
         {e.sets.map((s, i) => {
-          const cool = s.label === 'Schłodzenie';
+          const cool = s.label === 'Schłodzenie' || s.label === 'Przerwa';
           if (!s.warmup && !cool) n++;
           return (
             <div key={i}>
@@ -531,7 +542,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                   {s.rest && <span className="muted small">przerwa {fmtRest(s.rest)}</span>}
                 </div>
               )}
-              {setRow(k, i, s.warmup ? 'W' : cool ? 'S' : String(n))}
+              {setRow(k, i, s.warmup ? (e.cardio ? 'R' : 'W') : s.label === 'Przerwa' ? 'P' : cool ? 'S' : String(n))}
             </div>
           );
         })}
@@ -654,6 +665,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             setAdding(false);
             window.scrollTo(0, 0);
           }}
+          profile={client.run}
+          dob={client.dob}
           onTemplate={(e) => {
             setRun(appendExercise(run, buildRunExercise(e, sessionsOf(db, client.id), undefined, client.tests)));
             setAdding(false);
@@ -758,7 +771,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               <span>Z kim był trening?</span>
               <div className="seg" role="radiogroup" aria-label="Z kim był trening">
                 {([true, false] as const).map((v) => (
-                  <button key={String(v)} type="button" role="radio" aria-checked={finish.solo === v} className={finish.solo === v ? 'active' : ''} onClick={() => setFinish({ ...finish, solo: v })}>
+                  <button key={String(v)} type="button" role="radio" aria-checked={finish.solo === v} className={finish.solo === v ? 'active' : ''} onClick={() => setFinish({ ...finish, solo: v, ...(trainer && !editing ? { charge: v ? 'brak' : defaultCharge(client, sessionsOf(db, client.id)) } : {}) })}>
                     {v ? 'Samodzielnie' : 'Z trenerem'}
                   </button>
                 ))}
@@ -965,7 +978,11 @@ function AddExercise({
   onTemplate,
   onCancel,
   canLink,
+  profile,
+  dob,
 }: {
+  profile?: RunProfile;
+  dob?: string;
   onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean) => void;
   onCardio: (name: string, bouts: number, minutes: string, km: string) => void;
   onTemplate: (e: PlanExercise) => void;
@@ -974,6 +991,8 @@ function AddExercise({
 }) {
   const { db, toast } = useStore();
   const [kind, setKind] = useState<'sila' | 'cardio' | 'bieg'>('sila');
+  const [runName, setRunName] = useState('Bieg');
+  const [runGroups, setRunGroups] = useState<SetGroup[]>(() => emptyRunExercise().groups);
   const tabs = (
     <div className="seg seg-sm" role="tablist" aria-label="Rodzaj ćwiczenia">
       {(
@@ -999,26 +1018,36 @@ function AddExercise({
   const [km, setKm] = useState('');
   if (kind === 'bieg')
     return (
-      <div className="acard add-form">
+      <form
+        className="acard add-form"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          const gs = runGroups.filter((x) => x.reps.trim() || x.load.trim() || (x.pace ?? '').trim());
+          if (!gs.length) return toast('Wpisz czas albo dystans przynajmniej jednego odcinka.');
+          const bad = gs.find((x) => (x.reps.trim() && parseDur(x.reps) == null) || (x.load.trim() && parseKm(x.load) == null));
+          if (bad) return toast(`Odcinek „${bad.reps || bad.load}”: czas jako 40 albo 3:05, dystans jako 5 albo 800 m.`);
+          onTemplate({ id: uid(), name: runName.trim() || 'Bieg', cardio: true, rest: '', notes: '', groups: gs });
+        }}
+      >
         {tabs}
         <h3>Dodaj bieg</h3>
-        <p className="muted small">Wybierz jednostkę — czasy, dystanse i strefy zmienisz przy każdym odcinku. Czas wpisuj w minutach albo m:ss.</p>
-        <ul className="plain run-tpl">
-          {RUN_TEMPLATES.map((t) => (
-            <li key={t.id}>
-              <button type="button" className="btn btn-secondary btn-block run-tpl-btn" onClick={() => onTemplate(t.make())}>
-                <b>{t.name}</b>
-                <span className="muted small">{t.hint}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        {onCancel && (
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>
-            Anuluj
+        <label className="field">
+          <span>Nazwa</span>
+          <input className="input" value={runName} onChange={(ev) => setRunName(ev.target.value)} placeholder="np. Rozbieganie, Interwały, Długi bieg" />
+        </label>
+        <RunTargetList />
+        <RunBuilder groups={runGroups} onChange={setRunGroups} profile={profile} dob={dob} />
+        <div className="actions">
+          <button type="submit" className="btn btn-primary">
+            Dodaj bieg
           </button>
-        )}
-      </div>
+          {onCancel && (
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              Anuluj
+            </button>
+          )}
+        </div>
+      </form>
     );
   if (kind === 'cardio')
     return (
@@ -1029,8 +1058,8 @@ function AddExercise({
           if (!name.trim()) return toast('Wybierz albo wpisz rodzaj cardio.');
           const n = numIn(bouts, 1, 20);
           if (n == null || !Number.isInteger(n)) return toast('Odcinki: od 1 do 20.');
-          if (mins.trim() && numIn(mins, 0.1, 600) == null) return toast('Czas: liczba minut.');
-          if (km.trim() && numIn(km, 0.01, 500) == null) return toast('Dystans: liczba km.');
+          if (mins.trim() && parseDur(mins) == null) return toast('Czas: minuty (np. 20) albo minuty:sekundy (np. 1:30).');
+          if (km.trim() && parseKm(km) == null) return toast('Dystans: km (np. 3,5) albo metry (np. 400 m).');
           onCardio(name.trim(), n, mins.trim(), km.trim());
         }}
       >

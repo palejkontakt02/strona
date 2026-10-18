@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
-import type { Checkin, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
+import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
 import { allMeasurements, clientById, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -11,7 +11,8 @@ import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, numIn, repsN } from '../lib/parse';
 import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
-import { emptyRun, sessionToRun, type Run } from '../lib/run';
+import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
+import { fmtDur, fmtKm, planRunTotals } from '../lib/running';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
@@ -124,7 +125,8 @@ export function AthleteApp({
     const appts = db.appointments.filter((a) => a.sessionId === s.id);
     const prevExtra = extraPlanOf(db, s.clientId);
     // konto podopiecznego zapisuje tylko treningi — listę dodatkowych uzupełnia trener
-    const changes = mode === 'preview' ? undoSession(db, s.id, removePayment) : deleteSession(db, s.id, removePayment);
+    // konto podopiecznego może zapisać tylko treningi — bez zmian wizyt i planów (inaczej znikałyby po cichu)
+    const changes = mode === 'preview' ? undoSession(db, s.id, removePayment) : deleteSession(db, s.id, false).filter((c) => c.col === 'sessions');
     if (!(await apply(changes))) return;
     const extraChange = changes.find((c) => c.op === 'put' && c.col === 'plans');
     // „Cofnij” przywraca zapis (i powiązaną wizytę) — na wypadek pomyłki
@@ -144,7 +146,8 @@ export function AthleteApp({
     });
   };
   // Podopieczny cofa tylko swoje treningi (bez rozliczenia); trener w podglądzie — każdy.
-  const canUndo = (s: TrainingSession) => mode === 'preview' || s.charge === 'brak';
+  // podopieczny: tylko własny zapis — bez rozliczenia, wizyty i komentarza trenera (przywrócenie by go nie odtworzyło)
+  const canUndo = (s: TrainingSession) => mode === 'preview' || (s.charge === 'brak' && !s.reviewedAt && !s.coachNote && !db.appointments.some((a) => a.sessionId === s.id));
 
   return (
     <div className="ath">
@@ -227,6 +230,17 @@ export function AthleteApp({
       )}
     </div>
   );
+}
+
+/** Krótki opis jednostki: bieg — dystans / czas z odcinków, inaczej liczba ćwiczeń. */
+function workoutSummary(k: PlanWorkout, client: { run?: Client['run'] }): string {
+  const ex = k.exercises.filter((e) => e.name);
+  if (ex.length && ex.every((e) => e.cardio ?? cardioByName(e.name))) {
+    const t = planRunTotals(ex.flatMap((e) => e.groups), client.run);
+    const parts = [t.km > 0 && `${t.approx ? '~' : ''}${fmtKm(t.km)}`, t.min > 0 && `${t.approx ? '~' : ''}${fmtDur(t.min)}`].filter(Boolean);
+    return `🏃 ${parts.join(' · ') || 'bieg'}`;
+  }
+  return nEx(ex.length);
 }
 
 function Home({
@@ -320,7 +334,7 @@ function Home({
       )}
 
       {(() => {
-        // treningi zadane przez trenera na konkretny dzień (dodatkowe, poza planem): od wczoraj do 7 dni naprzód, niezrobione
+        // treningi zadane przez trenera na konkretny dzień (poza planem), niezrobione: zaległe do 7 dni wstecz i do 7 dni naprzód
         const due = (extra?.weeks.flatMap((w) => w.workouts) ?? [])
           .filter((k) => k.date && k.date >= addDays(today, -7) && k.date <= addDays(today, 7) && k.exercises.some((e) => e.name))
           .filter((k) => extraState(k, extra!.id, sessions, today).state !== 'done')
@@ -331,7 +345,7 @@ function Home({
           <section key={k.id} className={`acard ${k.date! <= today ? 'acard-hero' : ''}`}>
             <span className="eyebrow">Od trenera · {when(k.date!)}</span>
             <h2>{k.name}</h2>
-            <p className="muted small">{nEx(k.exercises.filter((e) => e.name).length)} · poza planem</p>
+            <p className="muted small">{workoutSummary(k, client)} · poza planem</p>
             <button className={`btn ${k.date! <= today ? 'btn-primary btn-lg' : 'btn-secondary'}`} onClick={() => onStartFrom({ planId: extra!.id, workoutId: k.id })}>
               <Icon name="play" /> Start
             </button>
@@ -402,7 +416,11 @@ function Home({
         <section className="acard acard-hero">
           <span className="eyebrow">Trening własny</span>
           <h2>Zacznij trening</h2>
-          <p className="muted small">Trener nie przygotował jeszcze planu — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.</p>
+          <p className="muted small">
+            {extra?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name)))
+              ? 'Poza treningami od trenera możesz zrobić własny — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.'
+              : 'Trener nie przygotował jeszcze planu — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.'}
+          </p>
           <button className="btn btn-primary btn-lg" onClick={onOwn}>
             <Icon name="play" /> Start
           </button>

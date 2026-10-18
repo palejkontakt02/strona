@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { chargeProblem, clientById, isSolo, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
+import { chargeProblem, clientById, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { deleteSetVideo, sessionVideos } from '../data/videos';
 import { fnum, pln, uid, nEx } from '../format';
@@ -10,7 +10,7 @@ import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
 import { cardioByName, perSideByName, buildRunExercise } from '../lib/run';
-import { fmtClock, paceText, parseDur } from '../lib/running';
+import { fmtClock, paceText, parseDur, parseKm } from '../lib/running';
 import { num, numIn, repsN, sidesOf, timeUnit } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
@@ -68,12 +68,12 @@ interface SetDraft {
   dist?: string;
   hr?: string;
 }
-const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
+const fromLog = (log: NonNullable<SessionExercise['setsLog']>, cardio?: boolean): SetDraft[] =>
   log.map((x) => ({
     key: uid(),
     load: x.load != null ? fnum(x.load) : '',
     // bieg: czas jako m:ss, gdy są sekundy
-    reps: x.reps != null ? (x.dist != null || x.hr != null) && x.unit === 'min' ? (Number.isInteger(x.reps) ? String(x.reps) : fmtClock(x.reps)) : `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '',
+    reps: x.reps != null ? cardio && x.unit === 'min' ? (Number.isInteger(x.reps) ? String(x.reps) : fmtClock(x.reps)) : `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '',
     rpe: x.rpe != null ? fnum(x.rpe) : '',
     warmup: x.warmup || undefined,
     label: x.label,
@@ -91,7 +91,7 @@ const toLog = (d: SetDraft[], cardio?: boolean): NonNullable<SessionExercise['se
         const d = parseDur(x.reps);
         if (d != null) out.reps = Math.round(d * 100) / 100;
         out.unit = 'min';
-        const km = num(x.dist);
+        const km = parseKm(x.dist);
         if (km != null) out.dist = km;
         const hr = numIn(x.hr, 30, 240);
         if (hr != null) out.hr = hr;
@@ -116,7 +116,7 @@ const toLog = (d: SetDraft[], cardio?: boolean): NonNullable<SessionExercise['se
       if (x.warmup) out.warmup = true;
       if (x.label) out.label = x.label;
       if (x.video) out.video = x.video;
-      if (num(x.dist) != null) out.dist = num(x.dist)!;
+      if (parseKm(x.dist) != null) out.dist = parseKm(x.dist)!;
       if (numIn(x.hr, 30, 240) != null) out.hr = numIn(x.hr, 30, 240)!;
       return out;
     });
@@ -132,7 +132,7 @@ const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
   return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -243,8 +243,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [autoLoaded, setAutoLoaded] = useState(!!existing || !!m.paste); // przy wklejaniu z notatki nie wczytujemy jednostki z planu
   if (!autoLoaded && client) {
     setAutoLoaded(true);
+    // trening zadany na ten dzień (poza planem) ma pierwszeństwo przed następnym z planu
+    const due = extra?.weeks.flatMap((w) => w.workouts).find((k) => k.date === date && k.exercises.some((e) => e.name) && extraState(k, extra.id, history, date).state !== 'done');
     const nx = nextWorkout(plan, history);
-    if (nx) loadWorkout(nx.workout.id);
+    if (due) loadWorkout(due.id);
+    else if (nx) loadWorkout(nx.workout.id);
     if (client.singleRate) setAmount(String(client.singleRate));
   }
 
@@ -301,7 +304,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         cardio: r.cardio || undefined,
       })),
     };
-    const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: m.appt?.id, amount: num(amount) ?? undefined, paidNow });
+    const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: solo ? undefined : m.appt?.id, amount: num(amount) ?? undefined, paidNow });
     if (!(await apply(changes, message))) return; // formularz zostaje otwarty — można ponowić
     closeModal();
   };
@@ -360,7 +363,16 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           </select>
         </Field>
         <Field label="Z kim">
-          <Seg options={['Z trenerem', 'Samodzielnie'] as const} value={solo ? 'Samodzielnie' : 'Z trenerem'} onChange={(v) => setSolo(v === 'Samodzielnie')} label="Z kim był trening" />
+          <Seg
+            options={['Z trenerem', 'Samodzielnie'] as const}
+            value={solo ? 'Samodzielnie' : 'Z trenerem'}
+            onChange={(v) => {
+              setSolo(v === 'Samodzielnie');
+              // samodzielny — bez rozliczenia (pakiet / sesja) i bez łączenia z wizytą; zmienisz niżej, jeśli trzeba
+              if (!existing) setCharge(v === 'Samodzielnie' ? 'brak' : '');
+            }}
+            label="Z kim był trening"
+          />
         </Field>
         <Field label="Nazwa treningu" wide>
           <input className="input" value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} placeholder="np. A – dół ciała" />
@@ -438,7 +450,12 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               type="button"
               className={`side-toggle ${r.cardio ? 'on' : ''}`}
               aria-pressed={!!r.cardio}
-              onClick={() => setRow(i, { cardio: !r.cardio || undefined, perSide: undefined, series: r.series ?? [blankSet()] })}
+              onClick={async () => {
+                // serie siłowe i odcinki cardio mają inne pola — przy zmianie zaczynamy od pustej serii
+                const filled = (r.series ?? []).some((x) => x.reps.trim() || x.load.trim() || (x.dist ?? '').trim());
+                if (filled && !(await ask(`Zmienić „${r.name || 'ćwiczenie'}” na ${r.cardio ? 'siłowe' : 'cardio / bieg'}? Wpisane serie zostaną wyczyszczone.`, { confirm: 'Zmień' }))) return;
+                setRow(i, { cardio: !r.cardio || undefined, perSide: undefined, series: [{ key: uid(), load: '', reps: '', rpe: '' }] });
+              }}
             >
               🫀 {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
             </button>
@@ -460,13 +477,13 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                     r.cardio ? (
                       <div key={x.key} className={`set-edit-row cardio ${x.warmup ? 'warm' : ''}`}>
                         <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Odcinek ${k + 1}: rozgrzewka` : `Odcinek ${k + 1}`} onClick={() => upd({ warmup: !x.warmup || undefined })}>
-                          {x.warmup ? 'R' : x.label === 'Schłodzenie' ? 'S' : workNo}
+                          {x.warmup ? 'R' : x.label === 'Schłodzenie' ? 'S' : x.label === 'Przerwa' ? 'P' : r.series!.slice(0, k + 1).filter((y) => !y.warmup && y.label !== 'Schłodzenie' && y.label !== 'Przerwa').length}
                         </button>
                         <input className="input" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Czas, odcinek ${k + 1}`} placeholder="min / m:ss" />
                         <input className="input" inputMode="decimal" value={x.dist ?? ''} onChange={(e) => upd({ dist: e.target.value })} aria-label={`Dystans (km), odcinek ${k + 1}`} placeholder="km" />
                         <input className="input" inputMode="numeric" value={x.hr ?? ''} onChange={(e) => upd({ hr: e.target.value })} aria-label={`Tętno, odcinek ${k + 1}`} placeholder="tętno" />
                         <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, odcinek ${k + 1}`} placeholder="RPE" />
-                        <span className="muted small">{paceText(parseDur(x.reps), num(x.dist))}</span>
+                        <span className="muted small">{paceText(parseDur(x.reps), parseKm(x.dist))}</span>
                         <IconBtn icon="trash" label={`Usuń odcinek ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
                       </div>
                     ) :

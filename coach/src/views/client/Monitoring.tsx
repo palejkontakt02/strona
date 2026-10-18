@@ -23,7 +23,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
 
   const weeklyLoad = weekly(sessions, sessionLoad, 12, today);
   const weeklyTon = weekly(sessions, tonnage, 12, today);
-  const weeklyKm = weekly(sessions, (s) => runTotals(s)?.km || null, 12, today);
+  const weeklyKm = weekly(sessions, (s) => runTotals(s, true)?.km || null, 12, today);
   const hasRun = weeklyKm.some((p) => p.y > 0) || !!client.run;
 
   // ACWR liczony na każdy tydzień (niedziela) z ostatnich 12 tygodni + dziś.

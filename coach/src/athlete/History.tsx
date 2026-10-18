@@ -62,6 +62,7 @@ export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; 
   if (cardio || x.dist != null || x.hr != null)
     return [
       x.label === 'Schłodzenie' && 'schł.',
+      x.label === 'Przerwa' && 'trucht',
       x.reps != null && fmtDur(x.reps),
       x.dist != null && fmtKm(x.dist),
       paceText(x.reps, x.dist),
@@ -162,7 +163,8 @@ export function SessionSheet({
 }) {
   const { db, apply } = useStore();
   // po przełączeniu „sam / z trenerem” pokazujemy aktualny zapis, nie migawkę z otwarcia
-  s = db.sessions.find((x) => x.id === s.id) ?? s;
+  const live = db.sessions.find((x) => x.id === s.id);
+  s = live ?? s;
   const solo = isSolo(db, s);
   const ton = tonnage(s);
   const nVid = sessionVideos(s).length;
@@ -191,7 +193,8 @@ export function SessionSheet({
           </button>
         )}
         <div className="hist-stats">
-          <span className="seg seg-sm" role="radiogroup" aria-label="Z kim był trening">
+          {/* usunięty w międzyczasie — bez przełącznika (zapis przywróciłby trening) */}
+          {!live ? <span className="tag tag-neutral">{solo ? 'samodzielnie' : 'z trenerem'}</span> : <span className="seg seg-sm" role="radiogroup" aria-label="Z kim był trening">
             {([true, false] as const).map((v) => (
               <button
                 key={String(v)}
@@ -204,7 +207,7 @@ export function SessionSheet({
                 {v ? 'samodzielnie' : 'z trenerem'}
               </button>
             ))}
-          </span>
+          </span>}
           {(() => {
             // suma cardio / biegu w treningu (z tempem, gdy są czasy i dystanse)
             const t = runTotals(s);
