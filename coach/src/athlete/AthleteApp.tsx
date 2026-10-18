@@ -319,6 +319,25 @@ function Home({
         </section>
       )}
 
+      {(() => {
+        // treningi zadane przez trenera na konkretny dzień (dodatkowe, poza planem): od wczoraj do 7 dni naprzód, niezrobione
+        const due = (extra?.weeks.flatMap((w) => w.workouts) ?? [])
+          .filter((k) => k.date && k.date >= addDays(today, -2) && k.date <= addDays(today, 7) && k.exercises.some((e) => e.name))
+          .filter((k) => !sessions.some((x) => x.planId === extra!.id && x.workoutId === k.id && x.date >= addDays(k.date!, -1)))
+          .sort((a, b) => a.date!.localeCompare(b.date!));
+        if (!due.length || run) return null;
+        const when = (d: string) => (d === today ? 'na dziś' : d === addDays(today, 1) ? 'na jutro' : d < today ? `zaległy z ${fmtDay(d)}` : `na ${fmtDay(d)}`);
+        return due.map((k) => (
+          <section key={k.id} className={`acard ${k.date! <= today ? 'acard-hero' : ''}`}>
+            <span className="eyebrow">Od trenera · {when(k.date!)}</span>
+            <h2>{k.name}</h2>
+            <p className="muted small">{nEx(k.exercises.filter((e) => e.name).length)} · poza planem</p>
+            <button className={`btn ${k.date! <= today ? 'btn-primary btn-lg' : 'btn-secondary'}`} onClick={() => onStartFrom({ planId: extra!.id, workoutId: k.id })}>
+              <Icon name="play" /> Start
+            </button>
+          </section>
+        ));
+      })()}
       {run?.editSessionId && (
         <section className="acard">
           <span className="eyebrow">Poprawki zapisanego treningu</span>

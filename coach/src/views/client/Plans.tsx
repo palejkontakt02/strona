@@ -186,6 +186,7 @@ export function ClientPlans({ client }: { client: Client }) {
               <div key={k.id} className="plan-workout">
                 <div className="plan-workout-head">
                   <strong>{k.name}</strong>
+                  {k.date && <Tag tone="accent">na {fmtDate(k.date)}</Tag>}
                   {lastDone(k.id) && <Tag tone="ok">ostatnio {fmtDate(lastDone(k.id)!)}</Tag>}
                   <span className="row-inline">
                     <IconBtn icon="edit" label={`Edytuj ${k.name}`} onClick={() => openModal({ kind: 'plan', plan: extra!, focusWorkoutId: k.id })} />

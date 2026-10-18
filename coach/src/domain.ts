@@ -207,6 +207,8 @@ export interface PlanExercise {
 export interface PlanWorkout {
   id: string;
   name: string;
+  /** Trening dodatkowy zadany na konkretny dzień (podopieczny widzi go „na dziś / jutro”). */
+  date?: ISODate;
   exercises: PlanExercise[];
 }
 

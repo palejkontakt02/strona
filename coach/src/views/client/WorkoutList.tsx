@@ -12,11 +12,11 @@ import { SessionSheet } from '../../athlete/History';
 import { newPlan } from './Plans';
 
 /** Edytor dodatkowych treningów z nową, pustą jednostką na końcu. */
-export function extraWithNewWorkout(clientId: string, extra?: Plan): Plan {
+export function extraWithNewWorkout(clientId: string, extra?: Plan, date?: string): Plan {
   const base = extra ?? newExtraPlan(clientId);
   const weeks = base.weeks.length ? base.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
   const n = weeks.reduce((a, w) => a + w.workouts.length, 0);
-  return { ...base, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, { id: uid(), name: `Trening dodatkowy ${n + 1}`, exercises: [] }] } : w)) };
+  return { ...base, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, { id: uid(), name: `Trening dodatkowy ${n + 1}`, date, exercises: [] }] } : w)) };
 }
 
 /**

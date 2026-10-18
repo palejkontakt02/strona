@@ -4463,3 +4463,30 @@ body.athlete-mode .toasts {
 .sgrid.cardio {
   grid-template-columns: 32px repeat(4, minmax(0, 1fr)) 52px;
 }
+.pe-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.pe-date input {
+  width: auto;
+}
+.detail-actions {
+  flex-wrap: wrap;
+}
+.pe-week-head:has(.pe-date-row) {
+  flex-wrap: wrap;
+}
+.pe-week-head .pe-date-row {
+  order: 3;
+  flex: 1 1 100%;
+}
+.pe-week-head .pe-date-row input {
+  flex: 0 1 200px;
+}
+.pe-week-head:has(.pe-date-row) .pe-title {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+}

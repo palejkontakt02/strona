@@ -96,7 +96,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
               </span>
             )}
             <span className="grow" />
-            <select
+            {!p.extra && <select
               className="input input-sm dup-week"
               value=""
               aria-label="Duplikuj tydzień"
@@ -118,7 +118,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                   {v === 'none' ? 'Kopia bez zmian' : `Kopia: ${l}`}
                 </option>
               ))}
-            </select>
+            </select>}
             <IconBtn
               icon="trash"
               label="Usuń tydzień"
@@ -133,6 +133,12 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
             <div key={k.id} className="pe-workout card">
               <div className="pe-week-head">
                 <input className="input pe-title" value={k.name} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).name = e.target.value))} aria-label="Nazwa jednostki" />
+                {p.extra && (
+                  <label className="pe-date pe-date-row" title="Podopieczny zobaczy ten trening na górze ekranu w wybranym dniu">
+                    <span className="muted small">na dzień</span>
+                    <input className="input input-sm" type="date" value={k.date ?? ''} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label="Na dzień" />
+                  </label>
+                )}
                 <IconBtn
                   icon="trash"
                   label="Usuń trening z planu"
@@ -195,9 +201,11 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => void (x.cardio = !(x.cardio ?? cardioByName(x.name))))}>
                       🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio — Powt. = czas (min), Ciężar = dystans (km)' : 'Cardio?'}
                     </button>
+{!(e.cardio ?? cardioByName(e.name)) && (
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
+                    )}
                     <div className="pe-sets">
                       <div className="pe-set pe-set-head">
                         <span>#</span>
