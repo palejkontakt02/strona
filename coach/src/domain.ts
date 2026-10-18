@@ -82,8 +82,16 @@ export interface Injury {
   note?: string;
 }
 
+/** Dane biegowe do stref: tętno maks. i czas na 5 km (np. „25:00”). */
+export interface RunProfile {
+  hrMax?: number;
+  t5k?: string;
+}
+
 export interface Client {
   id: string;
+  /** Bieganie: strefy tętna i tempa liczone z tych danych. */
+  run?: RunProfile;
   /** Domyślne miejsce treningów (studio, klub…). */
   locationId?: string;
   name: string;
@@ -172,7 +180,7 @@ export interface CoachReply {
 
 /* ---------- Plany ---------- */
 
-export const SET_TYPES = ['Rozgrzewka', 'Top set', 'Robocze', 'Back-off', 'Drop set', 'AMRAP'] as const;
+export const SET_TYPES = ['Rozgrzewka', 'Top set', 'Robocze', 'Back-off', 'Drop set', 'AMRAP', 'Schłodzenie'] as const;
 export type SetType = (typeof SET_TYPES)[number];
 
 /**
@@ -187,6 +195,8 @@ export interface SetGroup {
   load: string;
   rpe: string;
   rest?: string;
+  /** Cardio / bieg: cel intensywności — strefa („Z2”, „OWB1”, „BC3”) albo tempo („5:30”, „5:20–5:40”). */
+  pace?: string;
 }
 
 export interface PlanExercise {

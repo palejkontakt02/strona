@@ -10,6 +10,7 @@ import { acwrZone, loadStats, sessionLoad, tonnage, weekly } from '../../lib/loa
 import { num } from '../../lib/parse';
 import { e1Series, exerciseE1, records } from '../../lib/strength';
 import { readiness, readinessNorm, wellnessTotal } from '../../lib/wellness';
+import { fmtClock, fmtKm, hrMaxOf, pace5k, runTotals, ZONES } from '../../lib/running';
 
 const toneOf = (l: string | null) => (l === 'red' ? 'danger' : l === 'yellow' ? 'warn' : l === 'green' ? 'ok' : undefined);
 
@@ -22,6 +23,8 @@ export function ClientMonitoring({ client }: { client: Client }) {
 
   const weeklyLoad = weekly(sessions, sessionLoad, 12, today);
   const weeklyTon = weekly(sessions, tonnage, 12, today);
+  const weeklyKm = weekly(sessions, (s) => runTotals(s)?.km || null, 12, today);
+  const hasRun = weeklyKm.some((p) => p.y > 0) || !!client.run;
 
   // ACWR liczony na każdy tydzień (niedziela) z ostatnich 12 tygodni + dziś.
   const acwrPts: Pt[] = [];
@@ -92,6 +95,59 @@ export function ClientMonitoring({ client }: { client: Client }) {
         <Card title="Ból (0–10)">
           {painPts.length < 2 ? <Empty>Za mało danych.</Empty> : <LineChart label="Ból" series={[{ label: 'Ból', pts: painPts, tone: 'muted' }]} refs={[{ y: 4, label: '4', tone: 'warn' }]} minY={0} format={(v) => fnum(v, 0)} />}
         </Card>
+        {hasRun && (
+          <Card title="Bieganie — kilometraż tygodniowy">
+            <BarChart pts={weeklyKm} label="Kilometraż tygodniowy" format={(v) => fnum(v, 1)} />
+            {(() => {
+              // tydzień do tygodnia: skok powyżej ~10–30% zwiększa ryzyko przeciążenia
+              const [a, b] = weeklyKm.slice(-2).map((p) => p.y);
+              const prev3 = weeklyKm.slice(-4, -1).map((p) => p.y);
+              const avg = prev3.reduce((x, y) => x + y, 0) / (prev3.length || 1);
+              const jump = avg > 0 ? (b - avg) / avg : 0;
+              return (
+                <p className={`small ${jump > 0.3 ? 'warn-text' : 'muted'}`}>
+                  Ten tydzień: <b>{fmtKm(b || 0)}</b> · poprzedni: {fmtKm(a || 0)} · średnia z 3 tyg.: {fmtKm(avg)}
+                  {jump > 0.3 ? ` — o ${Math.round(jump * 100)}% więcej niż zwykle; zwiększaj kilometraż stopniowo (ok. 10% na tydzień).` : ''}
+                </p>
+              );
+            })()}
+            {(() => {
+              const hm = hrMaxOf(client.run, client.dob);
+              const p5 = pace5k(client.run);
+              if (!hm && !p5) return <p className="muted small">Strefy tętna i tempa: wpisz tętno maks. albo czas na 5 km w Profilu.</p>;
+              return (
+                <table className="table zones-table">
+                  <thead>
+                    <tr>
+                      <th>Strefa</th>
+                      {hm && <th>Tętno{hm.est ? ' (szac. z wieku)' : ''}</th>}
+                      {p5 && <th>Tempo / km</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ZONES.map((z) => (
+                      <tr key={z.z}>
+                        <td>
+                          <b>{z.z}</b> {z.name}
+                        </td>
+                        {hm && (
+                          <td>
+                            {Math.round(hm.v * z.hr[0])}–{Math.round(hm.v * z.hr[1])}
+                          </td>
+                        )}
+                        {p5 && (
+                          <td>
+                            {fmtClock(p5 * z.pace[0])}–{fmtClock(p5 * z.pace[1])}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </Card>
+        )}
         <Card title="Tonaż tygodniowy (kg)">
           <BarChart pts={weeklyTon} label="Tonaż tygodniowy" format={(v) => (v >= 1000 ? `${fnum(v / 1000, 1)}t` : String(Math.round(v)))} />
         </Card>

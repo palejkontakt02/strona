@@ -4490,3 +4490,79 @@ body.athlete-mode .toasts {
   min-width: 0;
   width: auto;
 }
+
+/* bieg: odcinki w edytorze planu (dodatkowa kolumna strefa / tempo) */
+.pe-set.cardio {
+  grid-template-columns: 24px minmax(96px, 1.2fr) repeat(4, minmax(52px, 1fr)) 32px;
+}
+@media (max-width: 640px) {
+  .pe-set.cardio {
+    grid-template-columns: 16px minmax(70px, 1.1fr) repeat(4, minmax(38px, 1fr)) 26px;
+    gap: 4px;
+  }
+}
+.run-tpl-select {
+  max-width: 240px;
+}
+.run-tpl {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.run-tpl-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  height: auto;
+  padding: var(--space-3) var(--space-4);
+}
+.set-edit-head.cardio,
+.set-edit-row.cardio {
+  grid-template-columns: 34px repeat(4, minmax(0, 1fr)) minmax(56px, auto) 36px;
+}
+@media (min-width: 601px) {
+  .set-edit-head.cardio,
+  .set-edit-row.cardio {
+    grid-template-columns: 34px repeat(4, minmax(0, 100px)) minmax(64px, auto) 36px;
+  }
+}
+.zones-table td,
+.zones-table th {
+  font-size: 0.82rem;
+}
+.wo-due {
+  display: block;
+  margin: -4px 0 6px 44px;
+}
+.assign-src {
+  display: grid;
+  gap: var(--space-2);
+}
+.assign-opt {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.assign-opt.on {
+  border-color: var(--color-neutral-300);
+}
+.assign-opt > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.assign-opt select {
+  max-width: 100%;
+}
+.assign-day {
+  margin-top: var(--space-2);
+  max-width: 220px;
+}

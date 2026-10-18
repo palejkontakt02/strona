@@ -19,6 +19,8 @@ export type ModalState =
   | { kind: 'exercise'; exercise?: LibraryExercise }
   | { kind: 'plan'; plan: Plan; isNew?: boolean; /** Rozwiń tydzień z tą jednostką. */ focusWorkoutId?: string }
   | { kind: 'review'; sessionId: string }
+  /** Trening poza planem na wybrany dzień (albo bez terminu). */
+  | { kind: 'assign'; clientId?: string; date?: string }
   | { kind: 'data' }
   | { kind: 'locations' }
   | { kind: 'location'; location?: Location };

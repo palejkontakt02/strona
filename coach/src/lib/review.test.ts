@@ -151,7 +151,7 @@ describe('cardio', () => {
     const out = runToExercises({ planId: '', workoutId: '', name: 'x', planName: '', weekName: '', date: '2026-10-18', startedAt: 0, idx: 0, ex: [ex] } as never);
     expect(out[0].cardio).toBe(true);
     expect(out[0].setsLog[0]).toMatchObject({ reps: 10, unit: 'min', dist: 5, hr: 142, rpe: 6 });
-    expect(setText(out[0].setsLog[0])).toBe('10 min · 5 km · 142 ud./min');
+    expect(setText(out[0].setsLog[0])).toBe('10 min · 5 km · 2:00/km · 142 ud./min');
     expect(tonnage({ id: 's', clientId: 'c', date: '2026-10-18', charge: 'brak', exercises: out } as never)).toBe(0);
   });
 });

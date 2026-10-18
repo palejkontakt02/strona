@@ -2,7 +2,8 @@ import { cardioByName, perSideByName } from '../../lib/run';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
-import { clonePlan, extraPlanOf, plansOf, savePlan, sessionsOf } from '../../data/ops';
+import { clonePlan, extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
+import { useState } from 'react';
 import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, uid } from '../../format';
@@ -10,7 +11,6 @@ import { todayISO } from '../../lib/dates';
 import { doneInPass, exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanSets } from '../../components/sets';
-import { extraWithNewWorkout } from './WorkoutList';
 
 export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
   return mergeGroups(e.groups)
@@ -36,8 +36,15 @@ export function ClientPlans({ client }: { client: Client }) {
   const sessions = sessionsOf(db, client.id);
   const extra = extraPlanOf(db, client.id);
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
-  const lastDone = (id: string) => sessions.find((s) => s.planId === extra?.id && s.workoutId === id)?.date;
-  const addExtra = () => openModal({ kind: 'plan', plan: extraWithNewWorkout(client.id, extra), isNew: !extra });
+  const today = todayISO();
+  const addExtra = () => openModal({ kind: 'assign', clientId: client.id });
+  // zadane na dzień i już wykonane chowamy pod „Wykonane”, żeby lista nie rosła bez końca
+  const states = new Map(extraWorkouts.map((k) => [k.id, extraState(k, extra?.id, sessions, today)]));
+  const [showDone, setShowDone] = useState(false);
+  const doneDated = extraWorkouts.filter((k) => states.get(k.id)!.state === 'done');
+  const visibleExtra = extraWorkouts
+    .filter((k) => showDone || states.get(k.id)!.state !== 'done')
+    .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'));
 
   const removeExtra = async (id: string, name: string) => {
     if (!extra || !(await ask(`Usunąć „${name}” z dodatkowych treningów? Zapisane wcześniej treningi zostają w historii.`, { confirm: 'Usuń trening' }))) return;
@@ -168,26 +175,25 @@ export function ClientPlans({ client }: { client: Client }) {
       </div>
       <Card
         className="extra-card"
-        title="Dodatkowe treningi"
+        title="Treningi poza planem"
         action={
           <div className="actions">
-            {extra && <IconBtn icon="edit" label="Edytuj dodatkowe treningi" onClick={() => openModal({ kind: 'plan', plan: extra })} />}
-            <button className="btn btn-secondary btn-sm" onClick={addExtra}>
-              + Dodaj trening
+            {extra && extraWorkouts.length > 1 && <IconBtn icon="edit" label="Edytuj wszystkie treningi poza planem" onClick={() => openModal({ kind: 'plan', plan: extra })} />}
+            <button className="btn btn-primary btn-sm" onClick={addExtra}>
+              + Zadaj trening
             </button>
           </div>
         }
       >
         {extraWorkouts.length === 0 ? (
-          <p className="muted small">Jednostki poza planem (np. dodatkowa siłownia, mobilność, kondycja). Podopieczny widzi je osobno i może zrobić w dowolnym momencie.</p>
+          <p className="muted small">Trening na konkretny dzień (np. jutro bieg, w sobotę mobilność) albo do zrobienia w dowolnym momencie. Plan i jego kolejność się nie zmieniają.</p>
         ) : (
           <div className="plan-week">
-            {extraWorkouts.map((k) => (
-              <div key={k.id} className="plan-workout">
+            {visibleExtra.map((k) => (
+              <div key={k.id} className={`plan-workout ${states.get(k.id)!.state === 'done' ? 'is-done' : ''}`}>
                 <div className="plan-workout-head">
                   <strong>{k.name}</strong>
-                  {k.date && <Tag tone="accent">na {fmtDate(k.date)}</Tag>}
-                  {lastDone(k.id) && <Tag tone="ok">ostatnio {fmtDate(lastDone(k.id)!)}</Tag>}
+                  <ExtraTag st={states.get(k.id)!} />
                   <span className="row-inline">
                     <IconBtn icon="edit" label={`Edytuj ${k.name}`} onClick={() => openModal({ kind: 'plan', plan: extra!, focusWorkoutId: k.id })} />
                     <IconBtn icon="trash" label={`Usuń ${k.name}`} danger onClick={() => void removeExtra(k.id, k.name)} />
@@ -219,9 +225,22 @@ export function ClientPlans({ client }: { client: Client }) {
                 )}
               </div>
             ))}
+            {doneDated.length > 0 && (
+              <button className="link small" onClick={() => setShowDone(!showDone)}>
+                {showDone ? 'Ukryj wykonane' : `Pokaż wykonane zadane (${doneDated.length})`}
+              </button>
+            )}
           </div>
         )}
       </Card>
     </>
   );
+}
+
+/** Stan treningu poza planem: na dzień / zaległy / wykonany / bez terminu (ostatnio). */
+export function ExtraTag({ st }: { st: ExtraState }) {
+  if (st.state === 'done') return <Tag tone="ok">✓ wykonany {fmtDate(st.date!)}</Tag>;
+  if (st.state === 'overdue') return <Tag tone="warn">zaległy · był na {fmtDate(st.date!)}</Tag>;
+  if (st.state === 'due') return <Tag tone="accent">na {fmtDate(st.date!)}</Tag>;
+  return <Tag tone="muted">bez terminu{st.date ? ` · ostatnio ${fmtDate(st.date)}` : ''}</Tag>;
 }

@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Field, IconBtn, Modal } from '../components/ui';
+import { Field, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { chargeProblem, clientById, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
+import { chargeProblem, clientById, isSolo, deleteSession, extraPlanOf, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { deleteSetVideo, sessionVideos } from '../data/videos';
 import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
-import { perSideByName, buildRunExercise } from '../lib/run';
+import { cardioByName, perSideByName, buildRunExercise } from '../lib/run';
+import { fmtClock, paceText, parseDur } from '../lib/running';
 import { num, numIn, repsN, sidesOf, timeUnit } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
@@ -63,17 +64,44 @@ interface SetDraft {
   /** Docelowe RPE z planu (podpowiedź w polu). */
   tRpe?: string;
   video?: string;
-  /** Cardio (zachowane przy poprawkach). */
-  dist?: number;
-  hr?: number;
+  /** Cardio / bieg: dystans (km) i tętno — tekst z pól. */
+  dist?: string;
+  hr?: string;
 }
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>): SetDraft[] =>
-  log.map((x) => ({ key: uid(), load: x.load != null ? fnum(x.load) : '', reps: x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '', rpe: x.rpe != null ? fnum(x.rpe) : '', warmup: x.warmup || undefined, label: x.label, video: x.video, dist: x.dist, hr: x.hr }));
-const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
+  log.map((x) => ({
+    key: uid(),
+    load: x.load != null ? fnum(x.load) : '',
+    // bieg: czas jako m:ss, gdy są sekundy
+    reps: x.reps != null ? (x.dist != null || x.hr != null) && x.unit === 'min' ? (Number.isInteger(x.reps) ? String(x.reps) : fmtClock(x.reps)) : `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '',
+    rpe: x.rpe != null ? fnum(x.rpe) : '',
+    warmup: x.warmup || undefined,
+    label: x.label,
+    video: x.video,
+    dist: x.dist != null ? fnum(x.dist) : undefined,
+    hr: x.hr != null ? String(x.hr) : undefined,
+  }));
+const toLog = (d: SetDraft[], cardio?: boolean): NonNullable<SessionExercise['setsLog']> =>
   d
-    .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video)
+    .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video || (x.dist ?? '').trim())
     .map((x) => {
       const out: NonNullable<SessionExercise['setsLog']>[number] = {};
+      if (cardio) {
+        // odcinek: czas (min albo m:ss), dystans, tętno, RPE
+        const d = parseDur(x.reps);
+        if (d != null) out.reps = Math.round(d * 100) / 100;
+        out.unit = 'min';
+        const km = num(x.dist);
+        if (km != null) out.dist = km;
+        const hr = numIn(x.hr, 30, 240);
+        if (hr != null) out.hr = hr;
+        const rpe = numIn(x.rpe, 0, 10);
+        if (rpe != null) out.rpe = rpe;
+        if (x.warmup) out.warmup = true;
+        if (x.label) out.label = x.label;
+        if (x.video) out.video = x.video;
+        return out;
+      }
       const load = num(x.load);
       // „30 s”, „2 min” — seria na czas; „30/20” — lewa/prawa
       const unit = timeUnit(x.reps);
@@ -88,8 +116,8 @@ const toLog = (d: SetDraft[]): NonNullable<SessionExercise['setsLog']> =>
       if (x.warmup) out.warmup = true;
       if (x.label) out.label = x.label;
       if (x.video) out.video = x.video;
-      if (x.dist != null) out.dist = x.dist;
-      if (x.hr != null) out.hr = x.hr;
+      if (num(x.dist) != null) out.dist = num(x.dist)!;
+      if (numIn(x.hr, 30, 240) != null) out.hr = numIn(x.hr, 30, 240)!;
       return out;
     });
 /** Podsumowanie ćwiczenia z serii: liczba serii roboczych, powtórzenia i ciężar pierwszej z nich. */
@@ -166,6 +194,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [locationId, setLocationId] = useState(existing?.locationId ?? m.appt?.locationId ?? clientById(db, existing?.clientId ?? m.clientId ?? m.appt?.clientId)?.locationId ?? '');
   const [amount, setAmount] = useState('');
   const [paidNow, setPaidNow] = useState(true);
+  // trener zapisuje zwykle trening, który prowadził; stary zapis — jak w historii
+  const [solo, setSolo] = useState(existing ? isSolo(db, existing) : false);
 
   const effCharge: Billing = charge || (client ? defaultCharge(client, history) : 'brak');
 
@@ -192,6 +222,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           hint: sug.why || undefined,
           linked: e.linked,
           perSide: e.perSide ?? (perSideByName(e.name) || undefined),
+          cardio: e.cardio ?? (cardioByName(e.name) || undefined),
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
           series: buildRunExercise(e, history, undefined, client?.tests ?? []).sets.map((x) => ({
             key: uid(),
@@ -201,6 +232,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             tRpe: x.tRpe || undefined,
             warmup: x.warmup || undefined,
             label: x.label && x.label !== 'Robocze' ? x.label : undefined,
+            dist: x.dist || undefined,
           })),
         };
       }),
@@ -257,13 +289,14 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       locationId: locationId || undefined,
       planId: planRef.planId,
       workoutId: planRef.workoutId,
+      solo,
       exercises: withBlockLabels(rows).map((r) => ({
         name: r.name.trim(),
         label: r.label,
         ...(r.series ? { ...seriesSummary(r.series, r.reps), rpe: '' } : { sets: r.sets, reps: r.reps, load: r.load, rpe: r.rpe }),
         rest: r.rest || undefined,
         notes: r.notes || undefined,
-        setsLog: r.series ? toLog(r.series) : undefined,
+        setsLog: r.series ? toLog(r.series, r.cardio) : undefined,
         perSide: r.perSide || undefined,
         cardio: r.cardio || undefined,
       })),
@@ -325,6 +358,9 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="Z kim">
+          <Seg options={['Z trenerem', 'Samodzielnie'] as const} value={solo ? 'Samodzielnie' : 'Z trenerem'} onChange={(v) => setSolo(v === 'Samodzielnie')} label="Z kim był trening" />
         </Field>
         <Field label="Nazwa treningu" wide>
           <input className="input" value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} placeholder="np. A – dół ciała" />
@@ -393,15 +429,26 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             </span>
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {r.hint && !r.series && <span className="ex-hint">Podpowiedź: {r.hint}</span>}
-            <button type="button" className={`side-toggle ${r.perSide ? 'on' : ''}`} aria-pressed={!!r.perSide} onClick={() => setRow(i, { perSide: !r.perSide || undefined })}>
-              ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
+            {!r.cardio && (
+              <button type="button" className={`side-toggle ${r.perSide ? 'on' : ''}`} aria-pressed={!!r.perSide} onClick={() => setRow(i, { perSide: !r.perSide || undefined })}>
+                ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`side-toggle ${r.cardio ? 'on' : ''}`}
+              aria-pressed={!!r.cardio}
+              onClick={() => setRow(i, { cardio: !r.cardio || undefined, perSide: undefined, series: r.series ?? [blankSet()] })}
+            >
+              🫀 {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
             </button>
             {r.series ? (
               <div className="set-edit">
-                <div className="set-edit-head">
+                <div className={`set-edit-head ${r.cardio ? 'cardio' : ''}`}>
                   <span>#</span>
-                  <span>powt.</span>
-                  <span>kg</span>
+                  <span>{r.cardio ? 'czas' : 'powt.'}</span>
+                  <span>{r.cardio ? 'km' : 'kg'}</span>
+                  {r.cardio && <span>tętno</span>}
                   <span>RPE</span>
                   <span />
                   <span />
@@ -410,6 +457,19 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   const upd = (patch: Partial<SetDraft>) => setSeries(i, (d) => d.map((y, m) => (m === k ? { ...y, ...patch } : y)));
                   const workNo = r.series!.slice(0, k + 1).filter((y) => !y.warmup).length;
                   return (
+                    r.cardio ? (
+                      <div key={x.key} className={`set-edit-row cardio ${x.warmup ? 'warm' : ''}`}>
+                        <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Odcinek ${k + 1}: rozgrzewka` : `Odcinek ${k + 1}`} onClick={() => upd({ warmup: !x.warmup || undefined })}>
+                          {x.warmup ? 'R' : x.label === 'Schłodzenie' ? 'S' : workNo}
+                        </button>
+                        <input className="input" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Czas, odcinek ${k + 1}`} placeholder="min / m:ss" />
+                        <input className="input" inputMode="decimal" value={x.dist ?? ''} onChange={(e) => upd({ dist: e.target.value })} aria-label={`Dystans (km), odcinek ${k + 1}`} placeholder="km" />
+                        <input className="input" inputMode="numeric" value={x.hr ?? ''} onChange={(e) => upd({ hr: e.target.value })} aria-label={`Tętno, odcinek ${k + 1}`} placeholder="tętno" />
+                        <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, odcinek ${k + 1}`} placeholder="RPE" />
+                        <span className="muted small">{paceText(parseDur(x.reps), num(x.dist))}</span>
+                        <IconBtn icon="trash" label={`Usuń odcinek ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
+                      </div>
+                    ) :
                     <div key={x.key} className={`set-edit-row ${x.warmup ? 'warm' : ''}`}>
                       <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Seria ${k + 1}: rozgrzewka` : `Seria ${k + 1}: robocza`} title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                         {x.warmup ? 'R' : workNo}

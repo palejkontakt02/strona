@@ -1,16 +1,15 @@
-import { extraWithNewWorkout } from './client/WorkoutList';
 import { AccountBadge } from '../components/accounts';
 import { useAccounts } from '../data/accounts';
 import { useState } from 'react';
 import { Avatar, Dot, Icon, Seg, Tag, type Tone } from '../components/ui';
 import type { ClientStatus } from '../domain';
-import { extraPlanOf, lastSessionDate, sessionsOf } from '../data/ops';
+import { lastSessionDate, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { needsReview } from '../data/videos';
 import { ago, ageOf, normalize } from '../format';
 import { clientAlerts } from '../lib/alerts';
 import { healthFlags, trainerNotesOf } from './client/Health';
-import { addDays, todayISO } from '../lib/dates';
+import { todayISO } from '../lib/dates';
 import { CLIENT_TABS, useNav } from '../nav';
 import { ClientOverview } from './client/Overview';
 import { ClientPlans } from './client/Plans';
@@ -130,11 +129,7 @@ export function ClientsView() {
                 <button
                   className="btn btn-secondary"
                   title="Trening poza planem na wybrany dzień — podopieczny zobaczy go na górze ekranu"
-                  onClick={() => {
-                    const extra = extraPlanOf(db, selected.id);
-                    const plan = extraWithNewWorkout(selected.id, extra, addDays(todayISO(), 1));
-                    openModal({ kind: 'plan', plan, isNew: !extra, focusWorkoutId: plan.weeks[plan.weeks.length - 1].workouts.slice(-1)[0]?.id });
-                  }}
+                  onClick={() => openModal({ kind: 'assign', clientId: selected.id })}
                 >
                   + Zadaj trening
                 </button>

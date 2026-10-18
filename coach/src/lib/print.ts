@@ -54,7 +54,10 @@ export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[
           .map((e, ei) => {
             if (!e.name) return '';
             const run = buildRunExercise(e, sessions, undefined, client.tests);
-            const sets = run.sets
+            // bieg / cardio: bloki odcinków („Rozgrzewka 15 min · Z2”, „6 × 800 m · Z5”)
+            const sets = run.cardio
+              ? run.sets.filter((x) => x.first).map((x) => `<span class="done"></span>${esc(x.gdesc)}`).join('<br>')
+              : run.sets
               .map((x) => `<span class="done"></span>${x.warmup ? 'R: ' : ''}${esc(x.reps || '?')}${x.unit ? ` ${x.unit}` : ''}${run.perSide ? '/str.' : ''}${x.load ? ` × ${esc(kg(x.load))}` : ''}${x.tRpe ? ` @${esc(x.tRpe)}` : ''}`)
               .join('&nbsp;&nbsp; ');
             return `<tr><td class="lbl">${esc(labels[ei])}</td><td><b>${esc(e.name)}</b>${e.notes ? `<div class="note">${esc(e.notes)}</div>` : ''}</td><td>${sets}</td><td>${esc(e.rest || '')}</td></tr>`;

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
 import type { Appointment, TrainingSession } from '../domain';
+import { put } from '../data/db';
 import { isSolo, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { StartButtons } from './StartButtons';
@@ -11,6 +12,7 @@ import { fmtDay, fmtLong, fnum, nEx } from '../format';
 import { todayISO } from '../lib/dates';
 import { sessionLoad, tonnage } from '../lib/load';
 import { num, repsN } from '../lib/parse';
+import { fmtDur, fmtKm, paceText, runTotals } from '../lib/running';
 
 /** Najbliższe zaplanowane wizyty klienta. */
 /** Zaplanowane wizyty, które jeszcze się nie skończyły (dzisiejsze po czasie trwania już nie). */
@@ -55,9 +57,18 @@ export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: nu
 }
 
 /** Seria jako tekst: „8 × 45 kg”, „8/str. × 20 kg”, „30/25 s” (lewa/prawa), „45 s”. */
-export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number; dist?: number; hr?: number }, perSide?: boolean): string {
-  // cardio: „20 min · 3,2 km · 145 ud./min”
-  if (x.dist != null || x.hr != null) return [x.reps != null && `${fnum(x.reps)} min`, x.dist != null && `${fnum(x.dist)} km`, x.hr != null && `${fnum(x.hr)} ud./min`].filter(Boolean).join(' · ');
+export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number; dist?: number; hr?: number; label?: string }, perSide?: boolean, cardio?: boolean): string {
+  // cardio / bieg: „schł. 3:05 · 800 m · 3:51/km · 172 ud./min”
+  if (cardio || x.dist != null || x.hr != null)
+    return [
+      x.label === 'Schłodzenie' && 'schł.',
+      x.reps != null && fmtDur(x.reps),
+      x.dist != null && fmtKm(x.dist),
+      paceText(x.reps, x.dist),
+      x.hr != null && `${fnum(x.hr)} ud./min`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
   const u = x.unit ? ` ${x.unit === 'min' ? 'min' : 's'}` : '';
   const side = perSide && x.repsR == null ? '/str.' : '';
   const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : fnum(x.reps);
@@ -149,7 +160,10 @@ export function SessionSheet({
   /** Trener: przegląd nagrań i komentarz. */
   onReview?: () => void;
 }) {
-  const { db } = useStore();
+  const { db, apply } = useStore();
+  // po przełączeniu „sam / z trenerem” pokazujemy aktualny zapis, nie migawkę z otwarcia
+  s = db.sessions.find((x) => x.id === s.id) ?? s;
+  const solo = isSolo(db, s);
   const ton = tonnage(s);
   const nVid = sessionVideos(s).length;
   const load = sessionLoad(s);
@@ -177,16 +191,30 @@ export function SessionSheet({
           </button>
         )}
         <div className="hist-stats">
-          <span className="tag tag-neutral">{isSolo(db, s) ? 'samodzielnie' : 'z trenerem'}</span>
+          <span className="seg seg-sm" role="radiogroup" aria-label="Z kim był trening">
+            {([true, false] as const).map((v) => (
+              <button
+                key={String(v)}
+                type="button"
+                role="radio"
+                aria-checked={solo === v}
+                className={solo === v ? 'active' : ''}
+                onClick={() => solo !== v && void apply([put('sessions', { ...s, solo: v })], v ? 'Oznaczono: samodzielnie.' : 'Oznaczono: z trenerem.')}
+              >
+                {v ? 'samodzielnie' : 'z trenerem'}
+              </button>
+            ))}
+          </span>
           {(() => {
-            // suma cardio w treningu
-            const logs = s.exercises.filter((e) => e.cardio).flatMap((e) => e.setsLog ?? []);
-            if (!logs.length) return null;
-            const min = logs.reduce((a, x) => a + (x.reps ?? 0), 0);
-            const km = logs.reduce((a, x) => a + (x.dist ?? 0), 0);
+            // suma cardio / biegu w treningu (z tempem, gdy są czasy i dystanse)
+            const t = runTotals(s);
+            if (!t) return null;
             return (
               <span>
-                🫀 <b>{fnum(min)}</b> min cardio{km ? ` · ${fnum(km)} km` : ''}
+                {t.km ? '🏃' : '🫀'} {t.km ? <b>{fmtKm(t.km)}</b> : null}
+                {t.km && t.min ? ' · ' : ''}
+                {t.min ? <b>{fmtDur(t.min)}</b> : null}
+                {t.pace ? ` · śr. ${t.pace}` : ''}
               </span>
             );
           })()}
@@ -228,10 +256,10 @@ export function SessionSheet({
                 </div>
                 {work.length + warm.length > 0 ? (
                   <div className="hist-sets">
-                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => setText(x, e.perSide)).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
+                    {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => setText(x, e.perSide, e.cardio)).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
                       <span key={j} className="set-chip">
-                        {setText(x, e.perSide)}
+                        {setText(x, e.perSide, e.cardio)}
                         {x.rpe != null && <i>{plain ? ` · trudność ${fnum(x.rpe)}/10` : ` @${fnum(x.rpe)}`}</i>}
                         {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}
                       </span>

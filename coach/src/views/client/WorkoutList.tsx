@@ -1,8 +1,8 @@
 import { Card, Empty, Icon, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
-import { extraPlanOf, newExtraPlan, plansOf, sessionsOf } from '../../data/ops';
+import { extraPlanOf, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { fmtDate, plural, uid } from '../../format';
+import { fmtDate, plural } from '../../format';
 import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { useState } from 'react';
@@ -10,14 +10,6 @@ import type { PlanWorkout, TrainingSession } from '../../domain';
 import { WorkoutPreview } from '../../athlete/WorkoutPreview';
 import { SessionSheet } from '../../athlete/History';
 import { newPlan } from './Plans';
-
-/** Edytor dodatkowych treningów z nową, pustą jednostką na końcu. */
-export function extraWithNewWorkout(clientId: string, extra?: Plan, date?: string): Plan {
-  const base = extra ?? newExtraPlan(clientId);
-  const weeks = base.weeks.length ? base.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
-  const n = weeks.reduce((a, w) => a + w.workouts.length, 0);
-  return { ...base, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, { id: uid(), name: `Trening dodatkowy ${n + 1}`, date, exercises: [] }] } : w)) };
-}
 
 /**
  * Wszystkie treningi podopiecznego w jednym miejscu: jednostki z aktywnego planu i dodatkowe (poza planem).
@@ -51,8 +43,8 @@ export function WorkoutList({ client }: { client: Client }) {
               + Plan
             </button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'plan', plan: extraWithNewWorkout(client.id, extra), isNew: !extra })}>
-            + Trening poza planem
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'assign', clientId: client.id })}>
+            + Zadaj trening
           </button>
         </div>
       }

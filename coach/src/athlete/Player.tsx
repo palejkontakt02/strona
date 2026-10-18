@@ -4,20 +4,22 @@ import { useDialog } from '../components/useDialog';
 import { IconBtn } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import { ChargeSelect, LocationSelect } from '../components/location';
-import type { Billing, Client, TrainingSession } from '../domain';
-import { chargeProblem, savePlan, saveSession, sessionsOf } from '../data/ops';
+import type { Billing, Client, PlanExercise, TrainingSession } from '../domain';
+import { chargeProblem, isSolo, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { num, numIn, repsN, sidesOf, sumReps } from '../lib/parse';
 import { recentE1 } from '../lib/strength';
+import { fmtDur, paceText, parseDur, parseKm, RUN_TEMPLATES, targetText } from '../lib/running';
 import {
   adHocCardio,
   adHocExercise,
   appendExercise,
   applyRunLayout,
   blockRest,
+  buildRunExercise,
   completeSet,
   moveExercise,
   removeExercise,
@@ -80,6 +82,8 @@ interface Finish {
   amount: string;
   paidNow: boolean;
   locationId: string;
+  /** Samodzielnie czy z trenerem — wybór przy zapisie, do zmiany później w historii. */
+  solo: boolean;
 }
 
 /** Płynne przewijanie, chyba że użytkownik wyłączył animacje. */
@@ -139,13 +143,16 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     }
     if (s.rpe.trim() && numIn(s.rpe, 1, 10) == null) return toast('RPE: od 1 do 10 (jak ciężka była seria).');
     if (ex.cardio) {
-      if (!s.reps.trim() && !(s.dist ?? '').trim()) return toast('Cardio: wpisz czas (min) albo dystans (km).');
-      if (s.reps.trim() && numIn(s.reps, 0.1, 600) == null) return toast('Czas: liczba minut (np. 20).');
+      if (!s.reps.trim() && !(s.dist ?? '').trim()) return toast('Wpisz czas (min albo m:ss) albo dystans (km).');
+      const d = parseDur(s.reps);
+      if (s.reps.trim() && (d == null || d < 0.05 || d > 1440)) return toast('Czas: minuty (np. 20) albo minuty:sekundy (np. 3:05).');
       if ((s.dist ?? '').trim() && numIn(s.dist, 0.01, 500) == null) return toast('Dystans: liczba km (np. 3,5).');
       if ((s.hr ?? '').trim() && numIn(s.hr, 30, 240) == null) return toast('Tętno: od 30 do 240.');
-      update((r) => void (r.ex[k].sets[i].done = true));
+      const next = update((r) => void (r.ex[k].sets[i].done = true));
       const br = blockRest(run, k, i);
-      if (br.rest && run.ex[k].rest) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
+      // po ostatnim odcinku i przed schłodzeniem bez przerwy
+      const nextSet = run.ex[k].sets[i + 1];
+      if (br.rest && run.ex[k].rest && nextSet && nextSet.label !== 'Schłodzenie' && !next.ex.every((e) => e.sets.every((x) => x.done))) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
       return;
     }
     const hasPrev = ex.sets.slice(0, i).some((x) => x.done && !x.warmup);
@@ -188,6 +195,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         notes: finish.notes.trim() || undefined,
         locationId: (trainer ? finish.locationId : editing.locationId) || undefined,
         exercises: runToExercises(run),
+        solo: finish.solo,
       };
       if (updated.exercises.length === 0) return toast('Zostaw przynajmniej jedną zaliczoną serię (✓).');
       const { changes } = saveSession(db, { session: updated, isNew: false });
@@ -214,7 +222,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       planId: run.planId,
       workoutId: run.workoutId,
       exercises: runToExercises(run),
-      solo: !trainer,
+      solo: finish.solo,
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
@@ -281,6 +289,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         amount: '',
         paidNow: true,
         locationId: editing.locationId ?? '',
+        solo: isSolo(db, editing),
       });
       return;
     }
@@ -293,6 +302,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       amount: client.singleRate ? String(client.singleRate) : '',
       paidNow: true,
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
+      // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem
+      solo: !trainer && !db.appointments.some((a) => a.clientId === client.id && a.date === run.date && a.status !== 'cancel' && a.status !== 'noshow'),
     });
   };
 
@@ -315,7 +326,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           {run.ex[k].cardio ? (
             // cardio: czas, dystans, tętno, RPE (bez ciężaru i nagrania)
             <>
-              <input inputMode="decimal" value={s.reps} placeholder="min" onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas (min), ${run.ex[k].name}, odcinek ${num}`} />
+              <input value={s.reps} placeholder="min" onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas (minuty albo m:ss), ${run.ex[k].name}, odcinek ${num}`} />
               <input inputMode="decimal" value={s.dist ?? ''} placeholder="km" onChange={(ev) => setSet(k, i, { dist: ev.target.value })} aria-label={`Dystans (km), ${run.ex[k].name}, odcinek ${num}`} />
               <input inputMode="numeric" value={s.hr ?? ''} placeholder="tętno" onChange={(ev) => setSet(k, i, { hr: ev.target.value })} aria-label={`Średnie tętno, ${run.ex[k].name}, odcinek ${num}`} />
               <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe || 'RPE'} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, odcinek ${num}`} />
@@ -348,17 +359,25 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             ✓
           </button>
         </div>
-        {s.sug && !s.done && <div className="sughint">{s.sug}</div>}
+        {run.ex[k].cardio && (s.pace || paceText(parseDur(s.reps), parseKm(s.dist))) && (
+          // bieg: cel ze strefą (tętno / tempo z profilu) i tempo wyliczone z czasu i dystansu
+          <div className="prevhint">
+            {s.pace && <>cel: {targetText(s.pace, client.run, client.dob)}</>}
+            {s.pace && paceText(parseDur(s.reps), parseKm(s.dist)) && ' · '}
+            {paceText(parseDur(s.reps), parseKm(s.dist)) && <b>tempo {paceText(parseDur(s.reps), parseKm(s.dist))}</b>}
+          </div>
+        )}
+        {s.sug && !s.done && !run.ex[k].cardio && <div className="sughint">{s.sug}</div>}
         {s.prev && !s.sug && <div className="prevhint">poprzednio: {s.prev}</div>}
-        {s.unit && !s.done && (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) > 0 && (
+        {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) > 0) && (
           <button
             className="link small hold-start"
             onClick={() => {
-              const sec = (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) * (s.unit === 'min' ? 60 : 1);
+              const sec = run.ex[k].cardio ? Math.round((parseDur(s.reps) ?? 0) * 60) : (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) * (s.unit === 'min' ? 60 : 1);
               setHold({ end: Date.now() + sec * 1000, total: sec });
             }}
           >
-            ⏱ Odliczaj {s.reps.split('/')[0]} {s.unit === 'min' ? 'min' : 's'}
+            ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : `${s.reps.split('/')[0]} ${s.unit === 'min' ? 'min' : 's'}`}
             {run.ex[k].perSide ? ' (jedna strona)' : ''}
           </button>
         )}
@@ -485,7 +504,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {e.cardio ? (
           <div className="sgrid sgrid-head cardio">
             <span />
-            <span>min</span>
+            <span>czas</span>
             <span>km</span>
             <span>tętno</span>
             <span title="RPE: jak ciężki był odcinek, 1–10">RPE</span>
@@ -502,16 +521,17 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </div>
         )}
         {e.sets.map((s, i) => {
-          if (!s.warmup) n++;
+          const cool = s.label === 'Schłodzenie';
+          if (!s.warmup && !cool) n++;
           return (
             <div key={i}>
-              {s.first && !s.warmup && s.gdesc && (
+              {s.first && (!s.warmup || e.cardio) && s.gdesc && (
                 <div className="ghead">
                   <b>{s.gdesc}</b>
                   {s.rest && <span className="muted small">przerwa {fmtRest(s.rest)}</span>}
                 </div>
               )}
-              {setRow(k, i, s.warmup ? 'W' : String(n))}
+              {setRow(k, i, s.warmup ? 'W' : cool ? 'S' : String(n))}
             </div>
           );
         })}
@@ -634,6 +654,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             setAdding(false);
             window.scrollTo(0, 0);
           }}
+          onTemplate={(e) => {
+            setRun(appendExercise(run, buildRunExercise(e, sessionsOf(db, client.id), undefined, client.tests)));
+            setAdding(false);
+            window.scrollTo(0, 0);
+          }}
           onCardio={(name, bouts, minutes, km) => {
             setRun(appendExercise(run, adHocCardio(name, bouts, minutes, km)));
             setAdding(false);
@@ -728,6 +753,16 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                   {v}
                 </button>
               ))}
+            </div>
+            <div className="field">
+              <span>Z kim był trening?</span>
+              <div className="seg" role="radiogroup" aria-label="Z kim był trening">
+                {([true, false] as const).map((v) => (
+                  <button key={String(v)} type="button" role="radio" aria-checked={finish.solo === v} className={finish.solo === v ? 'active' : ''} onClick={() => setFinish({ ...finish, solo: v })}>
+                    {v ? 'Samodzielnie' : 'Z trenerem'}
+                  </button>
+                ))}
+              </div>
             </div>
             <label className="field">
               <span>Czas treningu (min)</span>
@@ -927,16 +962,33 @@ const CARDIO_TYPES = ['Bieżnia', 'Rower stacjonarny', 'Wioślarz (ergometr)', '
 function AddExercise({
   onAdd,
   onCardio,
+  onTemplate,
   onCancel,
   canLink,
 }: {
   onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean) => void;
   onCardio: (name: string, bouts: number, minutes: string, km: string) => void;
+  onTemplate: (e: PlanExercise) => void;
   onCancel?: () => void;
   canLink?: boolean;
 }) {
   const { db, toast } = useStore();
-  const [kind, setKind] = useState<'sila' | 'cardio'>('sila');
+  const [kind, setKind] = useState<'sila' | 'cardio' | 'bieg'>('sila');
+  const tabs = (
+    <div className="seg seg-sm" role="tablist" aria-label="Rodzaj ćwiczenia">
+      {(
+        [
+          ['sila', 'Siłowe'],
+          ['bieg', '🏃 Bieg'],
+          ['cardio', '🫀 Cardio'],
+        ] as const
+      ).map(([k, l]) => (
+        <button key={k} type="button" role="tab" className={kind === k ? 'active' : ''} aria-selected={kind === k} onClick={() => setKind(k)}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
   const [name, setName] = useState('');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8');
@@ -945,6 +997,29 @@ function AddExercise({
   const [bouts, setBouts] = useState('1');
   const [mins, setMins] = useState('20');
   const [km, setKm] = useState('');
+  if (kind === 'bieg')
+    return (
+      <div className="acard add-form">
+        {tabs}
+        <h3>Dodaj bieg</h3>
+        <p className="muted small">Wybierz jednostkę — czasy, dystanse i strefy zmienisz przy każdym odcinku. Czas wpisuj w minutach albo m:ss.</p>
+        <ul className="plain run-tpl">
+          {RUN_TEMPLATES.map((t) => (
+            <li key={t.id}>
+              <button type="button" className="btn btn-secondary btn-block run-tpl-btn" onClick={() => onTemplate(t.make())}>
+                <b>{t.name}</b>
+                <span className="muted small">{t.hint}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {onCancel && (
+          <button type="button" className="btn btn-ghost" onClick={onCancel}>
+            Anuluj
+          </button>
+        )}
+      </div>
+    );
   if (kind === 'cardio')
     return (
       <form
@@ -959,10 +1034,7 @@ function AddExercise({
           onCardio(name.trim(), n, mins.trim(), km.trim());
         }}
       >
-        <div className="seg seg-sm" role="tablist" aria-label="Rodzaj ćwiczenia">
-          <button type="button" onClick={() => setKind('sila')}>Siłowe</button>
-          <button type="button" className="active" aria-selected="true">🫀 Cardio</button>
-        </div>
+        {tabs}
         <h3>Dodaj cardio</h3>
         <div className="intake-opts">
           {CARDIO_TYPES.map((t) => (
@@ -1014,10 +1086,7 @@ function AddExercise({
         onAdd(name.trim(), n, reps.trim() || '8', load.replace(',', '.'), linked);
       }}
     >
-      <div className="seg seg-sm" role="tablist" aria-label="Rodzaj ćwiczenia">
-        <button type="button" className="active" aria-selected="true">Siłowe</button>
-        <button type="button" onClick={() => setKind('cardio')}>🫀 Cardio</button>
-      </div>
+      {tabs}
       <h3>Dodaj ćwiczenie</h3>
       <datalist id="run-lib">
         {db.library.map((e) => (

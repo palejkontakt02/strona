@@ -21,6 +21,8 @@ export function toDraft(c: Partial<Client>): Draft {
   const d: Draft = { status: c.status ?? 'aktywny', billing: c.billing ?? '', dominant: c.dominant ?? '', locationId: c.locationId ?? '' };
   for (const k of [...TEXT_FIELDS, ...DATE_FIELDS]) d[k] = (c[k] as string | undefined) ?? '';
   for (const k of NUM_FIELDS) d[k] = c[k] != null ? String(c[k]) : '';
+  d.runHrMax = c.run?.hrMax != null ? String(c.run.hrMax) : '';
+  d.runT5k = c.run?.t5k ?? '';
   return d;
 }
 
@@ -30,6 +32,12 @@ export function fromDraft(base: Client, d: Draft): Client {
   c.name = d.name.trim();
   for (const k of DATE_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k] || undefined;
   for (const k of NUM_FIELDS) (c as unknown as Record<string, unknown>)[k] = num(d[k]) ?? undefined;
+  // bieganie: strefy tętna / tempa (pola z formularza; brak — bez zmian w zapisie)
+  if (d.runHrMax !== undefined || d.runT5k !== undefined) {
+    const hrMax = num(d.runHrMax ?? '') ?? undefined;
+    const t5k = (d.runT5k ?? '').trim() || undefined;
+    c.run = hrMax || t5k ? { hrMax, t5k } : undefined;
+  }
   return c;
 }
 
@@ -64,6 +72,8 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Staż treningowy">{inp('experience')}</Field>
           <Field label="Poziom">{inp('level')}</Field>
           <Field label="Dni treningowe / tydz.">{inp('daysPerWeek', 'text', { inputMode: 'numeric' })}</Field>
+          <Field label="Bieg: tętno maks.">{inp('runHrMax', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 192' })}</Field>
+          <Field label="Bieg: czas na 5 km">{inp('runT5k', 'text', { placeholder: 'np. 25:30' })}</Field>
           <Field label="Najbliższy start / cel">{inp('targetDate', 'date')}</Field>
           <Field label="Początek współpracy">{inp('startDate', 'date')}</Field>
           <Field label="Status">

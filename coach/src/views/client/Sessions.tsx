@@ -42,7 +42,7 @@ export function ClientSessions({ client }: { client: Client }) {
             📋 Wklej z notatki
           </button>
           <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
-            + Zapisz trening
+            + Zapisz wykonany trening
           </button>
         </div>
       </div>

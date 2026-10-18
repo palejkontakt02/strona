@@ -1,10 +1,13 @@
 import { cardioByName, perSideByName } from '../lib/run';
+import { RUN_TEMPLATES, ZONES } from '../lib/running';
+
+const CARDIO_TYPES: SetType[] = ['Rozgrzewka', 'Robocze', 'Schłodzenie'];
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
 import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, type Progression } from '../data/ops';
 import { useStore } from '../data/store';
-import { uid } from '../format';
+import { fmtDay, uid } from '../format';
 import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
@@ -36,6 +39,11 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     const focus = m.focusWorkoutId && m.plan.weeks.find((w) => w.workouts.some((k) => k.id === m.focusWorkoutId));
     return new Set((focus ? [focus] : m.plan.weeks.slice(0, 1)).map((w) => w.id));
   });
+  // poza planem: przy edycji jednego treningu pokazujemy tylko jego (reszta listy na żądanie)
+  const [showAll, setShowAll] = useState(false);
+  const only = !!p.extra && !!m.focusWorkoutId && !showAll && p.weeks.some((w) => w.workouts.some((k) => k.id === m.focusWorkoutId));
+  const extraCount = p.extra ? p.weeks.reduce((a, w) => a + w.workouts.length, 0) : 0;
+  const isOpen = (id: string) => !!p.extra || open.has(id);
   const toggle = (id: string) => setOpen((o) => (o.has(id) ? new Set([...o].filter((x) => x !== id)) : new Set([...o, id])));
 
   const upd = (fn: (draft: Plan) => void) =>
@@ -51,7 +59,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     const clean = structuredClone(p);
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
-    await apply(savePlan(db, clean), clean.extra ? 'Dodatkowe treningi zapisane.' : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
+    const focused = clean.weeks.flatMap((w) => w.workouts).find((k) => k.id === m.focusWorkoutId);
+    await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.');
     closeModal();
   };
 
@@ -60,8 +69,20 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   };
 
   return (
-    <Modal wide title={p.extra ? 'Dodatkowe treningi' : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
-      {p.extra && <p className="muted small">Jednostki poza planem — podopieczny widzi je osobno i może je zrobić w każdej chwili. Kolejność planu się nie zmienia.</p>}
+    <Modal wide title={p.extra ? (only ? 'Trening poza planem' : 'Treningi poza planem') : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
+      {p.extra && (
+        <p className="muted small">
+          Poza planem — kolejność planu się nie zmienia. Z datą: podopieczny widzi trening na górze ekranu w tym dniu. Bez daty: na liście „poza planem”, do zrobienia w dowolnym momencie.
+          {only && extraCount > 1 && (
+            <>
+              {' '}
+              <button type="button" className="link" onClick={() => setShowAll(true)}>
+                Pokaż wszystkie ({extraCount})
+              </button>
+            </>
+          )}
+        </p>
+      )}
       <div className="form-grid form-grid-3" style={p.extra ? { display: 'none' } : undefined}>
         <Field label="Nazwa planu">
           <input className="input" value={p.name} onChange={(e) => upd((d) => void (d.name = e.target.value))} required />
@@ -81,11 +102,22 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       <p className="muted small">
         Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
         Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
+        Bieg: „🏃 + Bieg…” wstawia gotową jednostkę; odcinek = czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), cel to strefa (<code>Z2</code>, <code>OWB1</code>, <code>BC3</code>) albo tempo (<code>5:30</code>), przerwa np. <code>2:00 trucht</code>.
       </p>
+      <datalist id="run-zones">
+        {ZONES.map((z) => (
+          <option key={z.z} value={z.z}>
+            {z.name}
+          </option>
+        ))}
+        {['OWB1', 'OWB2', 'BC1', 'BC2', 'BC3'].map((v) => (
+          <option key={v} value={v} />
+        ))}
+      </datalist>
 
       {p.weeks.map((week, wi) => (
         <section key={week.id} className="pe-week">
-          <div className="pe-week-head">
+          {!p.extra && <div className="pe-week-head">
             <button type="button" className="icon-btn" aria-expanded={open.has(week.id)} aria-label={open.has(week.id) ? 'Zwiń tydzień' : 'Rozwiń tydzień'} onClick={() => toggle(week.id)}>
               <Icon name={open.has(week.id) ? 'chevD' : 'chevR'} />
             </button>
@@ -127,16 +159,16 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 if (await ask(`Usunąć „${week.name}” z planu?`)) upd((d) => void d.weeks.splice(wi, 1));
               }}
             />
-          </div>
+          </div>}
 
-          {open.has(week.id) && week.workouts.map((k, ki) => (
+          {isOpen(week.id) && week.workouts.map((k, ki) => (only && k.id !== m.focusWorkoutId ? null :
             <div key={k.id} className="pe-workout card">
               <div className="pe-week-head">
                 <input className="input pe-title" value={k.name} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).name = e.target.value))} aria-label="Nazwa jednostki" />
                 {p.extra && (
                   <label className="pe-date pe-date-row" title="Podopieczny zobaczy ten trening na górze ekranu w wybranym dniu">
-                    <span className="muted small">na dzień</span>
-                    <input className="input input-sm" type="date" value={k.date ?? ''} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label="Na dzień" />
+                    <span className="muted small">{k.date ? 'na dzień' : 'bez terminu · na dzień'}</span>
+                    <input className="input input-sm" type="date" value={k.date ?? ''} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label="Na dzień (puste = bez terminu)" />
                   </label>
                 )}
                 <IconBtn
@@ -199,32 +231,39 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
                     <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => void (x.cardio = !(x.cardio ?? cardioByName(x.name))))}>
-                      🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio — Powt. = czas (min), Ciężar = dystans (km)' : 'Cardio?'}
+                      🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
                     </button>
 {!(e.cardio ?? cardioByName(e.name)) && (
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
                     )}
+                    {(() => {
+                      const cardio = !!(e.cardio ?? cardioByName(e.name));
+                      return (
                     <div className="pe-sets">
-                      <div className="pe-set pe-set-head">
+                      <div className={`pe-set pe-set-head ${cardio ? 'cardio' : ''}`}>
                         <span>#</span>
                         <span>Typ</span>
-                        <span>{e.cardio ?? cardioByName(e.name) ? 'Czas (min)' : 'Powt.'}</span>
-                        <span>{e.cardio ?? cardioByName(e.name) ? 'Dystans (km)' : 'Ciężar'}</span>
+                        <span>{cardio ? 'Czas (min / m:ss)' : 'Powt.'}</span>
+                        <span>{cardio ? 'Dystans (km / m)' : 'Ciężar'}</span>
+                        {cardio && <span title="Strefa (Z1–Z5, OWB1, BC2…) albo tempo min/km, np. 5:30">Strefa / tempo</span>}
                         <span>RPE</span>
                         <span />
                       </div>
                       {e.groups.map((g, gi) => (
-                        <div key={gi} className={`pe-set ${g.type === 'Rozgrzewka' ? 'is-warmup' : ''}`}>
+                        <div key={gi} className={`pe-set ${cardio ? 'cardio' : ''} ${g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' ? 'is-warmup' : ''}`}>
                           <span className="muted small">{gi + 1}</span>
                           <select className="input" value={g.type} onChange={(ev) => setEx((x) => void (x.groups[gi].type = ev.target.value as SetType))} aria-label="Typ serii">
-                            {SET_TYPES.map((t) => (
-                              <option key={t}>{t}</option>
+                            {(cardio ? CARDIO_TYPES : SET_TYPES.filter((t) => t !== 'Schłodzenie')).map((t) => (
+                              <option key={t} value={t}>
+                                {cardio && t === 'Robocze' ? 'Odcinek' : t}
+                              </option>
                             ))}
                           </select>
-                          <input className="input" value={g.reps} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label="Powtórzenia" />
-                          <input className="input" value={g.load} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label="Ciężar" />
+                          <input className="input" value={g.reps} placeholder={cardio ? 'np. 40 / 3:00' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label={cardio ? 'Czas' : 'Powtórzenia'} />
+                          <input className="input" value={g.load} placeholder={cardio ? 'np. 800 m' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label={cardio ? 'Dystans' : 'Ciężar'} />
+                          {cardio && <input className="input" list="run-zones" value={g.pace ?? ''} placeholder="Z2 / 5:30" onChange={(ev) => setEx((x) => void (x.groups[gi].pace = ev.target.value || undefined))} aria-label="Strefa albo tempo" />}
                           <input className="input" inputMode="decimal" value={g.rpe} onChange={(ev) => setEx((x) => void (x.groups[gi].rpe = ev.target.value))} aria-label="RPE" />
                           <IconBtn icon="x" label="Usuń serię" onClick={() => setEx((x) => void x.groups.splice(gi, 1))} />
                         </div>
@@ -236,23 +275,54 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEx((x) => void x.groups.unshift(newRow('Rozgrzewka')))}>
                           + rozgrzewkowa
                         </button>
+                        {cardio && (
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEx((x) => void x.groups.push({ ...newRow('Schłodzenie'), reps: '10', pace: 'Z1' }))}>
+                            + schłodzenie
+                          </button>
+                        )}
                       </div>
                     </div>
+                      );
+                    })()}
                   </div>
                   </div>
                 );
               })}
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => upd((d) => void findWorkout(d, wi, ki).exercises.push(newExercise()))}>
-                + Ćwiczenie
-              </button>
+              <div className="actions">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => upd((d) => void findWorkout(d, wi, ki).exercises.push(newExercise()))}>
+                  + Ćwiczenie
+                </button>
+                <select
+                  className="input input-sm run-tpl-select"
+                  value=""
+                  aria-label="Dodaj bieg z szablonu"
+                  onChange={(ev) => {
+                    const t = RUN_TEMPLATES.find((x) => x.id === ev.target.value);
+                    if (t) upd((d) => void findWorkout(d, wi, ki).exercises.push(t.make()));
+                  }}
+                >
+                  <option value="">🏃 + Bieg…</option>
+                  {RUN_TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} — {t.hint}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           ))}
-          {open.has(week.id) && <button type="button" className="btn btn-ghost btn-sm" onClick={() => upd((d) => void d.weeks[wi].workouts.push({ id: uid(), name: `Trening ${String.fromCharCode(65 + d.weeks[wi].workouts.length)}`, exercises: [] }))}>
-            + Trening w tym tygodniu
-          </button>}
+          {isOpen(week.id) && !only && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => upd((d) => void d.weeks[wi].workouts.push({ id: uid(), name: p.extra ? `Trening dodatkowy ${extraCount + 1}` : `Trening ${String.fromCharCode(65 + d.weeks[wi].workouts.length)}`, exercises: [] }))}
+            >
+              {p.extra ? '+ Trening poza planem' : '+ Trening w tym tygodniu'}
+            </button>
+          )}
         </section>
       ))}
-      <button
+      {!p.extra && <button
         type="button"
         className="btn btn-secondary"
         onClick={() => {
@@ -262,7 +332,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
         }}
       >
         + Tydzień
-      </button>
+      </button>}
     </Modal>
   );
 }

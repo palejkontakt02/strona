@@ -1,7 +1,8 @@
-import type { Appointment, Client, Measurement, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
+import type { Appointment, Client, ISODate, Measurement, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { fmtDay, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
+import { addDays } from '../lib/dates';
 import { del, put, type Change, type Db } from './db';
 
 /* ---------- selektory ---------- */
@@ -42,6 +43,29 @@ export function extraPlanOf(db: Db, clientId: string): Plan | undefined {
 
 export function newExtraPlan(clientId: string): Plan {
   return { id: uid(), clientId, name: 'Dodatkowe treningi', active: false, extra: true, weeks: [{ id: uid(), name: 'Dodatkowe', workouts: [] }] };
+}
+
+export interface ExtraState {
+  /** done — zadany na dzień i wykonany · overdue — termin minął · due — termin przed nami · open — bez daty (do zrobienia w dowolnym momencie). */
+  state: 'done' | 'overdue' | 'due' | 'open';
+  /** Data wykonania (done / open: ostatnio) albo termin (due / overdue). */
+  date?: ISODate;
+}
+
+/** Stan treningu poza planem. Zadany na dzień liczy się jako wykonany, gdy jest zapis od dnia przed terminem. */
+export function extraState(k: PlanWorkout, extraId: string | undefined, sessions: TrainingSession[], today: ISODate): ExtraState {
+  const done = sessions.filter((s) => s.planId === extraId && s.workoutId === k.id).sort((a, b) => b.date.localeCompare(a.date));
+  if (!k.date) return { state: 'open', date: done[0]?.date };
+  const hit = done.find((s) => s.date >= addDays(k.date!, -1));
+  if (hit) return { state: 'done', date: hit.date };
+  return { state: k.date < today ? 'overdue' : 'due', date: k.date };
+}
+
+/** Dodaje trening do listy „poza planem” (tworzy listę, jeśli jej nie ma). */
+export function addExtraWorkout(db: Db, clientId: string, wo: PlanWorkout): Change[] {
+  const extra = extraPlanOf(db, clientId) ?? newExtraPlan(clientId);
+  const weeks = extra.weeks.length ? extra.weeks : [{ id: uid(), name: 'Dodatkowe', workouts: [] }];
+  return savePlan(db, { ...extra, weeks: weeks.map((w, i) => (i === weeks.length - 1 ? { ...w, workouts: [...w.workouts, wo] } : w)) });
 }
 
 export function clientById(db: Db, id: string | null | undefined): Client | undefined {

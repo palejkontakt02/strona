@@ -2,6 +2,7 @@ import type { PlanExercise, PlanWorkout, SetType, TestResult, TrainingSession } 
 import { num, numIn, parseRest, parseTempo, repsN, sidesOf, sumReps, timeUnit } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
 import { e1rmRPE, loadFor, recentE1, resolveLoad, testedMax } from './strength';
+import { fmtClock, fmtKm, isRunning, parseDur, parseKm } from './running';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
 export interface RunSet {
@@ -33,6 +34,8 @@ export interface RunSet {
   /** Cardio: dystans (km) i tętno. */
   dist?: string;
   hr?: string;
+  /** Bieg / cardio: cel intensywności z planu (strefa albo tempo). */
+  pace?: string;
 }
 
 export interface RunExercise {
@@ -57,7 +60,7 @@ export interface RunExercise {
 
 /** Nazwy aktywności cardio (domyślnie tryb cardio, da się przełączyć). */
 export function cardioByName(name: string): boolean {
-  return /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|marsz|spacer|nordic|pływani|skakank|schody|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name);
+  return isRunning(name) || /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|marsz|spacer|nordic|pływani|skakank|schody|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name);
 }
 
 /** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
@@ -100,6 +103,17 @@ function distOf(v: string | undefined): string {
   if (!m) return '';
   const n = parseFloat(m[1].replace(',', '.'));
   return String(m[2]?.toLowerCase() === 'm' ? n / 1000 : n).replace('.', ',');
+}
+
+/** Opis bloku odcinków: „6 × 800 m · Z5”, „Rozgrzewka 15 min · Z2”. */
+function cardioDesc(g: { type: string; sets?: string; reps: string; load: string; pace?: string } | undefined): string {
+  if (!g) return '';
+  const n = repsN(g.sets) || 1;
+  const km = parseKm(g.load);
+  const d = parseDur(g.reps);
+  const what = [km != null && fmtKm(km), d != null && (Number.isInteger(d) ? `${d} min` : fmtClock(d))].filter(Boolean).join(' / ');
+  const head = g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' ? `${g.type} ` : n > 1 ? `${n} × ` : '';
+  return `${head}${what || 'odcinek'}${g.pace ? ` · ${g.pace}` : ''}`;
 }
 
 export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string, tests: TestResult[] = []): RunExercise {
@@ -159,7 +173,14 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     video,
     perSide: cardio ? undefined : e.perSide ?? (perSideByName(e.name) || undefined),
     cardio: cardio || undefined,
-    sets: cardio ? sets.map((x) => ({ ...x, unit: 'min' as const, load: '', dist: distOf(mergeGroups(e.groups)[x.gi ?? 0]?.load), prev: undefined })) : sets,
+    sets: cardio
+      ? sets.map((x) => {
+          // odcinek: czas tak jak w planie („15”, „0:30”), dystans w km, cel tempa / strefy
+          const gr = mergeGroups(e.groups)[x.gi ?? 0];
+          const d = parseDur(gr?.reps);
+          return { ...x, unit: 'min' as const, reps: d != null ? (Number.isInteger(d) ? String(d) : fmtClock(d)) : (gr?.reps.trim() ?? ''), load: '', dist: distOf(gr?.load), pace: gr?.pace || undefined, prev: undefined, gdesc: cardioDesc(gr), warmup: x.warmup };
+        })
+      : sets,
   };
 }
 
@@ -342,8 +363,19 @@ export function runToExercises(run: Run) {
       .filter((s) => s.done)
       .map((s) => {
         const cx = /^\d+(\+\d+)+$/.test(s.reps.replace(/\s/g, '')) ? s.reps.replace(/\s/g, '') : undefined;
-        if (e.cardio)
-          return { reps: repsN(s.reps) ?? undefined, unit: 'min' as const, dist: num(s.dist) ?? undefined, hr: numIn(s.hr, 30, 240) ?? undefined, rpe: numIn(s.rpe, 0, 10) ?? undefined, video: s.video };
+        if (e.cardio) {
+          const d = parseDur(s.reps);
+          return {
+            reps: d != null ? Math.round(d * 100) / 100 : undefined,
+            unit: 'min' as const,
+            dist: num(s.dist) ?? undefined,
+            hr: numIn(s.hr, 30, 240) ?? undefined,
+            rpe: numIn(s.rpe, 0, 10) ?? undefined,
+            warmup: s.warmup || undefined,
+            label: s.label === 'Schłodzenie' || s.warmup ? s.label : undefined,
+            video: s.video,
+          };
+        }
         const unit = s.unit ?? timeUnit(s.reps) ?? undefined;
         const lr = e.perSide ? sidesOf(s.reps) : null;
         // różny wynik na stronę (30/20): reps = lewa, repsR = prawa; ten sam — jedna liczba
@@ -434,7 +466,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       ? e.setsLog.map((x) => ({
           ...base,
           load: x.load != null ? String(x.load) : '',
-          reps: x.reps != null ? (x.repsR != null ? `${x.reps}/${x.repsR}` : String(x.reps)) : '',
+          reps: x.reps != null ? (x.repsR != null ? `${x.reps}/${x.repsR}` : e.cardio && !Number.isInteger(x.reps) ? fmtClock(x.reps) : String(x.reps)) : '',
           rpe: x.rpe != null ? String(x.rpe) : '',
           warmup: !!x.warmup,
           label: x.label as SetType | undefined,

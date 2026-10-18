@@ -1,7 +1,7 @@
 import type { Plan, PlanWeek, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { repsN } from './parse';
 
-const groupKey = (g: SetGroup) => [g.type, g.reps, g.load, g.rpe, g.rest || ''].join('|');
+const groupKey = (g: SetGroup) => [g.type, g.reps, g.load, g.rpe, g.rest || '', g.pace || ''].join('|');
 const isRange = (s: string | undefined) => /[-–]/.test(String(s || ''));
 
 /** Łączy kolejne identyczne wiersze (type, reps, load, rpe, rest) w jeden blok z liczbą serii. Zakresy („3–4”) nie są łączone. */

@@ -4,7 +4,7 @@ import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import type { Checkin, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
-import { allMeasurements, clientById, deleteSession, extraPlanOf, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { allMeasurements, clientById, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
@@ -322,8 +322,8 @@ function Home({
       {(() => {
         // treningi zadane przez trenera na konkretny dzień (dodatkowe, poza planem): od wczoraj do 7 dni naprzód, niezrobione
         const due = (extra?.weeks.flatMap((w) => w.workouts) ?? [])
-          .filter((k) => k.date && k.date >= addDays(today, -2) && k.date <= addDays(today, 7) && k.exercises.some((e) => e.name))
-          .filter((k) => !sessions.some((x) => x.planId === extra!.id && x.workoutId === k.id && x.date >= addDays(k.date!, -1)))
+          .filter((k) => k.date && k.date >= addDays(today, -7) && k.date <= addDays(today, 7) && k.exercises.some((e) => e.name))
+          .filter((k) => extraState(k, extra!.id, sessions, today).state !== 'done')
           .sort((a, b) => a.date!.localeCompare(b.date!));
         if (!due.length || run) return null;
         const when = (d: string) => (d === today ? 'na dziś' : d === addDays(today, 1) ? 'na jutro' : d < today ? `zaległy z ${fmtDay(d)}` : `na ${fmtDay(d)}`);
@@ -832,7 +832,8 @@ function Workouts({
 }) {
   const [preview, setPreview] = useState<{ workout: PlanWorkout; planId: string } | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
-  const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
+  // zadane na dzień i już zrobione są w historii — z listy znikają; bez terminu zostają (do powtarzania)
+  const extraWorkouts = (extra?.weeks.flatMap((w) => w.workouts) ?? []).filter((k) => extraState(k, extra?.id, sessions, todayISO()).state !== 'done');
   if (!plan && extraWorkouts.length === 0) return null;
   const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id)?.date; // sesje od najnowszej
   // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
@@ -882,8 +883,13 @@ function Workouts({
       ))}
       {extra && extraWorkouts.length > 0 && (
         <div>
-          <div className="wk-label">Poza planem · w dowolnym momencie</div>
-          {extraWorkouts.map((k) => item(k, extra.id, false))}
+          <div className="wk-label">Poza planem</div>
+          {extraWorkouts.map((k) => (
+            <div key={k.id}>
+              {item(k, extra.id, false)}
+              {k.date && <span className={`muted small wo-due ${k.date < todayISO() ? 'warn-text' : ''}`}>{k.date < todayISO() ? `zaległy — był na ${fmtDay(k.date)}` : `na ${fmtDay(k.date)}`}</span>}
+            </div>
+          ))}
         </div>
       )}
       {preview && (
