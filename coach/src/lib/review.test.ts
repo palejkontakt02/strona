@@ -121,3 +121,17 @@ describe('serie na czas i lewa/prawa', () => {
     expect(out[0].reps).toBe('30/20 s');
   });
 });
+
+describe('poprawki z weryfikacji', () => {
+  it('1RM z testu tylko dla tego samego ćwiczenia; tekst serii na stronę', async () => {
+    const { testedMax } = await import('./strength');
+    const tests = [{ name: '1RM przysiad', date: '2026-10-10', value: 140 }];
+    expect(testedMax(tests, 'Przysiad ze sztangą')?.value).toBe(140);
+    expect(testedMax(tests, 'Przysiad bułgarski')).toBeNull();
+    expect(testedMax(tests, 'Przysiad przedni')).toBeNull();
+    const { setText } = await import('../athlete/History');
+    expect(setText({ reps: 30, unit: 's' }, true)).toBe('30 s/str.');
+    expect(setText({ reps: 30, repsR: 20, unit: 's' }, true)).toBe('30/20 s (L/P)');
+    expect(setText({ reps: 8, load: 20 }, true)).toBe('8/str. × 20 kg');
+  });
+});

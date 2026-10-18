@@ -1,3 +1,4 @@
+import { perSideByName } from './run';
 import type { SessionExercise, SetLog } from '../domain';
 
 /** Wynik odczytu notatki: data (jeśli była w tekście) i ćwiczenia seria po serii. */
@@ -79,6 +80,7 @@ export function parseWorkoutNote(text: string): ParsedNote {
     if (inline && !parseSetLine(line) && parseSetLine(inline[2])) {
       flush();
       cur = { name: inline[1].replace(/[:–-]\s*$/, '').trim(), setsLog: [] };
+      if (perSideByName(cur.name)) cur.perSide = true;
     }
     const isInline = !!inline && cur?.name === inline[1].replace(/[:–-]\s*$/, '').trim() && cur.setsLog.length === 0;
     // „3x6/str”, „3x30s na stronę” — ćwiczenie na każdą stronę
@@ -103,6 +105,7 @@ export function parseWorkoutNote(text: string): ParsedNote {
     }
     flush();
     cur = { name: line.replace(/[:–-]\s*$/, '').trim(), setsLog: [] };
+    if (perSideByName(cur.name)) cur.perSide = true;
   }
   flush();
   // bez pustych pól w seriach

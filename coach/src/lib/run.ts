@@ -52,7 +52,7 @@ export interface RunExercise {
 
 /** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
 export function perSideByName(name: string): boolean {
-  return /jednorącz|jednonóż|jednonoż|na (jedną )?(nogę|rękę|stronę)|bułgarsk|wykrok|single[- ]?(arm|leg)|one[- ]?(arm|leg)|unilateral|split squat|lunge|step[- ]?up|pistol|copenhagen|suitcase|side plank|deska bokiem|pallof/i.test(name);
+  return /jednorącz|jednonóż|jednonoż|boczn|na (jedną )?(nogę|rękę|stronę)|bułgarsk|wykrok|single[- ]?(arm|leg)|one[- ]?(arm|leg)|unilateral|split squat|lunge|step[- ]?up|pistol|copenhagen|suitcase|side plank|deska bokiem|pallof/i.test(name);
 }
 
 export interface Run {
@@ -87,7 +87,9 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
   // %1RM: test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
   const tm = testedMax(tests, e.name);
   const lastDate = history.filter((s) => s.exercises.some((x) => x.name === e.name)).reduce((a, s) => (s.date > a ? s.date : a), '');
-  const e1 = tm && tm.date >= lastDate ? tm.value : lastE1(history, e.name) ?? tm?.value ?? null;
+  const hist = lastE1(history, e.name);
+  const fromTest = !!tm && (tm.date >= lastDate || hist == null);
+  const e1 = fromTest ? tm!.value : hist;
   const sets: RunSet[] = [];
   let prev: number | null = null;
   // ostatni zapis tego ćwiczenia — podpowiedź „poprzednio” przy każdej serii roboczej
@@ -100,7 +102,8 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     const range = /\d\s*[-–]\s*\d/.test(String(g.sets || ''));
     const ref = prev;
     for (let i = 0; i < cnt; i++) {
-      const rl = resolveLoad(g.load, e1, g.reps, g.rpe, g.type === 'Drop set' ? prev : ref);
+      const rl0 = resolveLoad(g.load, e1, g.reps, g.rpe, g.type === 'Drop set' ? prev : ref);
+      const rl = fromTest && rl0.why ? { ...rl0, why: rl0.why.replace('szac. 1RM', `1RM z testu (${String(e1).replace('.', ',')} kg)`) } : rl0;
       if (rl.load != null) prev = rl.load;
       sets.push({
         load: rl.load != null ? String(rl.load) : '',

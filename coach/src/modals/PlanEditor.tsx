@@ -27,7 +27,7 @@ const newRow = (type: SetType = 'Robocze', from?: SetGroup): SetGroup => ({ type
 const newExercise = (): PlanExercise => ({ id: uid(), name: '', rest: '2:00', notes: '', groups: [newRow(), newRow(), newRow()] });
 
 export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) {
-  const { db, apply, ask } = useStore();
+  const { db, apply, ask, toast } = useStore();
   const { closeModal } = useNav();
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
@@ -105,6 +105,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 if (!mode) return;
                 const name = nextWeekName(p.weeks, p.weeks[wi].name);
                 const copy = cloneWeek(p.weeks[wi], name, mode);
+                const same = JSON.stringify(cloneWeek(p.weeks[wi], name, 'none').workouts.map((k) => k.exercises.map((x) => x.groups))) === JSON.stringify(copy.workouts.map((k) => k.exercises.map((x) => x.groups)));
+                if (mode !== 'none' && same) toast(mode === 'load2' || mode === 'load5' ? 'Ciężary w tym tygodniu liczą się z RPE / „−10%” — progresja ciężaru nic nie zmieniła. Użyj „+0,5 RPE” albo wpisz kg.' : 'Ta progresja nic nie zmieniła w tym tygodniu.');
                 // „Tydzień N+1” na końcu planu; kopia bez numeru — zaraz za oryginałem
                 upd((d) => void d.weeks.splice(name.endsWith('(kopia)') ? wi + 1 : d.weeks.length, 0, copy));
                 setOpen((o) => new Set([...o, copy.id]));

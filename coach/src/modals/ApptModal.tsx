@@ -5,7 +5,7 @@ import { put } from '../data/db';
 import { clientById, deleteAppointment, saveAppointment, sessionsOf, updateSeries } from '../data/ops';
 import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
-import { fmtShort, uid } from '../format';
+import { fmtShort, plural, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
 import { todayISO } from '../lib/dates';
 import { num, numIn } from '../lib/parse';
@@ -168,7 +168,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           </label>
         )}
         {!editing && repeat && pk && pk.left < repeatN && (
-          <p className="small warn-text field-wide">Pakiet: zostało {pk.left} {pk.left === 1 ? 'trening' : 'treningów'}, a dodajesz {repeatN} wizyt — przypomnij o nowym pakiecie.</p>
+          <p className="small warn-text field-wide">Pakiet: zostało {pk.left} {pk.left === 1 ? 'trening' : 'treningów'}, a dodajesz {repeatN} {plural(repeatN, 'wizytę', 'wizyty', 'wizyt')} — przypomnij o nowym pakiecie.</p>
         )}
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />

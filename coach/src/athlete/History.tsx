@@ -56,8 +56,10 @@ export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: nu
 
 /** Seria jako tekst: „8 × 45 kg”, „8/str. × 20 kg”, „30/25 s” (lewa/prawa), „45 s”. */
 export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; load?: number }, perSide?: boolean): string {
-  const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : `${fnum(x.reps)}${perSide ? '/str.' : ''}`;
-  const main = x.unit ? `${r} ${x.unit === 'min' ? 'min' : 's'}${x.repsR != null ? ' (L/P)' : ''}` : x.repsR != null ? `${r} (L/P)` : r;
+  const u = x.unit ? ` ${x.unit === 'min' ? 'min' : 's'}` : '';
+  const side = perSide && x.repsR == null ? '/str.' : '';
+  const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : fnum(x.reps);
+  const main = `${r}${u}${side}${x.repsR != null ? ' (L/P)' : ''}`;
   return x.load != null ? `${main} × ${fnum(x.load)} kg` : x.unit ? main : `${main} × —`;
 }
 

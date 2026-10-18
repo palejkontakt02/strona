@@ -186,14 +186,17 @@ export function recentE1(sessions: TrainingSession[], name: string, weeks = 6): 
  * najnowszy wynik testu, którego nazwa (bez „1RM/max/kg”) zawiera się w nazwie ćwiczenia.
  */
 export function testedMax(tests: { name: string; date: string; value?: number | string }[], exercise: string): { value: number; date: string } | null {
-  const ex = exercise.toLowerCase();
+  // porównanie słów bez sprzętu i ozdobników: „1RM przysiad” = „Przysiad ze sztangą”, ale ≠ „Przysiad bułgarski”
+  const STOP = new Set(['z', 'ze', 'na', 'sztangą', 'sztanga', 'sztangi', 'barbell', 'bb', 'klasyczny', 'klasyczne', 'klasyczna', 'tylny', 'test', 'kg', '1rm', 'rm', 'max', 'maks', 'maksymalny']);
+  const words = (t: string) => new Set(t.toLowerCase().replace(/\(.*?\)|[^a-ząćęłńóśźż0-9 ]/g, ' ').split(/\s+/).filter((w) => w && !STOP.has(w)));
+  const ex = words(exercise);
   let best: { value: number; date: string } | null = null;
   for (const t of tests) {
     if (!/\b(1\s*rm|rm|max|maks)/i.test(t.name)) continue;
-    const key = t.name.toLowerCase().replace(/\b(1\s*rm|rm|max|maks\w*|test)\b|\(.*?\)|kg|[:–-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const key = words(t.name.replace(/1\s*rm/i, ''));
     const v = typeof t.value === 'number' ? t.value : parseFloat(String(t.value ?? '').replace(',', '.'));
-    if (!key || !Number.isFinite(v) || v <= 0) continue;
-    if (!ex.includes(key) && !key.split(' ').every((w) => w.length > 2 && ex.includes(w))) continue;
+    if (!key.size || !Number.isFinite(v) || v <= 0) continue;
+    if (key.size !== ex.size || [...key].some((w) => !ex.has(w))) continue;
     if (!best || t.date > best.date) best = { value: v, date: t.date };
   }
   return best;

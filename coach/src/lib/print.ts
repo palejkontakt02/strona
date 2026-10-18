@@ -4,6 +4,8 @@ import { buildRunExercise } from './run';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const kg = (v: string) => (v ? `${v.replace('.', ',')} kg` : '');
+/** Liczba po polsku: przecinek dziesiętny, maks. 1 miejsce. */
+const pl = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
 const lsiOf = (t: { lsi?: number }) => (t.lsi != null ? `${String(t.lsi).replace('.', ',')}%` : '');
 const fmtD = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -77,22 +79,25 @@ export function printReport(client: Client, sessions: TrainingSession[], opts: {
   const weeks = opts.weeks ?? 8;
   const from = new Date(Date.now() - weeks * 7 * 864e5).toISOString().slice(0, 10);
   const recent = sessions.filter((s) => s.date >= from).sort((a, b) => a.date.localeCompare(b.date));
+  // średnia z faktycznego okresu (krótsza współpraca niż 8 tyg. → mniej tygodni)
+  const firstDate = recent[0]?.date ?? from;
+  const spanW = Math.max(1, Math.min(weeks, (Date.now() - new Date(`${firstDate}T12:00:00`).getTime()) / (7 * 864e5)));
   const pains = recent.filter((s) => s.pain != null);
   const tests = [...client.tests].sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
   const inj = client.injuryLog.filter((i) => i.status !== 'wyleczony');
   const body = `
     <h1>Raport z treningów</h1>
-    <div class="muted">${esc(client.name)} · okres ${fmtD(from)} – ${fmtD(new Date().toISOString().slice(0, 10))}</div>
+    <div class="muted">${esc(client.name)} · okres ${fmtD(recent.length ? firstDate : from)} – ${fmtD(new Date().toISOString().slice(0, 10))}</div>
     <div class="box note">Raport treningowy przygotowany przez trenera — nie jest dokumentacją medyczną ani diagnozą.</div>
     ${client.goal ? `<p><b>Cel:</b> ${esc(client.goal)}</p>` : ''}
     ${inj.length ? `<p><b>Urazy / stany:</b> ${inj.map((i) => `${esc(i.name)}${i.side ? ` (${esc(i.side)})` : ''} — ${esc(i.status)} od ${fmtD(i.date)}`).join('; ')}</p>` : ''}
     ${opts.plan ? `<p><b>Aktualny plan:</b> ${esc(opts.plan.name)} (${opts.plan.weeks.length} tyg.)</p>` : ''}
     <h2>Regularność</h2>
-    <p>${recent.length} treningów w ${weeks} tyg. (średnio ${(recent.length / weeks).toFixed(1).replace('.', ',')} / tydz.)</p>
+    <p>${recent.length} treningów w ${pl(spanW)} tyg. (średnio ${pl(recent.length / spanW)} / tydz.)</p>
     <h2>Ból i odczucia po treningu</h2>
     ${pains.length ? `<table><tr><th>Data</th><th>Trening</th><th>Ból 0–10</th><th>Wysiłek 0–10</th><th>Uwagi</th></tr>${pains.map((s) => `<tr><td>${fmtD(s.date)}</td><td>${esc(s.workoutName || 'Trening')}</td><td>${esc(s.pain)}</td><td>${esc(s.srpe ?? '')}</td><td>${esc(s.notes || '')}</td></tr>`).join('')}</table>` : '<p class="muted">Brak zapisów bólu w tym okresie.</p>'}
     <h2>Testy</h2>
-    ${tests.length ? `<table><tr><th>Test</th><th>Data</th><th>Wynik</th><th>LSI</th></tr>${tests.map((t) => `<tr><td>${esc(t.name)}</td><td>${fmtD(t.date)}</td><td>${t.left != null && t.right != null ? `L ${esc(t.left)} / P ${esc(t.right)}` : esc(t.value ?? '')} ${esc(t.unit || '')}</td><td>${lsiOf(t)}</td></tr>`).join('')}</table>` : '<p class="muted">Brak testów.</p>'}
+    ${tests.length ? `<table><tr><th>Test</th><th>Data</th><th>Wynik</th><th>LSI</th></tr>${tests.map((t) => `<tr><td>${esc(t.name)}</td><td>${fmtD(t.date)}</td><td>${t.left != null && t.right != null ? `L ${pl(t.left)} / P ${pl(t.right)}` : typeof t.value === 'number' ? pl(t.value) : esc(t.value ?? '')} ${esc(t.unit || '')}</td><td>${lsiOf(t)}</td></tr>`).join('')}</table>` : '<p class="muted">Brak testów.</p>'}
     <h2>Ostatnie treningi</h2>
     <table><tr><th>Data</th><th>Trening</th><th>Ćwiczenia</th></tr>${recent
       .slice(-10)
