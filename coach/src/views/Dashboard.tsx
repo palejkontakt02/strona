@@ -31,7 +31,7 @@ export function Dashboard() {
   const overdue = payments.filter((p) => isOverdue(p, today));
   const due = payments.filter((p) => p.status !== 'paid').sort((a, b) => (a.dueDate || a.date).localeCompare(b.dueDate || b.date));
 
-  const alerts = active.flatMap((c) => clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health)).map((a) => ({ ...a, client: c })));
+  const alerts = active.flatMap((c) => clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health, c.intake)).map((a) => ({ ...a, client: c })));
   alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === 'red' ? -1 : 1));
 
   const packages = active

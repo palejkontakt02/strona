@@ -1,3 +1,4 @@
+import type { Intake } from '../lib/intake';
 import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Measurement, Plan, TrainerNotes, TrainingSession } from '../domain';
 
 export interface Db {
@@ -32,6 +33,7 @@ export function normalizeDb(db: Partial<Db>): Db {
         .filter((p) => isRec(p) && isDate(p.date))
         .map((p) => ({ type: 'pojedyncza', status: 'due', ...(p as Rec), amount: typeof (p as Rec).amount === 'number' ? (p as Rec).amount : 0 })),
       measurements: arr(r.measurements).filter(isRec),
+      intake: isRec(r.intake) && isRec(r.intake.answers) ? { ...r.intake, answers: Object.fromEntries(Object.entries(r.intake.answers as Rec).filter(([, v]) => typeof v === 'string')) } : undefined,
       selfMeasurements: Array.isArray(r.selfMeasurements) ? r.selfMeasurements.filter((m) => isRec(m) && isDate(m.date)) : undefined,
       tests: arr(r.tests).filter(isRec),
       injuryLog: arr(r.injuryLog).filter(isRec),
@@ -113,4 +115,6 @@ export interface Repository {
   addClientNote(clientId: string, note: ClientNote): Promise<void>;
   /** Pomiar wpisany przez podopiecznego. */
   addMeasurement(clientId: string, m: Measurement): Promise<void>;
+  /** Ankieta podopiecznego (zapis całości). */
+  saveIntake(clientId: string, intake: Intake): Promise<void>;
 }

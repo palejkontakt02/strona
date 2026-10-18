@@ -16,6 +16,7 @@ import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { Player } from './Player';
+import { IntakeWizard } from './Intake';
 import { WorkoutPreview } from './WorkoutPreview';
 import { NoteToTrainer, TodayHabits } from './Today';
 import { runFromStart, type RunStart } from './start';
@@ -59,7 +60,16 @@ export function AthleteApp({
   const { db, toast, ask, apply } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
-  const [screen, setScreen] = useState<'home' | 'run'>('home');
+  // ankieta startowa: przy pierwszym wejściu podopiecznego (raz na sesję, „Uzupełnię później” odkłada)
+  const [screen, setScreen] = useState<'home' | 'run' | 'intake'>(() => {
+    try {
+      const c = db.clients.find((x) => x.id === clientId);
+      if (mode === 'client' && c && !c.intake?.completedAt && !sessionStorage.getItem(`fitowa-intake-later:${clientId}`)) return 'intake';
+    } catch {
+      // brak sessionStorage
+    }
+    return 'home';
+  });
   const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => storeRun(clientId, run), [clientId, run]);
@@ -155,7 +165,22 @@ export function AthleteApp({
           </button>
         </div>
       )}
-      {screen === 'run' && run ? (
+      {screen === 'intake' ? (
+        <IntakeWizard
+          client={client}
+          first={!client.intake?.completedAt}
+          asTrainer={mode === 'preview'}
+          onClose={() => {
+            try {
+              sessionStorage.setItem(`fitowa-intake-later:${clientId}`, '1');
+            } catch {
+              // nic
+            }
+            setScreen('home');
+            window.scrollTo(0, 0);
+          }}
+        />
+      ) : screen === 'run' && run ? (
         <Player
           client={client}
           run={run}
@@ -193,6 +218,7 @@ export function AthleteApp({
           onUndo={undo}
           canUndo={canUndo}
           onResume={() => setScreen('run')}
+          onIntake={() => setScreen('intake')}
           onDiscard={() => {
             if (run) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
             setRun(null);
@@ -219,6 +245,7 @@ function Home({
   canUndo,
   onResume,
   onDiscard,
+  onIntake,
 }: {
   clientId: string;
   plan: ReturnType<typeof currentPlan>;
@@ -235,6 +262,7 @@ function Home({
   canUndo: (s: TrainingSession) => boolean;
   onResume: () => void;
   onDiscard: () => void;
+  onIntake: () => void;
 }) {
   const { db, ask, saveCheckin } = useStore();
   const client = clientById(db, clientId)!;
@@ -268,6 +296,9 @@ function Home({
             🔥 {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
           </span>
         )}
+        <button className="btn btn-ghost btn-sm msg-link" onClick={onIntake}>
+          📋 {onTrainer ? 'Ankieta podopiecznego' : 'Moja ankieta'}
+        </button>
         {(() => {
           const lastReply = (client.replies ?? []).reduce((a, r) => (r.at > a ? r.at : a), '');
           const lastMine = (client.inbox ?? []).reduce((a, n) => (n.at > a ? n.at : a), '');
@@ -364,6 +395,16 @@ function Home({
         </button>
       )}
 
+      {!client.intake?.completedAt && (
+        <section className="acard acard-warn">
+          <span className="eyebrow">Ankieta startowa</span>
+          <h3>Zdrowie, styl życia, jedzenie, sport i cele</h3>
+          <p className="muted small">Ok. 5 minut. Dzięki niej trener dopasuje treningi bezpiecznie do Ciebie.</p>
+          <button className="btn btn-primary" onClick={onIntake}>
+            Wypełnij ankietę
+          </button>
+        </section>
+      )}
       <TodayHabits client={client} />
       <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
       <Upcoming clientId={clientId} limit={2} />

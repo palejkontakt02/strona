@@ -23,7 +23,7 @@ export function ClientOverview({ client }: { client: Client }) {
   const sessions = sessionsOf(db, client.id);
   const st = loadStats(sessions, today);
   const zone = acwrZone(st.acwr);
-  const alerts = clientAlerts(client, sessions, today, healthFlags(trainerNotesOf(db.trainer_notes, client.id).health));
+  const alerts = clientAlerts(client, sessions, today, healthFlags(trainerNotesOf(db.trainer_notes, client.id).health, client.intake));
   const pk = packageStatus(client, sessions);
   const last4w = sessions.filter((s) => s.date > addDays(today, -28)).length;
   const next = db.appointments

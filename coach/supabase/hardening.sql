@@ -381,3 +381,36 @@ begin
   return new;
 end $$;
 notify pgrst, 'reload schema';
+
+-- 17. Ankieta podopiecznego (zdrowie, styl życia, odżywianie, sport, cele) — zapis przez funkcję,
+--     tylko przez samego podopiecznego albo trenera; zapis profilu przez trenera jej nie nadpisze.
+create or replace function public.save_intake(p_client_id text, p_intake jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  perform set_config('fitowa.rpc', '1', true);
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if jsonb_typeof(p_intake) <> 'object' or jsonb_typeof(p_intake -> 'answers') <> 'object' then raise exception 'Zła ankieta'; end if;
+  if length(p_intake::text) > 60000 then raise exception 'Ankieta za długa'; end if;
+  update clients
+  set data = jsonb_set(data, '{intake}', jsonb_build_object(
+        'answers', p_intake -> 'answers',
+        'consentAt', coalesce(data #> '{intake,consentAt}', p_intake -> 'consentAt'),
+        'completedAt', coalesce(data #> '{intake,completedAt}', to_jsonb(now())),
+        'updatedAt', to_jsonb(now()))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.save_intake from public, anon;
+grant execute on function public.save_intake to authenticated;
+
+create or replace function public.guard_client_intake() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := (new.data - 'intake') || case when old.data ? 'intake' then jsonb_build_object('intake', old.data -> 'intake') else '{}'::jsonb end;
+  return new;
+end $$;
+drop trigger if exists guard_client_intake on public.clients;
+create trigger guard_client_intake before update on public.clients
+  for each row execute function public.guard_client_intake();
+notify pgrst, 'reload schema';

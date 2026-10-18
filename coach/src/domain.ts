@@ -120,6 +120,8 @@ export interface Client {
   habitLog?: HabitDay[];
   /** Notatki od podopiecznego do trenera (wysyłane też e-mailem). */
   inbox?: ClientNote[];
+  /** Ankieta podopiecznego (zdrowie, styl życia, odżywianie, sport, cele) — wypełnia on sam. */
+  intake?: import('./lib/intake').Intake;
   /** Pomiary wpisane przez podopiecznego (zapis przez funkcję w bazie). */
   selfMeasurements?: Measurement[];
   /** Wizyty (nieobecność / późne odwołanie) pobrane z pakietu — id wizyt. */

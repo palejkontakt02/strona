@@ -1,4 +1,5 @@
 import type { Checkin, ClientNote, Measurement } from '../domain';
+import type { Intake } from '../lib/intake';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
 
@@ -76,6 +77,11 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
 
     async addClientNote(clientId: string, note: ClientNote) {
       const { error } = await supabase.rpc('add_client_note', { p_client_id: clientId, p_note: note });
+      if (error) throw error;
+    },
+
+    async saveIntake(clientId: string, intake: Intake) {
+      const { error } = await supabase.rpc('save_intake', { p_client_id: clientId, p_intake: intake });
       if (error) throw error;
     },
 

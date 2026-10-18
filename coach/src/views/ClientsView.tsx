@@ -55,7 +55,7 @@ export function ClientsView() {
         </div>
         <ul className="client-list">
           {list.map((c) => {
-            const alerts = c.status === 'aktywny' ? clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health)) : [];
+            const alerts = c.status === 'aktywny' ? clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health, c.intake)) : [];
             const red = alerts.some((a) => a.level === 'red');
             return (
               <li key={c.id}>

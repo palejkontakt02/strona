@@ -5,6 +5,8 @@ import { put } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDay, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
+import { INTAKE, intakeProgress, parqYesCount, type Intake } from '../../lib/intake';
+import { useNav } from '../../nav';
 
 /** PAR-Q (wersja skrócona, 7 pytań) — „tak” przy którymkolwiek = przed intensywnym treningiem zgoda lekarza. */
 export const PARQ: [string, string][] = [
@@ -22,13 +24,74 @@ export function trainerNotesOf(list: TrainerNotes[], clientId: string): TrainerN
 }
 
 /** Sygnały z wywiadu: „tak” w PAR-Q bez zgody lekarza, brak wywiadu, przeciwwskazania. */
-export function healthFlags(h: HealthIntake | undefined): { level: 'red' | 'yellow'; text: string }[] {
-  if (!h) return [];
-  const yes = PARQ.filter(([k]) => h.parq?.[k]).length;
+export function healthFlags(h: HealthIntake | undefined, intake?: Intake): { level: 'red' | 'yellow'; text: string }[] {
   const out: { level: 'red' | 'yellow'; text: string }[] = [];
-  if (yes && !h.clearanceDate) out.push({ level: 'red', text: `PAR-Q: ${yes}× „tak” — brak zgody lekarza w wywiadzie` });
-  if (h.updated && h.updated < new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok — zaktualizuj' });
+  const yes = Math.max(PARQ.filter(([k]) => h?.parq?.[k]).length, parqYesCount(intake));
+  if (yes && !h?.clearanceDate) out.push({ level: 'red', text: `PAR-Q: ${yes}× „tak”${parqYesCount(intake) ? ' (ankieta podopiecznego)' : ''} — brak zgody lekarza w wywiadzie` });
+  if (h?.updated && h.updated < new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok — zaktualizuj' });
   return out;
+}
+
+/** Odpowiedzi z ankiety podopiecznego (tylko do odczytu; poprawia podopieczny w „Moja ankieta”). */
+export function ClientIntakeCard({ client }: { client: Client }) {
+  const { startAthlete } = useNav();
+  const [open, setOpen] = useState(false);
+  const i = client.intake;
+  const prog = intakeProgress(i);
+  return (
+    <Card
+      title={
+        <>
+          Ankieta podopiecznego {i?.completedAt ? <Tag tone="ok">wypełniona</Tag> : <Tag tone="warn">niewypełniona</Tag>}{' '}
+          {parqYesCount(i) > 0 && <Tag tone="danger">PAR-Q: {parqYesCount(i)}× tak</Tag>}
+        </>
+      }
+      action={
+        i?.completedAt ? (
+          <button className="btn btn-ghost btn-sm" onClick={() => setOpen(!open)} aria-expanded={open}>
+            {open ? 'Zwiń' : 'Pokaż odpowiedzi'}
+          </button>
+        ) : undefined
+      }
+    >
+      {!i?.completedAt ? (
+        <p className="muted small">
+          Podopieczny wypełnia ankietę po pierwszym zalogowaniu (zdrowie, styl życia, odżywianie, sport, cele). Możesz też uzupełnić ją z nim:{' '}
+          <button className="link small" onClick={() => startAthlete(client.id)}>
+            Tryb zawodnika → „Ankieta podopiecznego”
+          </button>
+          .
+        </p>
+      ) : (
+        <p className="muted small">
+          Wypełniona {fmtDay(i.completedAt.slice(0, 10))}
+          {i.updatedAt && i.updatedAt !== i.completedAt ? ` · zmieniona ${fmtDay(i.updatedAt.slice(0, 10))}` : ''} · {prog.done}/{prog.total} odpowiedzi
+          {i.consentAt ? ` · zgoda RODO ${fmtDay(i.consentAt.slice(0, 10))}` : ' · bez zgody RODO'}
+        </p>
+      )}
+      {open && i && (
+        <div className="intake-answers">
+          {INTAKE.map((sec) => {
+            const rows = sec.fields.filter((f) => (i.answers[f.key] ?? '').trim());
+            if (!rows.length) return null;
+            return (
+              <div key={sec.id}>
+                <h4>{sec.title}</h4>
+                <dl>
+                  {rows.map((f) => (
+                    <div key={f.key} className={f.key.startsWith('parq_') && i.answers[f.key] === 'tak' ? 'flag' : ''}>
+                      <dt>{f.label}</dt>
+                      <dd>{i.answers[f.key]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
 }
 
 /** Wywiad zdrowotny i prywatne notatki — osobna tabela, podopieczny ich nie widzi. */

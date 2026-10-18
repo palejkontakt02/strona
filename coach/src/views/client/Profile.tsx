@@ -1,4 +1,4 @@
-import { ClientHealth } from './Health';
+import { ClientHealth, ClientIntakeCard } from './Health';
 import { useEffect, useRef, useState } from 'react';
 import { Card, Empty, Field, IconBtn, Tag } from '../../components/ui';
 import type { Billing, Client, ClientStatus } from '../../domain';
@@ -175,6 +175,7 @@ export function ClientProfile({ client }: { client: Client }) {
   return (
     <>
       <AccountStatusCard client={client} />
+      <ClientIntakeCard client={client} />
       <ClientHealth client={client} />
       <form
         className="card"
