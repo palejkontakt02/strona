@@ -183,12 +183,20 @@ export function ClientHabits({ client }: { client: Client }) {
 /** Notatki od podopiecznego (trafiają też na e-mail trenera). */
 /** Wątek z podopiecznym: jego wiadomości i odpowiedzi trenera (podopieczny widzi odpowiedzi u siebie). */
 export function ClientInbox({ client }: { client: Client }) {
-  const { apply } = useStore();
+  const { apply, ask } = useStore();
   const { openModal } = useNav();
   const [text, setText] = useState('');
+  const remove = async (id: string, mine: boolean) => {
+    if (!(await ask('Usunąć tę wiadomość z rozmowy?', { confirm: 'Usuń' }))) return;
+    await apply(
+      // wiadomość podopiecznego tylko ukrywamy (baza nie pozwala trenerowi nadpisać jego wiadomości)
+      [put('clients', mine ? { ...client, replies: (client.replies ?? []).filter((r) => r.id !== id) } : { ...client, inbox: (client.inbox ?? []).map((n) => (n.id === id ? { ...n, hidden: true, read: true } : n)) })],
+      'Wiadomość usunięta.',
+    );
+  };
   const [busy, setBusy] = useState(false);
   const thread = [
-    ...(client.inbox ?? []).map((n) => ({ ...n, mine: false })),
+    ...(client.inbox ?? []).filter((n) => !n.hidden).map((n) => ({ ...n, mine: false })),
     ...(client.replies ?? []).map((r) => ({ ...r, mine: true, read: true, sessionId: undefined as string | undefined })),
   ].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
   const unread = (client.inbox ?? []).filter((n) => !n.read).length;
@@ -236,6 +244,7 @@ export function ClientInbox({ client }: { client: Client }) {
                 </button>
               )}
             </div>
+            <IconBtn icon="trash" label="Usuń wiadomość" danger onClick={() => void remove(n.id, n.mine)} />
           </li>
         ))}
       </ul>

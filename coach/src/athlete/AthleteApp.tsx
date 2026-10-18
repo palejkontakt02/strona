@@ -273,7 +273,7 @@ function Home({
           const fresh = !!lastReply && lastReply > lastMine;
           return (
             <a href="#do-trenera" className={`btn btn-sm msg-link ${fresh ? 'btn-primary' : 'btn-ghost'}`}>
-              {fresh ? '✉ Nowa odpowiedź trenera' : '✉ Napisz do trenera'}
+              {onTrainer ? '✉ Napisz (jako trener)' : fresh ? '✉ Nowa odpowiedź trenera' : '✉ Napisz do trenera'}
             </a>
           );
         })()}
@@ -391,7 +391,7 @@ function Home({
         onUndo={onUndo}
         canUndo={canUndo}
       />
-      <NoteToTrainer client={client} />
+      <NoteToTrainer client={client} asTrainer={!!onTrainer} />
     </div>
   );
 }

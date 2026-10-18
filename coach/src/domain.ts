@@ -149,6 +149,8 @@ export interface ClientNote {
   read?: boolean;
   /** Dotyczy treningu (np. notatka z podsumowania). */
   sessionId?: string;
+  /** Trener usunął z rozmowy (ukryte u obu stron). */
+  hidden?: boolean;
 }
 
 /** Odpowiedź trenera na wiadomości podopiecznego (widoczna u podopiecznego). */

@@ -291,3 +291,23 @@ begin
   where id = p_client_id;
 end $$;
 notify pgrst, 'reload schema';
+
+-- 14. Trener może ukryć wiadomość podopiecznego (np. wysłaną przez pomyłkę) — oprócz „przeczytane”
+--     przenoszona jest flaga „hidden”; treści wiadomości trener nadal nie zmieni ani nie podmieni.
+create or replace function public.guard_client_owned() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := new.data || jsonb_build_object(
+    'habitLog', coalesce(old.data -> 'habitLog', '[]'::jsonb),
+    'checkins', coalesce(old.data -> 'checkins', '[]'::jsonb),
+    'inbox', coalesce((
+      select jsonb_agg(o
+        || case when exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'inbox', '[]'::jsonb)) n
+                             where n ->> 'id' = o ->> 'id' and (n ->> 'read')::boolean is true) then '{"read": true}'::jsonb else '{}'::jsonb end
+        || case when exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'inbox', '[]'::jsonb)) n
+                             where n ->> 'id' = o ->> 'id' and (n ->> 'hidden')::boolean is true) then '{"hidden": true}'::jsonb else '{}'::jsonb end)
+      from jsonb_array_elements(coalesce(old.data -> 'inbox', '[]'::jsonb)) o), '[]'::jsonb));
+  return new;
+end $$;
+notify pgrst, 'reload schema';
