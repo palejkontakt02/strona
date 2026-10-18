@@ -127,7 +127,7 @@ export function CalendarView() {
         />
       )}
       <p className="muted small legend-note">
-        Kolor paska = podopieczny · kropka = miejsce · przerywana ramka = trening zapisany bez wizyty
+        Kolor paska = podopieczny · kropka = miejsce
       </p>
     </div>
   );
@@ -161,11 +161,17 @@ function SessionTile({ s }: { s: TrainingSession }) {
   const { db } = useStore();
   const { openModal } = useNav();
   const c = clientById(db, s.clientId);
+  // ten sam wygląd co odbyta wizyta: godzina zapisu, podopieczny, miejsce, nazwa treningu
+  const time = s.createdAt ? new Date(s.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '';
   return (
-    <button className="tile tile-loose" style={hueStyle(s.clientId)} onClick={() => openModal({ kind: 'session', session: s })}>
-      <span className="tile-time">trening</span>
+    <button className="tile tile-done" style={hueStyle(s.clientId)} onClick={() => openModal({ kind: 'session', session: s })}>
+      <span className="tile-time">{time || 'Trening'}</span>
       <span className="tile-name">{c?.name ?? '—'}</span>
-      <span className="tile-status">{s.workoutName}</span>
+      <LocationTag id={s.locationId} short />
+      <span className="tile-status">
+        {s.workoutName || 'Trening'}
+        {s.solo ? ' · samodzielnie' : ''}
+      </span>
     </button>
   );
 }
@@ -209,7 +215,7 @@ function MonthGrid({
               </span>
             ))}
             {loose.slice(0, 1).map((s) => (
-              <span key={s.id} className="month-item tile-loose" style={hueStyle(s.clientId)}>
+              <span key={s.id} className="month-item tile-done" style={hueStyle(s.clientId)}>
                 {clientById(db, s.clientId)?.name.split(' ')[0]}
               </span>
             ))}
