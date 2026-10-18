@@ -186,9 +186,13 @@ export function ClientProfile({ client }: { client: Client }) {
       >
         <div className="card-head">
           <h4>Dane zawodnika</h4>
-          <button type="submit" className="btn btn-primary btn-sm" disabled={!dirty}>
-            {dirty ? 'Zapisz teraz' : 'Zapisano ✓'}
-          </button>
+          {dirty ? (
+            <button type="submit" className="btn btn-primary btn-sm">
+              Zapisz
+            </button>
+          ) : (
+            <span className="save-state">✓ Zapisano</span>
+          )}
         </div>
         <ClientFields d={d} set={set} />
       </form>

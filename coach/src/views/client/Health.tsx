@@ -205,20 +205,24 @@ export function ClientHealth({ client }: { client: Client }) {
               />
             </Field>
           </div>
-          <div className="between">
-            <span className="muted small">{rec.health?.updated ? `Wywiad z ${fmtDay(rec.health.updated)}` : 'Wywiad niewypełniony'}</span>
-            <button className="btn btn-primary btn-sm" disabled={!dirty} onClick={() => void save()}>
-              {dirty ? 'Zapisz' : 'Zapisano ✓'}
-            </button>
+          <div className="between save-row">
+            <span className="muted small">{rec.health?.updated ? `Wywiad z ${fmtDay(rec.health.updated)}` : 'Uzupełnij — zapisuje się samo'}</span>
+            {dirty ? (
+              <button className="btn btn-primary btn-sm" onClick={() => void save()}>
+                Zapisz
+              </button>
+            ) : rec.health ? (
+              <span className="save-state">✓ Zapisano</span>
+            ) : null}
           </div>
         </>
       )}
-      <div className="section-gap">
-        <h4>Notatki z wizyt (prywatne)</h4>
+      <div className="sub-section">
+        <h4 className="sub-title">Notatki z wizyt <span className="muted">· prywatne</span></h4>
         <div className="reply-box">
           <textarea className="input" rows={2} value={visit} onChange={(e) => setVisit(e.target.value)} placeholder="np. S: ból 3/10 po schodach · O: przysiad do 90° bez bólu · A: lepiej · P: dodać step-up" aria-label="Notatka z wizyty" />
           <button
-            className="btn btn-secondary btn-sm"
+            className={`btn btn-sm ${visit.trim() ? 'btn-primary' : 'btn-ghost'}`}
             disabled={!visit.trim()}
             onClick={() =>
               void save({ visits: [...(rec.visits ?? []), { id: uid(), date: todayISO(), text: visit.trim().slice(0, 4000) }] }, 'Notatka z wizyty zapisana.').then(() => setVisit(''))

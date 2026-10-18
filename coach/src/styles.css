@@ -4401,3 +4401,34 @@ body.athlete-mode .toasts {
     gap: 2px;
   }
 }
+/* stan zapisu: dyskretny napis zamiast nieaktywnego przycisku */
+.save-state {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ok-fg, var(--color-ok));
+  padding: 6px 2px;
+  white-space: nowrap;
+}
+.save-row {
+  margin-top: var(--space-3);
+}
+.sub-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-divider);
+}
+.sub-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-400);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+.sub-title .muted {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.reply-box .btn:disabled {
+  opacity: 0.45;
+}
