@@ -5,7 +5,7 @@
 export type IntakeField = {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'number' | 'yesno' | 'scale';
+  type: 'text' | 'textarea' | 'select' | 'multi' | 'number' | 'yesno' | 'scale';
   options?: string[];
   placeholder?: string;
   hint?: string;
@@ -77,8 +77,14 @@ export const INTAKE: IntakeSection[] = [
     id: 'goals',
     title: 'Cele',
     fields: [
-      { key: 'goal', label: 'Twój główny cel', type: 'select', options: ['redukcja tkanki tłuszczowej', 'budowa mięśni / siły', 'zdrowie i samopoczucie', 'powrót po kontuzji', 'wyniki w sporcie', 'inny'] },
-      { key: 'goal_detail', label: 'Opisz cel własnymi słowami', type: 'textarea', placeholder: 'np. −8 kg do wakacji, wejść po schodach bez zadyszki' },
+      { key: 'goal', label: 'Główny cel (najważniejszy)', type: 'select', options: ['redukcja tkanki tłuszczowej', 'budowa mięśni / siły', 'zdrowie i samopoczucie', 'powrót po kontuzji', 'wyniki w sporcie', 'inny'] },
+      {
+        key: 'goals_side',
+        label: 'Cele poboczne (możesz zaznaczyć kilka)',
+        type: 'multi',
+        options: ['redukcja tkanki tłuszczowej', 'budowa mięśni / siły', 'lepsza kondycja', 'mobilność / gibkość', 'mniej bólu (plecy, stawy)', 'lepsza postawa', 'więcej energii / lepszy sen', 'zdrowe nawyki żywieniowe', 'mniej stresu', 'przygotowanie do zawodów / wydarzenia'],
+      },
+      { key: 'goal_detail', label: 'Opisz cele własnymi słowami', type: 'textarea', placeholder: 'np. −8 kg do wakacji, wejść po schodach bez zadyszki' },
       { key: 'goal_when', label: 'Do kiedy?', type: 'text', placeholder: 'np. czerwiec 2027' },
       { key: 'motivation', label: 'Dlaczego to dla Ciebie ważne?', type: 'textarea' },
       { key: 'days_week', label: 'Ile treningów w tygodniu realnie dasz radę?', type: 'select', options: ['1', '2', '3', '4', '5+'] },

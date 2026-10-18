@@ -76,7 +76,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
           {sec.fields
             .filter((f) => !f.ifYes || answers[f.ifYes] === 'tak')
             .map((f) => (
-              <IntakeInput key={f.key} f={f} value={answers[f.key] ?? ''} onChange={(v) => set(f.key, v)} />
+              <IntakeInput key={f.key} f={f} value={answers[f.key] ?? ''} onChange={(v) => set(f.key, v)} exclude={f.key === 'goals_side' ? answers.goal : undefined} />
             ))}
         </section>
       ) : (
@@ -122,7 +122,28 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
   );
 }
 
-function IntakeInput({ f, value, onChange }: { f: IntakeField; value: string; onChange: (v: string) => void }) {
+function IntakeInput({ f, value, onChange, exclude }: { f: IntakeField; value: string; onChange: (v: string) => void; exclude?: string }) {
+  if (f.type === 'multi') {
+    // kilka odpowiedzi — zapis jako „a, b, c”
+    const sel = value ? value.split(', ').filter(Boolean) : [];
+    const opts = f.options!.filter((o) => o !== exclude);
+    return (
+      <div className="intake-q">
+        <span className="intake-label">{f.label}</span>
+        <div className="intake-opts" role="group" aria-label={f.label}>
+          {opts.map((o) => {
+            const on = sel.includes(o);
+            return (
+              <button key={o} type="button" aria-pressed={on} className={on ? 'active' : ''} onClick={() => onChange((on ? sel.filter((x) => x !== o) : [...sel, o]).join(', '))}>
+                {on ? '✓ ' : ''}
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
   if (f.type === 'yesno' || f.type === 'scale' || (f.type === 'select' && (f.options?.length ?? 0) <= 4)) {
     const opts = f.type === 'yesno' ? ['nie', 'tak'] : f.type === 'scale' ? ['1', '2', '3', '4', '5'] : f.options!;
     return (
