@@ -4820,3 +4820,109 @@ body.athlete-mode .toasts {
 .month-item.tile-solo {
   border-left-style: dotted;
 }
+
+/* plan jako arkusz: wiersze = ćwiczenia, kolumny = tygodnie */
+.ptab-wrap {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+.ptab-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.ptab-head strong {
+  font-size: 1.05rem;
+}
+.ptab-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+}
+.ptab-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.ptab-table th,
+.ptab-table td {
+  border: 1px solid var(--color-divider);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.ptab-table thead th {
+  background: var(--color-surface);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+  font-weight: 600;
+}
+.ptab-table td {
+  min-width: 128px;
+  white-space: nowrap;
+}
+.ptab-table .ptab-ex {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg);
+  min-width: 170px;
+  max-width: 240px;
+  white-space: normal;
+  font-weight: 500;
+}
+.ptab-table thead .ptab-ex {
+  background: var(--color-surface);
+}
+.ptab-table .ptab-rest {
+  min-width: 0;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+.ptab-note {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--color-neutral-400);
+}
+.ptab-warm {
+  color: var(--color-neutral-400);
+  font-size: 0.78rem;
+}
+.ptab-table .is-next {
+  background: color-mix(in srgb, var(--color-accent-800) 35%, transparent);
+}
+.ptab-table thead .is-next {
+  color: var(--color-accent-100);
+}
+.ptab-table thead .is-done {
+  color: var(--color-ok);
+}
+.ptab-linked .ptab-ex {
+  border-left: 3px solid var(--color-neutral-500, #666);
+}
+@media (max-width: 640px) {
+  .ptab-table .ptab-ex {
+    min-width: 128px;
+    max-width: 150px;
+  }
+  .ptab-table td {
+    min-width: 112px;
+  }
+}
+.ptab-wrap,
+.ptab {
+  min-width: 0;
+  max-width: 100%;
+}
+.ptab-scroll {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}

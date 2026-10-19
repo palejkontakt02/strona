@@ -11,6 +11,7 @@ import { todayISO } from '../../lib/dates';
 import { doneInPass, exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanSets } from '../../components/sets';
+import { PlanTable } from '../../components/PlanTable';
 
 export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
   return mergeGroups(e.groups)
@@ -129,45 +130,13 @@ export function ClientPlans({ client }: { client: Client }) {
               </p>
               {p.notes && <p className="small pre">{p.notes}</p>}
               {p.active && (
-                <div className="plan-weeks">
-                  {p.weeks.map((w) => (
-                    <div key={w.id} className="plan-week">
-                      <div className="plan-week-name">{w.name}</div>
-                      {w.workouts.map((k) => (
-                        <div key={k.id} className={`plan-workout ${done.has(k.id) ? 'is-done' : ''} ${nx?.workout.id === k.id ? 'is-next' : ''}`}>
-                          <div className="plan-workout-head">
-                            <strong>{k.name}</strong>
-                            {nx?.workout.id === k.id ? <Tag tone="accent">następny</Tag> : done.has(k.id) ? <Tag tone="ok">✓ zrobione</Tag> : null}
-                            {k.exercises.some((e) => e.name) && nx?.workout.id === k.id && (
-                              <span className="plan-workout-actions">
-                                <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: k.id })}>
-                                  ▶ Prowadź
-                                </button>
-                                <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: p.id, workoutId: k.id })}>
-                                  Jako zawodnik
-                                </button>
-                              </span>
-                            )}
-                          </div>
-                          {k.exercises.length === 0 ? (
-                            <p className="muted small">Brak ćwiczeń.</p>
-                          ) : (
-                            <ul className="plain">
-                              {k.exercises.map((e, ei) => (
-                                <li key={e.id} className={`plan-ex ${e.linked ? 'linked' : ''}`}>
-                                  <span>
-                                    <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
-                                  </span>
-                                  <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} timed={isTimed(e)} />
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                <PlanTable
+                  plan={p}
+                  done={done}
+                  nextId={nx?.workout.id}
+                  onLive={(id) => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: id })}
+                  onAthlete={(id) => startAthlete(client.id, { planId: p.id, workoutId: id })}
+                />
               )}
             </Card>
           );
