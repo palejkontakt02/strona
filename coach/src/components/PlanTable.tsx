@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { Plan, PlanExercise } from '../domain';
-import { exerciseLabels, mergeGroups } from '../lib/plan';
+import { exerciseLabels, expandSets, mergeGroups } from '../lib/plan';
 import { cardioByName, isTimed, perSideByName } from '../lib/run';
 import { fmtDur, fmtKm, parseDur, parseKm } from '../lib/running';
 import { fmtSec, secOf } from '../lib/parse';
@@ -28,6 +29,21 @@ export function exerciseLines(e: PlanExercise): { text: string; warm: boolean }[
   });
 }
 
+/** Serie ćwiczenia po kolei (każda osobno): numer („R”, „1”, „2”…) i opis „8 × 60 kg @7”. */
+export function setCells(e: PlanExercise): { no: string; text: string; warm: boolean }[] {
+  if (e.cardio ?? cardioByName(e.name)) return exerciseLines(e).map((l, i) => ({ no: l.warm ? '' : String(i + 1), ...l }));
+  const timed = isTimed(e);
+  const side = (e.perSide ?? perSideByName(e.name)) ? '/str.' : '';
+  let n = 0;
+  return expandSets(e.groups).map((g) => {
+    const warm = g.type === 'Rozgrzewka';
+    if (!warm) n++;
+    const reps = timed && secOf(g.reps) != null ? fmtSec(secOf(g.reps)!) : g.reps.trim() || '?';
+    const kind = !warm && g.type !== 'Robocze' && PREFIX[g.type] ? ` (${PREFIX[g.type]})` : '';
+    return { no: warm ? 'R' : String(n), warm, text: `${reps}${side}${g.load.trim() ? ` × ${kg(g.load)}` : ''}${g.rpe ? ` @${g.rpe}` : ''}${kind}` };
+  });
+}
+
 /**
  * Plan jak arkusz: dla każdego treningu (A, B, …) tabela — wiersze to ćwiczenia, kolumny to tygodnie.
  * Progresję tydzień po tygodniu czyta się w jednym wierszu.
@@ -45,6 +61,8 @@ export function PlanTable({
   onLive?: (workoutId: string) => void;
   onAthlete?: (workoutId: string) => void;
 }) {
+  // rozgrzewki schowane — widać je po rozwinięciu (osobno dla każdego treningu)
+  const [warmOpen, setWarmOpen] = useState<Set<string>>(new Set());
   // treningi łączone po nazwie (Trening A w każdym tygodniu), w kolejności z planu
   const slots: string[] = [];
   for (const w of plan.weeks) for (const k of w.workouts) if (!slots.includes(k.name)) slots.push(k.name);
@@ -61,10 +79,22 @@ export function PlanTable({
           });
         }
         const next = cols.find((c) => c.k!.id === nextId);
+        const hasWarm = cols.some((c) => c.k!.exercises.some((e) => !(e.cardio ?? cardioByName(e.name)) && e.groups.some((g) => g.type === 'Rozgrzewka')));
+        const showWarm = warmOpen.has(slot);
         return (
           <section key={slot} className="ptab">
             <div className="ptab-head">
               <strong>{slot}</strong>
+              {hasWarm && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  aria-expanded={showWarm}
+                  onClick={() => setWarmOpen((o) => (o.has(slot) ? new Set([...o].filter((x) => x !== slot)) : new Set([...o, slot])))}
+                >
+                  {showWarm ? 'Ukryj rozgrzewki' : 'Pokaż rozgrzewki'}
+                </button>
+              )}
               {next && (
                 <span className="plan-workout-actions">
                   <Tag tone="accent">następny: {next.week.name}</Tag>
@@ -89,6 +119,7 @@ export function PlanTable({
                   <thead>
                     <tr>
                       <th className="ptab-ex">Ćwiczenie</th>
+                      <th className="ptab-no">Seria</th>
                       <th className="ptab-rest">Przerwa</th>
                       {cols.map(({ week, k }) => (
                         <th key={week.id} className={`${k!.id === nextId ? 'is-next' : ''} ${done.has(k!.id) && k!.id !== nextId ? 'is-done' : ''}`}>
@@ -99,31 +130,52 @@ export function PlanTable({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.name} className={/\d$/.test(r.label) && !r.label.endsWith('1') ? 'ptab-linked' : ''}>
-                        <th scope="row" className="ptab-ex">
-                          <span className="ex-label">{r.label}</span> {r.name}
-                          {r.first.notes && <span className="ptab-note">{r.first.notes}</span>}
-                        </th>
-                        <td className="ptab-rest">{r.first.rest || '—'}</td>
-                        {cols.map(({ week, k }) => {
-                          const e = k!.exercises.find((x) => x.name === r.name);
-                          return (
-                            <td key={week.id} className={k!.id === nextId ? 'is-next' : ''}>
-                              {e ? (
-                                exerciseLines(e).map((l, i) => (
-                                  <div key={i} className={l.warm ? 'ptab-warm' : ''}>
-                                    {l.text}
-                                  </div>
-                                ))
-                              ) : (
-                                <span className="muted">—</span>
-                              )}
+                    {rows.map((r) => {
+                      // serie z każdego tygodnia wyrównane po numerze: najpierw rozgrzewki (R), potem serie robocze 1, 2, 3…
+                      const per = cols.map(({ k }) => {
+                        const e = k!.exercises.find((x) => x.name === r.name);
+                        return e ? setCells(e) : null;
+                      });
+                      const isCardio = r.first.cardio ?? cardioByName(r.name);
+                      const keyed = per.map((cells) => {
+                        if (!cells) return null;
+                        // bieg: odcinki po kolei (rozgrzewka, odcinki, schłodzenie)
+                        if (isCardio) return new Map(cells.map((c, idx) => [`x${idx + 1}`, c] as const));
+                        let w = 0;
+                        return new Map(cells.map((c) => [c.warm && c.no !== '' ? `R${++w}` : c.no || `x${++w}`, c] as const));
+                      });
+                      const warmN = Math.max(0, ...keyed.map((m) => (m ? [...m.keys()].filter((k) => k.startsWith('R')).length : 0)));
+                      const workN = Math.max(0, ...keyed.map((m) => (m ? [...m.keys()].filter((k) => /^\d+$/.test(k)).length : 0)));
+                      const otherN = Math.max(0, ...keyed.map((m) => (m ? [...m.keys()].filter((k) => k.startsWith('x')).length : 0)));
+                      const keys = [...Array.from({ length: showWarm ? warmN : 0 }, (_, i) => `R${i + 1}`), ...Array.from({ length: workN }, (_, i) => String(i + 1)), ...Array.from({ length: otherN }, (_, i) => `x${i + 1}`)];
+                      const n = Math.max(1, keys.length);
+                      const rowNo = (key: string | undefined) => (!key ? '' : key.startsWith('R') ? (warmN > 1 ? key : 'R') : key.startsWith('x') ? (isCardio ? key.slice(1) : '') : key);
+                      const linked = /\d$/.test(r.label) && !r.label.endsWith('1');
+                      return Array.from({ length: n }, (_, i) => (
+                        <tr key={`${r.name}-${i}`} className={`${linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''}`}>
+                          {i === 0 && (
+                            <th scope="row" className="ptab-ex" rowSpan={n}>
+                              <span className="ex-label">{r.label}</span> {r.name}
+                              {r.first.notes && <span className="ptab-note">{r.first.notes}</span>}
+                            </th>
+                          )}
+                          <td className="ptab-no">{rowNo(keys[i])}</td>
+                          {i === 0 && (
+                            <td className="ptab-rest" rowSpan={n}>
+                              {r.first.rest || '—'}
                             </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                          )}
+                          {keyed.map((cells, ci) => {
+                            const c = cells?.get(keys[i]);
+                            return (
+                              <td key={cols[ci].week.id} className={`${cols[ci].k!.id === nextId ? 'is-next' : ''} ${c?.warm ? 'ptab-warm' : ''}`}>
+                                {cells == null ? (i === 0 ? <span className="muted">—</span> : null) : c ? c.text : null}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ));
+                    })}
                   </tbody>
                 </table>
               </div>

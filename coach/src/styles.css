@@ -4926,3 +4926,22 @@ body.athlete-mode .toasts {
   max-width: 100%;
   -webkit-overflow-scrolling: touch;
 }
+.ptab-table .ptab-no {
+  min-width: 0;
+  width: 1%;
+  text-align: center;
+  color: var(--color-neutral-400);
+  font-size: 0.75rem;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.ptab-table tbody tr:not(.ptab-first) td,
+.ptab-table tbody tr:not(.ptab-first) th {
+  border-top-color: color-mix(in srgb, var(--color-divider) 45%, transparent);
+}
+.ptab-table tbody tr.ptab-first > * {
+  border-top-width: 2px;
+}
+.ptab-table td.ptab-warm {
+  color: var(--color-neutral-400);
+}
