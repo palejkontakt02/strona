@@ -1,10 +1,8 @@
 import type { Client, Plan, TrainingSession } from '../domain';
-import { exerciseLabels } from './plan';
-import { buildRunExercise } from './run';
+import { planGrid } from './planGrid';
 import { addDays, todayISO } from './dates';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const kg = (v: string) => (v ? `${v.replace('.', ',')} kg` : '');
 /** Liczba po polsku: przecinek dziesiętny, maks. 1 miejsce. */
 const pl = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
 const lsiOf = (t: { lsi?: number }) => (t.lsi != null ? `${String(t.lsi).replace('.', ',')}%` : '');
@@ -45,33 +43,41 @@ function openPrint(title: string, body: string) {
   }, 300);
 }
 
-/** Plan do druku: tygodnie, jednostki, każda seria z ciężarem wyliczonym z historii / testu (jak w treningu). */
-export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[]) {
-  const parts = plan.weeks.map((w) => {
-    const wos = w.workouts
-      .map((k) => {
-        const labels = exerciseLabels(k.exercises);
-        const rows = k.exercises
-          .map((e, ei) => {
-            if (!e.name) return '';
-            const run = buildRunExercise(e, sessions, undefined, client.tests);
-            // bieg / cardio: bloki odcinków („Rozgrzewka 15 min · Z2”, „6 × 800 m · Z5”)
-            const sets = run.cardio
-              ? run.sets.filter((x) => x.first).map((x) => `<span class="done"></span>${esc(x.gdesc)}${x.rest ? ` · przerwa ${esc(x.rest)}` : ''}`).join('<br>')
-              : run.sets
-              .map((x) => `<span class="done"></span>${x.warmup ? 'R: ' : ''}${esc(x.reps || '?')}${x.unit ? ` ${x.unit}` : ''}${run.perSide ? '/str.' : ''}${x.load ? ` × ${esc(kg(x.load))}` : ''}${x.tRpe ? ` @${esc(x.tRpe)}` : ''}`)
-              .join('&nbsp;&nbsp; ');
-            return `<tr><td class="lbl">${esc(labels[ei])}</td><td><b>${esc(e.name)}</b>${e.notes ? `<div class="note">${esc(e.notes)}</div>` : ''}</td><td>${sets}</td><td>${esc(e.rest || '')}</td></tr>`;
-          })
-          .join('');
-        return `<h3>${esc(k.name)}</h3><table><tr><th></th><th>Ćwiczenie</th><th>Serie (powt. × kg @RPE)</th><th>Przerwa</th></tr>${rows}</table>`;
-      })
-      .join('');
-    return `<h2>${esc(w.name)}</h2>${wos}`;
-  });
+/**
+ * Plan do druku — jak tabela w aplikacji: dla każdego treningu wiersz na serię, kolumny = tygodnie,
+ * w komórce „powt. × ciężar @RPE” (ciężar, gdy wpisany) i kratka do odhaczenia; rozgrzewki szare.
+ * Przy więcej niż 3 tygodniach strona pozioma.
+ */
+export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSession[]) {
+  const slots = planGrid(plan, () => true);
+  const wide = Math.max(0, ...slots.map((s) => s.cols.length)) > 3;
+  const tables = slots
+    .map((slot) => {
+      if (!slot.rows.length) return `<h2>${esc(slot.name)}</h2><p class="muted">Brak ćwiczeń.</p>`;
+      const head = `<tr><th>Ćwiczenie</th><th class="no">Seria</th><th class="no">Przerwa</th>${slot.cols.map((c) => `<th>${esc(c.week.name)}</th>`).join('')}</tr>`;
+      const body = slot.rows
+        .map((r) =>
+          r.lines
+            .map((line, i) => {
+              const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><b>${esc(r.label)}</b> ${esc(r.name)}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
+              const rest = i === 0 ? `<td class="no" rowspan="${r.lines.length}">${esc(r.rest || '—')}</td>` : '';
+              const cells = line.cells.map((c) => (c === 'none' ? '<td class="muted">—</td>' : c ? `<td class="${c.warm ? 'warm' : ''}"><span class="done"></span>${esc(c.text)}</td>` : '<td></td>')).join('');
+              return `<tr class="${i === 0 ? 'first' : ''}">${ex}<td class="no">${esc(line.no)}</td>${rest}${cells}</tr>`;
+            })
+            .join(''),
+        )
+        .join('');
+      return `<h2>${esc(slot.name)}</h2><table class="grid">${head}${body}</table>`;
+    })
+    .join('');
   openPrint(
     `${plan.name} — ${client.name}`,
-    `<h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · wydruk ${fmtD(todayISO())}</div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}${parts.join('')}`,
+    `<style>@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:0} body{margin:${wide ? '12mm 10mm' : '18mm 14mm'}}
+      table.grid{font-size:11px} table.grid td,table.grid th{padding:3px 5px;white-space:nowrap} table.grid td.ex{white-space:normal;min-width:120px;max-width:200px}
+      table.grid .no{text-align:center;color:#555;width:1%} table.grid tr.first td{border-top:2px solid #777} table.grid .warm{color:#888}
+      h2{break-after:avoid} table.grid{break-inside:auto} table.grid tr{break-inside:avoid}</style>
+    <h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · wydruk ${fmtD(todayISO())}</div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}
+    <p class="note">W komórce: powtórzenia (lub czas) × ciężar @RPE · R = rozgrzewka · kratka do odhaczenia</p>${tables}`,
   );
 }
 
