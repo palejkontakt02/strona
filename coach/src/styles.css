@@ -5122,3 +5122,77 @@ input[type='date'].input::-webkit-date-and-time-value {
   color: var(--color-neutral-400);
   pointer-events: none;
 }
+
+/* kalendarz podopiecznego: zaplanowane treningi i wizyty */
+button.mini-day {
+  position: relative;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 6px 0 9px;
+}
+.mini-day.todo::after,
+.mini-day.visit::before {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.mini-day.todo::after {
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-accent-100, #cfe);
+}
+.mini-day.todo.late::after {
+  background: var(--color-warn, #e0b44c);
+}
+.mini-day.visit::before {
+  left: calc(50% + 4px);
+  border: 1.5px solid var(--color-ok);
+  background: transparent;
+}
+.mini-day.todo.visit::after {
+  left: calc(50% - 5px);
+  transform: none;
+}
+.mini-day.todo {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.mini-day.sel {
+  background: var(--color-surface-2, rgba(255, 255, 255, 0.08));
+}
+.mini-day.has.sel {
+  background: color-mix(in srgb, var(--color-ok) 32%, transparent);
+}
+.mini-cal-nav h3 {
+  margin: 0 4px;
+}
+.mini-legend {
+  margin: var(--space-3) 0 0;
+}
+.mini-legend .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.mini-legend .dot.todo {
+  background: var(--color-accent-100, #cfe);
+}
+.mini-legend .dot.visit {
+  border: 1.5px solid var(--color-ok);
+}
+.mini-day-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--color-divider);
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}

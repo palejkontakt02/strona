@@ -471,7 +471,7 @@ function Home({
             </div>
           </div>
         </section>
-        <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} count={sessions.filter((s) => s.date.startsWith(today.slice(0, 7))).length} />
+        <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} planned={plannedByDay(db, clientId, plan, extra, sessions, today)} />
       </div>
 
       <BodyProgress client={client} />
@@ -582,17 +582,59 @@ function Ring({ value, max }: { value: number; max: number }) {
   );
 }
 
-function MonthCalendar({ dates, today, count }: { dates: Set<string>; today: string; count: number }) {
-  const first = today.slice(0, 7) + '-01';
+interface DayItem {
+  kind: 'plan' | 'extra' | 'visit';
+  text: string;
+}
+
+/** Co jest zaplanowane na dni: treningi z planu (dzień od trenera), zadane poza planem, wizyty z trenerem. */
+function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, plan: Plan | null | undefined, extra: Plan | undefined, sessions: TrainingSession[], today: string): Map<string, DayItem[]> {
+  const out = new Map<string, DayItem[]>();
+  const add = (d: string, it: DayItem) => out.set(d, [...(out.get(d) ?? []), it]);
+  if (plan) {
+    const done = new Set(sessions.filter((x) => x.planId === plan.id && x.workoutId).map((x) => x.workoutId));
+    plan.weeks.forEach((w, wi) =>
+      w.workouts.forEach((k) => {
+        const d = workoutDate(plan, wi, k);
+        if (d && !done.has(k.id) && k.exercises.some((e) => e.name)) add(d, { kind: 'plan', text: `${k.name} (${w.name})` });
+      }),
+    );
+  }
+  for (const k of extra?.weeks.flatMap((w) => w.workouts) ?? [])
+    if (k.date && k.exercises.some((e) => e.name) && extraState(k, extra!.id, sessions, today).state !== 'done') add(k.date, { kind: 'extra', text: `${k.name} — od trenera` });
+  for (const a of db.appointments.filter((x) => x.clientId === clientId && x.status === 'planned')) add(a.date, { kind: 'visit', text: `Wizyta z trenerem ${a.time}` });
+  return out;
+}
+
+function MonthCalendar({ dates, today, planned }: { dates: Set<string>; today: string; planned: Map<string, DayItem[]> }) {
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [sel, setSel] = useState<string | null>(null);
+  const first = month + '-01';
   const start = weekStart(first);
   const days: string[] = [];
   for (let d = start; days.length < 42; d = addDays(d, 1)) days.push(d);
   while (days.length > 35 && days[days.length - 7].slice(0, 7) !== first.slice(0, 7)) days.splice(-7);
-  const n = count;
+  const n = [...dates].filter((d) => d.startsWith(month)).length;
+  const shift = (dir: number) => {
+    const d = new Date(`${first}T12:00:00`);
+    d.setMonth(d.getMonth() + dir);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setSel(null);
+  };
+  const pick = sel ?? (month === today.slice(0, 7) ? today : null);
+  const items = pick ? planned.get(pick) ?? [] : [];
   return (
     <section className="acard">
       <div className="between">
-        <h3 className="first-cap">{fmtMonth(today.slice(0, 7))}</h3>
+        <span className="row-inline mini-cal-nav">
+          <button className="icon-btn icon-btn-sm" aria-label="Poprzedni miesiąc" onClick={() => shift(-1)}>
+            ‹
+          </button>
+          <h3 className="first-cap">{fmtMonth(month)}</h3>
+          <button className="icon-btn icon-btn-sm" aria-label="Następny miesiąc" onClick={() => shift(1)}>
+            ›
+          </button>
+        </span>
         <span className="muted small">
           {n} {plural(n, 'trening', 'treningi', 'treningów')}
         </span>
@@ -603,12 +645,39 @@ function MonthCalendar({ dates, today, count }: { dates: Set<string>; today: str
             {d}
           </span>
         ))}
-        {days.map((d) => (
-          <span key={d} className={`mini-day ${d.slice(0, 7) !== first.slice(0, 7) ? 'other' : ''} ${d === today ? 'is-today' : ''} ${dates.has(d) ? 'has' : ''}`}>
-            {dates.has(d) ? '✓' : Number(d.slice(8))}
-          </span>
-        ))}
+        {days.map((d) => {
+          const its = planned.get(d) ?? [];
+          const visit = its.some((x) => x.kind === 'visit');
+          const todo = its.some((x) => x.kind !== 'visit');
+          return (
+            <button
+              type="button"
+              key={d}
+              className={`mini-day ${d.slice(0, 7) !== first.slice(0, 7) ? 'other' : ''} ${d === today ? 'is-today' : ''} ${dates.has(d) ? 'has' : ''} ${todo ? 'todo' : ''} ${visit ? 'visit' : ''} ${pick === d ? 'sel' : ''} ${todo && d < today && !dates.has(d) ? 'late' : ''}`}
+              onClick={() => setSel(d)}
+              aria-label={`${d}${dates.has(d) ? ', trening zrobiony' : ''}${its.length ? `, ${its.map((x) => x.text).join(', ')}` : ''}`}
+            >
+              {dates.has(d) ? '✓' : Number(d.slice(8))}
+            </button>
+          );
+        })}
       </div>
+      <p className="mini-legend muted small">
+        <span className="dot todo" /> trening do zrobienia · <span className="dot visit" /> wizyta · ✓ zrobione
+      </p>
+      {pick && (items.length > 0 || dates.has(pick)) && (
+        <ul className="mini-day-list">
+          <li className="muted small first-cap">{fmtLong(pick)}</li>
+          {dates.has(pick) && <li>✓ Trening zrobiony</li>}
+          {items.map((x, i) => (
+            <li key={i} className={x.kind}>
+              {x.kind === 'visit' ? '🗓 ' : pick < today ? '⚠ ' : '🏋 '}
+              {x.text}
+              {x.kind !== 'visit' && pick < today ? ' — zaległy' : ''}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
