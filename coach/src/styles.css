@@ -5023,3 +5023,8 @@ body.athlete-mode .toasts {
     padding-right: 4px;
   }
 }
+.ex-opts-btn {
+  display: inline-block;
+  margin: 2px 0 var(--space-2);
+  color: var(--color-neutral-400);
+}

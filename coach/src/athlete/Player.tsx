@@ -109,6 +109,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const [finish, setFinish] = useState<Finish | null>(null);
   const [adding, setAdding] = useState(run.ex.length === 0);
   const [layoutOpen, setLayoutOpen] = useState(false);
+  // ćwiczenia z rozwiniętym wyborem typu (cardio / na czas / na stronę)
+  const [optsOpen, setOptsOpen] = useState<Set<number>>(new Set());
   const trainer = mode === 'trainer';
   const blocks = runBlocks(run);
   const bi = Math.max(0, blocks.findIndex((b) => b.includes(run.idx)));
@@ -471,7 +473,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </a>
           )}
         </div>
-        {!e.sets.some((x) => x.done) && (
+        {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone */}
+        {!optsOpen.has(k) && !e.sets.some((x) => x.done) && (
+          <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, k]))}>
+            ⚙ Typ ćwiczenia
+          </button>
+        )}
+        {(optsOpen.has(k) || e.cardio) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
             className={`side-toggle ${e.cardio ? 'on' : ''}`}
@@ -489,7 +497,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             🫀 {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
           </button>
         )}
-        {!e.cardio && !e.sets.some((x) => x.done) && (
+        {!e.cardio && (optsOpen.has(k) || e.timed) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
             className={`side-toggle ${e.timed ? 'on' : ''}`}
@@ -507,7 +515,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             ⏱ {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
           </button>
         )}
-        {!e.cardio && (
+        {!e.cardio && (optsOpen.has(k) || e.perSide) && (
         <button
           type="button"
           className={`side-toggle ${e.perSide ? 'on' : ''}`}

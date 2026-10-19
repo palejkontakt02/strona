@@ -203,6 +203,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [withIds, setWithIds] = useState<string[]>(() => existing?.withIds ?? apptPartners.map((a) => a.clientId));
   const [copyToPartners, setCopyToPartners] = useState(!existing);
   const [addingWith, setAddingWith] = useState(false);
+  // ćwiczenia z rozwiniętym wyborem typu (cardio / na czas / na stronę)
+  const [optsOpen, setOptsOpen] = useState<Set<string>>(new Set());
 
   const effCharge: Billing = charge || (client ? defaultCharge(client, history) : 'brak');
 
@@ -499,17 +501,22 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             </span>
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {r.hint && !r.series && <span className="ex-hint">Podpowiedź: {r.hint}</span>}
-            {!r.cardio && (
+            {!optsOpen.has(r.key) && (
+              <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, r.key]))}>
+                ⚙ Typ ćwiczenia
+              </button>
+            )}
+            {!r.cardio && (optsOpen.has(r.key) || r.timed) && (
               <button type="button" className={`side-toggle ${r.timed ? 'on' : ''}`} aria-pressed={!!r.timed} onClick={() => setRow(i, { timed: !r.timed || undefined })}>
                 ⏱ {r.timed ? 'Na czas — sekundy w miejscu powtórzeń' : 'Na czas?'}
               </button>
             )}
-            {!r.cardio && (
+            {!r.cardio && (optsOpen.has(r.key) || r.perSide) && (
               <button type="button" className={`side-toggle ${r.perSide ? 'on' : ''}`} aria-pressed={!!r.perSide} onClick={() => setRow(i, { perSide: !r.perSide || undefined })}>
                 ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
               </button>
             )}
-            <button
+            {(optsOpen.has(r.key) || r.cardio) && <button
               type="button"
               className={`side-toggle ${r.cardio ? 'on' : ''}`}
               aria-pressed={!!r.cardio}
@@ -521,7 +528,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               }}
             >
               🫀 {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
-            </button>
+            </button>}
             {r.series ? (
               <div className="set-edit">
                 <div className={`set-edit-head ${r.cardio ? 'cardio' : ''}`}>

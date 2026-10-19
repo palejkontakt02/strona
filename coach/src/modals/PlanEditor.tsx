@@ -44,6 +44,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   });
   // poza planem: przy edycji jednego treningu pokazujemy tylko jego (reszta listy na żądanie)
   const [showAll, setShowAll] = useState(false);
+  // ćwiczenia z rozwiniętym wyborem typu (cardio / na czas / na stronę)
+  const [optsOpen, setOptsOpen] = useState<Set<string>>(new Set());
   const only = !!p.extra && !!m.focusWorkoutId && !showAll && p.weeks.some((w) => w.workouts.some((k) => k.id === m.focusWorkoutId));
   const extraCount = p.extra ? p.weeks.reduce((a, w) => a + w.workouts.length, 0) : 0;
   const isOpen = (id: string) => !!p.extra || open.has(id);
@@ -234,14 +236,20 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       />
                     </div>
                     <input className="input pe-notes" value={e.notes ?? ''} placeholder="Uwagi / tempo" onChange={(ev) => setEx((x) => void (x.notes = ev.target.value))} aria-label="Uwagi" />
-                    <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => {
+                    {/* typ ćwiczenia schowany — na wierzchu tylko włączony */}
+                    {!optsOpen.has(e.id) && (
+                      <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, e.id]))}>
+                        ⚙ Typ ćwiczenia
+                      </button>
+                    )}
+                    {(optsOpen.has(e.id) || !!(e.cardio ?? cardioByName(e.name))) && <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => {
                       x.cardio = !(x.cardio ?? cardioByName(x.name));
                       // bieg: przerwy są przy odcinkach — domyślne „2:00” siłowe by się wliczało
                       if (x.cardio && x.rest === '2:00') x.rest = '';
                     })}>
                       🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
-                    </button>
-{!(e.cardio ?? cardioByName(e.name)) && (
+                    </button>}
+{!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || isTimed(e)) && (
                     <button
                       type="button"
                       className={`side-toggle ${isTimed(e) ? 'on' : ''}`}
@@ -252,7 +260,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       ⏱ {isTimed(e) ? 'Na czas — w serii czas zamiast powtórzeń' : 'Na czas?'}
                     </button>
                     )}
-{!(e.cardio ?? cardioByName(e.name)) && (
+{!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || !!(e.perSide ?? perSideByName(e.name))) && (
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
