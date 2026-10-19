@@ -1002,6 +1002,7 @@ function Workouts({
           workout={preview.workout}
           done={done(preview.planId, preview.workout.id)}
           extra={preview.planId === extra?.id}
+          session={sessions.find((x) => x.planId === preview.planId && x.workoutId === preview.workout.id)}
           onClose={() => setPreview(null)}
           onShowDone={() => {
             const last = sessions.find((x) => x.planId === preview.planId && x.workoutId === preview.workout.id);

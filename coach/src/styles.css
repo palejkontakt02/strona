@@ -5196,3 +5196,31 @@ button.mini-day {
   gap: 4px;
   font-size: 0.9rem;
 }
+/* podgląd: plan | wykonano — bez kolumny przerwy, ciaśniej, żeby zmieściło się na telefonie */
+@media (max-width: 640px) {
+  .ptab-two .ptab-table th,
+  .ptab-two .ptab-table td {
+    font-size: 0.78rem;
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+  .ptab-two .ptab-table .ptab-sub {
+    font-size: 0.6rem;
+  }
+  .ptab-two .ptab-table .ptab-ex {
+    min-width: 72px;
+    max-width: 96px;
+  }
+  .ptab-two .ptab-table .ptab-wk {
+    min-width: 36px;
+  }
+  .ptab-two .ptab-table .ptab-load {
+    min-width: 40px;
+  }
+  .ptab-two .ptab-table .ptab-rpe {
+    min-width: 24px;
+  }
+}
+.ptab-two .ptab-table thead .ptab-week {
+  white-space: normal;
+}

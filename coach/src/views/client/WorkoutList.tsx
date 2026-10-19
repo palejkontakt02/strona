@@ -137,6 +137,7 @@ export function WorkoutList({ client }: { client: Client }) {
           workout={preview.workout}
           done={last(preview.plan, preview.workout.id)}
           extra={preview.plan.extra}
+          session={lastSession(preview.plan, preview.workout.id)}
           onClose={() => setPreview(null)}
           onShowDone={() => setShown(lastSession(preview.plan, preview.workout.id) ?? null)}
           onStart={preview.workout.exercises.some((e) => e.name) ? () => startAthlete(client.id, { planId: preview.plan.id, workoutId: preview.workout.id }) : undefined}

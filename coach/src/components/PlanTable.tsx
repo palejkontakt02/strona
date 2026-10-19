@@ -67,7 +67,7 @@ export function PlanTable({
 }
 
 /** Tabela jednego treningu: wiersz na serię; każdy tydzień ma kolumny Powt. | Ciężar | RPE (bieg: odcinek | cel | RPE). */
-function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; done?: Set<string> }) {
+function GridTable({ slot, nextId, done, noRest }: { slot: GridSlot; nextId?: string; done?: Set<string>; /** Przerwa pod nazwą ćwiczenia zamiast osobnej kolumny (węższa tabela). */ noRest?: boolean }) {
   const { cols, rows } = slot;
   if (rows.length === 0) return <p className="muted small">Brak ćwiczeń.</p>;
   const cls = (id: string) => `${id === nextId ? 'is-next' : ''} ${done?.has(id) && id !== nextId ? 'is-done' : ''}`;
@@ -80,11 +80,13 @@ function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; do
               Ćwiczenie
             </th>
             <th className="ptab-no" rowSpan={2}>
-              Seria
+              {noRest ? 'Nr' : 'Seria'}
             </th>
-            <th className="ptab-rest" rowSpan={2}>
-              Przerwa
-            </th>
+            {!noRest && (
+              <th className="ptab-rest" rowSpan={2}>
+                Przerwa
+              </th>
+            )}
             {cols.map(({ week, k, date }) => (
               <th key={week.id} colSpan={3} className={`ptab-week ${cls(k.id)}`}>
                 {week.name}
@@ -114,11 +116,12 @@ function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; do
                 {i === 0 && (
                   <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
                     <span className="ex-label">{r.label}</span> {r.name}
+                    {noRest && r.rest && <span className="ptab-note">przerwa {r.rest}</span>}
                     {r.notes && <span className="ptab-note">{r.notes}</span>}
                   </th>
                 )}
                 <td className="ptab-no">{line.no}</td>
-                {i === 0 && (
+                {i === 0 && !noRest && (
                   <td className="ptab-rest" rowSpan={r.lines.length}>
                     {r.rest || '—'}
                   </td>
@@ -154,18 +157,20 @@ function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; do
 }
 
 /** Jeden trening (np. poza planem, podgląd) w tym samym układzie co plan; rozgrzewki po rozwinięciu. */
-export function WorkoutTable({ workout, colName = 'Plan' }: { workout: PlanWorkout; colName?: string }) {
+export function WorkoutTable({ workout, colName = 'Plan', done, doneName = 'Wykonano' }: { workout: PlanWorkout; colName?: string; /** Wykonanie (z zapisu) — druga kolumna obok planu. */ done?: PlanWorkout; doneName?: string }) {
   const [warm, setWarm] = useState(false);
-  const [slot] = planGrid({ id: 'w', clientId: '', name: '', active: false, weeks: [{ id: 'w1', name: colName, workouts: [{ ...workout, name: workout.name || 'Trening' }] }] }, () => warm);
+  const name = workout.name || 'Trening';
+  const weeks = [{ id: 'w1', name: colName, workouts: [{ ...workout, name }] }, ...(done ? [{ id: 'w2', name: doneName, workouts: [{ ...done, name }] }] : [])];
+  const [slot] = planGrid({ id: 'w', clientId: '', name: '', active: false, weeks }, () => warm);
   if (!slot) return null;
   return (
-    <div className="ptab ptab-one">
+    <div className={`ptab ptab-one ${done ? 'ptab-two' : ''}`}>
       {slot.hasWarm && (
         <button type="button" className="btn btn-ghost btn-sm ptab-warm-btn" aria-expanded={warm} onClick={() => setWarm(!warm)}>
           {warm ? 'Ukryj rozgrzewki' : 'Pokaż rozgrzewki'}
         </button>
       )}
-      <GridTable slot={slot} />
+      <GridTable slot={slot} noRest={!!done} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { WorkoutTable } from '../components/PlanTable';
 import { Sheet } from '../components/Sheet';
-import type { PlanWorkout } from '../domain';
+import type { PlanWorkout, TrainingSession } from '../domain';
+import { sessionToWorkout } from '../data/ops';
 import { fmtDay } from '../format';
 import { StartButtons } from './StartButtons';
 
@@ -16,6 +17,7 @@ export function WorkoutPreview({
   onStart,
   onTrainer,
   onShowDone,
+  session,
 }: {
   workout: PlanWorkout;
   done?: string;
@@ -25,6 +27,8 @@ export function WorkoutPreview({
   onTrainer?: () => void;
   /** Otwórz zapis ostatniego wykonania. */
   onShowDone?: () => void;
+  /** Ostatni zapis — wykonane serie (powtórzenia, ciężar, RPE) obok planu. */
+  session?: TrainingSession;
 }) {
   return (
     <Sheet label={workout.name} onClose={onClose}>
@@ -42,7 +46,7 @@ export function WorkoutPreview({
             Zobacz, jak poszło {fmtDay(done)} ›
           </button>
         )}
-        <WorkoutTable workout={{ ...workout, exercises: workout.exercises.filter((e) => e.name) }} />
+        <WorkoutTable workout={{ ...workout, exercises: workout.exercises.filter((e) => e.name) }} done={session?.exercises.length ? sessionToWorkout(session) : undefined} doneName={session ? `Wykonano ${fmtDay(session.date)}` : undefined} />
         {onStart && <StartButtons onStart={onStart} onTrainer={onTrainer} />}
       </Sheet>
   );
