@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Plan } from '../domain';
-import { planGrid } from '../lib/planGrid';
+import type { Plan, PlanWorkout } from '../domain';
+import { planGrid, type GridSlot } from '../lib/planGrid';
 import { Tag } from './ui';
 
 /**
@@ -24,7 +24,7 @@ export function PlanTable({
   const slots = planGrid(plan, (s) => warmOpen.has(s));
   return (
     <div className="ptab-wrap">
-      {slots.map(({ name: slot, cols, rows, hasWarm }) => {
+      {slots.map(({ name: slot, cols, hasWarm }) => {
         const next = cols.find((c) => c.k.id === nextId);
         const showWarm = warmOpen.has(slot);
         return (
@@ -57,7 +57,18 @@ export function PlanTable({
                 </span>
               )}
             </div>
-            {rows.length === 0 ? (
+            <GridTable slot={slots.find((x) => x.name === slot)!} nextId={nextId} done={done} />
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Tabela jednego treningu: wiersz na serię, kolumny = tygodnie (albo jedna kolumna „Plan”). */
+function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; done?: Set<string> }) {
+  const { cols, rows } = slot;
+  return rows.length === 0 ? (
               <p className="muted small">Brak ćwiczeń.</p>
             ) : (
               <div className="ptab-scroll">
@@ -68,9 +79,9 @@ export function PlanTable({
                       <th className="ptab-no">Seria</th>
                       <th className="ptab-rest">Przerwa</th>
                       {cols.map(({ week, k }) => (
-                        <th key={week.id} className={`${k.id === nextId ? 'is-next' : ''} ${done.has(k.id) && k.id !== nextId ? 'is-done' : ''}`}>
+                        <th key={week.id} className={`${k.id === nextId ? 'is-next' : ''} ${done?.has(k.id) && k.id !== nextId ? 'is-done' : ''}`}>
                           {week.name}
-                          {k.id === nextId ? ' ▶' : done.has(k.id) ? ' ✓' : ''}
+                          {k.id === nextId ? ' ▶' : done?.has(k.id) ? ' ✓' : ''}
                         </th>
                       ))}
                     </tr>
@@ -102,10 +113,22 @@ export function PlanTable({
                   </tbody>
                 </table>
               </div>
-            )}
-          </section>
-        );
-      })}
+            );
+}
+
+/** Jeden trening (np. poza planem, podgląd) w tym samym układzie co plan; rozgrzewki po rozwinięciu. */
+export function WorkoutTable({ workout, colName = 'Plan' }: { workout: PlanWorkout; colName?: string }) {
+  const [warm, setWarm] = useState(false);
+  const [slot] = planGrid({ id: 'w', clientId: '', name: '', active: false, weeks: [{ id: 'w1', name: colName, workouts: [{ ...workout, name: workout.name || 'Trening' }] }] }, () => warm);
+  if (!slot) return null;
+  return (
+    <div className="ptab ptab-one">
+      {slot.hasWarm && (
+        <button type="button" className="btn btn-ghost btn-sm ptab-warm-btn" aria-expanded={warm} onClick={() => setWarm(!warm)}>
+          {warm ? 'Ukryj rozgrzewki' : 'Pokaż rozgrzewki'}
+        </button>
+      )}
+      <GridTable slot={slot} />
     </div>
   );
 }

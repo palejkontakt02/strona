@@ -1,4 +1,3 @@
-import { cardioByName, isTimed, perSideByName } from '../../lib/run';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
@@ -8,16 +7,9 @@ import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
-import { doneInPass, exerciseLabels, mergeGroups, nextWorkout } from '../../lib/plan';
+import { doneInPass, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
-import { PlanSets } from '../../components/sets';
-import { PlanTable } from '../../components/PlanTable';
-
-export function groupSummary(e: Plan['weeks'][number]['workouts'][number]['exercises'][number]) {
-  return mergeGroups(e.groups)
-    .map((g) => `${g.type === 'Robocze' ? '' : g.type + ' '}${g.sets}×${g.reps || '?'}${g.load ? ' ' + g.load : ''}${g.rpe ? ' @' + g.rpe : ''}`)
-    .join(' → ');
-}
+import { PlanTable, WorkoutTable } from '../../components/PlanTable';
 
 export function newPlan(clientId: string): Plan {
   return {
@@ -180,18 +172,7 @@ export function ClientPlans({ client }: { client: Client }) {
                     <span className="muted small">brak ćwiczeń</span>
                   )}
                 </div>
-                {k.exercises.length > 0 && (
-                  <ul className="plain">
-                    {k.exercises.map((e, ei) => (
-                      <li key={e.id} className={`plan-ex ${e.linked ? 'linked' : ''}`}>
-                        <span>
-                          <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
-                        </span>
-                        <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} timed={isTimed(e)} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {k.exercises.length > 0 && <WorkoutTable workout={k} colName={k.date ? `na ${fmtDate(k.date)}` : 'Plan'} />}
               </div>
             ))}
             {doneDated.length > 0 && (

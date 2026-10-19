@@ -4945,3 +4945,12 @@ body.athlete-mode .toasts {
 .ptab-table td.ptab-warm {
   color: var(--color-neutral-400);
 }
+.ptab-one {
+  margin-top: var(--space-3);
+}
+.ptab-warm-btn {
+  margin-bottom: var(--space-2);
+}
+.sheet .ptab-table .ptab-ex {
+  background: var(--color-surface);
+}
