@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Field, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
-import { chargeProblem, clientById, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
+import { chargeProblem, clientById, groupOf, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { deleteSetVideo, sessionVideos } from '../data/videos';
 import { fnum, pln, uid, nEx } from '../format';
@@ -196,6 +196,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [paidNow, setPaidNow] = useState(true);
   // trener zapisuje zwykle trening, który prowadził; stary zapis — jak w historii
   const [solo, setSolo] = useState(existing ? isSolo(db, existing) : false);
+  // trening w parze: osoby z tej samej wizyty (bez zapisanego treningu) albo dopisane ręcznie
+  const apptPartners = m.appt ? groupOf(db.appointments, m.appt).filter((a) => a.id !== m.appt!.id && !a.sessionId && a.status !== 'cancel' && a.status !== 'noshow') : [];
+  const [withIds, setWithIds] = useState<string[]>(() => existing?.withIds ?? apptPartners.map((a) => a.clientId));
+  const [copyToPartners, setCopyToPartners] = useState(!existing);
+  const [addingWith, setAddingWith] = useState(false);
 
   const effCharge: Billing = charge || (client ? defaultCharge(client, history) : 'brak');
 
@@ -248,7 +253,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     const nx = nextWorkout(plan, history);
     if (due) loadWorkout(due.id);
     else if (nx) loadWorkout(nx.workout.id);
-    if (client.singleRate) setAmount(String(client.singleRate));
+    const rate = withIds.length && client.pairRate ? client.pairRate : client.singleRate;
+    if (rate) setAmount(String(rate));
   }
 
   const setRow = (i: number, patch: Partial<ExRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -293,6 +299,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       planId: planRef.planId,
       workoutId: planRef.workoutId,
       solo,
+      withIds: !solo && withIds.length ? withIds : undefined,
       exercises: withBlockLabels(rows).map((r) => ({
         name: r.name.trim(),
         label: r.label,
@@ -305,7 +312,18 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: solo ? undefined : m.appt?.id, amount: num(amount) ?? undefined, paidNow });
-    if (!(await apply(changes, message))) return; // formularz zostaje otwarty — można ponowić
+    // ten sam trening dla partnerów z pary: ich rozliczenie domyślne, ich wizyta z tego terminu
+    const copies = !existing && !solo && copyToPartners
+      ? withIds.flatMap((pid) => {
+          const pc = clientById(db, pid);
+          if (!pc) return [];
+          const pAppt = apptPartners.find((a) => a.clientId === pid);
+          const ps: TrainingSession = { ...session, id: uid(), clientId: pid, charge: defaultCharge(pc, sessionsOf(db, pid)), withIds: [client.id, ...withIds.filter((x) => x !== pid)], paymentId: undefined, wellness: undefined, sleepH: undefined, rhr: undefined, planId: undefined, workoutId: undefined, locationId: locationId || pc.locationId };
+          const rate = pc.pairRate ?? pc.singleRate;
+          return saveSession(db, { session: ps, isNew: true, appointmentId: pAppt?.id, matchAppointment: !!pAppt, amount: rate, paidNow: false }).changes;
+        })
+      : [];
+    if (!(await apply([...changes, ...copies], copies.length ? `${message} Zapisano też dla: ${withIds.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : message))) return; // formularz zostaje otwarty — można ponowić
     closeModal();
   };
 
@@ -362,6 +380,42 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             ))}
           </select>
         </Field>
+        {!solo && (
+          <div className="field field-wide">
+            <span>W parze / grupie z</span>
+            <div className="pair-chips">
+              {withIds.map((id) => (
+                <span key={id} className="pair-chip">
+                  👥 {clientById(db, id)?.name ?? '—'}
+                  <button type="button" className="icon-btn icon-btn-sm" aria-label={`Usuń ${clientById(db, id)?.name ?? ''}`} onClick={() => setWithIds(withIds.filter((x) => x !== id))}>
+                    ×
+                  </button>
+                </span>
+              ))}
+              {addingWith ? (
+                <ClientSelect
+                  value=""
+                  required={false}
+                  onChange={(id) => {
+                    if (id && id !== clientId && !withIds.includes(id)) setWithIds([...withIds, id]);
+                    setAddingWith(false);
+                  }}
+                />
+              ) : (
+                withIds.length < 3 && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingWith(true)} disabled={!clientId}>
+                    + {withIds.length ? 'kolejna osoba' : 'trening w parze'}
+                  </button>
+                )
+              )}
+            </div>
+            {!existing && withIds.length > 0 && (
+              <label className="check">
+                <input type="checkbox" checked={copyToPartners} onChange={(e) => setCopyToPartners(e.target.checked)} /> Zapisz ten sam trening też dla: {withIds.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')} (ich rozliczenie, popraw potem ciężary)
+              </label>
+            )}
+          </div>
+        )}
         <Field label="Z kim">
           <Seg
             options={['Z trenerem', 'Samodzielnie'] as const}

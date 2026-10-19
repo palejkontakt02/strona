@@ -208,6 +208,15 @@ export function SessionSheet({
               </button>
             ))}
           </span>}
+          {s.withIds?.length ? (
+            <span>
+              👥 w parze{(() => {
+                // podopieczny w aplikacji nie widzi innych osób — wtedy samo „w parze”
+                const names = s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0]).filter(Boolean);
+                return names.length ? ` z ${names.join(', ')}` : '';
+              })()}
+            </span>
+          ) : null}
           {(() => {
             // suma cardio / biegu w treningu (z tempem, gdy są czasy i dystanse)
             const t = runTotals(s);

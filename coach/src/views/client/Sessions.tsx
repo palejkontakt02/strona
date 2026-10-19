@@ -22,7 +22,8 @@ export function SessionBadges({ s }: { s: TrainingSession }) {
     <>
       {n > 0 && <Tag tone={needsReview(s) ? 'accent' : 'muted'}>{`🎥 ${n}${needsReview(s) ? ' · nowe' : ''}`}</Tag>}{' '}
       {isSolo(db, s) && <Tag tone="muted">samodzielnie</Tag>}{' '}
-      {s.coachNote && <Tag tone="muted">💬</Tag>}
+      {s.coachNote && <Tag tone="muted">💬</Tag>}{' '}
+      {s.withIds?.length ? <Tag tone="muted">👥 w parze z {s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0] ?? '—').join(', ')}</Tag> : null}
     </>
   );
 }

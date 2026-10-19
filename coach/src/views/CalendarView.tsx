@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Icon, Seg, Tag } from '../components/ui';
 import type { Appointment, AppointmentStatus, ISODate, Plan, PlanWorkout, TrainingSession } from '../domain';
-import { clientById, extraState, isSolo, type ExtraState } from '../data/ops';
+import { clientById, extraState, groupOf, isSolo, type ExtraState } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtMonth, fmtShort, fmtWeekday } from '../format';
 import { clashes, clientHue } from '../lib/calendar';
@@ -52,7 +52,16 @@ export function CalendarView() {
   };
 
   const inLoc = (id?: string) => !loc || id === loc;
-  const apptsOn = (date: ISODate) => db.appointments.filter((a) => a.date === date && inLoc(a.locationId)).sort((a, b) => a.time.localeCompare(b.time));
+  // para / grupa = jeden kafelek (pierwsza wizyta z grupy, pozostałe osoby w nim)
+  const apptsOn = (date: ISODate) => {
+    const list = db.appointments.filter((a) => a.date === date && inLoc(a.locationId));
+    const rep = (a: Appointment) => {
+      if (!a.groupId) return true;
+      const g = list.filter((x) => x.groupId === a.groupId);
+      return (g.find((x) => x.status !== 'cancel') ?? g[0]).id === a.id;
+    };
+    return list.filter(rep).sort((a, b) => a.time.localeCompare(b.time));
+  };
   const linked = new Set(db.appointments.map((a) => a.sessionId).filter(Boolean));
   const looseOn = (date: ISODate) => db.sessions.filter((s) => s.date === date && !linked.has(s.id) && inLoc(s.locationId));
   // treningi zadane na dzień (poza planem), jeszcze niewykonane — przerywana ramka
@@ -147,6 +156,7 @@ function ApptTile({ a }: { a: Appointment }) {
   const { db } = useStore();
   const { openModal } = useNav();
   const c = clientById(db, a.clientId);
+  const partners = groupOf(db.appointments, a).filter((x) => x.id !== a.id && x.status !== 'cancel');
   const clash = a.status === 'planned' && clashes(a, db.appointments).length > 0;
   return (
     <button
@@ -160,7 +170,9 @@ function ApptTile({ a }: { a: Appointment }) {
         {a.time}
         {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
       </span>
-      <span className="tile-name">{c?.name ?? '—'}</span>
+      <span className="tile-name">
+        {partners.length ? `👥 ${[c, ...partners.map((x) => clientById(db, x.clientId))].map((x) => x?.name.split(' ')[0] ?? '—').join(' + ')}` : c?.name ?? '—'}
+      </span>
       <LocationTag id={a.locationId} short />
       {a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>}
     </button>

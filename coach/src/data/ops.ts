@@ -251,10 +251,59 @@ export function saveAppointment(appt: Appointment, repeatWeeks: number): Change[
   );
 }
 
+/** Wizyty z tego samego terminu w parze / grupie (z tą wizytą włącznie). */
+export function groupOf(appts: Appointment[], a: Appointment): Appointment[] {
+  if (!a.groupId) return [a];
+  const g = appts.filter((x) => x.groupId === a.groupId && x.date === a.date);
+  return g.some((x) => x.id === a.id) ? g : [a, ...g];
+}
+
+/**
+ * Zapis wizyty w parze / grupie: ta wizyta + partnerzy w tym samym terminie (godzina, czas, miejsce, powtarzanie).
+ * Każdy ma własną wizytę (status, rozliczenie, trening). Usunięty partner: wizyta zaplanowana bez treningu znika,
+ * inaczej zostaje jako zwykła (bez pary).
+ */
+export function saveGroupAppointments(db: Db, draft: Appointment, partnerIds: string[], repeatWeeks: number, original?: Appointment): Change[] {
+  const ids = [...new Set(partnerIds.filter((id) => id && id !== draft.clientId))];
+  const before = original ? groupOf(db.appointments, original).filter((x) => x.id !== draft.id) : [];
+  if (!ids.length) {
+    // bez partnerów — zwykła wizyta; dotychczasowi partnerzy odłączeni
+    return [...saveAppointment({ ...draft, groupId: undefined }, repeatWeeks), ...before.flatMap((x) => dropPartner(x))];
+  }
+  const groupId = draft.groupId ?? original?.groupId ?? uid();
+  const main = { ...draft, groupId };
+  const changes: Change[] = [];
+  if (repeatWeeks > 1) {
+    // seria: dla każdego tygodnia osobne wizyty partnerów z tym samym groupId (grupa = groupId + data)
+    const seriesId = uid();
+    const dates = weeklyDates(main.date, repeatWeeks);
+    for (const [i, date] of dates.entries()) {
+      changes.push(put('appointments', { ...main, id: i === 0 ? main.id : uid(), date, seriesId }));
+      for (const cid of ids) changes.push(put('appointments', { ...main, id: uid(), clientId: cid, date, seriesId: `${seriesId}:${cid}`, sessionId: undefined, status: 'planned', note: undefined }));
+    }
+    return changes;
+  }
+  changes.push(put('appointments', main));
+  for (const cid of ids) {
+    const prev = before.find((x) => x.clientId === cid);
+    const same = { date: main.date, time: main.time, duration: main.duration, locationId: main.locationId, location: main.location, groupId };
+    changes.push(put('appointments', prev ? { ...prev, ...same } : { ...main, ...same, id: uid(), clientId: cid, status: 'planned', sessionId: undefined, seriesId: undefined, note: undefined }));
+  }
+  for (const x of before.filter((x) => !ids.includes(x.clientId))) changes.push(...dropPartner(x));
+  return changes;
+}
+
+function dropPartner(a: Appointment): Change[] {
+  return a.status === 'planned' && !a.sessionId ? [del('appointments', a.id)] : [put('appointments', { ...a, groupId: undefined })];
+}
+
 /** Zmiana godziny / czasu / miejsca w tej i kolejnych zaplanowanych wizytach serii. */
 export function updateSeries(db: Db, appt: Appointment): Change[] {
   if (!appt.seriesId) return [put('appointments', appt)];
-  const later = db.appointments.filter((a) => a.seriesId === appt.seriesId && a.id !== appt.id && a.date > appt.date && a.status === 'planned');
+  // także partnerzy z tej samej pary / grupy (ich seria: `${seriesId}:${clientId}`)
+  const later = db.appointments.filter(
+    (a) => (a.seriesId === appt.seriesId || (!!appt.groupId && a.groupId === appt.groupId && a.seriesId?.startsWith(`${appt.seriesId}:`))) && a.id !== appt.id && a.date > appt.date && a.status === 'planned',
+  );
   return [
     put('appointments', appt),
     ...later.map((a) => put('appointments', { ...a, time: appt.time, duration: appt.duration, locationId: appt.locationId, location: appt.location })),
@@ -262,11 +311,13 @@ export function updateSeries(db: Db, appt: Appointment): Change[] {
 }
 
 /** Usunięcie wizyty albo całej przyszłej części serii. */
-export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolean): Change[] {
-  if (!wholeSeries || !appt.seriesId) return [del('appointments', appt.id)];
-  return db.appointments
-    .filter((a) => a.seriesId === appt.seriesId && a.date >= appt.date && a.status === 'planned')
-    .map((a) => del('appointments', a.id));
+export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolean, withPartners = false): Change[] {
+  // partnerzy z pary: ich zaplanowane wizyty bez treningu (w tym terminie albo w całej serii)
+  const partners = withPartners && appt.groupId
+    ? db.appointments.filter((a) => a.groupId === appt.groupId && a.id !== appt.id && a.status === 'planned' && !a.sessionId && (wholeSeries ? a.date >= appt.date : a.date === appt.date))
+    : [];
+  const own = !wholeSeries || !appt.seriesId ? [appt] : db.appointments.filter((a) => a.seriesId === appt.seriesId && a.date >= appt.date && a.status === 'planned');
+  return [...own, ...partners.filter((p) => !own.some((o) => o.id === p.id))].map((a) => del('appointments', a.id));
 }
 
 /* ---------- plany ---------- */

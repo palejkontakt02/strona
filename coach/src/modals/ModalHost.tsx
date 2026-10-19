@@ -43,11 +43,11 @@ export function ModalHost({ modal }: { modal: ModalState }) {
 }
 
 /** Lista klientów do wyboru (aktywni pierwsi). */
-export function ClientSelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+export function ClientSelect({ value, onChange, required = true }: { value: string; onChange: (id: string) => void; required?: boolean }) {
   const { db } = useStore();
   const sorted = [...db.clients].sort((a, b) => Number(b.status === 'aktywny') - Number(a.status === 'aktywny') || a.name.localeCompare(b.name, 'pl'));
   return (
-    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} required>
+    <select className="input" value={value} onChange={(e) => onChange(e.target.value)} required={required}>
       <option value="" disabled>
         Wybierz podopiecznego…
       </option>

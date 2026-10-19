@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Avatar, Card, Dot, Empty, Icon, IconBtn, Kpi, Tag } from '../components/ui';
-import { allPayments, clientById, lastSessionDate, paymentLabel, sessionsOf } from '../data/ops';
+import { allPayments, clientById, groupOf, lastSessionDate, paymentLabel, sessionsOf } from '../data/ops';
 import { put } from '../data/db';
 import { needsReview, sessionVideos } from '../data/videos';
 import { markPaid } from '../data/payActions';
@@ -88,6 +88,10 @@ export function Dashboard() {
                       <button className="link ellipsis" onClick={() => c && openClient(c.id)}>
                         {c?.name ?? '—'}
                       </button>
+                      {(() => {
+                        const pr = groupOf(db.appointments, a).filter((x) => x.id !== a.id && x.status !== 'cancel');
+                        return pr.length ? <span className="muted small nowrap" title="Trening w parze — „Prowadź” otwiera obie osoby">👥 + {pr.map((x) => clientById(db, x.clientId)?.name.split(' ')[0] ?? '—').join(', ')}</span> : null;
+                      })()}
                       <LocationTag id={a.locationId} short />
                     </div>
                     <span className={a.status === 'planned' ? 'hide-mobile' : ''}>

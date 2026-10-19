@@ -4,13 +4,15 @@ import { addDays, toMinutes } from './dates';
 export const DEFAULT_APPT_MIN = 60;
 
 /** Wizyty kolidujące: nakładające się [time, time+duration) tego samego dnia, z pominięciem odwołanych. */
-export function clashes(a: Pick<Appointment, 'id' | 'date' | 'time' | 'duration'>, all: Appointment[]): Appointment[] {
+export function clashes(a: Pick<Appointment, 'id' | 'date' | 'time' | 'duration'> & { groupId?: string }, all: Appointment[]): Appointment[] {
   if (!a.date || !a.time) return [];
   const start = toMinutes(a.time);
   const end = start + (a.duration || DEFAULT_APPT_MIN);
   return all.filter(
     (o) =>
       o.id !== a.id &&
+      // partner z tej samej pary / grupy to nie kolizja
+      !(a.groupId && o.groupId === a.groupId) &&
       o.date === a.date &&
       o.status !== 'cancel' &&
       !!o.time &&

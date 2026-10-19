@@ -15,7 +15,7 @@ type Draft = Record<string, string>;
 
 const TEXT_FIELDS = ['name', 'phone', 'email', 'goal', 'level', 'sport', 'position', 'experience', 'injuries', 'notes'] as const;
 const DATE_FIELDS = ['dob', 'targetDate', 'startDate'] as const;
-const NUM_FIELDS = ['height', 'daysPerWeek', 'singleRate', 'subRate', 'pkgSize', 'pkgPrice'] as const;
+const NUM_FIELDS = ['height', 'daysPerWeek', 'singleRate', 'pairRate', 'subRate', 'pkgSize', 'pkgPrice'] as const;
 
 export function toDraft(c: Partial<Client>): Draft {
   const d: Draft = { status: c.status ?? 'aktywny', billing: c.billing ?? '', dominant: c.dominant ?? '', locationId: c.locationId ?? '' };
@@ -99,6 +99,7 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
         <LocationSelect value={d.locationId} onChange={(v) => set('locationId', v)} />
       </Field>
       <Field label="Stawka za sesję (zł)">{inp('singleRate', 'text', { inputMode: 'decimal' })}</Field>
+      <Field label="Stawka w parze (zł)">{inp('pairRate', 'text', { inputMode: 'decimal', placeholder: 'za osobę' })}</Field>
       {!compact && (
         <>
           <Field label="Abonament (zł / mies.)">{inp('subRate', 'text', { inputMode: 'decimal' })}</Field>

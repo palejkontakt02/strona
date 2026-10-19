@@ -82,6 +82,8 @@ export interface Run {
   editSessionId?: string;
   /** Wizyta, z której trener uruchomił trening (zachowana po wyjściu do panelu). */
   appointmentId?: string;
+  /** Trening w parze / grupie: pozostałe osoby prowadzone razem (id podopiecznych). */
+  pairWith?: string[];
 }
 
 const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;

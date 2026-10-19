@@ -110,6 +110,8 @@ export interface Client {
   targetDate?: ISODate;
   billing?: Billing;
   singleRate?: number;
+  /** Stawka za sesję w parze / grupie (zł) — domyślna kwota, gdy trening jest z partnerem. */
+  pairRate?: number;
   subRate?: number;
   pkgSize?: number;
   pkgPrice?: number;
@@ -317,6 +319,8 @@ export interface TrainingSession {
   reviewedAt?: string;
   /** Komentarz trenera widoczny dla podopiecznego. */
   coachNote?: string;
+  /** Trening w parze / grupie: z kim (id podopiecznych). */
+  withIds?: string[];
 }
 
 /* ---------- Kalendarz ---------- */
@@ -337,6 +341,8 @@ export interface Appointment {
   status: AppointmentStatus;
   sessionId?: string;
   seriesId?: string;
+  /** Trening w parze / małej grupie: wizyty z tym samym `groupId` i datą to jeden termin (każdy ma swój status i rozliczenie). */
+  groupId?: string;
 }
 
 /* ---------- Biblioteka ćwiczeń ---------- */

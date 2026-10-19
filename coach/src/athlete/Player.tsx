@@ -72,6 +72,8 @@ interface Props {
   /** Anulowanie rozpoczętego treningu (nic się nie zapisuje). */
   onCancel?: () => void;
   appointmentId?: string;
+  /** Trening w parze: koniec przerwy tej osoby (zakładka partnera pokazuje odliczanie). */
+  onRest?: (end: number | null) => void;
 }
 
 interface Finish {
@@ -97,9 +99,10 @@ function elapsedMinutes(startedAt: number): string {
   return m >= 10 && m <= 240 ? String(m) : '';
 }
 
-export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId }: Props) {
+export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId, onRest }: Props) {
   const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
+  useEffect(() => onRest?.(rest?.end ?? null), [rest, onRest]);
   const [hold, setHold] = useState<{ end: number; total: number } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
@@ -233,6 +236,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       workoutId: run.workoutId,
       exercises: runToExercises(run),
       solo: finish.solo,
+      withIds: run.pairWith?.filter((id) => id !== client.id).length ? run.pairWith.filter((id) => id !== client.id) : undefined,
     };
     if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
@@ -310,7 +314,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       duration: elapsedMinutes(run.startedAt),
       notes: '',
       charge,
-      amount: client.singleRate ? String(client.singleRate) : '',
+      // w parze — stawka „w parze” z profilu (jeśli ustawiona)
+      amount: run.pairWith?.length && client.pairRate ? String(client.pairRate) : client.singleRate ? String(client.singleRate) : '',
       paidNow: true,
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
       // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem

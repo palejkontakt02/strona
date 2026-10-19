@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, saveAppointment, sessionsOf, updateSeries } from '../data/ops';
+import { clientById, deleteAppointment, groupOf, saveAppointment, saveGroupAppointments, sessionsOf, updateSeries } from '../data/ops';
 import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
 import { fmtShort, plural, uid } from '../format';
@@ -31,6 +31,10 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const pk = cl ? packageStatus(cl, sessionsOf(db, cl.id)) : null;
   const [charged, setCharged] = useState(!!editing && !!cl?.noShowCharges?.includes(editing.id));
   const [weeks, setWeeks] = useState('8');
+  // trening w parze / małej grupie: pozostałe osoby w tym terminie
+  const group = editing ? groupOf(db.appointments, editing).filter((x) => x.id !== editing.id) : [];
+  const [partners, setPartners] = useState<string[]>(() => group.map((x) => x.clientId));
+  const [addingPartner, setAddingPartner] = useState(false);
 
   const draft: Appointment = {
     ...(editing ?? {}),
@@ -43,10 +47,11 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     location: location.trim() || db.locations.find((l) => l.id === locationId)?.name || undefined,
     note: note.trim() || undefined,
     status,
+    groupId: partners.length ? editing?.groupId : undefined,
   };
   // Kolizje sprawdzamy dla każdego terminu serii (wizyty cykliczne), nie tylko pierwszego.
   const repeatN = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
-  const clash = weeklyDates(draft.date, repeatN).flatMap((d) => clashes({ ...draft, date: d }, db.appointments));
+  const clash = weeklyDates(draft.date, repeatN).flatMap((d) => clashes({ ...draft, date: d }, db.appointments)).filter((c) => !partners.includes(c.clientId) || c.date !== draft.date || c.time !== draft.time);
 
   const save = async () => {
     if (!clientId) return;
@@ -58,7 +63,13 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const chargeNow = charged && (draft.status === 'noshow' || draft.status === 'cancel');
     const wasCharged = !!cl?.noShowCharges?.includes(draft.id);
     const chargeChange = cl && chargeNow !== wasCharged ? [put('clients', { ...cl, noShowCharges: chargeNow ? [...(cl.noShowCharges ?? []), draft.id] : (cl.noShowCharges ?? []).filter((x) => x !== draft.id) })] : [];
-    await apply([...(allNext ? updateSeries(db, draft) : saveAppointment(draft, n)), ...chargeChange], n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.');
+    if (partners.includes(clientId)) return toast('Ta sama osoba jest wybrana dwa razy.');
+    const grouped = partners.length > 0 || !!editing?.groupId;
+    const d2: Appointment = { ...draft, groupId: partners.length ? (editing?.groupId ?? uid()) : undefined };
+    const main = grouped ? saveGroupAppointments(db, d2, partners, allNext ? 1 : n, editing) : saveAppointment(d2, n);
+    const pairMsg = partners.length ? ` W parze z: ${partners.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : '';
+    const msg = n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
+    if (!(await apply([...main, ...(allNext ? updateSeries(db, d2) : []), ...chargeChange], msg + pairMsg))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
       if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
@@ -76,7 +87,9 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
       whole = await ask('To wizyta cykliczna. Usunąć też kolejne zaplanowane wizyty z tej serii?', { confirm: 'Usuń całą serię' });
       if (!whole && !(await ask('Usunąć tylko tę wizytę?'))) return;
     } else if (!(await ask('Usunąć tę wizytę?'))) return;
-    await apply(deleteAppointment(db, editing, whole), 'Wizyta usunięta.');
+    const others = group.filter((x) => x.status === 'planned' && !x.sessionId);
+    const withPartners = others.length > 0 && (await ask(`To trening w parze. Usunąć też wizytę: ${others.map((x) => clientById(db, x.clientId)?.name ?? '—').join(', ')}?`, { confirm: 'Usuń też', cancel: 'Tylko tę' }));
+    await apply(deleteAppointment(db, editing, whole, withPartners), 'Wizyta usunięta.');
     closeModal();
   };
 
@@ -105,11 +118,12 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
                   type="button"
                   className="btn btn-primary"
                   onClick={async () => {
-                    await apply([put('appointments', draft)]);
+                    // z partnerami — najpierw zapis pary, żeby prowadzenie otworzyło obie osoby
+                    if (!(await apply(partners.length || editing.groupId ? saveGroupAppointments(db, draft, partners, 1, editing) : [put('appointments', draft)]))) return;
                     startLive(clientId, draft.id);
                   }}
                 >
-                  Prowadź trening
+                  {partners.length ? 'Prowadź w parze' : 'Prowadź trening'}
                 </button>
                 <button
                   type="button"
@@ -139,6 +153,40 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
             }}
           />
         </Field>
+        <div className="field field-wide">
+          <span>Trening w parze / grupie</span>
+          <div className="pair-chips">
+            {partners.map((id) => {
+              const pa = group.find((x) => x.clientId === id);
+              return (
+                <span key={id} className="pair-chip">
+                  👥 {clientById(db, id)?.name ?? '—'}
+                  {pa && pa.status !== 'planned' && <i className="muted small"> · {APPT_STATUS[pa.status].label.toLowerCase()}</i>}
+                  <button type="button" className="icon-btn icon-btn-sm" aria-label={`Usuń ${clientById(db, id)?.name ?? ''} z pary`} onClick={() => setPartners(partners.filter((x) => x !== id))}>
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+            {addingPartner ? (
+              <ClientSelect
+                value=""
+                required={false}
+                onChange={(id) => {
+                  if (id && id !== clientId && !partners.includes(id)) setPartners([...partners, id]);
+                  setAddingPartner(false);
+                }}
+              />
+            ) : (
+              partners.length < 3 && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingPartner(true)} disabled={!clientId}>
+                  + {partners.length ? 'kolejna osoba' : 'dodaj osobę (w parze)'}
+                </button>
+              )
+            )}
+          </div>
+          {partners.length > 0 && <span className="muted small">Każda osoba ma swoją wizytę, status, trening i rozliczenie. Godzina, czas i miejsce są wspólne.</span>}
+        </div>
         <Field label="Data">
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
@@ -152,7 +200,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           <LocationSelect value={locationId} onChange={(v) => { setLocationId(v); setLocation(''); }} />
         </Field>
         {editing && (
-          <Field label="Status" wide>
+          <Field label={partners.length ? `Status — ${cl?.name.split(' ')[0] ?? ''}` : 'Status'} wide>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as AppointmentStatus)}>
               {(Object.keys(APPT_STATUS) as AppointmentStatus[]).map((s) => (
                 <option key={s} value={s}>

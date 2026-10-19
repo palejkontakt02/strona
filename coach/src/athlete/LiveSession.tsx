@@ -6,10 +6,30 @@ import { dropUnsavedVideos } from '../data/videos';
 import { fmtDay, nEx } from '../format';
 import { todayISO } from '../lib/dates';
 import { currentPlan, doneInPass, nextWorkout, planSequence } from '../lib/plan';
-import { buildRun, emptyRun, sessionToRun, type Run } from '../lib/run';
+import { buildRun, buildRunExercise, emptyRun, sessionToRun, type Run } from '../lib/run';
+import type { Db } from '../data/db';
 import { loadRun, storeRun } from './AthleteApp';
 import { Player } from './Player';
 import { runFromStart, type RunStart } from './start';
+
+/**
+ * Ten sam trening co partner: jednostka z planu partnera przeliczona na historię tej osoby
+ * (ciężary z jej e1RM / testów); bez planu — ćwiczenia i serie partnera, ciężar do wpisania.
+ */
+export function sameAsPartner(pr: Run, db: Db, clientId: string, date: string): Run {
+  const sessions = sessionsOf(db, clientId);
+  const tests = clientById(db, clientId)?.tests ?? [];
+  const src = db.plans.find((p) => p.id === pr.planId);
+  const wo = src && planSequence(src).find((x) => x.workout.id === pr.workoutId)?.workout;
+  const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
+  const ex = pr.ex.map((e) => {
+    const pe = wo?.exercises.find((x) => x.name === e.name);
+    if (pe) return { ...buildRunExercise(pe, sessions, videos[e.name], tests), label: e.label, linked: e.linked };
+    return { ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0, video: undefined, load: e.cardio ? x.load : '', rpe: '', hr: '', prev: undefined, sug: '' })) };
+  });
+  // to nie jest jednostka z planu tej osoby — bez przesuwania jej „następnego treningu”
+  return { ...emptyRun(pr.name, date), ex };
+}
 
 /**
  * Trener prowadzi trening 1:1 na żywo: wybór jednostki z planu (albo pusty trening),
@@ -22,12 +42,27 @@ export function LiveSession({
   editSessionId,
   start: initial,
   onExit,
+  pairWith,
+  hidden,
+  onDone,
+  onChange,
+  onRest,
 }: {
   clientId: string;
   appointmentId?: string;
   editSessionId?: string;
   start?: RunStart;
   onExit: () => void;
+  /** Trening w parze / grupie: pozostałe osoby (pasek z przełączaniem rysuje PairLive). */
+  pairWith?: string[];
+  /** W parze: ta osoba nie jest teraz na ekranie (stan i przerwa trwają dalej). */
+  hidden?: boolean;
+  /** W parze: trening tej osoby zapisany / anulowany — przejdź do kolejnej zamiast wychodzić. */
+  onDone?: () => void;
+  /** W parze: zmiana postępu (do paska z osobami). */
+  onChange?: () => void;
+  /** W parze: koniec przerwy tej osoby (null = bez przerwy). */
+  onRest?: (end: number | null) => void;
 }) {
   const { db, toast, ask } = useStore();
   const client = clientById(db, clientId);
@@ -40,11 +75,16 @@ export function LiveSession({
     return stored && !stored.editSessionId ? stored : null;
   });
   // Trening uruchomiony z wizyty pamięta ją, także po wyjściu do panelu i powrocie przez pasek.
-  const setRun = (r: Run | null) => setRunState(r && !r.editSessionId && appointmentId && !r.appointmentId ? { ...r, appointmentId } : r);
+  const pair = !!pairWith?.length;
+  const setRun = (r: Run | null) =>
+    setRunState(r && !r.editSessionId ? { ...r, appointmentId: r.appointmentId ?? appointmentId, pairWith: pair ? pairWith : r.pairWith } : r);
+  const finish = onDone ?? onExit;
   const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!editing) storeRun(clientId, run, 'live');
+    onChange?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, run, editing]);
   // Start od razu z wybranego treningu (lista treningów, historia); trening w toku zastępujemy tylko po potwierdzeniu.
   const started = useRef(false);
@@ -105,8 +145,8 @@ export function LiveSession({
   };
 
   return (
-    <div className="ath">
-      <div className="ath-preview live-bar">
+    <div className="ath" style={hidden ? { display: 'none' } : undefined}>
+      {!pair && <div className="ath-preview live-bar">
         <span className="row-inline">
           <Avatar name={client.name} size={24} /> Trening na żywo · {client.name}
         </span>
@@ -119,10 +159,12 @@ export function LiveSession({
         >
           ‹ Panel
         </button>
-      </div>
+      </div>}
+      {pair && <p className="pair-who">Prowadzisz: <b>{client.name}</b></p>}
       {run ? (
         <Player
           mode="trainer"
+          onRest={onRest}
           client={client}
           run={run}
           setRun={setRun}
@@ -148,13 +190,13 @@ export function LiveSession({
               storeRun(clientId, null, 'live');
             }
             setRun(null);
-            toast(editing ? 'Poprawki anulowane.' : 'Trening anulowany.');
-            onExit();
+            toast(editing ? 'Poprawki anulowane.' : pair ? `Trening anulowany (${client.name.split(' ')[0]}).` : 'Trening anulowany.');
+            finish();
           }}
           onSaved={() => {
             if (!editing) storeRun(clientId, null, 'live');
             setRun(null);
-            onExit();
+            finish();
           }}
         />
       ) : (
@@ -192,6 +234,29 @@ export function LiveSession({
               </section>
             );
           })()}
+          {pair &&
+            pairWith!.map((pid) => {
+              // ten sam trening co partner: ćwiczenia partnera, ciężary z historii tej osoby
+              const pr = loadRun(pid, 'live');
+              const pc = clientById(db, pid);
+              if (!pr || !pr.ex.length || !pc) return null;
+              return (
+                <section key={pid} className="acard">
+                  <span className="eyebrow">W parze z {pc.name.split(' ')[0]}</span>
+                  <h3>Ten sam trening: {pr.name}</h3>
+                  <p className="muted small">{nEx(pr.ex.length)} — ciężary dobrane z historii {client.name.split(' ')[0]}.</p>
+                  <button
+                    className="btn btn-secondary btn-lg"
+                    onClick={() => {
+                      setRun(sameAsPartner(pr, db, clientId, todayISO()));
+                      window.scrollTo(0, 0);
+                    }}
+                  >
+                    <Icon name="play" /> Start — ten sam co {pc.name.split(' ')[0]}
+                  </button>
+                </section>
+              );
+            })}
           {nx && (
             <section className="acard acard-hero">
               <span className="eyebrow">Następny z planu</span>
@@ -262,6 +327,126 @@ export function LiveSession({
             </section>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Trening w parze / małej grupie: każda osoba ma swój trening, ciężary, przerwę i rozliczenie;
+ * trener przełącza się między nimi jednym dotknięciem (trening drugiej osoby trwa dalej).
+ */
+export function PairLive({ people: initial, onExit }: { people: { clientId: string; appointmentId?: string }[]; onExit: () => void }) {
+  const { db, ask, toast } = useStore();
+  const [people, setPeople] = useState(initial);
+  const [active, setActive] = useState(initial[0]?.clientId);
+  const [done, setDone] = useState<string[]>([]);
+  const [, setTick] = useState(0);
+  const [adding, setAdding] = useState(false);
+  // przerwy osób (koniec, ms) — odliczanie na zakładce osoby, której nie widać
+  const [rests, setRests] = useState<Record<string, number | null>>({});
+  const restCb = useRef<Record<string, (end: number | null) => void>>({});
+  const onRestOf = (id: string) => (restCb.current[id] ??= (end) => setRests((r) => (r[id] === end ? r : { ...r, [id]: end })));
+  const anyRest = Object.values(rests).some((e) => e != null);
+  useEffect(() => {
+    if (!anyRest) return;
+    const t = window.setInterval(() => setTick((x) => x + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [anyRest]);
+  const ids = people.map((x) => x.clientId);
+  const left = ids.filter((id) => !done.includes(id));
+  const progress = (id: string) => {
+    const r = loadRun(id, 'live');
+    if (!r) return null;
+    return { d: r.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0), t: r.ex.reduce((a, e) => a + e.sets.length, 0) };
+  };
+  const finished = (id: string) => {
+    const rest = left.filter((x) => x !== id);
+    setDone((d) => [...d, id]);
+    if (!rest.length) return onExit();
+    setActive(rest[0]);
+    window.scrollTo(0, 0);
+    toast(`Teraz: ${clientById(db, rest[0])?.name ?? ''}`);
+  };
+  return (
+    <div className="pair-live">
+      <div className="ath-preview live-bar pair-bar">
+        <div className="pair-tabs" role="tablist" aria-label="Osoby w treningu">
+          {people.map(({ clientId: id }) => {
+            const c = clientById(db, id);
+            const p = progress(id);
+            const isDone = done.includes(id);
+            return (
+              <button key={id} role="tab" aria-selected={active === id} className={`pair-tab ${active === id ? 'active' : ''} ${isDone ? 'done' : ''}`} onClick={() => (setActive(id), window.scrollTo(0, 0))} disabled={isDone}>
+                <Avatar name={c?.name ?? '?'} size={22} />
+                <span className="pair-name">{c?.name.split(' ')[0] ?? '—'}</span>
+                <span className="pair-prog">{isDone ? '✓ zapisany' : p ? `${p.d}/${p.t}` : 'wybór'}</span>
+                {(() => {
+                  // przerwa osoby niewidocznej na ekranie: odliczanie, potem „gotowy”
+                  const end = rests[id];
+                  if (end == null || active === id || isDone) return null;
+                  const sec = Math.round((end - Date.now()) / 1000);
+                  return sec > 0 ? <span className="pair-rest">⏱ {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span> : <span className="pair-rest ready">gotowy</span>;
+                })()}
+              </button>
+            );
+          })}
+          {people.length < 4 && !adding && (
+            <button className="pair-tab pair-add" onClick={() => setAdding(true)} aria-label="Dodaj osobę do treningu">
+              +
+            </button>
+          )}
+          {adding && (
+            <select
+              className="input input-sm"
+              value=""
+              aria-label="Dodaj osobę do treningu"
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id && !ids.includes(id)) {
+                  setPeople([...people, { clientId: id }]);
+                  setActive(id);
+                }
+                setAdding(false);
+              }}
+              onBlur={() => setAdding(false)}
+            >
+              <option value="">Dodaj osobę…</option>
+              {db.clients
+                .filter((c) => c.status === 'aktywny' && !ids.includes(c.id))
+                .sort((a, b) => a.name.localeCompare(b.name, 'pl'))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={async () => {
+            if (left.length && left.some((id) => progress(id)?.d) && !(await ask('Wyjść do panelu? Treningi w toku zostaną — wrócisz do nich z paska „W toku”.', { confirm: 'Wyjdź', danger: false }))) return;
+            onExit();
+          }}
+        >
+          ‹ Panel
+        </button>
+      </div>
+      {people.map(({ clientId: id, appointmentId }) =>
+        done.includes(id) ? null : (
+          <LiveSession
+            key={id}
+            clientId={id}
+            appointmentId={appointmentId}
+            pairWith={ids.filter((x) => x !== id)}
+            hidden={active !== id}
+            onExit={onExit}
+            onDone={() => finished(id)}
+            onChange={() => setTick((t) => t + 1)}
+            onRest={onRestOf(id)}
+          />
+        ),
       )}
     </div>
   );

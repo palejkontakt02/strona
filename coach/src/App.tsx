@@ -6,7 +6,8 @@ import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
 import { CLIENT_TABS, NavCtx, SECTIONS, type ClientTab, type ModalState, type NavValue, type Section } from './nav';
 import { AthleteApp, loadRun } from './athlete/AthleteApp';
-import { LiveSession } from './athlete/LiveSession';
+import { LiveSession, PairLive } from './athlete/LiveSession';
+import { groupOf } from './data/ops';
 import { useStore } from './data/store';
 import { CalendarView } from './views/CalendarView';
 import { ClientsView } from './views/ClientsView';
@@ -28,7 +29,7 @@ export function App() {
   const [clientTab, setClientTab] = useState<ClientTab>('Przegląd');
   const [modal, setModal] = useState<ModalState | null>(null);
   const [athlete, setAthlete] = useState<{ id: string; start?: RunStart } | null>(null);
-  const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart } | null>(null);
+  const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart; pair?: { clientId: string; appointmentId?: string }[] } | null>(null);
   const [bannerOpen, setBannerOpen] = useState(false);
   const { db } = useStore();
 
@@ -70,6 +71,16 @@ export function App() {
   );
 
   if (live) {
+    // trening w parze / grupie: z wizyty z partnerami albo wznowiony z paska „W toku”
+    const appt = live.appointmentId ? db.appointments.find((a) => a.id === live.appointmentId) : undefined;
+    const group = appt && !live.editSessionId && !live.start ? groupOf(db.appointments, appt).filter((a) => a.status !== 'cancel' && a.status !== 'noshow' && !a.sessionId) : [];
+    const pair = live.pair ?? (group.length > 1 ? [appt!, ...group.filter((a) => a.id !== appt!.id)].map((a) => ({ clientId: a.clientId, appointmentId: a.id })) : null);
+    if (pair && pair.length > 1)
+      return (
+        <NavCtx.Provider value={nav}>
+          <PairLive people={pair} onExit={() => setLive(null)} />
+        </NavCtx.Provider>
+      );
     return (
       <NavCtx.Provider value={nav}>
         <LiveSession clientId={live.clientId} appointmentId={live.appointmentId} editSessionId={live.editSessionId} start={live.start} onExit={() => setLive(null)} />
@@ -128,9 +139,17 @@ export function App() {
           )}
           {(running.length === 1 || bannerOpen) &&
             running.map(({ c, run }) => (
-              <button key={c.id} className={running.length > 1 ? 'live-sub' : ''} onClick={() => setLive({ clientId: c.id })}>
+              <button
+                key={c.id}
+                className={running.length > 1 ? 'live-sub' : ''}
+                onClick={() => {
+                  // trening w parze wraca razem z partnerami, którzy dalej mają trening w toku
+                  const others = (run!.pairWith ?? []).filter((id) => loadRun(id, 'live'));
+                  setLive(others.length ? { clientId: c.id, pair: [c.id, ...others].map((id) => ({ clientId: id, appointmentId: loadRun(id, 'live')?.appointmentId })) } : { clientId: c.id });
+                }}
+              >
                 <span className="live-dot" />
-                <span className="live-label">Trening w toku:</span>
+                <span className="live-label">{run!.pairWith?.length ? 'W parze:' : 'Trening w toku:'}</span>
                 <b>{c.name}</b>
                 <span className="muted small">
                   {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
