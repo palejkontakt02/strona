@@ -9,9 +9,9 @@ import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
-import { cardioByName, perSideByName, buildRunExercise } from '../lib/run';
+import { cardioByName, isTimed, perSideByName, buildRunExercise } from '../lib/run';
 import { fmtClock, paceText, parseDur, parseKm } from '../lib/running';
-import { num, numIn, repsN, sidesOf, timeUnit } from '../lib/parse';
+import { num, numIn, repsN, secOf, sidesOf, timeUnit } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
 import { bestE1, resolveLoad } from '../lib/strength';
 import { WELLNESS_ITEMS } from '../lib/wellness';
@@ -36,6 +36,8 @@ interface ExRow {
   /** Powtórzenia na każdą stronę. */
   perSide?: boolean;
   cardio?: boolean;
+  /** Serie na czas (sekundy). */
+  timed?: boolean;
 }
 
 /** Blok odczytany z oznaczenia: „B2”, „C3” → połączone z poprzednim. */
@@ -81,7 +83,7 @@ const fromLog = (log: NonNullable<SessionExercise['setsLog']>, cardio?: boolean)
     dist: x.dist != null ? fnum(x.dist) : undefined,
     hr: x.hr != null ? String(x.hr) : undefined,
   }));
-const toLog = (d: SetDraft[], cardio?: boolean): NonNullable<SessionExercise['setsLog']> =>
+const toLog = (d: SetDraft[], cardio?: boolean, timed?: boolean): NonNullable<SessionExercise['setsLog']> =>
   d
     .filter((x) => x.load.trim() || x.reps.trim() || x.rpe.trim() || x.video || (x.dist ?? '').trim())
     .map((x) => {
@@ -103,10 +105,10 @@ const toLog = (d: SetDraft[], cardio?: boolean): NonNullable<SessionExercise['se
         return out;
       }
       const load = num(x.load);
-      // „30 s”, „2 min” — seria na czas; „30/20” — lewa/prawa
-      const unit = timeUnit(x.reps);
+      // „30 s”, „2 min” — seria na czas; „30/20” — lewa/prawa; ćwiczenie „na czas” — sekundy (też „1:30”)
+      const unit = timed ? 's' : timeUnit(x.reps);
       const lr = sidesOf(x.reps);
-      const reps = lr ? lr[0] : unit ? repsN(x.reps) : numIn(x.reps, 0, 10000);
+      const reps = lr ? lr[0] : timed ? secOf(x.reps) : unit ? repsN(x.reps) : numIn(x.reps, 0, 10000);
       if (unit) out.unit = unit;
       if (lr && lr[1] !== lr[0]) out.repsR = lr[1];
       const rpe = numIn(x.rpe, 0, 10);
@@ -132,7 +134,7 @@ const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
   return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio, timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -228,6 +230,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           linked: e.linked,
           perSide: e.perSide ?? (perSideByName(e.name) || undefined),
           cardio: e.cardio ?? (cardioByName(e.name) || undefined),
+          timed: isTimed(e) || undefined,
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
           series: buildRunExercise(e, history, undefined, client?.tests ?? []).sets.map((x) => ({
             key: uid(),
@@ -306,7 +309,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         ...(r.series ? { ...seriesSummary(r.series, r.reps), rpe: '' } : { sets: r.sets, reps: r.reps, load: r.load, rpe: r.rpe }),
         rest: r.rest || undefined,
         notes: r.notes || undefined,
-        setsLog: r.series ? toLog(r.series, r.cardio) : undefined,
+        setsLog: r.series ? toLog(r.series, r.cardio, r.timed) : undefined,
+        timed: r.timed || undefined,
         perSide: r.perSide || undefined,
         cardio: r.cardio || undefined,
       })),
@@ -496,6 +500,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <input className="input ex-notes" value={r.notes} onChange={(e) => setRow(i, { notes: e.target.value })} placeholder="Uwagi (np. tempo 3-1-X-0)" aria-label="Uwagi" />
             {r.hint && !r.series && <span className="ex-hint">Podpowiedź: {r.hint}</span>}
             {!r.cardio && (
+              <button type="button" className={`side-toggle ${r.timed ? 'on' : ''}`} aria-pressed={!!r.timed} onClick={() => setRow(i, { timed: !r.timed || undefined })}>
+                ⏱ {r.timed ? 'Na czas — sekundy w miejscu powtórzeń' : 'Na czas?'}
+              </button>
+            )}
+            {!r.cardio && (
               <button type="button" className={`side-toggle ${r.perSide ? 'on' : ''}`} aria-pressed={!!r.perSide} onClick={() => setRow(i, { perSide: !r.perSide || undefined })}>
                 ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
               </button>
@@ -517,7 +526,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               <div className="set-edit">
                 <div className={`set-edit-head ${r.cardio ? 'cardio' : ''}`}>
                   <span>#</span>
-                  <span>{r.cardio ? 'czas' : 'powt.'}</span>
+                  <span>{r.cardio || r.timed ? 'czas' : 'powt.'}</span>
                   <span>{r.cardio ? 'km' : 'kg'}</span>
                   {r.cardio && <span>tętno</span>}
                   <span>RPE</span>
@@ -545,7 +554,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                       <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Seria ${k + 1}: rozgrzewka` : `Seria ${k + 1}: robocza`} title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                         {x.warmup ? 'R' : workNo}
                       </button>
-                      <input className="input" inputMode="numeric" value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`Powtórzenia, seria ${k + 1}`} placeholder="powt." />
+                      <input className="input" inputMode={r.timed ? 'text' : 'numeric'} value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`${r.timed ? 'Czas' : 'Powtórzenia'}, seria ${k + 1}`} placeholder={r.timed ? 's' : 'powt.'} />
                       <input className="input" inputMode="decimal" value={x.load} onChange={(e) => upd({ load: e.target.value })} aria-label={`Ciężar, seria ${k + 1}`} placeholder="kg" />
                       <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, seria ${k + 1}`} placeholder={x.tRpe ? `cel ${x.tRpe}` : 'RPE'} />
                       {clientId ? <SetVideoButton clientId={clientId} video={x.video} title={`${r.name || 'Ćwiczenie'} · seria ${k + 1}`} onChange={(video) => upd({ video })} /> : <span />}

@@ -11,12 +11,13 @@ import { useStore } from '../data/store';
 import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
-import { num, numIn, repsN, sidesOf, sumReps } from '../lib/parse';
+import { fmtSec as fmtHold, num, numIn, repsN, secOf, sidesOf, sumReps } from '../lib/parse';
 import { recentE1 } from '../lib/strength';
 import { emptyRunExercise, fmtDur, paceText, parseDur, parseKm, recoverySec, targetText } from '../lib/running';
 import {
   adHocCardio,
   adHocExercise,
+  timedByName,
   appendExercise,
   applyRunLayout,
   blockRest,
@@ -164,9 +165,15 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       return;
     }
     const hasPrev = ex.sets.slice(0, i).some((x) => x.done && !x.warmup);
-    if (!s.warmup && !hasPrev && !s.reps.trim()) return toast('Wpisz liczbę powtórzeń.');
-    if (s.reps.trim() && !/\d/.test(s.reps)) return toast('Powtórzenia: wpisz liczbę.');
-    if (s.reps.trim() && sumReps(s.reps) === 0) return toast('Powtórzenia: co najmniej 1.');
+    if (s.unit === 's') {
+      // seria na czas: sekundy, m:ss albo „2 min”; na stronę „30/25”
+      if (!s.warmup && !hasPrev && !s.reps.trim()) return toast('Wpisz czas serii (np. 30 albo 1:30).');
+      if (s.reps.trim() && !sidesOf(s.reps) && !secOf(s.reps)) return toast('Czas: sekundy (np. 45), minuty:sekundy (1:30) albo „2 min”.');
+    } else {
+      if (!s.warmup && !hasPrev && !s.reps.trim()) return toast('Wpisz liczbę powtórzeń.');
+      if (s.reps.trim() && !/\d/.test(s.reps)) return toast('Powtórzenia: wpisz liczbę.');
+      if (s.reps.trim() && sumReps(s.reps) === 0) return toast('Powtórzenia: co najmniej 1.');
+    }
     if (s.load.trim() && !/^\s*-?\d+([.,]\d+)?\s*(kg)?\s*$/i.test(s.load)) return toast(`Ciężar „${s.load.trim()}” — wpisz samą liczbę, np. 42,5.`);
     const load = num(s.load);
     if (load != null && load < 0) return toast('Ciężar nie może być ujemny.');
@@ -362,7 +369,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               })()}
             </span>
           ) : (
-            <input inputMode="numeric" value={s.reps} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+            <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
           )}
           {!run.ex[k].cardio && (
             <>
@@ -385,15 +392,15 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         )}
         {s.sug && !s.done && !run.ex[k].cardio && <div className="sughint">{s.sug}</div>}
         {s.prev && !s.sug && <div className="prevhint">poprzednio: {s.prev}</div>}
-        {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) > 0) && (
+        {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : holdSec(s) > 0) && (
           <button
             className="link small hold-start"
             onClick={() => {
-              const sec = run.ex[k].cardio ? Math.round((parseDur(s.reps) ?? 0) * 60) : (repsN(sidesOf(s.reps)?.[0] ?? s.reps) ?? 0) * (s.unit === 'min' ? 60 : 1);
+              const sec = run.ex[k].cardio ? Math.round((parseDur(s.reps) ?? 0) * 60) : holdSec(s);
               setHold({ end: Date.now() + sec * 1000, total: sec });
             }}
           >
-            ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : `${s.reps.split('/')[0]} ${s.unit === 'min' ? 'min' : 's'}`}
+            ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
             {run.ex[k].perSide ? ' (jedna strona)' : ''}
           </button>
         )}
@@ -480,6 +487,24 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             title="Cardio: czas, dystans i tętno zamiast powtórzeń i ciężaru"
           >
             🫀 {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
+          </button>
+        )}
+        {!e.cardio && !e.sets.some((x) => x.done) && (
+          <button
+            type="button"
+            className={`side-toggle ${e.timed ? 'on' : ''}`}
+            aria-pressed={!!e.timed}
+            onClick={() =>
+              update((r) => {
+                const x = r.ex[k];
+                x.timed = !x.timed || undefined;
+                // na czas: sekundy w miejscu powtórzeń (wpisane liczby zostają)
+                x.sets = x.sets.map((st) => ({ ...st, unit: x.timed ? 's' : undefined, reps: x.timed ? st.reps : st.reps.replace(/\s*s$/i, ''), sug: x.timed ? '' : st.sug }));
+              })
+            }
+            title="Ćwiczenie na czas (deska, wall sit, zwis): wpisujesz sekundy zamiast powtórzeń"
+          >
+            ⏱ {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
           </button>
         )}
         {!e.cardio && (
@@ -664,8 +689,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         <AddExercise
           onCancel={run.ex.length ? () => setAdding(false) : undefined}
           canLink={run.ex.length > 0}
-          onAdd={(name, sets, reps, load, linked) => {
-            const next = appendExercise(run, adHocExercise(name, sets, reps, load));
+          onAdd={(name, sets, reps, load, linked, timed) => {
+            const next = appendExercise(run, adHocExercise(name, sets, reps, load, '2:00', !!timed));
             setRun(linked ? toggleLink(next, next.ex.length - 1) : next);
             setAdding(false);
             window.scrollTo(0, 0);
@@ -833,6 +858,14 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 }
 
 /** Nagłówek kolumny powtórzeń: „powt.”, „sek.”, „min”, z „/str.” dla ćwiczeń na stronę (L | P). */
+/** Czas serii do odliczania (s): pierwsza strona przy „30/20”, „1:30”, „2 min”. */
+function holdSec(s: RunSet): number {
+  const side = sidesOf(s.reps)?.[0];
+  if (side != null) return Math.round(side * (s.unit === 'min' ? 60 : 1));
+  if (s.unit === 'min') return Math.round((repsN(s.reps) ?? 0) * 60);
+  return secOf(s.reps) ?? 0;
+}
+
 function repsHead(e: RunExercise): string {
   const u = e.sets.find((x) => !x.warmup)?.unit;
   const base = u === 's' ? 'sek.' : u === 'min' ? 'min' : 'powt.';
@@ -988,7 +1021,7 @@ function AddExercise({
 }: {
   profile?: RunProfile;
   dob?: string;
-  onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean) => void;
+  onAdd: (name: string, sets: number, reps: string, load: string, linked: boolean, timed?: boolean) => void;
   onCardio: (name: string, bouts: number, minutes: string, km: string) => void;
   onTemplate: (e: PlanExercise) => void;
   onCancel?: () => void;
@@ -1016,6 +1049,9 @@ function AddExercise({
   const [name, setName] = useState('');
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8');
+  const [timedOverride, setTimed] = useState<boolean | null>(null);
+  // „na czas” — z nazwy (deska, wall sit…), chyba że zmienione ręcznie
+  const timedMode = timedOverride ?? timedByName(name);
   const [load, setLoad] = useState('');
   const [linked, setLinked] = useState(false);
   const [bouts, setBouts] = useState('1');
@@ -1117,11 +1153,30 @@ function AddExercise({
         const n = numIn(sets, 1, 20);
         if (n == null || !Number.isInteger(n)) return toast('Serie: od 1 do 20.');
         if (load.trim() && (num(load) == null || num(load)! < 0)) return toast('Ciężar: wpisz liczbę kg albo zostaw puste.');
-        onAdd(name.trim(), n, reps.trim() || '8', load.replace(',', '.'), linked);
+        if (timedMode && reps.trim() && !secOf(reps)) return toast('Czas: sekundy (np. 45), minuty:sekundy (1:30) albo „2 min”.');
+        onAdd(name.trim(), n, reps.trim() || (timedMode ? '30' : '8'), load.replace(',', '.'), linked, timedMode);
       }}
     >
       {tabs}
       <h3>Dodaj ćwiczenie</h3>
+      <div className="seg seg-sm" role="radiogroup" aria-label="Powtórzenia czy czas">
+        {([false, true] as const).map((v) => (
+          <button
+            key={String(v)}
+            type="button"
+            role="radio"
+            aria-checked={timedMode === v}
+            className={timedMode === v ? 'active' : ''}
+            onClick={() => {
+              setTimed(v);
+              if (v && reps === '8') setReps('30');
+              if (!v && reps === '30') setReps('8');
+            }}
+          >
+            {v ? '⏱ Na czas' : 'Powtórzenia'}
+          </button>
+        ))}
+      </div>
       <datalist id="run-lib">
         {db.library.map((e) => (
           <option key={e.id} value={e.name} />
@@ -1137,8 +1192,8 @@ function AddExercise({
           <input className="input" inputMode="numeric" value={sets} onChange={(ev) => setSets(ev.target.value)} />
         </label>
         <label className="field">
-          <span>Powt.</span>
-          <input className="input" value={reps} onChange={(ev) => setReps(ev.target.value)} />
+          <span>{timedMode ? 'Czas (s)' : 'Powt.'}</span>
+          <input className="input" value={reps} placeholder={timedMode ? 'np. 45 / 1:30' : undefined} onChange={(ev) => setReps(ev.target.value)} />
         </label>
         <label className="field">
           <span>kg</span>

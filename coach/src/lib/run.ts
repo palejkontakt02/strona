@@ -1,5 +1,5 @@
 import type { PlanExercise, PlanWorkout, SetType, TestResult, TrainingSession } from '../domain';
-import { num, numIn, parseRest, parseTempo, repsN, sidesOf, sumReps, timeUnit } from './parse';
+import { num, numIn, parseRest, parseTempo, repsN, secOf, sidesOf, sumReps, timeUnit } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
 import { e1rmRPE, loadFor, recentE1, resolveLoad, testedMax } from './strength';
 import { fmtClock, fmtKm, isRunning, parseDur, parseKm } from './running';
@@ -53,6 +53,8 @@ export interface RunExercise {
   video?: string;
   /** Powtórzenia na każdą stronę (jednostronne). */
   perSide?: boolean;
+  /** Serie na czas (sekundy) zamiast powtórzeń. */
+  timed?: boolean;
   /** Cardio: wiersz = odcinek (min, km, tętno, RPE). */
   cardio?: boolean;
   sets: RunSet[];
@@ -61,6 +63,17 @@ export interface RunExercise {
 /** Nazwy aktywności cardio (domyślnie tryb cardio, da się przełączyć). */
 export function cardioByName(name: string): boolean {
   return isRunning(name) || /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|marsz|spacer|nordic|pływani|skakank|schody|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name);
+}
+
+/** Nazwy ćwiczeń zwykle robionych na czas (domyślnie „na czas”, da się wyłączyć). */
+export function timedByName(name: string): boolean {
+  return /\bdesk|plank|wall ?sit|krzesełk|\bzwis|dead ?hang|hollow|izometr|\bl-?sit\b|wytrzym|utrzymani|\bhold\b|farmer|spacer farmera|copenhagen|side plank|mostek bokiem/i.test(name);
+}
+
+/** Ćwiczenie z planu na czas: ustawione ręcznie, z nazwy albo z zapisu serii („30 s”). */
+export function isTimed(e: Pick<PlanExercise, 'name' | 'timed' | 'cardio' | 'groups'>): boolean {
+  if (e.cardio ?? cardioByName(e.name)) return false;
+  return e.timed ?? (timedByName(e.name) || e.groups.some((g) => g.type !== 'Rozgrzewka' && timeUnit(g.reps) != null));
 }
 
 /** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
@@ -117,6 +130,7 @@ function cardioDesc(g: { type: string; sets?: string; reps: string; load: string
 
 export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string, tests: TestResult[] = []): RunExercise {
   const cardio = e.cardio ?? cardioByName(e.name);
+  const timed = isTimed(e);
   // %1RM: test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
   const tm = testedMax(tests, e.name);
   const lastDate = history.filter((s) => s.exercises.some((x) => x.name === e.name)).reduce((a, s) => (s.date > a ? s.date : a), '');
@@ -172,7 +186,17 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     video,
     perSide: cardio ? undefined : e.perSide ?? (perSideByName(e.name) || undefined),
     cardio: cardio || undefined,
-    sets: cardio
+    timed: timed || undefined,
+    sets: timed
+      ? sets.map((x) => {
+          // seria na czas: sekundy z planu („30”, „1:30”, „2 min”); L/P „30/20” zostaje
+          const raw = mergeGroups(e.groups)[x.gi ?? 0]?.reps ?? '';
+          const sec = secOf(raw);
+          // ciężar tylko wpisany w planie (np. deska z obciążeniem) — bez doboru z e1RM, które przy czasie nie ma sensu
+          const fixed = !!x.spec && /\d/.test(x.spec) && !/%/.test(x.spec);
+          return { ...x, unit: 's' as const, reps: sec != null ? String(sec) : raw.trim().replace(/\s*s$/i, ''), load: fixed ? x.load : '', sug: '' };
+        })
+      : cardio
       ? sets.map((x) => {
           // odcinek: czas tak jak w planie („15”, „0:30”), dystans w km, cel tempa / strefy
           const gr = mergeGroups(e.groups)[x.gi ?? 0];
@@ -220,10 +244,11 @@ export function adHocCardio(name: string, bouts: number, minutes: string, km: st
   };
 }
 
-export function adHocExercise(name: string, sets: number, reps: string, load: string, rest = '2:00'): RunExercise {
+export function adHocExercise(name: string, sets: number, reps: string, load: string, rest = '2:00', timed = false): RunExercise {
   return {
     name,
     perSide: perSideByName(name) || undefined,
+    timed: timed || undefined,
     rest,
     tempo: null,
     tempoStr: '',
@@ -239,6 +264,7 @@ export function adHocExercise(name: string, sets: number, reps: string, load: st
       tRpe: '',
       spec: load,
       rest: '',
+      ...(timed ? { unit: 's' as const, reps: String(secOf(reps) ?? reps) } : {}),
     })),
   };
 }
@@ -324,7 +350,8 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
 
   const j = sets.findIndex((x, k) => k > i && !x.done && !x.warmup);
   // bez RPE (ani wpisanego, ani celu z planu) nie zgadujemy — następna seria bierze ten sam ciężar
-  if (!s.rpe && !myR) {
+  // seria na czas: bez autoregulacji ciężaru (e1RM z sekund nie ma sensu) — następna z tym samym ciężarem
+  if ((!s.rpe && !myR) || s.unit) {
     if (j > -1 && !sets[j].edited && !sets[j].load && !sets[j].spec) sets[j].load = s.load;
     return { sets, rest: parseRest(s.rest || ex.rest) || 120 };
   }
@@ -380,7 +407,7 @@ export function runToExercises(run: Run) {
         const unit = s.unit ?? timeUnit(s.reps) ?? undefined;
         const lr = e.perSide ? sidesOf(s.reps) : null;
         // różny wynik na stronę (30/20): reps = lewa, repsR = prawa; ten sam — jedna liczba
-        const reps = lr ? lr[0] : unit ? repsN(s.reps) ?? undefined : sumReps(s.reps) ?? undefined;
+        const reps = lr ? lr[0] : unit === 's' ? secOf(s.reps) ?? repsN(s.reps) ?? undefined : unit ? repsN(s.reps) ?? undefined : sumReps(s.reps) ?? undefined;
         const repsR = lr && lr[1] !== lr[0] ? lr[1] : undefined;
         return { load: num(s.load) ?? undefined, reps, repsR, unit, rpe: numIn(s.rpe, 0, 10) ?? undefined, warmup: s.warmup || undefined, label: s.label, complex: cx, video: s.video };
       });
@@ -404,6 +431,7 @@ export function runToExercises(run: Run) {
       setsLog: log,
       perSide: e.perSide || undefined,
       cardio: e.cardio || undefined,
+      timed: e.timed || undefined,
     };
   }).filter((e) => e.setsLog.length > 0);
 }
@@ -488,6 +516,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       notes: e.notes ?? '',
       perSide: e.perSide || undefined,
       cardio: e.cardio || undefined,
+      timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined,
       sets,
     };
   });

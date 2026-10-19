@@ -1,4 +1,4 @@
-import { cardioByName, perSideByName } from '../../lib/run';
+import { cardioByName, isTimed, perSideByName } from '../../lib/run';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
@@ -158,7 +158,7 @@ export function ClientPlans({ client }: { client: Client }) {
                                   <span>
                                     <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                                   </span>
-                                  <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} />
+                                  <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} timed={isTimed(e)} />
                                 </li>
                               ))}
                             </ul>
@@ -218,7 +218,7 @@ export function ClientPlans({ client }: { client: Client }) {
                         <span>
                           <span className="ex-label">{exerciseLabels(k.exercises)[ei]}</span> {e.name}
                         </span>
-                        <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} />
+                        <PlanSets groups={e.groups} perSide={e.perSide ?? perSideByName(e.name)} cardio={e.cardio ?? cardioByName(e.name)} timed={isTimed(e)} />
                       </li>
                     ))}
                   </ul>

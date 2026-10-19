@@ -70,6 +70,11 @@ export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; 
     ]
       .filter(Boolean)
       .join(' · ');
+  // na czas od minuty: „1:30” zamiast „90 s”
+  if (x.unit === 's' && x.reps != null && x.reps >= 60 && x.repsR == null) {
+    const t = `${Math.floor(x.reps / 60)}:${String(x.reps % 60).padStart(2, '0')}${perSide ? '/str.' : ''}`;
+    return x.load != null ? `${t} × ${fnum(x.load)} kg` : t;
+  }
   const u = x.unit ? ` ${x.unit === 'min' ? 'min' : 's'}` : '';
   const side = perSide && x.repsR == null ? '/str.' : '';
   const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : fnum(x.reps);

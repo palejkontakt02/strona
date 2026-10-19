@@ -1,6 +1,7 @@
 import type { SetGroup } from '../domain';
 import { expandSets, mergeGroups } from '../lib/plan';
 import { fmtDur, fmtKm, parseDur, parseKm } from '../lib/running';
+import { fmtSec, secOf } from '../lib/parse';
 
 const kg = (load: string) => (/^\d+([.,]\d+)?$/.test(load) ? `${load} kg` : load);
 
@@ -28,8 +29,10 @@ function CardioSets({ groups }: { groups: SetGroup[] }) {
   );
 }
 
-export function PlanSets({ groups, perSide, cardio }: { groups: SetGroup[]; perSide?: boolean; cardio?: boolean }) {
+export function PlanSets({ groups, perSide, cardio, timed }: { groups: SetGroup[]; perSide?: boolean; cardio?: boolean; timed?: boolean }) {
   if (cardio) return <CardioSets groups={groups} />;
+  // na czas: „45 s”, „1:30” zamiast powtórzeń
+  if (timed) groups = groups.map((g) => ({ ...g, reps: secOf(g.reps) != null ? fmtSec(secOf(g.reps)!) : g.reps }));
   let n = 0;
   return (
     <div className="hist-sets">

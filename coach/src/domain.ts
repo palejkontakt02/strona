@@ -211,6 +211,8 @@ export interface PlanExercise {
   notes?: string;
   /** Ćwiczenie jednostronne: powtórzenia liczone na każdą stronę (rękę/nogę). */
   perSide?: boolean;
+  /** Ćwiczenie na czas (deska, wall sit, zwis): w seriach zamiast powtórzeń czas (s, m:ss, „2 min”). */
+  timed?: boolean;
   /** Cardio: w seriach „powt.” = czas (min), „ciężar” = dystans (km). */
   cardio?: boolean;
   groups: SetGroup[];
@@ -282,6 +284,8 @@ export interface SessionExercise {
   setsLog?: SetLog[];
   /** Powtórzenia na każdą stronę (ćwiczenie jednostronne). */
   perSide?: boolean;
+  /** Serie na czas (sekundy). */
+  timed?: boolean;
   /** Cardio: odcinki z czasem, dystansem i tętnem. */
   cardio?: boolean;
 }

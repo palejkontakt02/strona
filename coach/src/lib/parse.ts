@@ -64,6 +64,24 @@ export function timeUnit(v: unknown): 's' | 'min' | null {
   return null;
 }
 
+/** Czas serii w sekundach: „30”, „30 s”, „45''”, „1:30”, „1'30”, „2 min”, „1,5 min” → s. */
+export function secOf(v: unknown): number | null {
+  const t = String(v ?? '').trim().toLowerCase();
+  if (!t) return null;
+  let m = t.match(/^(\d+)\s*[:']\s*(\d{1,2})\s*(?:''|")?$/);
+  if (m) return +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
+  m = t.match(/^(\d+(?:[.,]\d+)?)\s*(min\w*|')$/);
+  if (m) return Math.round(parseFloat(m[1].replace(',', '.')) * 60);
+  m = t.match(/^(\d+(?:[.,]\d+)?)\s*(s|sek\w*|sec\w*|''|")?$/);
+  if (m) return Math.round(parseFloat(m[1].replace(',', '.')));
+  return null;
+}
+
+/** Sekundy do pokazania: 45 → „45 s”, 90 → „1:30”. */
+export function fmtSec(s: number): string {
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 /** Lewa/prawa strona: „30/20” → [30, 20]; jedna liczba → null. */
 export function sidesOf(v: unknown): [number, number] | null {
   const m = String(v ?? '').match(/^\s*(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)\s*[a-ząćęłńóśźż".']*\s*$/i);

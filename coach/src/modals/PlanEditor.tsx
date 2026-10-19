@@ -1,4 +1,4 @@
-import { cardioByName, perSideByName } from '../lib/run';
+import { cardioByName, isTimed, perSideByName } from '../lib/run';
 import { emptyRunExercise, RUN_TEMPLATES } from '../lib/running';
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 
@@ -242,6 +242,17 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
                     </button>
 {!(e.cardio ?? cardioByName(e.name)) && (
+                    <button
+                      type="button"
+                      className={`side-toggle ${isTimed(e) ? 'on' : ''}`}
+                      aria-pressed={isTimed(e)}
+                      onClick={() => setEx((x) => void (x.timed = !isTimed(x)))}
+                      title="Ćwiczenie na czas (deska, wall sit, zwis): w kolumnie „Czas” sekundy, m:ss albo „2 min”"
+                    >
+                      ⏱ {isTimed(e) ? 'Na czas — w serii czas zamiast powtórzeń' : 'Na czas?'}
+                    </button>
+                    )}
+{!(e.cardio ?? cardioByName(e.name)) && (
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
@@ -254,7 +265,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       <div className={`pe-set pe-set-head ${cardio ? 'cardio' : ''}`}>
                         <span>#</span>
                         <span>Typ</span>
-                        <span>{cardio ? 'Czas (min / m:ss)' : 'Powt.'}</span>
+                        <span>{cardio ? 'Czas (min / m:ss)' : isTimed(e) ? 'Czas (s / m:ss)' : 'Powt.'}</span>
                         <span>{cardio ? 'Dystans (km / m)' : 'Ciężar'}</span>
                         {cardio && <span title="Strefa (Z1–Z5, OWB1, BC2…) albo tempo min/km, np. 5:30">Strefa / tempo</span>}
                         <span>RPE</span>
@@ -270,7 +281,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                               </option>
                             ))}
                           </select>
-                          <input className="input" value={g.reps} placeholder={cardio ? 'np. 40 / 3:00' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label={cardio ? 'Czas' : 'Powtórzenia'} />
+                          <input className="input" value={g.reps} placeholder={cardio ? 'np. 40 / 3:00' : isTimed(e) ? 'np. 45' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label={cardio ? 'Czas' : 'Powtórzenia'} />
                           <input className="input" value={g.load} placeholder={cardio ? 'np. 800 m' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label={cardio ? 'Dystans' : 'Ciężar'} />
                           {cardio && <input className="input" list="run-zones" value={g.pace ?? ''} placeholder="Z2 / 5:30" onChange={(ev) => setEx((x) => void (x.groups[gi].pace = ev.target.value || undefined))} aria-label="Strefa albo tempo" />}
                           <input className="input" inputMode="decimal" value={g.rpe} onChange={(ev) => setEx((x) => void (x.groups[gi].rpe = ev.target.value))} aria-label="RPE" />
