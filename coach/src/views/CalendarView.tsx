@@ -24,6 +24,8 @@ export function ApptStatusTag({ status }: { status: AppointmentStatus }) {
 export const hueStyle = (clientId: string) => ({ '--hue': clientHue(clientId) }) as React.CSSProperties;
 
 type Mode = 'Tydzień' | 'Miesiąc';
+const WHO = ['Wszyscy', 'Ze mną', 'Samodzielnie'] as const;
+type Who = (typeof WHO)[number];
 
 export function CalendarView() {
   const { db } = useStore();
@@ -32,6 +34,23 @@ export function CalendarView() {
   const [mode, setMode] = useState<Mode>('Tydzień');
   const [anchor, setAnchor] = useState<ISODate>(today);
   const [locSel, setLoc] = useState('');
+  // kto: wszyscy / treningi ze mną (wizyty) / samodzielne — wybór zapamiętany na tym urządzeniu
+  const [who, setWhoState] = useState<Who>(() => {
+    try {
+      const v = localStorage.getItem('fitowa-cal-who');
+      return v === 'Ze mną' || v === 'Samodzielnie' ? v : 'Wszyscy';
+    } catch {
+      return 'Wszyscy';
+    }
+  });
+  const setWho = (v: Who) => {
+    setWhoState(v);
+    try {
+      localStorage.setItem('fitowa-cal-who', v);
+    } catch {
+      // bez zapamiętania
+    }
+  };
   // telefon: tydzień przewija się do wybranego dnia (domyślnie dziś), a nie od poniedziałku
   useEffect(() => {
     if (mode !== 'Tydzień' || !matchMedia('(max-width: 720px)').matches) return;
@@ -54,6 +73,7 @@ export function CalendarView() {
   const inLoc = (id?: string) => !loc || id === loc;
   // para / grupa = jeden kafelek (pierwsza wizyta z grupy, pozostałe osoby w nim)
   const apptsOn = (date: ISODate) => {
+    if (who === 'Samodzielnie') return [];
     const list = db.appointments.filter((a) => a.date === date && inLoc(a.locationId));
     const rep = (a: Appointment) => {
       if (!a.groupId) return true;
@@ -63,13 +83,15 @@ export function CalendarView() {
     return list.filter(rep).sort((a, b) => a.time.localeCompare(b.time));
   };
   const linked = new Set(db.appointments.map((a) => a.sessionId).filter(Boolean));
-  const looseOn = (date: ISODate) => db.sessions.filter((s) => s.date === date && !linked.has(s.id) && inLoc(s.locationId));
+  const looseOn = (date: ISODate) =>
+    db.sessions.filter((s) => s.date === date && !linked.has(s.id) && inLoc(s.locationId) && (who === 'Wszyscy' || (who === 'Samodzielnie') === isSolo(db, s)));
   // treningi zadane na dzień (poza planem), jeszcze niewykonane — przerywana ramka
   const assigned: Assigned[] = db.plans
     .filter((p) => p.extra && db.clients.some((c) => c.id === p.clientId && c.status === 'aktywny' && inLoc(c.locationId)))
     .flatMap((p) => p.weeks.flatMap((w) => w.workouts).filter((k) => k.date).map((k) => ({ plan: p, workout: k, state: extraState(k, p.id, db.sessions.filter((s) => s.clientId === p.clientId), today).state })))
     .filter((x) => x.state !== 'done');
-  const assignedOn = (date: ISODate) => assigned.filter((x) => x.workout.date === date);
+  // zadane poza planem robi się samodzielnie — nie w widoku „Ze mną”
+  const assignedOn = (date: ISODate) => (who === 'Ze mną' ? [] : assigned.filter((x) => x.workout.date === date));
 
   const ws = weekStart(anchor);
   const title =
@@ -81,6 +103,7 @@ export function CalendarView() {
         <h2>Kalendarz</h2>
         <div className="cal-controls">
           <Seg options={['Tydzień', 'Miesiąc'] as const} value={mode} onChange={setMode} label="Widok" />
+          <Seg options={WHO} value={who} onChange={setWho} label="Kto trenuje" />
           <div className="cal-nav">
             <button className="icon-btn" aria-label="Poprzedni" onClick={() => shift(-1)}>
               <Icon name="chevL" />
@@ -146,7 +169,7 @@ export function CalendarView() {
         />
       )}
       <p className="muted small legend-note">
-        Kolor paska = podopieczny · kropka = miejsce · przerywana ramka = trening zadany do zrobienia (poza planem)
+        Kolor paska = podopieczny · kropka = miejsce · „sam” = trening samodzielny (kropkowany pasek) · przerywana ramka = zadany do zrobienia
       </p>
     </div>
   );
@@ -185,15 +208,15 @@ function SessionTile({ s }: { s: TrainingSession }) {
   const c = clientById(db, s.clientId);
   // ten sam wygląd co odbyta wizyta: godzina zapisu, podopieczny, miejsce, nazwa treningu
   const time = s.createdAt ? new Date(s.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '';
+  const solo = isSolo(db, s);
   return (
-    <button className="tile tile-done" style={hueStyle(s.clientId)} onClick={() => openModal({ kind: 'session', session: s })}>
-      <span className="tile-time">{time || 'Trening'}</span>
+    <button className={`tile tile-done ${solo ? 'tile-solo' : ''}`} style={hueStyle(s.clientId)} onClick={() => openModal({ kind: 'session', session: s })}>
+      <span className="tile-time">
+        {time || 'Trening'} <span className={`who-badge ${solo ? 'solo' : 'with'}`}>{solo ? 'sam' : 'ze mną'}</span>
+      </span>
       <span className="tile-name">{c?.name ?? '—'}</span>
       <LocationTag id={s.locationId} short />
-      <span className="tile-status">
-        {s.workoutName || 'Trening'}
-        {isSolo(db, s) ? ' · samodzielnie' : ''}
-      </span>
+      <span className="tile-status">{s.workoutName || 'Trening'}</span>
     </button>
   );
 }
@@ -264,7 +287,7 @@ function MonthGrid({
                   {clientById(db, s.plan.clientId)?.name.split(' ')[0]}
                 </span>
               ) : (
-                <span key={s.id} className="month-item tile-done" style={hueStyle(s.clientId)}>
+                <span key={s.id} className={`month-item tile-done ${isSolo(db, s) ? 'tile-solo' : ''}`} style={hueStyle(s.clientId)}>
                   {clientById(db, s.clientId)?.name.split(' ')[0]}
                 </span>
               ),

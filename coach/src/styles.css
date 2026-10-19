@@ -4793,3 +4793,30 @@ body.athlete-mode .toasts {
   padding-top: 4px;
   padding-bottom: 4px;
 }
+
+/* kalendarz: samodzielnie / ze mną */
+.who-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+.who-badge.solo {
+  background: color-mix(in srgb, var(--color-warn, #e0b44c) 22%, transparent);
+  color: var(--color-warn, #e0b44c);
+}
+.who-badge.with {
+  background: color-mix(in srgb, var(--color-ok) 20%, transparent);
+  color: var(--color-ok);
+}
+.tile.tile-solo {
+  border-left-style: dotted;
+  border-left-width: 4px;
+}
+.month-item.tile-solo {
+  border-left-style: dotted;
+}
