@@ -698,20 +698,24 @@ function AddMeasurement({ client, onClose }: { client: NonNullable<ReturnType<ty
           <Icon name="x" />
         </button>
       </div>
-      <div className="form-grid">
+      <div className="meas-form">
         <label className="field">
           <span>Data</span>
           <input className="input" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {SELF_FIELDS.map(([k, label, unit]) => (
-          <label key={k} className="field">
-            <span>
-              {label} ({unit})
-            </span>
-            <input className="input" inputMode="decimal" value={v[k] ?? ''} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
-          </label>
-        ))}
-        <label className="field field-wide">
+        <p className="muted small meas-hint">Wpisz tylko to, co mierzysz — resztę zostaw pustą.</p>
+        <div className="meas-grid">
+          {SELF_FIELDS.map(([k, label, unit]) => (
+            <label key={k} className="field">
+              <span>{label}</span>
+              <span className="unit-input">
+                <input className="input" inputMode="decimal" value={v[k] ?? ''} placeholder="—" onChange={(e) => setV({ ...v, [k]: e.target.value })} aria-label={`${label} (${unit})`} />
+                <i>{unit}</i>
+              </span>
+            </label>
+          ))}
+        </div>
+        <label className="field">
           <span>Notatka (opcjonalnie)</span>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. rano, na czczo" />
         </label>
