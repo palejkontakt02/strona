@@ -174,9 +174,9 @@ export function StoreProvider({
       try {
         await repo.saveIntake(clientId, intake);
         return true;
-      } catch {
+      } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, intake: prev } : c)) } : cur));
-        toast('Nie udało się zapisać ankiety — sprawdź połączenie i spróbuj ponownie.');
+        toast(e instanceof Error && e.message === 'DB_OUTDATED' ? 'Pliki w ankiecie się nie zapisały — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 18 w hardening.sql).' : 'Nie udało się zapisać ankiety — sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },

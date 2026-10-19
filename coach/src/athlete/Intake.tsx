@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { Client } from '../domain';
 import { useStore } from '../data/store';
-import { INTAKE, INTAKE_PARQ, intakeProgress, type Intake, type IntakeField } from '../lib/intake';
+import { INTAKE, INTAKE_PARQ, intakeProgress, type Intake, type IntakeField, type IntakeFile } from '../lib/intake';
+import { ClientFiles } from '../components/ClientFiles';
 
 const DRAFT = (id: string) => `fitowa-intake-draft:${id}`;
+const DRAFT_FILES = (id: string) => `fitowa-intake-files:${id}`;
 
 /**
  * Ankieta podopiecznego krok po kroku: zdrowie → styl życia → odżywianie → sport → cele → zgoda.
@@ -21,11 +23,22 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     }
     return { ...client.intake?.answers };
   });
+  const [files, setFiles] = useState<IntakeFile[]>(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_FILES(client.id)) || 'null') as IntakeFile[] | null;
+      if (Array.isArray(d)) return d;
+    } catch {
+      // brak szkicu
+    }
+    return client.intake?.files ?? [];
+  });
   const [step, setStep] = useState(0);
   const [consent, setConsent] = useState(!!client.intake?.consentAt);
   const [busy, setBusy] = useState(false);
-  const steps = INTAKE.length + 1;
+  // kroki: sekcje ankiety → zdjęcia i dokumenty → zgoda i zapis
+  const steps = INTAKE.length + 2;
   const sec = INTAKE[step];
+  const filesStep = step === INTAKE.length;
 
   useEffect(() => {
     try {
@@ -34,6 +47,13 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
       // brak miejsca — szkic tylko w pamięci
     }
   }, [answers, client.id]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_FILES(client.id), JSON.stringify(files));
+    } catch {
+      // brak miejsca
+    }
+  }, [files, client.id]);
   useEffect(() => window.scrollTo(0, 0), [step]);
 
   const set = (k: string, v: string) => setAnswers((a) => ({ ...a, [k]: v }));
@@ -44,19 +64,22 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     setBusy(true);
     const now = new Date().toISOString();
     const clean = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim().slice(0, 2000)]).filter(([, v]) => v));
-    const intake: Intake = { answers: clean, consentAt: client.intake?.consentAt ?? (consent ? now : undefined), completedAt: client.intake?.completedAt ?? now, updatedAt: now };
+    const intake: Intake = { answers: clean, files: files.length ? files : undefined, consentAt: client.intake?.consentAt ?? (consent ? now : undefined), completedAt: client.intake?.completedAt ?? now, updatedAt: now };
     const ok = await saveIntake(client.id, intake);
     setBusy(false);
     if (!ok) return;
     try {
       localStorage.removeItem(DRAFT(client.id));
+      localStorage.removeItem(DRAFT_FILES(client.id));
     } catch {
       // nic
     }
     // nowe „tak” w pytaniach zdrowotnych (PAR-Q) — wprost w wiadomości do trenera
     const newYes = INTAKE_PARQ.filter((k) => clean[k] === 'tak' && client.intake?.answers[k] !== 'tak').map((k) => INTAKE[0].fields.find((f) => f.key === k)?.label ?? k);
     const warn = client.intake?.completedAt && newYes.length ? ` UWAGA — nowe „tak” w pytaniach o zdrowie: ${newYes.join(' · ')}` : '';
-    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}` : 'Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.');
+    const added = files.filter((f) => !(client.intake?.files ?? []).some((x) => x.id === f.id)).length;
+    const filesMsg = added ? ` Dołączone pliki: ${added}.` : '';
+    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}${filesMsg}` : `Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.${filesMsg}`);
     else toast('Ankieta zapisana.');
     onClose();
   };
@@ -67,7 +90,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
         <span className="eyebrow">
           {first ? 'Witaj! Zacznijmy od krótkiej ankiety' : 'Moja ankieta'} · krok {step + 1} z {steps}
         </span>
-        <h1>{sec ? sec.title : 'Zgoda i zapis'}</h1>
+        <h1>{sec ? sec.title : filesStep ? 'Zdjęcia i dokumenty' : 'Zgoda i zapis'}</h1>
         <div className="progress" aria-label={`Odpowiedzi: ${prog.done} z ${prog.total}`}>
           <span style={{ width: `${Math.round(((step + 1) / steps) * 100)}%` }} />
         </div>
@@ -82,10 +105,17 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
               <IntakeInput key={f.key} f={f} value={answers[f.key] ?? ''} onChange={(v) => set(f.key, v)} exclude={f.key === 'goals_side' ? answers.goal : undefined} />
             ))}
         </section>
+      ) : filesStep ? (
+        <section className="acard">
+          <p className="muted small">
+            Opcjonalnie: wyniki badań, wypis ze szpitala, opis rezonansu / RTG, zalecenia lekarza albo zdjęcia sylwetki (przód, bok, tył). Zdjęcie zrobisz od razu aparatem albo dodasz z galerii; PDF z telefonu lub komputera. Widzi je tylko Twój trener.
+          </p>
+          <ClientFiles clientId={client.id} files={files} onChange={setFiles} />
+        </section>
       ) : (
         <section className="acard">
           <p>
-            Odpowiedziano na <b>{prog.done}</b> z {prog.total} pytań. Puste pola możesz uzupełnić później w „Moja ankieta”.
+            Odpowiedziano na <b>{prog.done}</b> z {prog.total} pytań{files.length ? `, dołączone pliki: ${files.length}` : ''}. Puste pola możesz uzupełnić później w „Moja ankieta”.
           </p>
           {!asTrainer && (
             <label className="check intake-consent">

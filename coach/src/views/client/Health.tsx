@@ -7,6 +7,7 @@ import { fmtDay, uid } from '../../format';
 import { addDays, todayISO } from '../../lib/dates';
 import { INTAKE, intakeProgress, parqYesCount, type Intake } from '../../lib/intake';
 import { useNav } from '../../nav';
+import { ClientFiles } from '../../components/ClientFiles';
 
 /** PAR-Q (wersja skrócona, 7 pytań) — „tak” przy którymkolwiek = przed intensywnym treningiem zgoda lekarza. */
 export const PARQ: [string, string][] = [
@@ -46,7 +47,8 @@ export function ClientIntakeCard({ client }: { client: Client }) {
       title={
         <>
           Ankieta podopiecznego {i?.completedAt ? <Tag tone="ok">wypełniona</Tag> : <Tag tone="warn">niewypełniona</Tag>}{' '}
-          {parqYesCount(i) > 0 && <Tag tone="danger">PAR-Q: {parqYesCount(i)}× tak</Tag>}
+          {parqYesCount(i) > 0 && <Tag tone="danger">PAR-Q: {parqYesCount(i)}× tak</Tag>}{' '}
+          {i?.files?.length ? <Tag tone="muted">📎 {i.files.length}</Tag> : null}
         </>
       }
       action={
@@ -72,6 +74,12 @@ export function ClientIntakeCard({ client }: { client: Client }) {
           {i.consentAt ? ` · zgoda RODO ${fmtDay(i.consentAt.slice(0, 10))}` : ' · bez zgody RODO'}
         </p>
       )}
+      {i?.files?.length ? (
+        <div className="sub-section">
+          <h4 className="sub-title">Zdjęcia i dokumenty od podopiecznego</h4>
+          <ClientFiles clientId={client.id} files={i.files} editable={false} />
+        </div>
+      ) : null}
       {open && i && (
         <div className="intake-answers">
           {INTAKE.map((sec) => {

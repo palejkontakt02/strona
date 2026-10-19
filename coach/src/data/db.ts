@@ -33,7 +33,14 @@ export function normalizeDb(db: Partial<Db>): Db {
         .filter((p) => isRec(p) && isDate(p.date))
         .map((p) => ({ type: 'pojedyncza', status: 'due', ...(p as Rec), amount: typeof (p as Rec).amount === 'number' ? (p as Rec).amount : 0 })),
       measurements: arr(r.measurements).filter(isRec),
-      intake: isRec(r.intake) && isRec(r.intake.answers) ? { ...r.intake, answers: Object.fromEntries(Object.entries(r.intake.answers as Rec).filter(([, v]) => typeof v === 'string')) } : undefined,
+      intake: isRec(r.intake) && isRec(r.intake.answers)
+        ? {
+            ...r.intake,
+            answers: Object.fromEntries(Object.entries(r.intake.answers as Rec).filter(([, v]) => typeof v === 'string')),
+            // pliki: tylko poprawne wpisy (odnośnik do magazynu, nazwa)
+            files: Array.isArray(r.intake.files) ? (r.intake.files as unknown[]).filter((f): f is Rec => isRec(f) && typeof f.ref === 'string' && /^(sb|idb):/.test(f.ref) && typeof f.name === 'string') : undefined,
+          }
+        : undefined,
       selfMeasurements: Array.isArray(r.selfMeasurements) ? r.selfMeasurements.filter((m) => isRec(m) && isDate(m.date)) : undefined,
       tests: arr(r.tests).filter(isRec),
       injuryLog: arr(r.injuryLog).filter(isRec),

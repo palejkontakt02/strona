@@ -87,6 +87,12 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
     async saveIntake(clientId: string, intake: Intake) {
       const { error } = await supabase.rpc('save_intake', { p_client_id: clientId, p_intake: intake });
       if (error) throw error;
+      // stara wersja save_intake (przed sekcją 18) gubi listę plików — sprawdzamy, czy się zapisała
+      if (intake.files?.length) {
+        const { data } = await supabase.from('clients').select('data').eq('id', clientId).maybeSingle();
+        const saved = (data as { data?: { intake?: { files?: unknown[] } } } | null)?.data?.intake?.files;
+        if (data && (saved?.length ?? 0) !== intake.files.length) throw new Error('DB_OUTDATED');
+      }
     },
 
     async addMeasurement(clientId: string, m: Measurement) {

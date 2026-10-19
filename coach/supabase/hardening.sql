@@ -414,3 +414,57 @@ drop trigger if exists guard_client_intake on public.clients;
 create trigger guard_client_intake before update on public.clients
   for each row execute function public.guard_client_intake();
 notify pgrst, 'reload schema';
+
+-- 18. Pliki w ankiecie (zdjęcia, wyniki badań, PDF) — prywatny koszyk Storage „client-files”.
+--     Folder = id podopiecznego; trener widzi i usuwa wszystko, podopieczny tylko swój folder.
+--     Lista plików zapisuje się w ankiecie (save_intake) — tylko odnośniki do własnego folderu.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('client-files', 'client-files', false, 20971520, array['image/*', 'application/pdf'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists client_files_trainer on storage.objects;
+create policy client_files_trainer on storage.objects for all to authenticated
+  using (bucket_id = 'client-files' and public.is_trainer())
+  with check (bucket_id = 'client-files' and public.is_trainer());
+
+drop policy if exists client_files_client_read on storage.objects;
+create policy client_files_client_read on storage.objects for select to authenticated
+  using (bucket_id = 'client-files' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+drop policy if exists client_files_client_insert on storage.objects;
+create policy client_files_client_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'client-files' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+drop policy if exists client_files_client_delete on storage.objects;
+create policy client_files_client_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'client-files' and (storage.foldername(name))[1] in (select public.my_client_ids()));
+
+create or replace function public.save_intake(p_client_id text, p_intake jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare files jsonb;
+begin
+  perform set_config('fitowa.rpc', '1', true);
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if jsonb_typeof(p_intake) <> 'object' or jsonb_typeof(p_intake -> 'answers') <> 'object' then raise exception 'Zła ankieta'; end if;
+  if length(p_intake::text) > 60000 then raise exception 'Ankieta za długa'; end if;
+  -- pliki: najwyżej 30, tylko odnośniki do folderu tego podopiecznego (albo plik z przeglądarki „idb:”)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', left(f ->> 'id', 64), 'ref', f ->> 'ref', 'name', left(coalesce(f ->> 'name', 'plik'), 120),
+           'type', left(coalesce(f ->> 'type', ''), 60), 'size', case when jsonb_typeof(f -> 'size') = 'number' then f -> 'size' else '0'::jsonb end,
+           'at', left(coalesce(f ->> 'at', ''), 40), 'kind', left(coalesce(f ->> 'kind', 'Inne'), 40))), '[]'::jsonb)
+    into files
+    from (select f from jsonb_array_elements(case when jsonb_typeof(p_intake -> 'files') = 'array' then p_intake -> 'files' else '[]'::jsonb end) f limit 30) t
+    where jsonb_typeof(f) = 'object' and ((f ->> 'ref') like 'sb:' || p_client_id || '/%' or (f ->> 'ref') like 'idb:%');
+  update clients
+  set data = jsonb_set(data, '{intake}', jsonb_build_object(
+        'answers', p_intake -> 'answers',
+        'files', files,
+        'consentAt', coalesce(data #> '{intake,consentAt}', p_intake -> 'consentAt'),
+        'completedAt', coalesce(data #> '{intake,completedAt}', to_jsonb(now())),
+        'updatedAt', to_jsonb(now()))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.save_intake from public, anon;
+grant execute on function public.save_intake to authenticated;
+notify pgrst, 'reload schema';

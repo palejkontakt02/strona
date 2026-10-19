@@ -96,8 +96,27 @@ export const INTAKE: IntakeSection[] = [
 /** Klucze PAR-Q w ankiecie — „tak” przy którymkolwiek = przed intensywnym treningiem zgoda lekarza. */
 export const INTAKE_PARQ = INTAKE[0].fields.filter((f) => f.key.startsWith('parq_')).map((f) => f.key);
 
+/** Rodzaje załączników w ankiecie. */
+export const FILE_KINDS = ['Wyniki badań', 'Dokumentacja medyczna', 'Zdjęcie sylwetki / postawy', 'Inne'] as const;
+export type FileKind = (typeof FILE_KINDS)[number];
+
+/** Plik dołączony do ankiety (zdjęcie albo dokument) — w zapisie tylko odnośnik do magazynu plików. */
+export interface IntakeFile {
+  id: string;
+  /** „sb:<ścieżka>” (chmura) albo „idb:<id>” (ta przeglądarka). */
+  ref: string;
+  name: string;
+  type: string;
+  size: number;
+  at: string;
+  kind?: FileKind;
+  note?: string;
+}
+
 export interface Intake {
   answers: Record<string, string>;
+  /** Zdjęcia i dokumenty (wyniki badań, dokumentacja, sylwetka). */
+  files?: IntakeFile[];
   /** Zgoda na przetwarzanie danych o zdrowiu (data ISO). */
   consentAt?: string;
   completedAt?: string;
