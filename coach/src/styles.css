@@ -5052,3 +5052,19 @@ body.athlete-mode .toasts {
   line-height: 1;
   padding: 0;
 }
+.ptab-date {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+.pe-day {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.pe-day.missing select {
+  border-color: var(--color-warn, #e0b44c);
+}

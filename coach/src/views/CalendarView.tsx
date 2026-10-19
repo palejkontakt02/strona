@@ -7,6 +7,7 @@ import { fmtMonth, fmtShort, fmtWeekday } from '../format';
 import { clashes, clientHue } from '../lib/calendar';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { useNav } from '../nav';
+import { workoutDate } from '../lib/plan';
 import { LocationTag, locStyle } from '../components/location';
 
 export const APPT_STATUS: Record<AppointmentStatus, { label: string; tone: 'neutral' | 'ok' | 'muted' | 'warn' }> = {
@@ -90,6 +91,18 @@ export function CalendarView() {
     .filter((p) => p.extra && db.clients.some((c) => c.id === p.clientId && c.status === 'aktywny' && inLoc(c.locationId)))
     .flatMap((p) => p.weeks.flatMap((w) => w.workouts).filter((k) => k.date).map((k) => ({ plan: p, workout: k, state: extraState(k, p.id, db.sessions.filter((s) => s.clientId === p.clientId), today).state })))
     .filter((x) => x.state !== 'done');
+  // treningi z aktywnego planu na dni ustawione przez trenera — do zrobienia (bez wizyty tego dnia)
+  for (const p of db.plans.filter((x) => x.active && !x.extra && db.clients.some((c) => c.id === x.clientId && c.status === 'aktywny' && inLoc(c.locationId)))) {
+    const done = new Set(db.sessions.filter((x) => x.planId === p.id && x.workoutId).map((x) => x.workoutId));
+    p.weeks.forEach((w, wi) =>
+      w.workouts.forEach((k) => {
+        const d = workoutDate(p, wi, k);
+        if (!d || done.has(k.id) || !k.exercises.some((e) => e.name.trim())) return;
+        if (db.appointments.some((a) => a.clientId === p.clientId && a.date === d && a.status !== 'cancel')) return;
+        assigned.push({ plan: p, workout: { ...k, date: d }, state: d < today ? 'overdue' : 'due', fromPlan: true });
+      }),
+    );
+  }
   // zadane poza planem robi się samodzielnie — nie w widoku „Ze mną”
   const assignedOn = (date: ISODate) => (who === 'Ze mną' ? [] : assigned.filter((x) => x.workout.date === date));
 
@@ -225,6 +238,8 @@ interface Assigned {
   plan: Plan;
   workout: PlanWorkout;
   state: ExtraState['state'];
+  /** Jednostka z planu (dzień ustawiony w planie), nie trening poza planem. */
+  fromPlan?: boolean;
 }
 
 /** Trening zadany na ten dzień (jeszcze niewykonany) — otwiera jego edycję. */
@@ -233,8 +248,11 @@ function AssignedTile({ x }: { x: Assigned }) {
   const { openModal } = useNav();
   const c = clientById(db, x.plan.clientId);
   return (
-    <button className="tile tile-loose" style={hueStyle(x.plan.clientId)} onClick={() => openModal({ kind: 'plan', plan: x.plan, focusWorkoutId: x.workout.id })} title="Trening zadany poza planem — kliknij, by zmienić">
-      <span className="tile-time">{x.state === 'overdue' ? 'zaległy' : 'do zrobienia'}</span>
+    <button className="tile tile-loose" style={hueStyle(x.plan.clientId)} onClick={() => openModal({ kind: 'plan', plan: x.plan, focusWorkoutId: x.workout.id })} title={x.fromPlan ? 'Trening z planu na ten dzień — kliknij, by zmienić plan' : 'Trening zadany poza planem — kliknij, by zmienić'}>
+      <span className="tile-time">
+        {x.fromPlan ? 'z planu · ' : ''}
+        {x.state === 'overdue' ? 'zaległy' : 'do zrobienia'}
+      </span>
       <span className="tile-name">{c?.name ?? '—'}</span>
       <span className="tile-status">{x.workout.name}</span>
     </button>

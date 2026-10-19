@@ -9,8 +9,8 @@ import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGrou
 import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, type Progression } from '../data/ops';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
-import { todayISO } from '../lib/dates';
-import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel } from '../lib/plan';
+import { addDays, todayISO } from '../lib/dates';
+import { exerciseLabels, moveInBlocks, removeFromBlocks, setCountLabel, undatedWorkouts, WEEKDAYS, workoutDate } from '../lib/plan';
 import { useNav, type ModalState } from '../nav';
 
 /**
@@ -62,6 +62,13 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
 
   const save = async () => {
     const clean = structuredClone(p);
+    // plan: każdy trening musi mieć dzień tygodnia albo datę (inaczej podopieczny nie wie, kiedy go zrobić)
+    const missing = undatedWorkouts(clean);
+    if (missing.length) {
+      setOpen(new Set(clean.weeks.filter((w) => w.workouts.some((k) => !k.day && !k.date && k.exercises.some((e) => e.name.trim()))).map((w) => w.id)));
+      return toast(`Ustaw dzień tygodnia albo datę: ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ` i ${missing.length - 4} więcej` : ''}.`);
+    }
+    if (!clean.extra && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
     const focused = clean.weeks.flatMap((w) => w.workouts).find((k) => k.id === m.focusWorkoutId);
@@ -136,7 +143,12 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 const same = JSON.stringify(cloneWeek(p.weeks[wi], name, 'none').workouts.map((k) => k.exercises.map((x) => x.groups))) === JSON.stringify(copy.workouts.map((k) => k.exercises.map((x) => x.groups)));
                 if (mode !== 'none' && same) toast(mode === 'load2' || mode === 'load5' ? 'Ciężary w tym tygodniu liczą się z RPE / „−10%” — progresja ciężaru nic nie zmieniła. Użyj „+0,5 RPE” albo wpisz kg.' : 'Ta progresja nic nie zmieniła w tym tygodniu.');
                 // „Tydzień N+1” na końcu planu; kopia bez numeru — zaraz za oryginałem
-                upd((d) => void d.weeks.splice(name.endsWith('(kopia)') ? wi + 1 : d.weeks.length, 0, copy));
+                upd((d) => {
+                  const at = name.endsWith('(kopia)') ? wi + 1 : d.weeks.length;
+                  // data wpisana na sztywno przesuwa się o tyle tygodni, o ile dalej jest kopia
+                  for (const k of copy.workouts) if (k.date) k.date = addDays(k.date, 7 * (at - wi));
+                  d.weeks.splice(at, 0, copy);
+                });
                 setOpen((o) => new Set([...o, copy.id]));
               }}
             >
@@ -161,6 +173,43 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
             <div key={k.id} className="pe-workout card">
               <div className="pe-week-head">
                 <input className="input pe-title" value={k.name} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).name = e.target.value))} aria-label="Nazwa jednostki" />
+                {!p.extra && (
+                  <span className={`pe-date pe-date-row pe-day ${!k.day && !k.date && k.exercises.some((e) => e.name.trim()) ? 'missing' : ''}`}>
+                    <select
+                      className="input input-sm"
+                      value={k.date ? 'date' : String(k.day ?? '')}
+                      aria-label={`Dzień tygodnia: ${k.name}`}
+                      onChange={(e) =>
+                        upd((d) => {
+                          const v = e.target.value;
+                          const w = findWorkout(d, wi, ki);
+                          if (v === 'date') {
+                            w.day = undefined;
+                            w.date = w.date ?? workoutDate(d, wi, w) ?? todayISO();
+                            return;
+                          }
+                          w.date = undefined;
+                          w.day = v ? Number(v) : undefined;
+                          // ten sam trening w kolejnych tygodniach bez dnia — ten sam dzień
+                          if (w.day) for (const ww of d.weeks.slice(wi + 1)) for (const x of ww.workouts) if (x.name === w.name && !x.day && !x.date) x.day = w.day;
+                        })
+                      }
+                    >
+                      <option value="">dzień…</option>
+                      {WEEKDAYS.map((n, i) => (
+                        <option key={n} value={i + 1}>
+                          {n}
+                        </option>
+                      ))}
+                      <option value="date">data…</option>
+                    </select>
+                    {k.date ? (
+                      <input className="input input-sm" type="date" value={k.date} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label={`Data: ${k.name}`} />
+                    ) : (
+                      workoutDate(p, wi, k) && <span className="muted small">{fmtDay(workoutDate(p, wi, k)!)}</span>
+                    )}
+                  </span>
+                )}
                 {p.extra && (
                   <label className="pe-date pe-date-row" title="Podopieczny zobaczy ten trening na górze ekranu w wybranym dniu">
                     <span className="muted small">{k.date ? 'na dzień' : 'bez terminu · na dzień'}</span>

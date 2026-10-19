@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Plan, PlanWorkout } from '../domain';
 import { planGrid, type GridSlot } from '../lib/planGrid';
 import { Tag } from './ui';
+import { fmtWeekdayDate } from '../lib/planGrid';
 
 /**
  * Plan jak arkusz: dla każdego treningu (A, B, …) tabela — wiersz na serię, kolumny to tygodnie.
@@ -84,10 +85,11 @@ function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; do
             <th className="ptab-rest" rowSpan={2}>
               Przerwa
             </th>
-            {cols.map(({ week, k }) => (
+            {cols.map(({ week, k, date }) => (
               <th key={week.id} colSpan={3} className={`ptab-week ${cls(k.id)}`}>
                 {week.name}
                 {k.id === nextId ? ' ▶' : done?.has(k.id) ? ' ✓' : ''}
+                {date && <span className="ptab-date">{fmtWeekdayDate(date)}</span>}
               </th>
             ))}
           </tr>

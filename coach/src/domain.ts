@@ -225,6 +225,8 @@ export interface PlanWorkout {
   date?: ISODate;
   /** Kiedy zadano na ten dzień — trening zrobiony od tego dnia (także wcześniej niż termin) liczy się jako wykonany. */
   assignedAt?: ISODate;
+  /** Plan: dzień tygodnia tej jednostki (1 = pon … 7 = niedz.); data liczona od startu planu i numeru tygodnia. */
+  day?: number;
   exercises: PlanExercise[];
 }
 

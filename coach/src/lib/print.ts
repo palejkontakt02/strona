@@ -1,5 +1,5 @@
 import type { Client, Plan, TrainingSession } from '../domain';
-import { planGrid } from './planGrid';
+import { fmtWeekdayDate, planGrid } from './planGrid';
 import { addDays, todayISO } from './dates';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -54,7 +54,7 @@ export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSessio
   const tables = slots
     .map((slot) => {
       if (!slot.rows.length) return `<h2>${esc(slot.name)}</h2><p class="muted">Brak ćwiczeń.</p>`;
-      const head = `<tr><th rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk">${esc(c.week.name)}</th>`).join('')}</tr><tr>${slot.cols.map(() => '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub no">RPE</th>').join('')}</tr>`;
+      const head = `<tr><th rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk">${esc(c.week.name)}${c.date ? `<br><span class="note">${esc(fmtWeekdayDate(c.date))}</span>` : ''}</th>`).join('')}</tr><tr>${slot.cols.map(() => '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub no">RPE</th>').join('')}</tr>`;
       const body = slot.rows
         .map((r) =>
           r.lines

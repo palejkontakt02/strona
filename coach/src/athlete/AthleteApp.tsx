@@ -10,7 +10,8 @@ import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, numIn, repsN } from '../lib/parse';
-import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
+import { currentPlan, nextWorkout, planSequence, workoutDate } from '../lib/plan';
+import { fmtWeekdayDate } from '../lib/planGrid';
 import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { fmtDur, fmtKm, planRunTotals } from '../lib/running';
 import { e1Series, exerciseE1, records } from '../lib/strength';
@@ -232,6 +233,11 @@ export function AthleteApp({
   );
 }
 
+/** „dziś”, „jutro”, „pon. 20.10”. */
+function dayWord(d: string, today: string): string {
+  return d === today ? 'dziś' : d === addDays(today, 1) ? 'jutro' : fmtWeekdayDate(d);
+}
+
 /** Krótki opis jednostki: bieg — dystans / czas z odcinków, inaczej liczba ćwiczeń. */
 function workoutSummary(k: PlanWorkout, client: { run?: Client['run'] }): string {
   const ex = k.exercises.filter((e) => e.name);
@@ -402,6 +408,12 @@ function Home({
           <p className="muted small">
             {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
           </p>
+          {(() => {
+            // dzień z planu (ustawiony przez trenera)
+            const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
+            if (!d) return null;
+            return <p className={`small ${d < today ? 'warn-text' : ''}`}>{d < today ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>;
+          })()}
           {withTrainer && <p className="small">Ten trening zrobicie razem na wizycie ({visitText}). Start tylko, jeśli ćwiczysz dziś sam(a).</p>}
           {(() => {
             const ci = client.checkins.find((c) => c.date === today);
@@ -862,6 +874,7 @@ function Workouts({
     const dn = done(planId, k.id);
     const idx = planId === plan?.id ? seqIds.indexOf(k.id) : -1;
     const doneNow = !!dn && !isNext && (planId !== plan?.id || nextIdx < 0 || idx < nextIdx);
+    const planned = planId === plan?.id && plan ? workoutDate(plan, plan.weeks.findIndex((w) => w.workouts.some((x) => x.id === k.id)), k) : undefined;
     return (
       <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${doneNow ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
         <span className="wo-st">{isNext ? '▶' : doneNow ? '✓' : ''}</span>
@@ -869,6 +882,7 @@ function Workouts({
           <b>{k.name}</b>
           <span className="muted small">
             {n ? `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}` : 'brak ćwiczeń'}
+            {planned ? ` · ${fmtWeekdayDate(planned)}` : ''}
             {isNext ? ` · następny — do zrobienia${dn ? ` (ostatnio ${fmtDay(dn)})` : ''}` : dn ? ` · ${doneNow && planId !== extra?.id ? 'zrobione' : 'ostatnio'} ${fmtDay(dn)}` : ''}
           </span>
         </span>

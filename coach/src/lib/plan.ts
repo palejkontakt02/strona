@@ -1,3 +1,4 @@
+import { addDays, weekStart } from './dates';
 import type { Plan, PlanWeek, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { repsN } from './parse';
 
@@ -164,4 +165,22 @@ export function removeFromBlocks<T extends { linked?: boolean }>(list: T[], k: n
   const out = list.filter((_, i) => i !== k);
   if (!list[k]?.linked && out[k]?.linked) out[k] = { ...out[k], linked: undefined };
   return out;
+}
+
+export const WEEKDAYS = ['pon.', 'wt.', 'śr.', 'czw.', 'pt.', 'sob.', 'niedz.'] as const;
+
+/**
+ * Data jednostki z planu: wpisana data albo dzień tygodnia (1–7) w tygodniu `weekIndex` od startu planu
+ * (tydzień 1 = tydzień, w którym jest data startu). Bez daty i dnia — undefined.
+ */
+export function workoutDate(plan: Pick<Plan, 'startDate' | 'extra'>, weekIndex: number, k: { date?: string; day?: number }): string | undefined {
+  if (k.date) return k.date;
+  if (!k.day || !plan.startDate || plan.extra) return undefined;
+  return addDays(weekStart(plan.startDate), weekIndex * 7 + (k.day - 1));
+}
+
+/** Jednostki planu bez dnia ani daty (z ćwiczeniami) — do zatwierdzenia planu. */
+export function undatedWorkouts(plan: Plan): string[] {
+  if (plan.extra) return [];
+  return plan.weeks.flatMap((w) => w.workouts.filter((k) => k.exercises.some((e) => e.name.trim()) && !k.day && !k.date).map((k) => `${w.name} · ${k.name}`));
 }

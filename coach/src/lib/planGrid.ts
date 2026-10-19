@@ -1,5 +1,5 @@
 import type { Plan, PlanExercise, PlanWeek, PlanWorkout } from '../domain';
-import { exerciseLabels, expandSets, mergeGroups } from './plan';
+import { exerciseLabels, expandSets, mergeGroups, WEEKDAYS, workoutDate } from './plan';
 import { cardioByName, isTimed, perSideByName } from './run';
 import { fmtDur, fmtKm, parseDur, parseKm } from './running';
 import { fmtSec, secOf } from './parse';
@@ -62,7 +62,7 @@ export interface GridRow {
 }
 export interface GridSlot {
   name: string;
-  cols: { week: PlanWeek; k: PlanWorkout }[];
+  cols: { week: PlanWeek; k: PlanWorkout; /** Data z dnia tygodnia / daty jednostki. */ date?: string }[];
   rows: GridRow[];
   hasWarm: boolean;
 }
@@ -75,9 +75,9 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean): GridSlot[
   const names: string[] = [];
   for (const w of plan.weeks) for (const k of w.workouts) if (!names.includes(k.name)) names.push(k.name);
   return names.map((slot) => {
-    const cols = plan.weeks.flatMap((w) => {
+    const cols = plan.weeks.flatMap((w, wi) => {
       const k = w.workouts.find((x) => x.name === slot);
-      return k ? [{ week: w, k }] : [];
+      return k ? [{ week: w, k, date: workoutDate(plan, wi, k) }] : [];
     });
     const base: { name: string; label: string; first: PlanExercise }[] = [];
     for (const c of cols) {
@@ -112,4 +112,10 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean): GridSlot[
     });
     return { name: slot, cols, rows, hasWarm };
   });
+}
+
+/** „pon. 20.10” */
+export function fmtWeekdayDate(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return `${WEEKDAYS[(d.getDay() + 6) % 7]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
