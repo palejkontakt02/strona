@@ -5028,3 +5028,27 @@ body.athlete-mode .toasts {
   margin: 2px 0 var(--space-2);
   color: var(--color-neutral-400);
 }
+/* seria na czas: ⏱ w polu czasu tej serii */
+.reps-hold {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.reps-hold input {
+  padding-right: 30px;
+}
+.reps-hold .hold-btn {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent-800) 60%, transparent);
+  color: var(--color-accent-100);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0;
+}

@@ -104,7 +104,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
   useEffect(() => onRest?.(rest?.end ?? null), [rest, onRest]);
-  const [hold, setHold] = useState<{ end: number; total: number } | null>(null);
+  const [hold, setHold] = useState<{ end: number; total: number; what?: string } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
   const [adding, setAdding] = useState(run.ex.length === 0);
@@ -371,7 +371,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               })()}
             </span>
           ) : (
-            <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+            s.unit && !s.done && holdSec(s) > 0 ? (
+              // seria na czas: odliczanie w polu tej serii
+              <span className="reps-hold">
+                <input inputMode="text" value={s.reps} placeholder="s" onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas, ${run.ex[k].name}, seria ${num}`} />
+                <button
+                  type="button"
+                  className="hold-btn"
+                  aria-label={`Odliczaj ${fmtHold(holdSec(s))} — ${run.ex[k].name}, seria ${num}`}
+                  title={`Odliczaj ${fmtHold(holdSec(s))}`}
+                  onClick={() => setHold({ end: Date.now() + holdSec(s) * 1000, total: holdSec(s), what: `${label ?? run.ex[k].label ?? ''} ${run.ex[k].name.slice(0, 18)} · seria ${num}`.trim() })}
+                >
+                  ⏱
+                </button>
+              </span>
+            ) : (
+              <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+            )
           )}
           {!run.ex[k].cardio && (
             <>
@@ -394,12 +410,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         )}
         {s.sug && !s.done && !run.ex[k].cardio && <div className="sughint">{s.sug}</div>}
         {s.prev && !s.sug && <div className="prevhint">poprzednio: {s.prev}</div>}
-        {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : holdSec(s) > 0) && (
+        {/* cardio i „na stronę” — odliczanie pod wierszem (seria na czas ma ⏱ w polu) */}
+        {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : run.ex[k].perSide && holdSec(s) > 0) && (
           <button
             className="link small hold-start"
             onClick={() => {
               const sec = run.ex[k].cardio ? Math.round((parseDur(s.reps) ?? 0) * 60) : holdSec(s);
-              setHold({ end: Date.now() + sec * 1000, total: sec });
+              setHold({ end: Date.now() + sec * 1000, total: sec, what: `${run.ex[k].name.slice(0, 18)} · ${num}` });
             }}
           >
             ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
@@ -764,7 +781,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       )}
 
       {rest && !hold && <RestBar rest={rest} setRest={setRest} />}
-      {hold && <RestBar rest={hold} setRest={setHold} label="Trzymaj" endText="Koniec — zalicz serię ✓" />}
+      {hold && <RestBar rest={hold} setRest={setHold} label={hold.what ? `Trzymaj · ${hold.what}` : 'Trzymaj'} endText="Koniec — zalicz serię ✓" />}
       {layoutOpen && (
         <LayoutSheet
           canSavePlan={trainer}
