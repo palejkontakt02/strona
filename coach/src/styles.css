@@ -4954,3 +4954,72 @@ body.athlete-mode .toasts {
 .sheet .ptab-table .ptab-ex {
   background: var(--color-surface);
 }
+/* tydzień = 3 kolumny: Powt. | Ciężar | RPE */
+.ptab-table td {
+  min-width: 0;
+}
+.ptab-table .ptab-week {
+  text-align: center;
+}
+.ptab-table .ptab-sub {
+  font-size: 0.66rem;
+  text-align: left;
+}
+.ptab-table .ptab-wk {
+  border-left: 2px solid var(--color-neutral-600, #555);
+  min-width: 56px;
+}
+.ptab-table thead .ptab-week {
+  border-left: 2px solid var(--color-neutral-600, #555);
+}
+.ptab-table .ptab-load {
+  min-width: 64px;
+}
+.ptab-table .ptab-rpe {
+  min-width: 36px;
+  text-align: center;
+}
+.ptab-table thead .ptab-sub:last-child,
+.ptab-table thead tr:last-child th:nth-child(3n) {
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .ptab-table th,
+  .ptab-table td {
+    padding: 5px 6px;
+  }
+  .ptab-table .ptab-wk {
+    min-width: 44px;
+  }
+  .ptab-table .ptab-load {
+    min-width: 48px;
+  }
+  .ptab-table .ptab-rpe {
+    min-width: 28px;
+  }
+  .ptab-one .ptab-table .ptab-ex {
+    min-width: 96px;
+    max-width: 120px;
+    font-size: 0.8rem;
+  }
+  .ptab-one .ptab-table .ptab-rest,
+  .ptab-one .ptab-table .ptab-no {
+    font-size: 0.72rem;
+  }
+}
+@media (max-width: 640px) {
+  .ptab-one .ptab-table .ptab-ex {
+    min-width: 80px;
+    max-width: 104px;
+  }
+  .ptab-one .ptab-table thead th {
+    letter-spacing: 0;
+  }
+}
+@media (max-width: 640px) {
+  .ptab-one .ptab-table th,
+  .ptab-one .ptab-table td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}

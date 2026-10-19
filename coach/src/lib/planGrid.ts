@@ -7,29 +7,38 @@ import { fmtSec, secOf } from './parse';
 const kg = (load: string) => (/^\d+([.,]\d+)?$/.test(load.trim()) ? `${load.trim()} kg` : load.trim());
 const PREFIX: Record<string, string> = { Rozgrzewka: 'R', 'Top set': 'Top', 'Back-off': 'B-off', 'Drop set': 'Drop', AMRAP: 'AMRAP', Schłodzenie: 'S', Przerwa: 'trucht' };
 
-/** Linie komórki: jeden blok serii na linię („3 × 6–10 · 75% @8”, „R 1 × 5 · 60 kg”). */
-export function exerciseLines(e: PlanExercise): { text: string; warm: boolean }[] {
-  const cardio = e.cardio ?? cardioByName(e.name);
-  const timed = isTimed(e);
-  const side = !cardio && (e.perSide ?? perSideByName(e.name)) ? '/str.' : '';
+/** Komórka serii rozbita na kolumny: powtórzenia (lub czas / dystans), ciężar (lub cel biegu), RPE. */
+export interface GridCell {
+  reps: string;
+  load: string;
+  rpe: string;
+  warm: boolean;
+}
+
+/** Bieg / cardio: odcinki po kolei (rozgrzewka, „5 × 1 km”, trucht, schłodzenie). */
+function cardioCells(e: PlanExercise): (GridCell & { no: string })[] {
+  let n = 0;
   return mergeGroups(e.groups).map((g) => {
-    const n = Number(g.sets) || 1;
-    const pre = PREFIX[g.type] ? `${PREFIX[g.type]} ` : '';
+    const reps = Number(g.sets) || 1;
     const warm = g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' || g.type === 'Przerwa';
-    if (cardio) {
-      const d = parseDur(g.reps);
-      const km = parseKm(g.load);
-      const what = [km != null ? fmtKm(km) : g.load.trim(), d != null ? fmtDur(d) : g.reps.trim()].filter(Boolean).join(' / ') || '?';
-      return { warm, text: `${pre}${n > 1 ? `${n} × ` : ''}${what}${g.pace ? ` · ${g.pace}` : ''}${g.rpe ? ` @${g.rpe}` : ''}${g.rest && n > 1 ? ` · p. ${g.rest}` : ''}` };
-    }
-    const reps = timed && secOf(g.reps) != null ? fmtSec(secOf(g.reps)!) : g.reps.trim() || '?';
-    return { warm, text: `${pre}${n} × ${reps}${side}${g.load.trim() ? ` · ${kg(g.load)}` : ''}${g.rpe ? ` @${g.rpe}` : ''}` };
+    if (!warm) n++;
+    const d = parseDur(g.reps);
+    const km = parseKm(g.load);
+    const what = [km != null ? fmtKm(km) : g.load.trim(), d != null ? fmtDur(d) : g.reps.trim()].filter(Boolean).join(' / ') || '?';
+    const pre = PREFIX[g.type] ? `${PREFIX[g.type]} ` : '';
+    return {
+      no: warm ? (PREFIX[g.type] ?? '') : String(n),
+      warm,
+      reps: `${pre}${reps > 1 ? `${reps} × ` : ''}${what}`,
+      load: [g.pace, g.rest && reps > 1 ? `p. ${g.rest}` : ''].filter(Boolean).join(' · '),
+      rpe: g.rpe || '',
+    };
   });
 }
 
-/** Serie ćwiczenia po kolei (każda osobno): numer („R”, „1”, „2”…) i opis „8 × 60 kg @7”. */
-export function setCells(e: PlanExercise): { no: string; text: string; warm: boolean }[] {
-  if (e.cardio ?? cardioByName(e.name)) return exerciseLines(e).map((l, i) => ({ no: l.warm ? '' : String(i + 1), ...l }));
+/** Serie ćwiczenia po kolei (każda osobno): numer („R”, „1”, „2”…), powtórzenia, ciężar, RPE. */
+export function setCells(e: PlanExercise): (GridCell & { no: string })[] {
+  if (e.cardio ?? cardioByName(e.name)) return cardioCells(e);
   const timed = isTimed(e);
   const side = (e.perSide ?? perSideByName(e.name)) ? '/str.' : '';
   let n = 0;
@@ -38,14 +47,10 @@ export function setCells(e: PlanExercise): { no: string; text: string; warm: boo
     if (!warm) n++;
     const reps = timed && secOf(g.reps) != null ? fmtSec(secOf(g.reps)!) : g.reps.trim() || '?';
     const kind = !warm && g.type !== 'Robocze' && PREFIX[g.type] ? ` (${PREFIX[g.type]})` : '';
-    return { no: warm ? 'R' : String(n), warm, text: `${reps}${side}${g.load.trim() ? ` × ${kg(g.load)}` : ''}${g.rpe ? ` @${g.rpe}` : ''}${kind}` };
+    return { no: warm ? 'R' : String(n), warm, reps: `${reps}${side}${kind}`, load: g.load.trim() ? kg(g.load) : '', rpe: g.rpe.trim() };
   });
 }
 
-export interface GridCell {
-  text: string;
-  warm: boolean;
-}
 export interface GridRow {
   name: string;
   label: string;

@@ -65,55 +65,90 @@ export function PlanTable({
   );
 }
 
-/** Tabela jednego treningu: wiersz na serię, kolumny = tygodnie (albo jedna kolumna „Plan”). */
+/** Tabela jednego treningu: wiersz na serię; każdy tydzień ma kolumny Powt. | Ciężar | RPE (bieg: odcinek | cel | RPE). */
 function GridTable({ slot, nextId, done }: { slot: GridSlot; nextId?: string; done?: Set<string> }) {
   const { cols, rows } = slot;
-  return rows.length === 0 ? (
-              <p className="muted small">Brak ćwiczeń.</p>
-            ) : (
-              <div className="ptab-scroll">
-                <table className="ptab-table">
-                  <thead>
-                    <tr>
-                      <th className="ptab-ex">Ćwiczenie</th>
-                      <th className="ptab-no">Seria</th>
-                      <th className="ptab-rest">Przerwa</th>
-                      {cols.map(({ week, k }) => (
-                        <th key={week.id} className={`${k.id === nextId ? 'is-next' : ''} ${done?.has(k.id) && k.id !== nextId ? 'is-done' : ''}`}>
-                          {week.name}
-                          {k.id === nextId ? ' ▶' : done?.has(k.id) ? ' ✓' : ''}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r) =>
-                      r.lines.map((line, i) => (
-                        <tr key={`${r.name}-${i}`} className={`${r.linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''}`}>
-                          {i === 0 && (
-                            <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
-                              <span className="ex-label">{r.label}</span> {r.name}
-                              {r.notes && <span className="ptab-note">{r.notes}</span>}
-                            </th>
-                          )}
-                          <td className="ptab-no">{line.no}</td>
-                          {i === 0 && (
-                            <td className="ptab-rest" rowSpan={r.lines.length}>
-                              {r.rest || '—'}
-                            </td>
-                          )}
-                          {line.cells.map((c, ci) => (
-                            <td key={cols[ci].week.id} className={`${cols[ci].k.id === nextId ? 'is-next' : ''} ${c && c !== 'none' && c.warm ? 'ptab-warm' : ''}`}>
-                              {c === 'none' ? <span className="muted">—</span> : c ? c.text : null}
-                            </td>
-                          ))}
-                        </tr>
-                      )),
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            );
+  if (rows.length === 0) return <p className="muted small">Brak ćwiczeń.</p>;
+  const cls = (id: string) => `${id === nextId ? 'is-next' : ''} ${done?.has(id) && id !== nextId ? 'is-done' : ''}`;
+  return (
+    <div className="ptab-scroll">
+      <table className="ptab-table">
+        <thead>
+          <tr>
+            <th className="ptab-ex" rowSpan={2}>
+              Ćwiczenie
+            </th>
+            <th className="ptab-no" rowSpan={2}>
+              Seria
+            </th>
+            <th className="ptab-rest" rowSpan={2}>
+              Przerwa
+            </th>
+            {cols.map(({ week, k }) => (
+              <th key={week.id} colSpan={3} className={`ptab-week ${cls(k.id)}`}>
+                {week.name}
+                {k.id === nextId ? ' ▶' : done?.has(k.id) ? ' ✓' : ''}
+              </th>
+            ))}
+          </tr>
+          <tr>
+            {cols.map(({ week, k }) => [
+              <th key={`${week.id}-r`} className={`ptab-sub ptab-wk ${cls(k.id)}`}>
+                Powt.
+              </th>,
+              <th key={`${week.id}-l`} className={`ptab-sub ${cls(k.id)}`}>
+                Ciężar
+              </th>,
+              <th key={`${week.id}-p`} className={`ptab-sub ${cls(k.id)}`}>
+                RPE
+              </th>,
+            ])}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) =>
+            r.lines.map((line, i) => (
+              <tr key={`${r.name}-${i}`} className={`${r.linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''}`}>
+                {i === 0 && (
+                  <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
+                    <span className="ex-label">{r.label}</span> {r.name}
+                    {r.notes && <span className="ptab-note">{r.notes}</span>}
+                  </th>
+                )}
+                <td className="ptab-no">{line.no}</td>
+                {i === 0 && (
+                  <td className="ptab-rest" rowSpan={r.lines.length}>
+                    {r.rest || '—'}
+                  </td>
+                )}
+                {line.cells.map((c, ci) => {
+                  const id = cols[ci].k.id;
+                  const base = `${id === nextId ? 'is-next' : ''} ${c && c !== 'none' && c.warm ? 'ptab-warm' : ''}`;
+                  if (c === 'none')
+                    return (
+                      <td key={cols[ci].week.id} colSpan={3} className={`ptab-wk ${base} muted`}>
+                        —
+                      </td>
+                    );
+                  return [
+                    <td key={`${cols[ci].week.id}-r`} className={`ptab-wk ${base}`}>
+                      {c?.reps}
+                    </td>,
+                    <td key={`${cols[ci].week.id}-l`} className={`ptab-load ${base}`}>
+                      {c?.load}
+                    </td>,
+                    <td key={`${cols[ci].week.id}-p`} className={`ptab-rpe ${base}`}>
+                      {c?.rpe}
+                    </td>,
+                  ];
+                })}
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /** Jeden trening (np. poza planem, podgląd) w tym samym układzie co plan; rozgrzewki po rozwinięciu. */

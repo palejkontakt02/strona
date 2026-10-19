@@ -54,14 +54,22 @@ export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSessio
   const tables = slots
     .map((slot) => {
       if (!slot.rows.length) return `<h2>${esc(slot.name)}</h2><p class="muted">Brak ćwiczeń.</p>`;
-      const head = `<tr><th>Ćwiczenie</th><th class="no">Seria</th><th class="no">Przerwa</th>${slot.cols.map((c) => `<th>${esc(c.week.name)}</th>`).join('')}</tr>`;
+      const head = `<tr><th rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk">${esc(c.week.name)}</th>`).join('')}</tr><tr>${slot.cols.map(() => '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub no">RPE</th>').join('')}</tr>`;
       const body = slot.rows
         .map((r) =>
           r.lines
             .map((line, i) => {
               const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><b>${esc(r.label)}</b> ${esc(r.name)}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
               const rest = i === 0 ? `<td class="no" rowspan="${r.lines.length}">${esc(r.rest || '—')}</td>` : '';
-              const cells = line.cells.map((c) => (c === 'none' ? '<td class="muted">—</td>' : c ? `<td class="${c.warm ? 'warm' : ''}"><span class="done"></span>${esc(c.text)}</td>` : '<td></td>')).join('');
+              const cells = line.cells
+                .map((c) =>
+                  c === 'none'
+                    ? '<td class="wk muted" colspan="3">—</td>'
+                    : c
+                      ? `<td class="wk ${c.warm ? 'warm' : ''}"><span class="done"></span>${esc(c.reps)}</td><td class="${c.warm ? 'warm' : ''}">${esc(c.load)}</td><td class="no ${c.warm ? 'warm' : ''}">${esc(c.rpe)}</td>`
+                      : '<td class="wk"></td><td></td><td></td>',
+                )
+                .join('');
               return `<tr class="${i === 0 ? 'first' : ''}">${ex}<td class="no">${esc(line.no)}</td>${rest}${cells}</tr>`;
             })
             .join(''),
@@ -74,10 +82,10 @@ export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSessio
     `${plan.name} — ${client.name}`,
     `<style>@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:0} body{margin:${wide ? '12mm 10mm' : '18mm 14mm'}}
       table.grid{font-size:11px} table.grid td,table.grid th{padding:3px 5px;white-space:nowrap} table.grid td.ex{white-space:normal;min-width:120px;max-width:200px}
-      table.grid .no{text-align:center;color:#555;width:1%} table.grid tr.first td{border-top:2px solid #777} table.grid .warm{color:#888}
+      table.grid .no{text-align:center;color:#555;width:1%} table.grid .wk{border-left:2px solid #777} table.grid .sub{font-size:9px;font-weight:600} table.grid tr.first td{border-top:2px solid #777} table.grid .warm{color:#888}
       h2{break-after:avoid} table.grid{break-inside:auto} table.grid tr{break-inside:avoid}</style>
     <h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · wydruk ${fmtD(todayISO())}</div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}
-    <p class="note">W komórce: powtórzenia (lub czas) × ciężar @RPE · R = rozgrzewka · kratka do odhaczenia</p>${tables}`,
+    <p class="note">Każdy tydzień: powtórzenia (lub czas) · ciężar · RPE dla każdej serii · R = rozgrzewka · kratka do odhaczenia</p>${tables}`,
   );
 }
 
