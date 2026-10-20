@@ -118,6 +118,7 @@ function GridTable({ slot, nextId, done, noRest }: { slot: GridSlot; nextId?: st
                 {i === 0 && (
                   <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
                     <span className="ex-label">{r.label}</span> {r.name}
+                    {r.loadPer && <span className="ptab-note">kg: {r.loadPer}</span>}
                     {noRest && r.rest && <span className="ptab-note">przerwa {r.rest}</span>}
                     {r.notes && <span className="ptab-note">{r.notes}</span>}
                   </th>

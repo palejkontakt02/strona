@@ -200,6 +200,7 @@ export function sessionToWorkout(s: TrainingSession): PlanWorkout {
         rest: e.rest,
         notes: e.notes,
         perSide: e.perSide,
+        loadPer: e.loadPer,
         cardio: e.cardio,
         groups: e.setsLog?.length
           ? e.setsLog.map((x) => ({

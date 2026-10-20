@@ -1,4 +1,5 @@
-import { cardioByName, isTimed, perSideByName } from '../lib/run';
+import { cardioByName, isTimed, loadPerOf, perSideByName } from '../lib/run';
+import { LoadPerToggle } from '../components/LoadPerToggle';
 import { emptyRunExercise, parseDur, parseKm, RUN_TEMPLATES } from '../lib/running';
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 
@@ -328,6 +329,9 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     <button type="button" className={`side-toggle ${e.perSide ?? perSideByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.perSide ?? perSideByName(e.name))} onClick={() => setEx((x) => void (x.perSide = !(x.perSide ?? perSideByName(x.name))))}>
                       ↔ {e.perSide ?? perSideByName(e.name) ? 'Powtórzenia na każdą stronę' : 'Na stronę? (jednostronne)'}
                     </button>
+                    )}
+                    {!(e.cardio ?? cardioByName(e.name)) && !isTimed(e) && (optsOpen.has(e.id) || !!loadPerOf(e)) && (
+                      <LoadPerToggle value={loadPerOf(e)} onChange={(v) => setEx((x) => void (x.loadPer = v))} />
                     )}
                     {(() => {
                       const cardio = !!(e.cardio ?? cardioByName(e.name));

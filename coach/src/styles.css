@@ -5404,3 +5404,11 @@ button.mini-day {
   background: var(--color-neutral-800, #222);
   border-color: var(--color-neutral-300);
 }
+/* hantle: ciężar za 1 hantel / suma */
+.load-per {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 var(--space-2);
+}

@@ -9,7 +9,8 @@ import { fnum, pln, uid, nEx } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
-import { cardioByName, isTimed, perSideByName, buildRunExercise } from '../lib/run';
+import { cardioByName, isTimed, loadPerOf, perSideByName, buildRunExercise } from '../lib/run';
+import { LoadPerToggle } from '../components/LoadPerToggle';
 import { fmtClock, paceText, parseDur, parseKm } from '../lib/running';
 import { num, numIn, repsN, secOf, sidesOf, timeUnit } from '../lib/parse';
 import { currentPlan, exerciseLabels, exerciseSummary, moveInBlocks, nextWorkout, planSequence, removeFromBlocks } from '../lib/plan';
@@ -35,6 +36,7 @@ interface ExRow {
   linked?: boolean;
   /** Powtórzenia na każdą stronę. */
   perSide?: boolean;
+  loadPer?: 'one' | 'sum';
   cardio?: boolean;
   /** Serie na czas (sekundy). */
   timed?: boolean;
@@ -134,7 +136,7 @@ const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
   return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, cardio: e.cardio, timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, loadPer: e.loadPer, cardio: e.cardio, timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
@@ -231,6 +233,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           hint: sug.why || undefined,
           linked: e.linked,
           perSide: e.perSide ?? (perSideByName(e.name) || undefined),
+          loadPer: e.loadPer,
           cardio: e.cardio ?? (cardioByName(e.name) || undefined),
           timed: isTimed(e) || undefined,
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
@@ -314,6 +317,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         setsLog: r.series ? toLog(r.series, r.cardio, r.timed) : undefined,
         timed: r.timed || undefined,
         perSide: r.perSide || undefined,
+        loadPer: r.cardio ? undefined : loadPerOf(r),
         cardio: r.cardio || undefined,
       })),
     };
@@ -516,6 +520,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                 ↔ {r.perSide ? 'Na każdą stronę' : 'Na stronę?'}
               </button>
             )}
+            {!r.cardio && !r.timed && (optsOpen.has(r.key) || !!loadPerOf(r)) && <LoadPerToggle value={loadPerOf(r)} onChange={(v) => setRow(i, { loadPer: v })} />}
             {(optsOpen.has(r.key) || r.cardio) && <button
               type="button"
               className={`side-toggle ${r.cardio ? 'on' : ''}`}

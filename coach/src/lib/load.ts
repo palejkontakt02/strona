@@ -11,7 +11,8 @@ export function sessionLoad(s: TrainingSession): number | null {
 export function tonnage(s: TrainingSession): number {
   return s.exercises.reduce((acc, e) => {
     // jednostronne: powtórzenia na stronę × 2 strony
-    const sides = e.perSide ? 2 : 1;
+    // ciężar za 1 hantel przy ćwiczeniu obiema rękami naraz (2 hantle) — tonaż liczy oba
+    const sides = (e.perSide ? 2 : 1) * (e.loadPer === 'one' && !e.perSide && !e.cardio ? 2 : 1);
     if (e.setsLog && e.setsLog.length) {
       // serie na czas bez tonażu; różny wynik na stronę (30/20) — suma obu stron
       return acc + e.setsLog.filter((x) => !x.warmup && !x.unit).reduce((b, x) => b + (x.load || 0) * (x.repsR != null ? (x.reps || 0) + x.repsR : sides * (x.reps || 0)), 0);

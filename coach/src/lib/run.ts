@@ -53,6 +53,8 @@ export interface RunExercise {
   video?: string;
   /** Powtórzenia na każdą stronę (jednostronne). */
   perSide?: boolean;
+  /** Hantle / kettle: ciężar wpisywany za 1 hantel („one”) albo suma obu („sum”). Brak — domyślnie z nazwy (hantle → 1 hantel). */
+  loadPer?: 'one' | 'sum';
   /** Serie na czas (sekundy) zamiast powtórzeń. */
   timed?: boolean;
   /** Cardio: wiersz = odcinek (min, km, tętno, RPE). */
@@ -75,6 +77,19 @@ export function isTimed(e: Pick<PlanExercise, 'name' | 'timed' | 'cardio' | 'gro
   if (e.cardio ?? cardioByName(e.name)) return false;
   return e.timed ?? (timedByName(e.name) || e.groups.some((g) => g.type !== 'Rozgrzewka' && timeUnit(g.reps) != null));
 }
+
+/** Ćwiczenia z hantlami / kettlebell — przy nich ważne, czy ciężar to 1 hantel, czy suma. */
+export function dumbbellByName(name: string): boolean {
+  return /hantl|hantel|kettlebell|kettla|odważnik|dumbbell|\bdb\b|\bkb\b/i.test(name);
+}
+
+/** Jak liczony ciężar: jawnie ustawione albo z nazwy (hantle → 1 hantel). */
+export function loadPerOf(e: { name: string; loadPer?: 'one' | 'sum'; cardio?: boolean }): 'one' | 'sum' | undefined {
+  if (e.cardio) return undefined;
+  return e.loadPer ?? (dumbbellByName(e.name) ? 'one' : undefined);
+}
+
+export const LOAD_PER_TEXT = { one: '1 hantel', sum: '2 hantle (suma)' } as const;
 
 /** Nazwy ćwiczeń zwykle robionych na każdą stronę osobno (domyślnie „na stronę”, da się wyłączyć). */
 export function perSideByName(name: string): boolean {
@@ -185,6 +200,7 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     notes: TEMPO_RE.test(notes) ? notes.replace(/tempo\s*:?\s*/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, '') : notes.trim(),
     video,
     perSide: cardio ? undefined : e.perSide ?? (perSideByName(e.name) || undefined),
+    loadPer: cardio ? undefined : e.loadPer,
     cardio: cardio || undefined,
     timed: timed || undefined,
     sets: timed
@@ -430,6 +446,8 @@ export function runToExercises(run: Run) {
         .join(' · ') || undefined,
       setsLog: log,
       perSide: e.perSide || undefined,
+      // zapis: jawnie (hantle z nazwy → 1 hantel), żeby tonaż i historia nie zależały od późniejszej zmiany nazwy
+      loadPer: loadPerOf(e),
       cardio: e.cardio || undefined,
       timed: e.timed || undefined,
     };
@@ -515,6 +533,7 @@ export function sessionToRun(s: TrainingSession, now = Date.now()): Run {
       tempoStr: (String(e.notes || '').match(TEMPO_RE)?.[0] ?? '').replace(/\s/g, ''),
       notes: e.notes ?? '',
       perSide: e.perSide || undefined,
+      loadPer: e.loadPer,
       cardio: e.cardio || undefined,
       timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined,
       sets,

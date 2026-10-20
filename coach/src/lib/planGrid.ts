@@ -1,6 +1,6 @@
 import type { Plan, PlanExercise, PlanWeek, PlanWorkout } from '../domain';
 import { exerciseLabels, expandSets, mergeGroups, WEEKDAYS, workoutDate } from './plan';
-import { cardioByName, isTimed, perSideByName } from './run';
+import { cardioByName, isTimed, LOAD_PER_TEXT, loadPerOf, perSideByName } from './run';
 import { fmtDur, fmtKm, parseDur, parseKm } from './running';
 import { fmtSec, secOf } from './parse';
 
@@ -61,6 +61,8 @@ export interface GridRow {
   linked: boolean;
   /** Bieg / cardio: kolumny to odcinek | cel | RPE. */
   cardio: boolean;
+  /** Hantle: „1 hantel” / „2 hantle (suma)” — jak czytać ciężar. */
+  loadPer?: string;
   /** Wiersze serii: numer („R”, „1”…) i komórka w każdym tygodniu (null — brak tej serii, 'none' — brak ćwiczenia w tygodniu). */
   lines: { no: string; cells: (GridCell | null | 'none')[] }[];
 }
@@ -112,7 +114,7 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = f
         no: key ? no(key) : '',
         cells: keyed.map((m) => (m == null ? (i === 0 ? ('none' as const) : null) : (m.get(key) ?? null))),
       }));
-      return { name: r.name, label: r.label, notes: r.first.notes || undefined, rest: r.first.rest || undefined, linked: /\d$/.test(r.label) && !r.label.endsWith('1'), cardio: !!isCardio, lines };
+      return { name: r.name, label: r.label, notes: r.first.notes || undefined, rest: r.first.rest || undefined, linked: /\d$/.test(r.label) && !r.label.endsWith('1'), cardio: !!isCardio, loadPer: !isCardio && !isTimed(r.first) && loadPerOf(r.first) ? LOAD_PER_TEXT[loadPerOf(r.first)!] : undefined, lines };
     });
     return { name: slot, cols, rows, hasWarm };
   });

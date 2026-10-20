@@ -1,3 +1,4 @@
+import { LOAD_PER_TEXT } from '../lib/run';
 import { VideoChip } from '../components/SetVideo';
 import { needsReview, sessionVideos } from '../data/videos';
 import { useState } from 'react';
@@ -275,6 +276,7 @@ export function SessionSheet({
                     {e.label && <span className="ex-label">{e.label}</span>} {e.name}
                   </b>
                   {e.perSide && <span className="muted small">na każdą stronę</span>}
+                  {e.loadPer && !e.cardio && <span className="muted small">kg: {LOAD_PER_TEXT[e.loadPer]}</span>}
                   {e.cardio && <span className="muted small">cardio</span>}
                 </div>
                 {work.length + warm.length > 0 ? (

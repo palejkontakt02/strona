@@ -67,7 +67,7 @@ export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSessio
         .map((r) =>
           r.lines
             .map((line, i) => {
-              const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><b>${esc(r.label)}</b> ${esc(r.name)}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
+              const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><b>${esc(r.label)}</b> ${esc(r.name)}${r.loadPer ? `<div class="note">kg: ${esc(r.loadPer)}</div>` : ''}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
               const rest = i === 0 ? `<td class="no" rowspan="${r.lines.length}">${esc(r.rest || '—')}</td>` : '';
               const cells = line.cells
                 .map((c) =>

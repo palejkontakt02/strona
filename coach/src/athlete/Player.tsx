@@ -18,6 +18,7 @@ import {
   adHocCardio,
   adHocExercise,
   timedByName,
+  loadPerOf,
   appendExercise,
   applyRunLayout,
   blockRest,
@@ -33,6 +34,7 @@ import {
   type RunExercise,
   type RunSet,
 } from '../lib/run';
+import { LoadPerToggle } from '../components/LoadPerToggle';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -522,6 +524,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             🫀 {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
           </button>
         )}
+        {!e.cardio && !e.timed && (optsOpen.has(k) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
         {!e.cardio && (optsOpen.has(k) || e.timed) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
@@ -588,7 +591,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           <div className="sgrid sgrid-head">
             <span />
             <span className={sidesWide(e) ? 'wide' : undefined}>{repsHead(e)}</span>
-            {!sidesWide(e) && <span>kg</span>}
+            {!sidesWide(e) && <span>{kgHead(e)}</span>}
             <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
             <span />
             <span />
@@ -910,6 +913,9 @@ function holdSec(s: RunSet): number {
   if (s.unit === 'min') return Math.round((repsN(s.reps) ?? 0) * 60);
   return secOf(s.reps) ?? 0;
 }
+
+/** Nagłówek kolumny ciężaru: przy hantlach widać, czy wpisuje się 1 hantel, czy sumę. */
+const kgHead = (e: RunExercise) => (loadPerOf(e) === 'one' ? 'kg / 1 hantel' : loadPerOf(e) === 'sum' ? 'kg (suma)' : 'kg');
 
 /** Ćwiczenie na czas na stronę bez ciężaru (deska boczna): pola L i P zajmują miejsce kolumny kg. */
 const sidesWide = (e: RunExercise) => !!e.perSide && e.sets.some((x) => x.unit) && e.sets.every((x) => !x.load.trim() && !x.sug);

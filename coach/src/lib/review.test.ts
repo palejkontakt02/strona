@@ -6,6 +6,8 @@ import { upcomingVisits } from '../athlete/History';
 import { clientAlerts } from './alerts';
 import { doneInPass } from './plan';
 import type { Client, Plan, TrainingSession } from '../domain';
+import { loadPerOf } from './run';
+import { tonnage } from './load';
 
 const sess = (p: Partial<TrainingSession>): TrainingSession => ({ id: 's', clientId: 'c1', date: '2026-10-15', charge: 'brak', exercises: [], ...p });
 
@@ -153,5 +155,20 @@ describe('cardio', () => {
     expect(out[0].setsLog[0]).toMatchObject({ reps: 10, unit: 'min', dist: 5, hr: 142, rpe: 6 });
     expect(setText(out[0].setsLog[0])).toBe('10 min · 5 km · 2:00/km · 142 ud./min');
     expect(tonnage({ id: 's', clientId: 'c', date: '2026-10-18', charge: 'brak', exercises: out } as never)).toBe(0);
+  });
+});
+
+describe('hantle: ciężar za 1 hantel / suma', () => {
+  it('rozpoznaje hantle z nazwy, jawny wybór wygrywa', () => {
+    expect(loadPerOf({ name: 'Wyciskanie hantli na skosie' })).toBe('one');
+    expect(loadPerOf({ name: 'Wyciskanie hantli na skosie', loadPer: 'sum' })).toBe('sum');
+    expect(loadPerOf({ name: 'Przysiad ze sztangą' })).toBeUndefined();
+    expect(loadPerOf({ name: 'Bieg z hantlami', cardio: true })).toBeUndefined();
+  });
+  it('tonaż: 1 hantel obiema rękami liczy oba, suma i jednorącz bez zmian', () => {
+    const s = (e: object) => ({ id: 's', clientId: 'c', date: '2026-10-20', charge: 'brak', exercises: [{ name: 'Wyciskanie hantli', setsLog: [{ reps: 10, load: 20 }], ...e }] }) as never;
+    expect(tonnage(s({ loadPer: 'one' }))).toBe(400);
+    expect(tonnage(s({ loadPer: 'sum' }))).toBe(200);
+    expect(tonnage(s({ loadPer: 'one', perSide: true }))).toBe(400);
   });
 });
