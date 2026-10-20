@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
+import { PalettePicker } from '../components/PalettePicker';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
 import { allMeasurements, clientById, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
@@ -73,6 +74,7 @@ export function AthleteApp({
     return 'home';
   });
   const [planId, setPlanId] = useState<string | null>(null);
+  const [look, setLook] = useState(false);
 
   useEffect(() => storeRun(clientId, run), [clientId, run]);
   const started = useRef(false);
@@ -157,17 +159,39 @@ export function AthleteApp({
           <span className="auth-logo small-logo">
             FITOWA <span>/ coach</span>
           </span>
-          <button className="btn btn-ghost btn-sm" onClick={onExit}>
-            Wyloguj
-          </button>
+          <span className="row-inline">
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Wygląd — kolory aplikacji">
+              🎨 Wygląd
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={onExit}>
+              Wyloguj
+            </button>
+          </span>
         </div>
       ) : (
         <div className="ath-preview">
           <span>Podgląd trybu zawodnika · {client.name}</span>
-          <button className="btn btn-ghost btn-sm" onClick={onExit}>
-            Wróć do panelu
-          </button>
+          <span className="row-inline">
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Wygląd — kolory aplikacji">
+              🎨
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={onExit}>
+              Wróć do panelu
+            </button>
+          </span>
         </div>
+      )}
+      {look && (
+        <Sheet label="Wygląd" onClose={() => setLook(false)}>
+          <div className="between">
+            <h2>Wygląd</h2>
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(false)}>
+              Gotowe
+            </button>
+          </div>
+          <p className="muted small">Wybierz kolory aplikacji — zapisują się na tym telefonie.</p>
+          <PalettePicker />
+        </Sheet>
       )}
       {screen === 'intake' ? (
         <IntakeWizard

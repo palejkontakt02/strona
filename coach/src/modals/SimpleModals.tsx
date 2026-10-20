@@ -11,7 +11,7 @@ import { num, numIn } from '../lib/parse';
 import { computeLsi } from '../lib/tests';
 import { useNav, type ModalState } from '../nav';
 import { MEASURE_FIELDS } from '../views/client/Measurements';
-import { getPalette, PALETTES, setPalette, type PaletteId } from '../theme';
+import { PalettePicker } from '../components/PalettePicker';
 import { ClientFields, fromDraft, toDraft } from '../views/client/Profile';
 import { ClientSelect } from './ModalHost';
 
@@ -415,7 +415,6 @@ export function DataModal() {
   const { db, reset, importDb, ask, toast, cloud, signOut } = useStore();
   const { closeModal, go, openModal } = useNav();
   const file = useRef<HTMLInputElement>(null);
-  const [palette, setPal] = useState<PaletteId>(getPalette());
 
   const exportAll = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -442,26 +441,7 @@ export function DataModal() {
   return (
     <Modal title="Ustawienia" onClose={closeModal}>
       <h4>Kolory</h4>
-      <div className="palettes" role="radiogroup" aria-label="Motyw kolorystyczny">
-        {PALETTES.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="radio"
-            aria-checked={palette === p.id}
-            className={`palette ${palette === p.id ? 'active' : ''}`}
-            onClick={() => {
-              setPalette(p.id);
-              setPal(p.id);
-            }}
-          >
-            <span className="swatch" style={{ background: p.bg }}>
-              <i style={{ background: p.accent }} />
-            </span>
-            {p.name}
-          </button>
-        ))}
-      </div>
+      <PalettePicker />
       <h4 className="form-section">Konta w aplikacji</h4>
       <AccountsPanel />
       <h4 className="form-section">Miejsca treningów</h4>

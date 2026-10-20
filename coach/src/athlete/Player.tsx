@@ -372,8 +372,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 const set = (nl: string, nr: string) => setSet(k, i, { reps: nl === nr ? nl : `${nl}/${nr}` });
                 return (
                   <>
-                    <input inputMode="numeric" value={l} placeholder="L" onChange={(ev) => set(ev.target.value, r)} aria-label={`Lewa strona, ${run.ex[k].name}, seria ${num}`} />
-                    <input inputMode="numeric" value={r} placeholder="P" onChange={(ev) => set(l, ev.target.value)} aria-label={`Prawa strona, ${run.ex[k].name}, seria ${num}`} />
+                    <input inputMode="numeric" value={l} placeholder="L" onFocus={selectAll} onChange={(ev) => set(ev.target.value, r)} aria-label={`Lewa strona, ${run.ex[k].name}, seria ${num}`} />
+                    <input inputMode="numeric" value={r} placeholder="P" onFocus={selectAll} onChange={(ev) => set(l, ev.target.value)} aria-label={`Prawa strona, ${run.ex[k].name}, seria ${num}`} />
                   </>
                 );
               })()}
@@ -382,7 +382,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             s.unit && !s.done && holdSec(s) > 0 ? (
               // seria na czas: odliczanie w polu tej serii
               <span className="reps-hold">
-                <input inputMode="text" value={s.reps} placeholder="s" onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas, ${run.ex[k].name}, seria ${num}`} />
+                <input inputMode="text" value={s.reps} placeholder="s" onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas, ${run.ex[k].name}, seria ${num}`} />
                 <button
                   type="button"
                   className="hold-btn"
@@ -394,12 +394,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 </button>
               </span>
             ) : (
-              <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+              <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
             )
           )}
           {!run.ex[k].cardio && (
             <>
-              {!sidesWide(run.ex[k]) && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
+              {!sidesWide(run.ex[k]) && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
               <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
               <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />
             </>
@@ -892,6 +892,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
 /** Nagłówek kolumny powtórzeń: „powt.”, „sek.”, „min”, z „/str.” dla ćwiczeń na stronę (L | P). */
 /** Czas serii do odliczania (s): pierwsza strona przy „30/20”, „1:30”, „2 min”. */
+/**
+ * Pole z wartością podpowiedzianą (ciężar, powtórzenia z planu): dotknięcie zaznacza całość,
+ * więc wpisana liczba zastępuje podpowiedź zamiast się do niej dopisać (42,5 + „42” ≠ „42,542”).
+ * Opóźnienie — iOS po fokusie sam ustawia kursor i kasowałby zaznaczenie.
+ */
+function selectAll(ev: React.FocusEvent<HTMLInputElement>) {
+  const el = ev.currentTarget;
+  window.setTimeout(() => {
+    if (document.activeElement === el && el.value) el.setSelectionRange(0, el.value.length);
+  }, 0);
+}
+
 function holdSec(s: RunSet): number {
   const side = sidesOf(s.reps)?.[0];
   if (side != null) return Math.round(side * (s.unit === 'min' ? 60 : 1));
