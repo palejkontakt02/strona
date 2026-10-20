@@ -114,8 +114,8 @@ export function hrMaxOf(p?: RunProfile, birthDate?: string): { v: number; est: b
 /** Dystans startowy z celu: „5K”, „10 km”, „HM”, „półmaraton”, „M”, „maraton” → km. */
 function raceKm(t: string): number | null {
   const s = t.toLowerCase().replace(/^tempo\s*/, '').trim();
-  if (/^(hm|półmaraton|polmaraton|21(,1)?\s*k(m)?)$/.test(s)) return 21.0975;
-  if (/^(m|maraton|42(,2)?\s*k(m)?)$/.test(s)) return 42.195;
+  if (/^(hm|półmaraton[u]?|polmaraton[u]?|21(,1)?\s*k(m)?)$/.test(s)) return 21.0975;
+  if (/^(m|maraton[u]?|42(,2)?\s*k(m)?)$/.test(s)) return 42.195;
   const m = s.match(/^(\d{1,2})\s*k(m)?$/);
   return m && +m[1] >= 1 && +m[1] <= 50 ? +m[1] : null;
 }

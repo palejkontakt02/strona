@@ -2,8 +2,30 @@ import { WorkoutTable } from '../components/PlanTable';
 import { Sheet } from '../components/Sheet';
 import type { PlanWorkout, TrainingSession } from '../domain';
 import { sessionToWorkout } from '../data/ops';
+import { fmtClock } from '../lib/running';
 import { fmtDay } from '../format';
 import { StartButtons } from './StartButtons';
+
+/** Wykonanie jako jednostka do tabeli; bieg: w kolumnie celu faktyczne tempo i tętno, RPE z zapisu. */
+function doneWorkout(s: TrainingSession): PlanWorkout {
+  const w = sessionToWorkout(s);
+  const named = s.exercises.filter((e) => e.name.trim());
+  return {
+    ...w,
+    exercises: w.exercises.map((e, i) => {
+      const log = named[i]?.setsLog;
+      if (!e.cardio || !log?.length) return e;
+      return {
+        ...e,
+        groups: e.groups.map((g, j) => {
+          const x = log[j];
+          const pace = x?.dist && x.reps ? x.reps / x.dist : null;
+          return { ...g, pace: [pace ? `${fmtClock(pace)}/km` : '', x?.hr ? `♥ ${x.hr}` : ''].filter(Boolean).join(' · ') || undefined, rpe: x?.rpe != null ? String(x.rpe) : '' };
+        }),
+      };
+    }),
+  };
+}
 
 /**
  * Podgląd jednostki: ta sama tabela co plan (wiersz na serię, ciężar, przerwa, uwagi; rozgrzewki po rozwinięciu).
@@ -46,7 +68,7 @@ export function WorkoutPreview({
             Zobacz, jak poszło {fmtDay(done)} ›
           </button>
         )}
-        <WorkoutTable workout={{ ...workout, exercises: workout.exercises.filter((e) => e.name) }} done={session?.exercises.length ? sessionToWorkout(session) : undefined} doneName={session ? `Wykonano ${fmtDay(session.date)}` : undefined} />
+        <WorkoutTable workout={{ ...workout, exercises: workout.exercises.filter((e) => e.name) }} done={session?.exercises.length ? doneWorkout(session) : undefined} doneName={session ? `Wykonano ${fmtDay(session.date)}` : undefined} />
         {onStart && <StartButtons onStart={onStart} onTrainer={onTrainer} />}
       </Sheet>
   );

@@ -1,4 +1,5 @@
 import type { Client, Plan, TrainingSession } from '../domain';
+import { targetText, ZONES } from './running';
 import { fmtWeekdayDate, planGrid } from './planGrid';
 import { addDays, todayISO } from './dates';
 
@@ -48,13 +49,20 @@ function openPrint(title: string, body: string) {
  * w komórce „powt. × ciężar @RPE” (ciężar, gdy wpisany) i kratka do odhaczenia; rozgrzewki szare.
  * Przy więcej niż 3 tygodniach strona pozioma.
  */
+/** Bieg w planie: legenda stref z tętnem / tempem podopiecznego (na wydruku „Z2” samo nic nie mówi). */
+function zoneLegend(slots: ReturnType<typeof planGrid>, client: Client): string {
+  if (!slots.some((s) => s.rows.some((r) => r.cardio))) return '';
+  const items = ZONES.map((z) => `<li><b>${esc(z.z)}</b> ${esc(targetText(z.z, client.run, client.dob))}</li>`).join('');
+  return `<h2>Strefy</h2><ul class="note">${items}</ul>`;
+}
+
 export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSession[]) {
   const slots = planGrid(plan, () => true);
   const wide = Math.max(0, ...slots.map((s) => s.cols.length)) > 3;
   const tables = slots
     .map((slot) => {
       if (!slot.rows.length) return `<h2>${esc(slot.name)}</h2><p class="muted">Brak ćwiczeń.</p>`;
-      const head = `<tr><th rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk">${esc(c.week.name)}${c.date ? `<br><span class="note">${esc(fmtWeekdayDate(c.date))}</span>` : ''}</th>`).join('')}</tr><tr>${slot.cols.map(() => '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub no">RPE</th>').join('')}</tr>`;
+      const head = `<tr><th rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk">${esc(c.week.name)}${c.date ? `<br><span class="note">${esc(fmtWeekdayDate(c.date))}</span>` : ''}</th>`).join('')}</tr><tr>${slot.cols.map(() => (slot.rows.every((r) => r.cardio) ? '<th class="wk sub">Odcinek</th><th class="sub">Cel</th><th class="sub no">RPE</th>' : '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub no">RPE</th>')).join('')}</tr>`;
       const body = slot.rows
         .map((r) =>
           r.lines
@@ -77,7 +85,7 @@ export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSessio
         .join('');
       return `<h2>${esc(slot.name)}</h2><table class="grid">${head}${body}</table>`;
     })
-    .join('');
+    .join('') + zoneLegend(slots, client);
   openPrint(
     `${plan.name} — ${client.name}`,
     `<style>@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:0} body{margin:${wide ? '12mm 10mm' : '18mm 14mm'}}

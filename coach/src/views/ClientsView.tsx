@@ -39,14 +39,15 @@ export function ClientsView() {
   const q = normalize(query.trim());
   const list = db.clients
     .filter((c) => (filter === 'Aktywni' ? c.status === 'aktywny' : true))
-    .filter((c) => normalize(`${c.name} ${c.sport ?? ''}`).includes(q))
+    // szukanie także po celu, poziomie, urazach, notatkach, kontakcie i miejscu (np. „ACL”, „powrót”, „online”)
+    .filter((c) => !q || normalize([c.name, c.sport, c.position, c.goal, c.level, c.injuries, c.notes, c.phone, c.email, db.locations.find((l) => l.id === c.locationId)?.name].filter(Boolean).join(' ')).includes(q))
     .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   const selected = db.clients.find((c) => c.id === clientId);
 
   return (
     <div className={`master-detail ${selected ? 'show-detail' : ''}`}>
       <aside className="sidebar">
-        <input className="input" type="search" placeholder="Szukaj podopiecznego…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="input" type="search" placeholder="Szukaj: imię, cel, uraz, miejsce…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="sidebar-row">
           <Seg options={FILTERS} value={filter} onChange={setFilter} label="Filtr" />
           <button className="btn btn-primary btn-sm" onClick={() => openModal({ kind: 'client' })}>

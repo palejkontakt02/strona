@@ -10,13 +10,14 @@ import { relativeStrength } from '../../lib/tests';
 import { useNav } from '../../nav';
 
 export const MEASURE_FIELDS = [
-  ['weight', 'Masa', 'kg'],
-  ['waist', 'Talia', 'cm'],
-  ['hips', 'Biodra', 'cm'],
-  ['chest', 'Klatka', 'cm'],
-  ['arm', 'Ramię', 'cm'],
-  ['thigh', 'Udo', 'cm'],
-  ['bf', '%BF', '%'],
+  // [pole, nazwa, jednostka, min, max] — zakres chroni przed literówką (725 zamiast 72,5)
+  ['weight', 'Masa', 'kg', 25, 300],
+  ['waist', 'Talia', 'cm', 40, 200],
+  ['hips', 'Biodra', 'cm', 50, 200],
+  ['chest', 'Klatka', 'cm', 50, 200],
+  ['arm', 'Ramię', 'cm', 15, 70],
+  ['thigh', 'Udo', 'cm', 30, 100],
+  ['bf', '%BF', '%', 2, 70],
 ] as const;
 
 export function lsiTone(lsi: number) {

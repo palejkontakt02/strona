@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { del } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, uid } from '../../format';
-import { todayISO } from '../../lib/dates';
+import { addDays, daysBetween, todayISO, weekStart } from '../../lib/dates';
 import { doneInPass, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
@@ -51,7 +51,8 @@ export function ClientPlans({ client }: { client: Client }) {
         <div className="actions">
           {(() => {
             // gotowy plan innego podopiecznego jako szablon (kopia — oryginał zostaje bez zmian)
-            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra);
+            const who = (x: Plan) => db.clients.find((c) => c.id === x.clientId)?.name ?? '';
+            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra).sort((a, b) => who(a).localeCompare(who(b), 'pl') || a.name.localeCompare(b.name, 'pl'));
             if (!others.length) return null;
             return (
               <select
@@ -61,14 +62,24 @@ export function ClientPlans({ client }: { client: Client }) {
                 onChange={(e) => {
                   const src = others.find((x) => x.id === e.target.value);
                   if (!src) return;
-                  const copy = { ...clonePlan(src, src.name), clientId: client.id, active: plans.length === 0 };
+                  // start od najbliższego poniedziałku (nie data innego podopiecznego); daty jednostek przesunięte o tyle samo
+                  const start = weekStart(addDays(todayISO(), 6));
+                  const shift = src.startDate ? daysBetween(src.startDate, start) : 0;
+                  const base = clonePlan(src, src.name);
+                  const copy = {
+                    ...base,
+                    clientId: client.id,
+                    active: plans.length === 0,
+                    startDate: start,
+                    weeks: base.weeks.map((w) => ({ ...w, workouts: w.workouts.map((k) => (k.date ? { ...k, date: addDays(k.date, shift) } : k)) })),
+                  };
                   void apply(savePlan(db, copy), `Skopiowano plan „${src.name}” — możesz go dopasować.`);
                 }}
               >
                 <option value="">Plan od innego podopiecznego…</option>
                 {others.map((x) => (
                   <option key={x.id} value={x.id}>
-                    {x.name} — {db.clients.find((c) => c.id === x.clientId)?.name ?? ''}
+                    {who(x)} — {x.name}
                   </option>
                 ))}
               </select>

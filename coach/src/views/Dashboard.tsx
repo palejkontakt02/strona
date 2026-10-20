@@ -21,6 +21,7 @@ export function Dashboard() {
   const clubs = db.locations.filter((l) => l.kind === 'klub');
   const today = todayISO();
   const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [showAllToday, setShowAllToday] = useState(false);
   const active = db.clients.filter((c) => c.status === 'aktywny');
 
   const todayAppts = db.appointments.filter((a) => a.date === today && a.status !== 'cancel').sort((a, b) => a.time.localeCompare(b.time));
@@ -74,12 +75,13 @@ export function Dashboard() {
       </div>
 
       <div className="dash-grid">
-        <Card title="Dziś w kalendarzu" className="span-2">
+        <Card title={`Dziś w kalendarzu${todayAppts.length > 6 ? ` (${todayAppts.length})` : ''}`} className="span-2 dash-today">
           {todayAppts.length === 0 ? (
             <Empty>Brak wizyt na dziś.</Empty>
           ) : (
             <ul className="rows">
-              {todayAppts.map((a) => {
+              {/* dużo wizyt: najpierw te, które jeszcze przed Tobą (reszta po rozwinięciu) */}
+              {(showAllToday || todayAppts.length <= 8 ? todayAppts : (todayAppts.filter((a) => a.status === 'planned').length ? todayAppts.filter((a) => a.status === 'planned') : todayAppts).slice(0, 6)).map((a) => {
                 const c = clientById(db, a.clientId);
                 return (
                   <li key={a.id} className="row">
@@ -114,6 +116,11 @@ export function Dashboard() {
                 );
               })}
             </ul>
+          )}
+          {todayAppts.length > 8 && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAllToday(!showAllToday)}>
+              {showAllToday ? 'Pokaż mniej' : `Pokaż wszystkie wizyty (${todayAppts.length})`}
+            </button>
           )}
         </Card>
 
@@ -220,7 +227,7 @@ export function Dashboard() {
             .map((client) => ({ client, items: alerts.filter((a) => a.client.id === client.id) }))
             .sort((a, b) => Number(b.items.some((x) => x.level === 'red')) - Number(a.items.some((x) => x.level === 'red')));
           return (
-            <Card title={`Sygnały ostrzegawcze${groups.length ? ` (${groups.length})` : ''}`}>
+            <Card title={`Sygnały ostrzegawcze${groups.length ? ` (${groups.length})` : ''}`} className="dash-alerts">
               {groups.length === 0 ? (
                 <Empty>Wszystko w normie.</Empty>
               ) : (

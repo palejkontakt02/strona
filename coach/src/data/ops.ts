@@ -379,9 +379,9 @@ export function nextWeekName(weeks: { name: string }[], name: string): string {
 export type Progression = 'none' | 'load2' | 'load5' | 'rep' | 'rpe' | 'deload';
 export const PROGRESSIONS: [Progression, string][] = [
   ['none', 'bez zmian'],
-  ['load2', '+2,5% ciężaru'],
-  ['load5', '+5% ciężaru'],
-  ['rep', '+1 powtórzenie'],
+  ['load2', '+2,5% ciężaru (bieg: ~+5% czasu / dystansu)'],
+  ['load5', '+5% ciężaru (bieg: ~+10%)'],
+  ['rep', '+1 powtórzenie (bieg: +1 odcinek)'],
   ['rpe', '+0,5 RPE'],
   ['deload', 'deload (−1 seria, −10%, RPE −2)'],
 ];

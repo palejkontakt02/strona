@@ -56,7 +56,7 @@ export interface RefLine {
 
 /** Wykres liniowy z osią czasu i liniami odniesienia. */
 export function LineChart({
-  series,
+  series: rawSeries,
   refs = [],
   height = 200,
   label,
@@ -70,6 +70,8 @@ export function LineChart({
   format?: (v: number) => string;
   minY?: number;
 }) {
+  // punkty bez poprawnej daty (np. stary pomiar z pustą datą) nie psują osi
+  const series = rawSeries.map((s) => ({ ...s, pts: s.pts.filter((p) => /^\d{4}-\d{2}-\d{2}/.test(p.x) && Number.isFinite(p.y)) }));
   const all = series.flatMap((s) => s.pts);
   if (all.length < 2) return <p className="empty">Za mało danych do wykresu.</p>;
   const R = 12;
@@ -113,7 +115,11 @@ export function LineChart({
             </text>
           </g>
         ))}
-        {[sortedX[0], sortedX[Math.floor(sortedX.length / 2)], sortedX[sortedX.length - 1]].filter((v, i, a) => a.indexOf(v) === i).map((x) => (
+        {/* daty pod osią: pierwsza, środkowa, ostatnia — bez tych, które nachodziłyby na sąsiednią */}
+        {[sortedX[0], sortedX[sortedX.length - 1], sortedX[Math.floor(sortedX.length / 2)]]
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .filter((v, i, a) => a.slice(0, i).every((u) => Math.abs(X(u) - X(v)) > 80))
+          .map((x) => (
           <text key={x} x={X(x)} y={height - 6} className="chart-axis" textAnchor={sortedX.length > 1 && x === sortedX[0] ? 'start' : sortedX.length > 1 && x === sortedX[sortedX.length - 1] ? 'end' : 'middle'}>
             {fmtShort(x)}
           </text>

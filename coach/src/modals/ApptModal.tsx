@@ -68,7 +68,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const d2: Appointment = { ...draft, groupId: partners.length ? (editing?.groupId ?? uid()) : undefined };
     const main = grouped ? saveGroupAppointments(db, d2, partners, allNext ? 1 : n, editing) : saveAppointment(d2, n);
     const pairMsg = partners.length ? ` W parze z: ${partners.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : '';
-    const msg = n > 1 ? `Dodano ${n} wizyt (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
+    const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
     if (!(await apply([...main, ...(allNext ? updateSeries(db, d2) : []), ...chargeChange], msg + pairMsg))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {

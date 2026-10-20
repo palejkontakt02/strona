@@ -4538,7 +4538,9 @@ body.athlete-mode .toasts {
 }
 .assign-src {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
+  min-width: 0;
 }
 .assign-opt {
   display: flex;
@@ -4561,6 +4563,9 @@ body.athlete-mode .toasts {
 }
 .assign-opt select {
   max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
 }
 .assign-day {
   margin-top: var(--space-2);
@@ -5223,4 +5228,179 @@ button.mini-day {
 }
 .ptab-two .ptab-table thead .ptab-week {
   white-space: normal;
+}
+.mini-legend .dot.done {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-ok) 35%, transparent);
+}
+.mini-day-list li.done {
+  color: var(--color-ok);
+}
+/* telefon: sygnały ostrzegawcze zaraz po dzisiejszych wizytach (nie pod wiadomościami i nagraniami) */
+@media (max-width: 640px) {
+  .dash-grid > .dash-today {
+    order: -2;
+  }
+  .dash-grid > .dash-alerts {
+    order: -1;
+  }
+}
+/* telefon: nagłówek karty — tytuł na całą szerokość, przyciski w rzędzie pod nim */
+@media (max-width: 640px) {
+  .card-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+  .card-head h4 {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  .card-head .actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+/* telefon: wiersz serii w edytorze — pełna nazwa typu („Robocze”), węższe pola liczb */
+@media (max-width: 640px) {
+  .pe-set {
+    grid-template-columns: 16px minmax(92px, 1.5fr) repeat(3, minmax(38px, 1fr)) 26px;
+    gap: 4px;
+  }
+  .pe-set select.input {
+    padding: var(--space-1) 18px var(--space-1) 6px;
+    font-size: 0.8rem;
+    background-position: right 4px center;
+  }
+  .pe-set .input {
+    padding-left: 6px;
+    padding-right: 4px;
+  }
+  .pe-ex .side-toggle {
+    white-space: normal;
+    text-align: left;
+    height: auto;
+  }
+}
+/* telefon: zapis treningu — przełączniki typu na całą szerokość, odcinek biegu bez ucinania (tempo w osobnej linii) */
+@media (max-width: 600px) {
+  .ex-row > .side-toggle,
+  .ex-row > .ex-opts-btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+    white-space: normal;
+    text-align: left;
+  }
+  .set-edit-row.cardio {
+    grid-template-columns: 28px repeat(4, minmax(0, 1fr)) 30px;
+    gap: 4px;
+  }
+  .set-edit-row.cardio > .muted.small {
+    grid-column: 2 / -2;
+    grid-row: 2;
+    margin-top: -2px;
+  }
+  .set-edit-row.cardio .input {
+    padding-left: 5px;
+    padding-right: 3px;
+  }
+  .set-edit-head.cardio {
+    grid-template-columns: 28px repeat(4, minmax(0, 1fr)) 30px;
+  }
+}
+@media (max-width: 600px) {
+  .set-edit-head.cardio span:last-child {
+    display: none;
+  }
+}
+/* telefon: para — zakładki osób w osobnym rzędzie, „‹ Panel” ich nie zasłania */
+@media (max-width: 600px) {
+  .pair-live > .pair-bar {
+    flex-wrap: wrap;
+    width: calc(100% - 2 * var(--space-4));
+  }
+  .pair-live > .pair-bar .pair-tabs {
+    order: 2;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+@media (max-width: 600px) {
+  .pair-live > .pair-bar > .btn {
+    margin-left: auto;
+  }
+}
+.sgrid .lr.wide,
+.sgrid-head .wide {
+  grid-column: span 2;
+}
+/* mały telefon: samopoczucie — opis nad przyciskami, nie ściśnięty obok; nagłówek kalendarza w jednej linii */
+@media (max-width: 420px) {
+  .checkin-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .checkin-row > :first-child {
+    flex: 1 1 100%;
+  }
+  .checkin-row .scale {
+    flex: 1 1 100%;
+  }
+}
+.mini-cal-nav h3 {
+  white-space: nowrap;
+}
+.mini-cal-nav + .muted {
+  white-space: nowrap;
+}
+@media (max-width: 420px) {
+  .checkin-row .checkin-ends {
+    display: inline;
+    margin-left: 6px;
+  }
+}
+/* podgląd plan | wykonano — szerszy arkusz na komputerze, żeby obie kolumny były widoczne */
+.sheet:has(.ptab-two) {
+  max-width: 820px;
+}
+/* kalendarz: widok jednego dnia z paskiem tygodnia */
+.week.week-one {
+  grid-template-columns: minmax(0, 1fr);
+}
+.day-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: var(--space-4);
+}
+.day-strip-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-divider);
+  background: transparent;
+  color: var(--color-neutral-400);
+  font-size: 0.72rem;
+}
+.day-strip-btn b {
+  font-size: 1rem;
+  color: var(--color-text);
+}
+.day-strip-btn i {
+  font-style: normal;
+  min-height: 1em;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.day-strip-btn.is-today {
+  border-color: var(--color-accent);
+}
+.day-strip-btn.active {
+  background: var(--color-neutral-800, #222);
+  border-color: var(--color-neutral-300);
 }

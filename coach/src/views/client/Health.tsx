@@ -183,10 +183,24 @@ export function ClientHealth({ client }: { client: Client }) {
       )}
       {open && (
         <>
+          {(() => {
+            // odpowiedzi podopiecznego z ankiety — do przepisania jednym kliknięciem (bez nadpisywania już wpisanych)
+            const fromIntake = PARQ.filter(([k]) => h.parq?.[k] == null && (client.intake?.answers[`parq_${k}`] === 'tak' || client.intake?.answers[`parq_${k}`] === 'nie'));
+            return fromIntake.length > 0 ? (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => upd({ parq: { ...h.parq, ...Object.fromEntries(fromIntake.map(([k]) => [k, client.intake!.answers[`parq_${k}`] === 'tak'])) } })}>
+                Przepisz PAR-Q z ankiety podopiecznego ({fromIntake.length})
+              </button>
+            ) : null;
+          })()}
           <div className="parq">
             {PARQ.map(([k, q]) => (
               <div key={k} className="parq-row">
-                <span>{q}</span>
+                <span>
+                  {q}
+                  {h.parq?.[k] == null && client.intake?.answers[`parq_${k}`] && (
+                    <span className={`small ${client.intake.answers[`parq_${k}`] === 'tak' ? 'warn-text' : 'muted'}`}> · w ankiecie: {String(client.intake.answers[`parq_${k}`])}</span>
+                  )}
+                </span>
                 <div className="seg seg-sm" role="radiogroup" aria-label={q}>
                   {[
                     [false, 'nie'],

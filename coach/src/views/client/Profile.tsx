@@ -7,6 +7,7 @@ import { sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { fmtDate, slugify } from '../../format';
 import { num } from '../../lib/parse';
+import { parseDur } from '../../lib/running';
 import { useNav } from '../../nav';
 import { LocationSelect } from '../../components/location';
 import { AccountStatusCard } from '../../components/accounts';
@@ -72,8 +73,14 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Staż treningowy">{inp('experience')}</Field>
           <Field label="Poziom">{inp('level')}</Field>
           <Field label="Dni treningowe / tydz.">{inp('daysPerWeek', 'text', { inputMode: 'numeric' })}</Field>
-          <Field label="Bieg: tętno maks.">{inp('runHrMax', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 192' })}</Field>
-          <Field label="Bieg: czas na 5 km">{inp('runT5k', 'text', { placeholder: 'np. 25:30' })}</Field>
+          <Field label="Bieg: tętno maks.">
+            {inp('runHrMax', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 192' })}
+            {d.runHrMax?.trim() && !((num(d.runHrMax) ?? 0) > 120 && (num(d.runHrMax) ?? 0) < 230) && <span className="small warn-text">Tętno maks. zwykle 121–229 — przy tej wartości strefy liczą się z wieku.</span>}
+          </Field>
+          <Field label="Bieg: czas na 5 km">
+            {inp('runT5k', 'text', { placeholder: 'np. 25:30' })}
+            {d.runT5k?.trim() && !((parseDur(d.runT5k) ?? 0) > 10 && (parseDur(d.runT5k) ?? 0) < 90) && <span className="small warn-text">Wpisz czas całych 5 km (np. 25:30), nie tempo na km — inaczej tempa stref się nie policzą.</span>}
+          </Field>
           <Field label="Najbliższy start / cel">{inp('targetDate', 'date')}</Field>
           <Field label="Początek współpracy">{inp('startDate', 'date')}</Field>
           <Field label="Status">

@@ -33,7 +33,7 @@ export function Upcoming({ clientId, limit = 4 }: { clientId: string; limit?: nu
   if (next.length === 0) return null;
   return (
     <section className="acard">
-      <h3>Najbliższe treningi</h3>
+      <h3>Najbliższe wizyty z trenerem</h3>
       <ul className="rows">
         {(all ? next.slice(0, 8) : next.slice(0, limit)).map((a) => (
           <li key={a.id} className="row">
@@ -118,6 +118,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                     {nEx(s.exercises.length)}
                     {s.duration ? ` · ${s.duration} min` : ''}
                     {s.srpe != null ? (plain ? ` · wysiłek ${s.srpe}/10` : ` · RPE ${s.srpe}`) : ''}
+                    {s.pain ? ` · ból ${s.pain}/10` : ''}
                   </span>
                 </span>
                 <span className="wo-go">›</span>
@@ -218,7 +219,7 @@ export function SessionSheet({
               👥 w parze{(() => {
                 // podopieczny w aplikacji nie widzi innych osób — wtedy samo „w parze”
                 const names = s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0]).filter(Boolean);
-                return names.length ? ` z ${names.join(', ')}` : '';
+                return names.length ? `: ${names.join(', ')}` : '';
               })()}
             </span>
           ) : null}
@@ -244,6 +245,11 @@ export function SessionSheet({
             <span>
               {plain ? 'wysiłek' : 'RPE'} <b>{s.srpe}</b>
               {plain && '/10'}
+            </span>
+          )}
+          {s.pain != null && s.pain > 0 && (
+            <span className={s.pain >= 5 ? 'warn-text' : undefined}>
+              ból <b>{s.pain}</b>/10
             </span>
           )}
           {ton > 0 && (

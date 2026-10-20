@@ -471,7 +471,7 @@ function Home({
             </div>
           </div>
         </section>
-        <MonthCalendar dates={new Set(sessions.map((s) => s.date))} today={today} planned={plannedByDay(db, clientId, plan, extra, sessions, today)} />
+        <MonthCalendar done={sessions.reduce((m, s) => m.set(s.date, [...(m.get(s.date) ?? []), s.workoutName || 'Trening']), new Map<string, string[]>())} today={today} planned={plannedByDay(db, clientId, plan, extra, sessions, today)} />
       </div>
 
       <BodyProgress client={client} />
@@ -585,7 +585,10 @@ function Ring({ value, max }: { value: number; max: number }) {
 interface DayItem {
   kind: 'plan' | 'extra' | 'visit';
   text: string;
+  /** Bieg / cardio — ikona biegu zamiast sztangi. */
+  run?: boolean;
 }
+const isRunWorkout = (k: PlanWorkout) => k.exercises.some((e) => e.name) && k.exercises.filter((e) => e.name).every((e) => e.cardio ?? cardioByName(e.name));
 
 /** Co jest zaplanowane na dni: treningi z planu (dzień od trenera), zadane poza planem, wizyty z trenerem. */
 function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, plan: Plan | null | undefined, extra: Plan | undefined, sessions: TrainingSession[], today: string): Map<string, DayItem[]> {
@@ -596,17 +599,18 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
     plan.weeks.forEach((w, wi) =>
       w.workouts.forEach((k) => {
         const d = workoutDate(plan, wi, k);
-        if (d && !done.has(k.id) && k.exercises.some((e) => e.name)) add(d, { kind: 'plan', text: `${k.name} (${w.name})` });
+        if (d && !done.has(k.id) && k.exercises.some((e) => e.name)) add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
       }),
     );
   }
   for (const k of extra?.weeks.flatMap((w) => w.workouts) ?? [])
-    if (k.date && k.exercises.some((e) => e.name) && extraState(k, extra!.id, sessions, today).state !== 'done') add(k.date, { kind: 'extra', text: `${k.name} — od trenera` });
+    if (k.date && k.exercises.some((e) => e.name) && extraState(k, extra!.id, sessions, today).state !== 'done') add(k.date, { kind: 'extra', text: `${k.name} — od trenera`, run: isRunWorkout(k) });
   for (const a of db.appointments.filter((x) => x.clientId === clientId && x.status === 'planned')) add(a.date, { kind: 'visit', text: `Wizyta z trenerem ${a.time}` });
   return out;
 }
 
-function MonthCalendar({ dates, today, planned }: { dates: Set<string>; today: string; planned: Map<string, DayItem[]> }) {
+function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; today: string; planned: Map<string, DayItem[]> }) {
+  const dates = new Set(done.keys());
   const [month, setMonth] = useState(today.slice(0, 7));
   const [sel, setSel] = useState<string | null>(null);
   const first = month + '-01';
@@ -655,23 +659,27 @@ function MonthCalendar({ dates, today, planned }: { dates: Set<string>; today: s
               key={d}
               className={`mini-day ${d.slice(0, 7) !== first.slice(0, 7) ? 'other' : ''} ${d === today ? 'is-today' : ''} ${dates.has(d) ? 'has' : ''} ${todo ? 'todo' : ''} ${visit ? 'visit' : ''} ${pick === d ? 'sel' : ''} ${todo && d < today && !dates.has(d) ? 'late' : ''}`}
               onClick={() => setSel(d)}
-              aria-label={`${d}${dates.has(d) ? ', trening zrobiony' : ''}${its.length ? `, ${its.map((x) => x.text).join(', ')}` : ''}`}
+              aria-label={`${fmtLong(d)}${dates.has(d) ? ', trening zrobiony' : ''}${its.length ? `, ${its.map((x) => x.text).join(', ')}` : ''}`}
             >
-              {dates.has(d) ? '✓' : Number(d.slice(8))}
+              {Number(d.slice(8))}
             </button>
           );
         })}
       </div>
       <p className="mini-legend muted small">
-        <span className="dot todo" /> trening do zrobienia · <span className="dot visit" /> wizyta · ✓ zrobione
+        <span className="dot todo" /> trening do zrobienia · <span className="dot visit" /> wizyta · <span className="dot done" /> zrobiony
       </p>
       {pick && (items.length > 0 || dates.has(pick)) && (
         <ul className="mini-day-list">
           <li className="muted small first-cap">{fmtLong(pick)}</li>
-          {dates.has(pick) && <li>✓ Trening zrobiony</li>}
+          {done.get(pick)?.map((name, i) => (
+            <li key={`d${i}`} className="done">
+              ✓ {name} — zrobiony
+            </li>
+          ))}
           {items.map((x, i) => (
             <li key={i} className={x.kind}>
-              {x.kind === 'visit' ? '🗓 ' : pick < today ? '⚠ ' : '🏋 '}
+              {x.kind === 'visit' ? '🗓 ' : pick < today ? '⚠ ' : x.run ? '🏃 ' : '🏋 '}
               {x.text}
               {x.kind !== 'visit' && pick < today ? ' — zaległy' : ''}
             </li>
@@ -711,14 +719,14 @@ function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof client
               {vals.length >= 2 &&
                 (() => {
                   const d = vals[vals.length - 1][field]! - vals[0][field]!;
-                  return <span className={`small ${d < 0 ? 'ok-text' : ''}`}>{`${d > 0 ? '+' : ''}${fnum(d)} od ${fmtDay(vals[0].date)}`}</span>;
+                  return <span className={`small ${d < 0 ? 'ok-text' : ''}`}>{d === 0 ? `bez zmian od ${fmtDay(vals[0].date)}` : `${d > 0 ? '+' : ''}${fnum(d)} ${field === 'weight' ? 'kg' : 'cm'} od ${fmtDay(vals[0].date)}`}</span>;
                 })()}
             </div>
             {field === 'weight' && wd != null && (
               <div>
                 <span className="muted small">Talia</span>
                 <strong className="big">{fnum(waist[waist.length - 1].waist!)} cm</strong>
-                <span className={`small ${wd < 0 ? 'ok-text' : ''}`}>{`${wd > 0 ? '+' : ''}${fnum(wd)} cm`}</span>
+                <span className={`small ${wd < 0 ? 'ok-text' : ''}`}>{wd === 0 ? `bez zmian od ${fmtDay(waist[0].date)}` : `${wd > 0 ? '+' : ''}${fnum(wd)} cm od ${fmtDay(waist[0].date)}`}</span>
               </div>
             )}
           </div>
@@ -746,6 +754,7 @@ function AddMeasurement({ client, onClose }: { client: NonNullable<ReturnType<ty
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const save = async () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Wybierz datę pomiaru.');
     if (date > todayISO()) return toast('Data pomiaru nie może być w przyszłości.');
     const m: Measurement = { id: uid(), date, note: note.trim() || undefined };
     for (const [k, label, , min, max] of SELF_FIELDS) {

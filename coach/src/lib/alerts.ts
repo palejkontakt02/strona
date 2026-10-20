@@ -34,9 +34,9 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
     const last = wellnessTotal(ws[0].wellness)!;
     const prev = ws.slice(1, 5).map((s) => wellnessTotal(s.wellness)!);
     const avg = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
-    if (last <= 12) a.push({ level: 'red', text: `Wellness ${last}/25 na ostatnim treningu` });
+    if (last <= 12) a.push({ level: 'red', text: `Wellness ${last}/25 na treningu ${fmtD(ws[0].date)}` });
     else if (avg && last < avg * 0.8)
-      a.push({ level: 'yellow', text: `Wellness spadł do ${last}/25 (średnio ${Math.round(avg)})` });
+      a.push({ level: 'yellow', text: `Wellness spadł do ${last}/25 (${fmtD(ws[0].date)}, średnio ${Math.round(avg)})` });
   }
 
   // check-in samopoczucia z ostatnich 2 dni (także bez treningu), jeśli nowszy niż ostatni trening z wellness

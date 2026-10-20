@@ -1,5 +1,5 @@
 import { cardioByName, isTimed, perSideByName } from '../lib/run';
-import { emptyRunExercise, RUN_TEMPLATES } from '../lib/running';
+import { emptyRunExercise, parseDur, parseKm, RUN_TEMPLATES } from '../lib/running';
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 
 const CARDIO_TYPES: SetType[] = ['Rozgrzewka', 'Robocze', 'Schłodzenie'];
@@ -68,6 +68,21 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       setOpen(new Set(clean.weeks.filter((w) => w.workouts.some((k) => !k.day && !k.date && k.exercises.some((e) => e.name.trim()))).map((w) => w.id)));
       return toast(`Ustaw dzień tygodnia albo datę: ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ` i ${missing.length - 4} więcej` : ''}.`);
     }
+    // bieg: czas i dystans odcinków muszą dać się odczytać (inaczej podopieczny utknie w odtwarzaczu)
+    for (const w of clean.weeks)
+      for (const k of w.workouts)
+        for (const e of k.exercises) {
+          if (!e.name.trim() || !(e.cardio ?? cardioByName(e.name))) continue;
+          if (!e.groups.some((g) => g.reps.trim() || g.load.trim())) {
+            setOpen(new Set([w.id]));
+            return toast(`${k.name} · ${e.name}: wpisz czas albo dystans przynajmniej jednego odcinka.`);
+          }
+          const bad = e.groups.findIndex((g) => (g.reps.trim() && parseDur(g.reps) == null) || (g.load.trim() && parseKm(g.load) == null));
+          if (bad >= 0) {
+            setOpen(new Set([w.id]));
+            return toast(`${k.name} · ${e.name}, odcinek ${bad + 1}: czas „${e.groups[bad].reps}” / dystans „${e.groups[bad].load}” — popraw (czas: 40, 3:05, 1:20:00; dystans: 5, 400 m).`);
+          }
+        }
     if (!clean.extra && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
@@ -264,7 +279,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         placeholder={inBlock && all[ei + 1]?.linked ? 'Przejście' : 'Przerwa'}
                         title={inBlock ? (all[ei + 1]?.linked ? 'Czas przejścia do następnego ćwiczenia bloku (puste = od razu)' : 'Przerwa po całej rundzie bloku') : 'Przerwa między seriami'}
                         onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" /></> : <span className="grow" />}
-                      <span className="muted small nowrap">{setCountLabel(e.groups)}</span>
+                      <span className="muted small nowrap">{(e.cardio ?? cardioByName(e.name)) ? `${e.groups.length} ${e.groups.length === 1 ? 'odcinek' : e.groups.length < 5 ? 'odcinki' : 'odcinków'}` : setCountLabel(e.groups)}</span>
                       <IconBtn
                         icon="up"
                         label="Przesuń ćwiczenie w górę"
@@ -306,7 +321,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       onClick={() => setEx((x) => void (x.timed = !isTimed(x)))}
                       title="Ćwiczenie na czas (deska, wall sit, zwis): w kolumnie „Czas” sekundy, m:ss albo „2 min”"
                     >
-                      ⏱ {isTimed(e) ? 'Na czas — w serii czas zamiast powtórzeń' : 'Na czas?'}
+                      ⏱ {isTimed(e) ? 'Na czas (czas zamiast powtórzeń)' : 'Na czas?'}
                     </button>
                     )}
 {!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || !!(e.perSide ?? perSideByName(e.name))) && (

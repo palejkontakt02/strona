@@ -24,7 +24,7 @@ export function ApptStatusTag({ status }: { status: AppointmentStatus }) {
 
 export const hueStyle = (clientId: string) => ({ '--hue': clientHue(clientId) }) as React.CSSProperties;
 
-type Mode = 'Tydzień' | 'Miesiąc';
+type Mode = 'Dzień' | 'Tydzień' | 'Miesiąc';
 const WHO = ['Wszyscy', 'Ze mną', 'Samodzielnie'] as const;
 type Who = (typeof WHO)[number];
 
@@ -32,7 +32,8 @@ export function CalendarView() {
   const { db } = useStore();
   const { openModal } = useNav();
   const today = todayISO();
-  const [mode, setMode] = useState<Mode>('Tydzień');
+  // telefon: domyślnie jeden dzień (tydzień przy wielu podopiecznych to bardzo długa strona)
+  const [mode, setMode] = useState<Mode>(() => (typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches ? 'Dzień' : 'Tydzień'));
   const [anchor, setAnchor] = useState<ISODate>(today);
   const [locSel, setLoc] = useState('');
   // kto: wszyscy / treningi ze mną (wizyty) / samodzielne — wybór zapamiętany na tym urządzeniu
@@ -62,7 +63,8 @@ export function CalendarView() {
   const loc = db.locations.some((l) => l.id === locSel) ? locSel : '';
 
   const shift = (dir: number) => {
-    if (mode === 'Tydzień') setAnchor(addDays(anchor, 7 * dir));
+    if (mode === 'Dzień') setAnchor(addDays(anchor, dir));
+    else if (mode === 'Tydzień') setAnchor(addDays(anchor, 7 * dir));
     else {
       const d = new Date(anchor + 'T12:00:00');
       d.setDate(1);
@@ -108,14 +110,14 @@ export function CalendarView() {
 
   const ws = weekStart(anchor);
   const title =
-    mode === 'Tydzień' ? `${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}` : fmtMonth(anchor.slice(0, 7));
+    mode === 'Dzień' ? `${fmtWeekday(anchor)} ${fmtShort(anchor)}` : mode === 'Tydzień' ? `${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}` : fmtMonth(anchor.slice(0, 7));
 
   return (
     <div className="page page-wide fade">
       <div className="page-head">
         <h2>Kalendarz</h2>
         <div className="cal-controls">
-          <Seg options={['Tydzień', 'Miesiąc'] as const} value={mode} onChange={setMode} label="Widok" />
+          <Seg options={['Dzień', 'Tydzień', 'Miesiąc'] as const} value={mode} onChange={setMode} label="Widok" />
           <Seg options={WHO} value={who} onChange={setWho} label="Kto trenuje" />
           <div className="cal-nav">
             <button className="icon-btn" aria-label="Poprzedni" onClick={() => shift(-1)}>
@@ -144,9 +146,24 @@ export function CalendarView() {
         </div>
       </div>
 
-      {mode === 'Tydzień' ? (
-        <div className="week">
-          {Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => (
+      {mode === 'Dzień' && (
+        // pasek tygodnia: szybki wybór dnia, kropka = coś zaplanowane
+        <div className="day-strip" role="tablist" aria-label="Dzień tygodnia">
+          {Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => {
+            const n = apptsOn(date).length + looseOn(date).length + assignedOn(date).length;
+            return (
+              <button key={date} type="button" role="tab" aria-selected={date === anchor} className={`day-strip-btn ${date === anchor ? 'active' : ''} ${date === today ? 'is-today' : ''}`} onClick={() => setAnchor(date)} aria-label={`${fmtWeekday(date)} ${fmtShort(date)}${n ? `, ${n}` : ''}`}>
+                <span>{fmtWeekday(date).slice(0, 2)}</span>
+                <b>{Number(date.slice(8))}</b>
+                <i>{n || ''}</i>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {mode !== 'Miesiąc' ? (
+        <div className={`week ${mode === 'Dzień' ? 'week-one' : ''}`}>
+          {(mode === 'Dzień' ? [anchor] : Array.from({ length: 7 }, (_, i) => addDays(ws, i))).map((date) => (
             <section key={date} data-date={date} className={`week-day ${date === today ? 'is-today' : ''}`}>
               <header>
                 <span className="first-cap">{fmtWeekday(date)}</span> <strong>{fmtShort(date)}</strong>
@@ -177,7 +194,7 @@ export function CalendarView() {
           assignedOn={assignedOn}
           onPickDay={(d) => {
             setAnchor(d);
-            setMode('Tydzień');
+            setMode(matchMedia('(max-width: 720px)').matches ? 'Dzień' : 'Tydzień');
           }}
         />
       )}
@@ -193,10 +210,15 @@ function ApptTile({ a }: { a: Appointment }) {
   const { openModal } = useNav();
   const c = clientById(db, a.clientId);
   const partners = groupOf(db.appointments, a).filter((x) => x.id !== a.id && x.status !== 'cancel');
+  // para: status każdej osoby osobno (nieobecność jednej nie wyszarza całej wizyty)
+  const all = [a, ...partners];
+  const mixed = partners.length > 0 && all.some((x) => x.status !== a.status);
+  const status = mixed && all.some((x) => x.status === 'planned') ? 'planned' : a.status;
+  const first = (id: string) => clientById(db, id)?.name.split(' ')[0] ?? '—';
   const clash = a.status === 'planned' && clashes(a, db.appointments).length > 0;
   return (
     <button
-      className={`tile tile-${a.status} ${clash ? 'tile-clash' : ''} ${a.status === 'planned' && a.date < todayISO() ? 'tile-overdue' : ''}`}
+      className={`tile tile-${status} ${clash ? 'tile-clash' : ''} ${a.status === 'planned' && a.date < todayISO() ? 'tile-overdue' : ''}`}
       style={hueStyle(a.clientId)}
       title={clash ? 'Kolizja z inną wizytą o tej porze' : undefined}
       onClick={() => openModal({ kind: 'appt', appt: a })}
@@ -210,7 +232,11 @@ function ApptTile({ a }: { a: Appointment }) {
         {partners.length ? `👥 ${[c, ...partners.map((x) => clientById(db, x.clientId))].map((x) => x?.name.split(' ')[0] ?? '—').join(' + ')}` : c?.name ?? '—'}
       </span>
       <LocationTag id={a.locationId} short />
-      {a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>}
+      {mixed ? (
+        <span className="tile-status">{all.filter((x) => x.status !== 'planned').map((x) => `${first(x.clientId)}: ${APPT_STATUS[x.status].label.toLowerCase()}`).join(', ')}</span>
+      ) : (
+        a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>
+      )}
     </button>
   );
 }

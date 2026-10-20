@@ -242,9 +242,9 @@ export function LiveSession({
               if (!pr || !pr.ex.length || !pc) return null;
               return (
                 <section key={pid} className="acard">
-                  <span className="eyebrow">W parze z {pc.name.split(' ')[0]}</span>
+                  <span className="eyebrow">W parze: {pc.name.split(' ')[0]}</span>
                   <h3>Ten sam trening: {pr.name}</h3>
-                  <p className="muted small">{nEx(pr.ex.length)} — ciężary dobrane z historii {client.name.split(' ')[0]}.</p>
+                  <p className="muted small">{nEx(pr.ex.length)} — ciężary dobrane z własnej historii ({client.name.split(' ')[0]}).</p>
                   <button
                     className="btn btn-secondary btn-lg"
                     onClick={() => {

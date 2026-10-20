@@ -60,15 +60,16 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
       title="Nowy pomiar"
       onClose={closeModal}
       onSubmit={async () => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Wybierz datę pomiaru.');
         if (date > todayISO()) return toast('Data pomiaru jest w przyszłości — sprawdź datę.');
         const meas: Measurement = { id: uid(), date, note: note.trim() || undefined };
         let any = false;
-        for (const [k] of MEASURE_FIELDS) {
-          const n = num(v[k]);
-          if (n != null) {
-            meas[k] = n;
-            any = true;
-          }
+        for (const [k, label, unit, min, max] of MEASURE_FIELDS) {
+          if (!v[k]?.trim()) continue;
+          const n = numIn(v[k], min, max);
+          if (n == null) return toast(`${label}: wpisz liczbę od ${min} do ${max} ${unit}.`);
+          meas[k] = n;
+          any = true;
         }
         if (!any) return toast('Wpisz przynajmniej jeden pomiar.');
         await apply([put('clients', { ...client, measurements: [...client.measurements, meas] })], 'Pomiar dodany.');

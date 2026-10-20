@@ -156,6 +156,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if ((s.dist ?? '').trim() && (parseKm(s.dist) ?? 0) > 300) return toast('Dystans: km (np. 3,5) albo metry (np. 400 m).');
       if ((s.dist ?? '').trim() && parseKm(s.dist) == null) return toast('Dystans: km (np. 3,5) albo metry (np. 400 m).');
       if ((s.hr ?? '').trim() && numIn(s.hr, 30, 240) == null) return toast('Tętno: od 30 do 240.');
+      const km = parseKm(s.dist);
+      // „1:20” przy 16 km to 1 min 20 s — tempo niemożliwe, prawie na pewno chodziło o godziny
+      if (d && km && km >= 0.8 && d / km < 2.4) return toast(`Tempo ${paceText(d, km)} to za szybko — „${s.reps.trim()}” to ${fmtDur(d)}. Dla godzin wpisz np. 1:20:00 albo 80.`);
       const next = update((r) => void (r.ex[k].sets[i].done = true));
       // przerwa po powtórzeniu (z odcinka albo całego biegu) — tylko między powtórzeniami tego samego odcinka
       const nextSet = run.ex[k].sets[i + 1];
@@ -281,6 +284,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
   /** Przed podsumowaniem: nagrania na niezaliczonych seriach i trening skończony dużo wcześniej. */
   const openFinish = async () => {
+    if (!editing && !run.ex.some((e) => e.sets.some((x) => x.done || x.video))) return toast('Zalicz przynajmniej jedną serię (✓), zanim zakończysz trening.');
     const open = run.ex.flatMap((e, k) => e.sets.map((x, i) => ({ x, k, i }))).filter(({ x }) => !x.done);
     const withVideo = open.filter(({ x }) => x.video);
     let added = 0;
@@ -297,7 +301,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     }
     const total = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup).length, 0);
     const done = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup && x.done).length, 0) + added;
-    if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane.`, { confirm: 'Zakończ' }))) return;
+    if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii roboczych. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane.`, { confirm: 'Zakończ' }))) return;
     showFinish();
   };
   const showFinish = () => {
@@ -320,7 +324,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     setFinish({
       srpe: '',
       pain: '',
-      duration: elapsedMinutes(run.startedAt),
+      // bieg wpisany po fakcie: czas z odcinków (suma wpisanych minut)
+      duration: elapsedMinutes(run.startedAt) || (() => {
+        const m = run.ex.filter((e) => e.cardio).reduce((a, e) => a + e.sets.filter((x) => x.done).reduce((b, x) => b + (parseDur(x.reps) ?? 0), 0), 0);
+        return m >= 1 ? String(Math.round(m)) : '';
+      })(),
       notes: '',
       charge,
       // w parze — stawka „w parze” z profilu (jeśli ustawiona)
@@ -358,7 +366,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </>
           ) : run.ex[k].perSide ? (
             // na stronę: osobno lewa i prawa (różny wynik, np. 30/20 s)
-            <span className="lr">
+            <span className={`lr ${sidesWide(run.ex[k]) ? 'wide' : ''}`}>
               {(() => {
                 const [l, r] = sidesOf(s.reps)?.map(String) ?? [s.reps, s.reps];
                 const set = (nl: string, nr: string) => setSet(k, i, { reps: nl === nr ? nl : `${nl}/${nr}` });
@@ -391,7 +399,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           )}
           {!run.ex[k].cardio && (
             <>
-              <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />
+              {!sidesWide(run.ex[k]) && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
               <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
               <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />
             </>
@@ -420,7 +428,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }}
           >
             ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
-            {run.ex[k].perSide ? ' (jedna strona)' : ''}
+            {run.ex[k].perSide ? ' — jedna strona, potem druga' : ''}
           </button>
         )}
         {s.warmup && !s.done && (
@@ -540,7 +548,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           onClick={() => update((r) => void (r.ex[k].perSide = !r.ex[k].perSide || undefined))}
           title="Ćwiczenie na jedną stronę: wpisuj powtórzenia na każdą stronę"
         >
-          ↔ {e.perSide ? 'Na każdą stronę — powt. na stronę' : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
+          ↔ {e.perSide ? (e.sets.some((x) => x.unit) ? 'Na każdą stronę — czas na stronę' : 'Na każdą stronę — powt. na stronę') : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
         </button>
         )}
         {(e.tempo || e.notes) && (
@@ -579,8 +587,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         ) : (
           <div className="sgrid sgrid-head">
             <span />
-            <span>{repsHead(e)}</span>
-            <span>kg</span>
+            <span className={sidesWide(e) ? 'wide' : undefined}>{repsHead(e)}</span>
+            {!sidesWide(e) && <span>kg</span>}
             <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
             <span />
             <span />
@@ -672,7 +680,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         <p className="muted small">
           {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
-        {!trainer && <p className="muted small rpe-legend" style={doneSets === 0 ? undefined : { visibility: 'hidden' }} aria-hidden={doneSets > 0}>Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.</p>}
+        {!trainer && <p className="muted small rpe-legend" style={doneSets === 0 ? undefined : { visibility: 'hidden' }} aria-hidden={doneSets > 0}>{run.ex.every((x) => x.cardio) ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.' : run.ex.some((x) => x.cardio) ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.' : 'Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'}</p>}
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
@@ -890,6 +898,9 @@ function holdSec(s: RunSet): number {
   if (s.unit === 'min') return Math.round((repsN(s.reps) ?? 0) * 60);
   return secOf(s.reps) ?? 0;
 }
+
+/** Ćwiczenie na czas na stronę bez ciężaru (deska boczna): pola L i P zajmują miejsce kolumny kg. */
+const sidesWide = (e: RunExercise) => !!e.perSide && e.sets.some((x) => x.unit) && e.sets.every((x) => !x.load.trim() && !x.sug);
 
 function repsHead(e: RunExercise): string {
   const u = e.sets.find((x) => !x.warmup)?.unit;

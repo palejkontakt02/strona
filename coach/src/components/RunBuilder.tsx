@@ -87,6 +87,15 @@ export function RunBuilder({ groups, onChange, profile, dob }: { groups: SetGrou
             </div>
             {g.reps.trim() && parseDur(g.reps) == null && <p className="small warn-text rb-tgt">Czas „{g.reps}” — wpisz minuty (40), m:ss (3:05) albo godziny (1:20:00).</p>}
             {g.load.trim() && parseKm(g.load) == null && <p className="small warn-text rb-tgt">Dystans „{g.load}” — wpisz km (5, 21,1) albo metry (400 m).</p>}
+            {(() => {
+              // „1:20” to minuty:sekundy — przy długim odcinku łatwo pomylić z godzinami
+              const d = parseDur(g.reps);
+              const km = parseKm(g.load);
+              if (d == null || !/^\d{1,2}:\d{2}$/.test(g.reps.trim())) return null;
+              if (km && km >= 0.8 && d / km < 2.4) return <p className="small warn-text rb-tgt">„{g.reps.trim()}” to {fmtDur(d)} — za szybko na {fmtKm(km)}. Godziny wpisz jako 1:20:00 albo 80.</p>;
+              if (!km && n === 1 && d < 6 && g.type !== 'Przerwa') return <p className="muted small rb-tgt">„{g.reps.trim()}” = {fmtDur(d)}. Jeśli godziny — wpisz 1:20:00 albo 80.</p>;
+              return null;
+            })()}
             {tgt && <p className="muted small rb-tgt">{tgt}</p>}
           </div>
         );

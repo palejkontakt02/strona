@@ -70,6 +70,8 @@ export function PlanTable({
 function GridTable({ slot, nextId, done, noRest }: { slot: GridSlot; nextId?: string; done?: Set<string>; /** Przerwa pod nazwą ćwiczenia zamiast osobnej kolumny (węższa tabela). */ noRest?: boolean }) {
   const { cols, rows } = slot;
   if (rows.length === 0) return <p className="muted small">Brak ćwiczeń.</p>;
+  // sam bieg: nagłówki biegowe (przy mieszanym treningu zostają siłowe)
+  const run = rows.every((r) => r.cardio);
   const cls = (id: string) => `${id === nextId ? 'is-next' : ''} ${done?.has(id) && id !== nextId ? 'is-done' : ''}`;
   return (
     <div className="ptab-scroll">
@@ -98,10 +100,10 @@ function GridTable({ slot, nextId, done, noRest }: { slot: GridSlot; nextId?: st
           <tr>
             {cols.map(({ week, k }) => [
               <th key={`${week.id}-r`} className={`ptab-sub ptab-wk ${cls(k.id)}`}>
-                Powt.
+                {run ? 'Odcinek' : 'Powt.'}
               </th>,
               <th key={`${week.id}-l`} className={`ptab-sub ${cls(k.id)}`}>
-                Ciężar
+                {run ? 'Cel' : 'Ciężar'}
               </th>,
               <th key={`${week.id}-p`} className={`ptab-sub ${cls(k.id)}`}>
                 RPE
@@ -161,7 +163,7 @@ export function WorkoutTable({ workout, colName = 'Plan', done, doneName = 'Wyko
   const [warm, setWarm] = useState(false);
   const name = workout.name || 'Trening';
   const weeks = [{ id: 'w1', name: colName, workouts: [{ ...workout, name }] }, ...(done ? [{ id: 'w2', name: doneName, workouts: [{ ...done, name }] }] : [])];
-  const [slot] = planGrid({ id: 'w', clientId: '', name: '', active: false, weeks }, () => warm);
+  const [slot] = planGrid({ id: 'w', clientId: '', name: '', active: false, weeks }, () => warm, !!done);
   if (!slot) return null;
   return (
     <div className={`ptab ptab-one ${done ? 'ptab-two' : ''}`}>

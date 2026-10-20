@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { plural } from './format';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import type { RunStart } from './athlete/start';
@@ -70,11 +70,17 @@ export function App() {
     [section, go, clientId, clientTab],
   );
 
+  // trening w parze / grupie: z wizyty z partnerami albo wznowiony z paska „W toku”
+  const liveAppt = live?.appointmentId ? db.appointments.find((a) => a.id === live.appointmentId) : undefined;
+  const liveGroup = live && liveAppt && !live.editSessionId && !live.start ? groupOf(db.appointments, liveAppt).filter((a) => a.status !== 'cancel' && a.status !== 'noshow' && !a.sessionId) : [];
+  const livePair = live?.pair ?? (liveGroup.length > 1 ? [liveAppt!, ...liveGroup.filter((a) => a.id !== liveAppt!.id)].map((a) => ({ clientId: a.clientId, appointmentId: a.id })) : null);
+  // skład pary zapamiętany na starcie — po zapisie pierwszej osoby jej wizyta ma już sessionId i nie może wypaść z pary
+  useEffect(() => {
+    if (live && !live.pair && livePair) setLive((l) => (l && !l.pair ? { ...l, pair: livePair } : l));
+  }, [live, livePair]);
+
   if (live) {
-    // trening w parze / grupie: z wizyty z partnerami albo wznowiony z paska „W toku”
-    const appt = live.appointmentId ? db.appointments.find((a) => a.id === live.appointmentId) : undefined;
-    const group = appt && !live.editSessionId && !live.start ? groupOf(db.appointments, appt).filter((a) => a.status !== 'cancel' && a.status !== 'noshow' && !a.sessionId) : [];
-    const pair = live.pair ?? (group.length > 1 ? [appt!, ...group.filter((a) => a.id !== appt!.id)].map((a) => ({ clientId: a.clientId, appointmentId: a.id })) : null);
+    const pair = livePair;
     if (pair && pair.length > 1)
       return (
         <NavCtx.Provider value={nav}>

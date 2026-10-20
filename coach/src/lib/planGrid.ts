@@ -4,7 +4,7 @@ import { cardioByName, isTimed, perSideByName } from './run';
 import { fmtDur, fmtKm, parseDur, parseKm } from './running';
 import { fmtSec, secOf } from './parse';
 
-const kg = (load: string) => (/^\d+([.,]\d+)?$/.test(load.trim()) ? `${load.trim()} kg` : load.trim());
+const kg = (load: string) => (/^\d+([.,]\d+)?$/.test(load.trim()) ? `${load.trim().replace('.', ',')} kg` : load.trim());
 const PREFIX: Record<string, string> = { Rozgrzewka: 'R', 'Top set': 'Top', 'Back-off': 'B-off', 'Drop set': 'Drop', AMRAP: 'AMRAP', Schłodzenie: 'S', Przerwa: 'trucht' };
 
 /** Komórka serii rozbita na kolumny: powtórzenia (lub czas / dystans), ciężar (lub cel biegu), RPE. */
@@ -16,9 +16,11 @@ export interface GridCell {
 }
 
 /** Bieg / cardio: odcinki po kolei (rozgrzewka, „5 × 1 km”, trucht, schłodzenie). */
-function cardioCells(e: PlanExercise): (GridCell & { no: string })[] {
+function cardioCells(e: PlanExercise, perRep = false): (GridCell & { no: string })[] {
   let n = 0;
-  return mergeGroups(e.groups).map((g) => {
+  // perRep: każde powtórzenie osobno (porównanie z wykonaniem, które jest zapisane powtórzenie po powtórzeniu)
+  const groups = perRep ? e.groups.flatMap((g) => Array.from({ length: Math.max(1, Number(g.sets) || 1) }, () => ({ ...g, sets: '1', rest: Number(g.sets) > 1 ? g.rest : undefined }))) : mergeGroups(e.groups);
+  return groups.map((g) => {
     const reps = Number(g.sets) || 1;
     const warm = g.type === 'Rozgrzewka' || g.type === 'Schłodzenie' || g.type === 'Przerwa';
     if (!warm) n++;
@@ -30,15 +32,15 @@ function cardioCells(e: PlanExercise): (GridCell & { no: string })[] {
       no: warm ? (PREFIX[g.type] ?? '') : String(n),
       warm,
       reps: `${pre}${reps > 1 ? `${reps} × ` : ''}${what}`,
-      load: [g.pace, g.rest && reps > 1 ? `p. ${g.rest}` : ''].filter(Boolean).join(' · '),
+      load: [g.pace, g.rest && (reps > 1 || perRep) ? `p. ${g.rest}` : ''].filter(Boolean).join(' · '),
       rpe: g.rpe || '',
     };
   });
 }
 
 /** Serie ćwiczenia po kolei (każda osobno): numer („R”, „1”, „2”…), powtórzenia, ciężar, RPE. */
-export function setCells(e: PlanExercise): (GridCell & { no: string })[] {
-  if (e.cardio ?? cardioByName(e.name)) return cardioCells(e);
+export function setCells(e: PlanExercise, perRep = false): (GridCell & { no: string })[] {
+  if (e.cardio ?? cardioByName(e.name)) return cardioCells(e, perRep);
   const timed = isTimed(e);
   const side = (e.perSide ?? perSideByName(e.name)) ? '/str.' : '';
   let n = 0;
@@ -57,6 +59,8 @@ export interface GridRow {
   notes?: string;
   rest?: string;
   linked: boolean;
+  /** Bieg / cardio: kolumny to odcinek | cel | RPE. */
+  cardio: boolean;
   /** Wiersze serii: numer („R”, „1”…) i komórka w każdym tygodniu (null — brak tej serii, 'none' — brak ćwiczenia w tygodniu). */
   lines: { no: string; cells: (GridCell | null | 'none')[] }[];
 }
@@ -71,7 +75,7 @@ export interface GridSlot {
  * Plan jako arkusz: treningi łączone po nazwie (Trening A w każdym tygodniu); wiersz na serię, kolumny = tygodnie.
  * Serie wyrównane po numerze (rozgrzewki R, potem 1, 2, 3…); bieg — odcinki po kolei. `warm` — czy pokazać rozgrzewki.
  */
-export function planGrid(plan: Plan, warm: (slot: string) => boolean): GridSlot[] {
+export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = false): GridSlot[] {
   const names: string[] = [];
   for (const w of plan.weeks) for (const k of w.workouts) if (!names.includes(k.name)) names.push(k.name);
   return names.map((slot) => {
@@ -93,7 +97,7 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean): GridSlot[
       const keyed = cols.map(({ k }) => {
         const e = k.exercises.find((x) => x.name === r.name);
         if (!e) return null;
-        const cells = setCells(e);
+        const cells = setCells(e, perRep);
         if (isCardio) return new Map(cells.map((c, idx) => [`x${idx + 1}`, c] as const));
         let w = 0;
         return new Map(cells.map((c) => [c.warm && c.no !== '' ? `R${++w}` : c.no || `x${++w}`, c] as const));
@@ -108,7 +112,7 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean): GridSlot[
         no: key ? no(key) : '',
         cells: keyed.map((m) => (m == null ? (i === 0 ? ('none' as const) : null) : (m.get(key) ?? null))),
       }));
-      return { name: r.name, label: r.label, notes: r.first.notes || undefined, rest: r.first.rest || undefined, linked: /\d$/.test(r.label) && !r.label.endsWith('1'), lines };
+      return { name: r.name, label: r.label, notes: r.first.notes || undefined, rest: r.first.rest || undefined, linked: /\d$/.test(r.label) && !r.label.endsWith('1'), cardio: !!isCardio, lines };
     });
     return { name: slot, cols, rows, hasWarm };
   });
