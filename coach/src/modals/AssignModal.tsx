@@ -8,6 +8,7 @@ import { addDays, todayISO } from '../lib/dates';
 import { currentPlan, planSequence } from '../lib/plan';
 import { emptyRunExercise, RUN_TEMPLATES } from '../lib/running';
 import { useNav, type ModalState } from '../nav';
+import { put } from '../data/db';
 import { ClientSelect } from './ModalHost';
 
 const WHEN = ['Dziś', 'Jutro', 'Inny dzień', 'Kiedy chce'] as const;
@@ -30,14 +31,25 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
   const start = m.date && m.date >= today ? m.date : undefined;
   const [when, setWhen] = useState<When>(start ? (start === today ? 'Dziś' : start === addDays(today, 1) ? 'Jutro' : 'Inny dzień') : m.date ? 'Dziś' : 'Jutro');
   const [day, setDay] = useState(start ?? addDays(today, 2));
-  const [src, setSrc] = useState<Source>('empty');
-  const [pick, setPick] = useState('');
-  const [name, setName] = useState('');
+  // powtórka / kopia z historii: trening może być innego podopiecznego
+  const srcSession = m.sessionId ? db.sessions.find((x) => x.id === m.sessionId) : undefined;
+  const [src, setSrc] = useState<Source>(srcSession ? 'repeat' : 'empty');
+  const [pick, setPick] = useState(srcSession?.id ?? '');
+  const [name, setName] = useState(srcSession?.workoutName || '');
+  // ciężary z oryginału albo puste (podpowiedź z historii tej osoby) — przy kopii dla kogoś innego domyślnie puste
+  const [keepLoads, setKeepLoads] = useState<boolean | null>(null);
+  const [time, setTime] = useState('');
 
   const client = clientById(db, clientId);
   const plan = clientId ? currentPlan(plansOf(db, clientId)) : null;
   const steps = plan ? planSequence(plan) : [];
-  const done = clientId ? sessionsOf(db, clientId).filter((s) => s.exercises.length).slice(0, 15) : [];
+  const own = clientId ? sessionsOf(db, clientId).filter((s) => s.exercises.length).slice(0, 15) : [];
+  const done = srcSession && !own.some((x) => x.id === srcSession.id) ? [srcSession, ...own] : own;
+  const fromOther = (id: string) => {
+    const se = done.find((x) => x.id === id);
+    return !!se && !!clientId && se.clientId !== clientId;
+  };
+  const keep = keepLoads ?? !(src === 'repeat' && fromOther(pick));
   const date = when === 'Dziś' ? today : when === 'Jutro' ? addDays(today, 1) : when === 'Inny dzień' ? day : undefined;
 
   /** Ćwiczenia i domyślna nazwa z wybranego źródła. */
@@ -53,7 +65,10 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     }
     if (s === 'repeat') {
       const se = done.find((x) => x.id === id);
-      return se ? { name: se.workoutName || 'Trening', exercises: copyEx(sessionToWorkout(se).exercises) } : null;
+      if (!se) return null;
+      const ex = copyEx(sessionToWorkout(se).exercises);
+      // bez ciężarów: odtwarzacz dobierze je z historii tej osoby (bieg — dystans zostaje)
+      return { name: se.workoutName || 'Trening', exercises: keep ? ex : ex.map((e) => (e.cardio ? e : { ...e, groups: e.groups.map((g) => ({ ...g, load: '' })) })) };
     }
     return { name: '', exercises: [] };
   };
@@ -70,6 +85,8 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     if (when === 'Inny dzień' && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return toast('Wybierz dzień.'), null;
     if (when === 'Inny dzień' && day < today) return toast('Ten dzień już minął — wybierz dziś albo później.'), null;
     if (src !== 'empty' && !chosen) return toast('Wybierz, z czego ma być trening.'), null;
+    if (time && !date) return toast('Godzina wizyty — wybierz też dzień (nie „Kiedy chce”).'), null;
+    if (time && !/^\d{1,2}:\d{2}$/.test(time)) return toast('Godzina wizyty, np. 9:00.'), null;
     const n = extraPlanOf(db, client.id)?.weeks.reduce((a, w) => a + w.workouts.length, 0) ?? 0;
     return { id: uid(), name: name.trim() || chosen?.name || `Trening dodatkowy ${n + 1}`, date, assignedAt: date ? today : undefined, exercises: chosen?.exercises ?? [] };
   };
@@ -79,7 +96,9 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     const wo = build();
     if (!wo || !client) return;
     if (!hasEx) return edit();
-    if (await apply(addExtraWorkout(db, client.id, wo), `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''} — ${client.name.split(' ')[0]} zobaczy go w aplikacji.`)) closeModal();
+    // z godziną: także wizyta z trenerem tego dnia
+    const appt = time && date ? [put('appointments', { id: uid(), clientId: client.id, date, time: time.padStart(5, '0'), duration: 60, status: 'planned' as const, locationId: client.locationId })] : [];
+    if (await apply([...addExtraWorkout(db, client.id, wo), ...appt], `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyta ${time}` : ''} — ${client.name.split(' ')[0]} zobaczy go w aplikacji.`)) closeModal();
   };
   /** Do edytora: ułożenie albo dopasowanie ćwiczeń przed zapisem. */
   const edit = () => {
@@ -108,9 +127,9 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
       }
     >
       <p className="muted small">Trening poza planem — plan i jego kolejność zostają bez zmian. Podopieczny zobaczy go na górze ekranu w wybranym dniu (albo na liście „poza planem”, jeśli bez terminu).</p>
-      {!m.clientId && (
-        <Field label="Podopieczny">
-          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setSrc('empty'), setPick(''), setName(''))} />
+      {(!m.clientId || m.sessionId) && (
+        <Field label={m.sessionId ? 'Dla kogo' : 'Podopieczny'}>
+          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setKeepLoads(null), srcSession ? undefined : (setSrc('empty'), setPick(''), setName('')))} />
         </Field>
       )}
       <div className="field">
@@ -169,7 +188,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
                   {src !== 'repeat' && <option value="">wybierz…</option>}
                   {done.map((x) => (
                     <option key={x.id} value={x.id}>
-                      {fmtDay(x.date)} · {x.workoutName || 'Trening'}
+                      {fmtDay(x.date)} · {x.workoutName || 'Trening'}{x.clientId !== clientId ? ` (${clientById(db, x.clientId)?.name ?? ''})` : ''}
                     </option>
                   ))}
                 </select>
@@ -177,8 +196,22 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
             </label>
           )}
         </div>
+        {src === 'repeat' && chosen && (
+          <label className="assign-loads small">
+            <input type="checkbox" checked={keep} onChange={(e) => setKeepLoads(e.target.checked)} />
+            <span>
+              {fromOther(pick) ? `Ciężary z oryginału (${clientById(db, done.find((x) => x.id === pick)?.clientId)?.name.split(' ')[0] ?? '—'})` : 'Ciężary jak w tamtym treningu'}
+              {!keep && <span className="muted"> — bez zaznaczenia ciężary podpowie historia tej osoby</span>}
+            </span>
+          </label>
+        )}
         {hasEx && <span className="muted small">{nEx(chosen!.exercises.filter((e) => e.name).length)} — możesz zadać od razu albo najpierw zmienić.</span>}
       </div>
+      {when !== 'Kiedy chce' && (
+        <Field label="Wizyta z trenerem o (opcjonalnie)">
+          <input className="input assign-day" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Godzina wizyty" />
+        </Field>
+      )}
       <Field label="Nazwa">
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={chosen?.name || 'np. Mobilność + core'} />
       </Field>

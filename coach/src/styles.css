@@ -5412,3 +5412,17 @@ button.mini-day {
   gap: 6px;
   margin: 2px 0 var(--space-2);
 }
+.sheet-assign {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.assign-loads {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin-top: var(--space-2);
+}
+.assign-loads input {
+  margin-top: 2px;
+}

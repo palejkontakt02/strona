@@ -144,7 +144,14 @@ export function WorkoutList({ client }: { client: Client }) {
           onTrainer={() => startLive(client.id, undefined, undefined, { planId: preview.plan.id, workoutId: preview.workout.id })}
         />
       )}
-      {shown && <SessionSheet s={shown} onClose={() => setShown(null)} onEdit={() => (setShown(null), setPreview(null), openModal({ kind: 'session', session: shown }))} />}
+      {shown && (
+        <SessionSheet
+          s={shown}
+          onClose={() => setShown(null)}
+          onEdit={() => (setShown(null), setPreview(null), openModal({ kind: 'session', session: shown }))}
+          onAssign={(other) => (setShown(null), setPreview(null), openModal({ kind: 'assign', clientId: other ? undefined : client.id, sessionId: shown.id }))}
+        />
+      )}
     </Card>
   );
 }

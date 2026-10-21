@@ -131,6 +131,7 @@ export function ClientSessions({ client }: { client: Client }) {
           onTrainer={shown.exercises.length ? () => startLive(client.id, undefined, undefined, { repeatSessionId: shown.id }) : undefined}
           onRepeat={shown.exercises.length ? () => startAthlete(client.id, { repeatSessionId: shown.id }) : undefined}
           onReview={() => (setShown(null), openModal({ kind: 'review', sessionId: shown.id }))}
+          onAssign={(other) => (setShown(null), openModal({ kind: 'assign', clientId: other ? undefined : client.id, sessionId: shown.id }))}
         />
       )}
     </>

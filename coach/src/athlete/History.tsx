@@ -157,6 +157,7 @@ export function SessionSheet({
   onTrainer,
   onUndo,
   onReview,
+  onAssign,
 }: {
   plain?: boolean;
   s: TrainingSession;
@@ -165,6 +166,8 @@ export function SessionSheet({
   onRepeat?: () => void;
   onTrainer?: () => void;
   onUndo?: () => void;
+  /** Trener: zadaj ten trening jeszcze raz (temu samemu albo innemu podopiecznemu). */
+  onAssign?: (other: boolean) => void;
   /** Trener: przegląd nagrań i komentarz. */
   onReview?: () => void;
 }) {
@@ -312,6 +315,16 @@ export function SessionSheet({
           </div>
         )}
         {onRepeat && s.exercises.length > 0 && <StartButtons onStart={onRepeat} onTrainer={onTrainer} label="Zrób ten trening jeszcze raz" />}
+        {onAssign && s.exercises.length > 0 && (
+          <div className="sheet-assign">
+            <button className="btn btn-secondary" onClick={() => onAssign(false)}>
+              ↻ Powtórz trening
+            </button>
+            <button className="btn btn-secondary" onClick={() => onAssign(true)}>
+              ⧉ Kopiuj na innego
+            </button>
+          </div>
+        )}
         <div className="sheet-actions">
           {onEdit && (
             <button className="btn btn-secondary" onClick={onEdit}>

@@ -153,7 +153,7 @@ function Scale({ value, onChange, max, min = 0, label }: { value: string; onChan
 
 export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }> }) {
   const { db, apply, ask, toast } = useStore();
-  const { closeModal, startLive } = useNav();
+  const { closeModal, startLive, openModal } = useNav();
   const existing = m.session;
   const [clientId, setClientId] = useState(existing?.clientId ?? m.clientId ?? m.appt?.clientId ?? '');
   const client = clientById(db, clientId);
@@ -369,6 +369,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <button type="button" className="btn btn-secondary" onClick={() => startLive(existing.clientId, undefined, existing.id)}>
               Popraw seria po serii
             </button>
+            {existing.exercises.length > 0 && (
+              <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'assign', clientId: existing.clientId, sessionId: existing.id })}>
+                ↻ Powtórz / kopiuj
+              </button>
+            )}
           </>
         )
       }
