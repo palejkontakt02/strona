@@ -54,7 +54,10 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
       // brak miejsca
     }
   }, [files, client.id]);
-  useEffect(() => window.scrollTo(0, 0), [step]);
+  // klamry: nowsze przeglądarki zwracają z scrollTo obietnicę — React wziąłby ją za funkcję sprzątającą i wywołał
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
 
   const set = (k: string, v: string) => setAnswers((a) => ({ ...a, [k]: v }));
   const prog = intakeProgress({ answers });

@@ -76,7 +76,9 @@ export function AthleteApp({
   const [planId, setPlanId] = useState<string | null>(null);
   const [look, setLook] = useState(false);
 
-  useEffect(() => storeRun(clientId, run), [clientId, run]);
+  useEffect(() => {
+    storeRun(clientId, run);
+  }, [clientId, run]);
   const started = useRef(false);
   useEffect(() => {
     if (!initial || !client || started.current) return;

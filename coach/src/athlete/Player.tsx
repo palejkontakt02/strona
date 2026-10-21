@@ -105,7 +105,9 @@ function elapsedMinutes(startedAt: number): string {
 export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId, onRest }: Props) {
   const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
-  useEffect(() => onRest?.(rest?.end ?? null), [rest, onRest]);
+  useEffect(() => {
+    onRest?.(rest?.end ?? null);
+  }, [rest, onRest]);
   const [hold, setHold] = useState<{ end: number; total: number; what?: string } | null>(null);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
