@@ -55,7 +55,7 @@ export function ClientOverview({ client }: { client: Client }) {
         </button>
       </div>
       <ClientInbox client={client} />
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-strip">
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
           label="ACWR"

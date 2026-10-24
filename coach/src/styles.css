@@ -3441,7 +3441,6 @@ h2 {
   margin: 0 0 var(--space-8);
   font-family: var(--font-display);
   font-weight: 700;
-  text-transform: uppercase;
   font-size: clamp(2.6rem, 5.4vw, 4.6rem);
   line-height: 0.92;
   letter-spacing: 0.01em;
@@ -3472,14 +3471,12 @@ h2 {
   font-family: var(--font-display);
   font-weight: 600;
   color: #f2f2f2;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
 }
 .auth-sign {
   position: relative;
   margin: 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: var(--fs-xs);
   color: #7c7c80;
 }
 .auth-side {
@@ -3496,8 +3493,7 @@ h2 {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 2rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 .auth-logo-mobile {
   display: none;
@@ -5327,7 +5323,7 @@ input[type='date'].input {
   max-width: 100%;
   display: block;
   text-align: left;
-  min-height: 46px;
+  min-height: 0;
 }
 input[type='date'].input::-webkit-date-and-time-value {
   text-align: left;

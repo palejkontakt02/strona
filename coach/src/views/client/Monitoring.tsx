@@ -54,7 +54,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
 
   return (
     <>
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-strip">
         <Kpi label="ACWR" value={st.acwr != null ? fx(st.acwr, 2) : '—'} sub={zone.label} tone={toneOf(zone.level)} />
         <Kpi label="Obciążenie ostre / przewlekłe" value={`${fnum(st.acute, 0)} / ${fnum(st.chronic, 0)}`} sub="AU: 7 dni / średnia tyg. z 28 dni" />
         <Kpi label="Monotonia" value={st.monotony != null ? fx(st.monotony, 2) : '—'} sub={st.monotony != null && st.monotony > 2 ? 'wysoka (>2)' : '7 dni'} tone={st.monotony != null && st.monotony > 2 ? 'warn' : undefined} />

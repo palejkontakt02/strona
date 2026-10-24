@@ -52,3 +52,19 @@ input[type='datetime-local'].input {
     height: var(--tap);
   }
 }
+@media (max-width: 600px) {
+  /* telefon: przyciski stopki wypełniają wiersze zamiast „schodków” */
+  .modal-actions {
+    gap: var(--space-2);
+  }
+  .modal-actions > .btn {
+    flex: 1 1 auto;
+  }
+  .modal-actions-main {
+    flex: 1 1 auto;
+    gap: var(--space-2);
+  }
+  .modal-actions-main > .btn {
+    flex: 1 1 auto;
+  }
+}
