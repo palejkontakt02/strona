@@ -2,6 +2,7 @@ import type { Checkin, ClientNote, Measurement } from '../domain';
 import type { Intake } from '../lib/intake';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
+import { SUPABASE_URL } from './config';
 
 const TABLES: Collection[] = ['clients', 'plans', 'sessions', 'appointments', 'library', 'locations', 'trainer_notes'];
 /** Tabele dodane później (SQL może nie być jeszcze uruchomiony) — brak tabeli nie blokuje aplikacji. */
@@ -37,9 +38,16 @@ async function selectAll(table: Collection): Promise<unknown[]> {
 export function createSupabaseRepository(role: 'trainer' | 'client'): Repository {
   return {
     async outboxScope() {
-      // sesja z pamięci przeglądarki — działa też bez sieci
-      const { data } = await supabase.auth.getSession();
-      return `${role}:${data.session?.user.id ?? 'anon'}`;
+      // konto z sesji zapisanej w przeglądarce — bez sieci i bez odświeżania tokenu (kolejka offline jest per konto)
+      let id: string | undefined;
+      try {
+        const raw = localStorage.getItem(`sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`);
+        id = raw ? (JSON.parse(raw) as { user?: { id?: string } }).user?.id : undefined;
+      } catch {
+        // brak localStorage
+      }
+      if (!id) id = (await supabase.auth.getSession().catch(() => null))?.data.session?.user.id;
+      return `${role}:${id ?? 'anon'}`;
     },
 
     async load() {

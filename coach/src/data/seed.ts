@@ -264,7 +264,8 @@ function buildPlan(clientId: string, key: keyof typeof TEMPLATES, start: string)
   const weeks = [1, 2, 3, 4].map((n) => ({
     id: uid(),
     name: `Tydzień ${n}${n === 4 ? ' (deload)' : ''}`,
-    workouts: t.workouts.map<PlanWorkout>((w) => ({ id: uid(), name: w.name, exercises: w.exercises() })),
+    // dni tygodnia jak u prawdziwego trenera (plan bez dni nie da się zapisać w edytorze)
+    workouts: t.workouts.map<PlanWorkout>((w, i) => ({ id: uid(), name: w.name, day: ([[2], [1, 4], [1, 3, 5], [1, 2, 4, 5]][t.workouts.length - 1] ?? [1, 2, 3, 4, 5, 6])[i] ?? 1, exercises: w.exercises() })),
   }));
   return { id: uid(), clientId, name: t.name, startDate: start, active: true, weeks, updatedAt: start + 'T08:00:00Z' };
 }

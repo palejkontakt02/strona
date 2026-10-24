@@ -70,12 +70,11 @@ export function PushSettings({ role }: { role: 'trainer' | 'client' }) {
 
   return (
     <div className="push-settings">
-      <h4 className="form-section">Powiadomienia</h4>
+      <h4 className="form-section" id={`push-label-${role}`}>
+        Powiadomienia na tym telefonie
+      </h4>
       <div className="push-row">
-        <div className="push-text">
-          <strong id={`push-label-${role}`}>Powiadomienia na tym telefonie</strong>
-          <span className="muted small">{WHAT[role]}</span>
-        </div>
+        <span className="muted small push-text">{WHAT[role]}</span>
         <button
           type="button"
           role="switch"

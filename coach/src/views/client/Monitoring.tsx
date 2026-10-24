@@ -13,7 +13,7 @@ import { painHistory, painSpotsOf } from '../../lib/analytics';
 import { painLabel } from '../../lib/painMap';
 import { PainMap } from '../../components/PainMap';
 import { readiness, readinessNorm, wellnessTotal } from '../../lib/wellness';
-import { fmtClock, fmtKm, hrMaxOf, pace5k, runTotals, ZONES } from '../../lib/running';
+import { fmtClock, fmtKm, pace5k, runTotals, zoneHr, zoneHrRange, zoneSourceText, ZONES } from '../../lib/running';
 import { RunVolume } from '../../components/RunVolume'; // funkcje: bieg
 
 const toneOf = (l: string | null) => (l === 'red' ? 'danger' : l === 'yellow' ? 'warn' : l === 'green' ? 'ok' : undefined);
@@ -121,15 +121,16 @@ export function ClientMonitoring({ client }: { client: Client }) {
               );
             })()}
             {(() => {
-              const hm = hrMaxOf(client.run, client.dob);
+              // tętno stref: z progu (LTHR), gdy wpisany, inaczej z tętna maks. albo wieku
+              const hm = zoneHr(ZONES[0], client.run, client.dob);
               const p5 = pace5k(client.run);
-              if (!hm && !p5) return <p className="muted small">Strefy tętna i tempa: wpisz tętno maks. albo czas na 5 km w Profilu.</p>;
+              if (!hm && !p5) return <p className="muted small">Strefy tętna i tempa: wpisz tętno progowe, tętno maks. albo czas na 5 km w Profilu.</p>;
               return (
                 <table className="table zones-table">
                   <thead>
                     <tr>
                       <th>Strefa</th>
-                      {hm && <th>Tętno{hm.est ? ' (szac. z wieku)' : ''}</th>}
+                      {hm && <th>Tętno ({zoneSourceText(client.run, client.dob)})</th>}
                       {p5 && <th>Tempo / km</th>}
                     </tr>
                   </thead>
@@ -139,11 +140,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
                         <td>
                           <b>{z.z}</b> {z.name}
                         </td>
-                        {hm && (
-                          <td>
-                            {Math.round(hm.v * z.hr[0])}–{Math.round(hm.v * z.hr[1])}
-                          </td>
-                        )}
+                        {hm && <td>{(() => { const h = zoneHr(z, client.run, client.dob); return h ? zoneHrRange(h) : '—'; })()}</td>}
                         {p5 && (
                           <td>
                             {fmtClock(p5 * z.pace[0])}–{fmtClock(p5 * z.pace[1])}
