@@ -114,12 +114,13 @@ function GridTable({ slot, nextId, done, noRest }: { slot: GridSlot; nextId?: st
         <tbody>
           {rows.map((r) =>
             r.lines.map((line, i) => (
-              <tr key={`${r.name}-${i}`} className={`${r.linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''}`}>
+              <tr key={`${r.name}-${i}`} className={`${r.linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''} ${line.no.startsWith('R') ? 'ptab-warmline' : ''}`}>
                 {i === 0 && (
                   <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
                     <span className="ex-label">{r.label}</span> {r.name}
                     {r.loadPer && <span className="ptab-note">kg: {r.loadPer}</span>}
                     {noRest && r.rest && <span className="ptab-note">przerwa {r.rest}</span>}
+                    {!noRest && r.rest && <span className="ptab-restnote">przerwa {r.rest}</span>}
                     {r.notes && <span className="ptab-note">{r.notes}</span>}
                   </th>
                 )}

@@ -1,1 +1,778 @@
-/* tables — nadpisania designu (ładowane po styles.css) */
+/* tables — tabele i edytory treningu (ładowane po styles.css).
+   Arkusz: pasek tygodnia w kolorze (--band), zebra (--zebra), duże wąskie cyfry (Barlow Condensed). */
+
+/* ---------- plan jako arkusz ---------- */
+.ptab-wrap {
+  gap: var(--space-8);
+  margin-top: var(--space-6);
+}
+.ptab-head {
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  min-height: 36px;
+}
+.ptab-head strong {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+/* kolejność: tytuł · „następny” · rozgrzewki … Prowadź / Jako zawodnik */
+.ptab-head .plan-workout-actions {
+  display: contents;
+}
+.ptab-head .plan-workout-actions .tag {
+  order: 1;
+}
+.ptab-head > .btn {
+  order: 2;
+}
+.ptab-head .plan-workout-actions .btn {
+  order: 3;
+}
+.ptab-head .plan-workout-actions .btn-primary {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .ptab-head {
+    row-gap: var(--space-3);
+  }
+  .ptab-head .plan-workout-actions .btn {
+    flex: 1 1 40%;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .ptab-head .plan-workout-actions .btn-primary {
+    margin-left: 0;
+  }
+  .ptab-head .plan-workout-actions .tag {
+    margin-right: auto;
+  }
+  .ptab-head > .btn {
+    order: 4;
+    min-height: 40px;
+  }
+}
+.ptab-restnote {
+  display: none;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-neutral-400);
+}
+
+.ptab-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid color-mix(in srgb, var(--band) 70%, var(--color-divider));
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.ptab-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.ptab-table th,
+.ptab-table td {
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* nagłówek: pasek tygodnia jak w arkuszu */
+.ptab-table thead th {
+  background: var(--band);
+  color: var(--band-fg);
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  border-bottom: 0;
+  vertical-align: bottom;
+}
+.ptab-table thead tr:first-child th {
+  padding-top: 9px;
+  padding-bottom: 7px;
+}
+.ptab-table thead .ptab-week {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.1;
+  border-left: 2px solid var(--color-surface);
+}
+.ptab-date {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.78;
+}
+/* podnagłówek Powt. | Ciężar | RPE — jaśniejszy odcień paska */
+.ptab-table thead .ptab-sub {
+  background: color-mix(in srgb, var(--band) 52%, var(--color-surface));
+  color: color-mix(in srgb, var(--band-fg) 80%, transparent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  text-align: center;
+  border-bottom: 1px solid color-mix(in srgb, var(--band) 80%, var(--color-divider));
+}
+.ptab-table thead .ptab-sub.ptab-wk {
+  border-left: 2px solid var(--color-surface);
+}
+.ptab-table thead .ptab-ex,
+.ptab-table thead .ptab-no,
+.ptab-table thead .ptab-rest {
+  color: color-mix(in srgb, var(--band-fg) 82%, transparent);
+  font-weight: 500;
+  border-bottom: 1px solid color-mix(in srgb, var(--band) 80%, var(--color-divider));
+}
+.ptab-table thead th.ptab-ex,
+.sheet .ptab-table thead th.ptab-ex {
+  background: var(--band);
+  vertical-align: bottom;
+  padding-top: 7px;
+}
+
+/* tydzień „następny” — akcent; „zrobiony” — zielony znacznik */
+.ptab-table thead .ptab-week.is-next {
+  background: var(--color-accent);
+  color: var(--on-accent);
+}
+.ptab-table thead .ptab-sub.is-next {
+  background: color-mix(in srgb, var(--color-accent) 30%, var(--color-surface));
+  color: var(--color-text);
+}
+.ptab-table thead .ptab-week.is-done {
+  color: var(--band-fg);
+  box-shadow: inset 0 -3px 0 var(--color-ok);
+}
+.ptab-table td.is-next {
+  background-color: color-mix(in srgb, var(--color-accent) 11%, var(--color-surface));
+}
+.ptab-table thead .is-done {
+  color: var(--band-fg);
+}
+
+/* treść: kolumna ćwiczenia przyklejona przy przewijaniu */
+.ptab-table .ptab-ex {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  min-width: 168px;
+  max-width: 240px;
+  white-space: normal;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  vertical-align: top;
+  padding-top: 10px;
+  border-right: 1px solid var(--color-divider);
+}
+.sheet .ptab-table tbody .ptab-ex {
+  background: var(--color-surface);
+}
+.ptab-table tbody .ptab-ex .ex-label {
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+.ptab-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--color-neutral-400);
+}
+.ptab-linked .ptab-ex {
+  border-left: 0;
+  box-shadow: inset 3px 0 0 var(--color-accent-600);
+}
+
+.ptab-table .ptab-no,
+.ptab-table .ptab-rest {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+.ptab-table .ptab-no {
+  width: 1%;
+  min-width: 0;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.ptab-table thead .ptab-no,
+.ptab-table thead .ptab-rest {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+}
+.ptab-table tbody .ptab-rest {
+  vertical-align: top;
+  padding-top: 10px;
+  text-align: center;
+}
+
+/* liczby treningowe */
+.ptab-table tbody td.ptab-wk,
+.ptab-table tbody td.ptab-load,
+.ptab-table tbody td.ptab-rpe {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.ptab-table td.ptab-wk {
+  border-left: 2px solid color-mix(in srgb, var(--band) 85%, var(--color-divider));
+  min-width: 58px;
+  text-align: center;
+}
+.ptab-table td.ptab-load {
+  min-width: 64px;
+  text-align: right;
+}
+.ptab-table td.ptab-rpe {
+  min-width: 40px;
+  text-align: center;
+  color: var(--color-neutral-300);
+}
+.ptab-table tbody td.ptab-wk.muted {
+  color: var(--color-neutral-500);
+}
+
+/* zebra wierszy (warstwa nad tłem kolumny „następny”) */
+.ptab-table tbody tr:nth-child(even) > td {
+  background-image: linear-gradient(var(--zebra), var(--zebra));
+}
+/* granica ćwiczeń */
+.ptab-table tbody tr.ptab-first > * {
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+}
+.ptab-table tbody tr:first-child > * {
+  border-top: 0;
+}
+.ptab-table tbody tr:not(.ptab-first) td,
+.ptab-table tbody tr:not(.ptab-first) th {
+  border-top-color: transparent;
+}
+
+/* rozgrzewki — wyciszone */
+.ptab-table tbody td.ptab-warm {
+  color: var(--color-neutral-400);
+  font-size: 0.9375rem;
+  font-weight: 400;
+}
+.ptab-table tbody tr.ptab-warmline > td.ptab-no {
+  color: var(--color-neutral-500);
+}
+.ptab-table tbody tr.ptab-warmline > td {
+  background-image: linear-gradient(color-mix(in srgb, var(--color-text) 2%, transparent), color-mix(in srgb, var(--color-text) 2%, transparent));
+}
+
+.ptab-warm-btn {
+  margin-bottom: var(--space-3);
+}
+.ptab-one {
+  margin-top: var(--space-3);
+}
+
+/* telefon: ciaśniej, dalej czytelnie; przewijanie tylko wewnątrz tabeli */
+@media (max-width: 640px) {
+  .ptab-head strong {
+    font-size: 1.25rem;
+  }
+  .ptab-table th,
+  .ptab-table td {
+    padding: 6px 7px;
+  }
+  .ptab-table .ptab-ex {
+    min-width: 124px;
+    max-width: 148px;
+    font-size: 0.875rem;
+  }
+  .ptab-table td.ptab-wk {
+    min-width: 46px;
+  }
+  .ptab-table td.ptab-load {
+    min-width: 50px;
+  }
+  .ptab-table td.ptab-rpe {
+    min-width: 32px;
+  }
+  .ptab-table .ptab-no {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+  /* przerwa pod nazwą ćwiczenia — więcej miejsca na tygodnie */
+  .ptab-table .ptab-rest {
+    display: none;
+  }
+  .ptab-restnote {
+    display: block;
+  }
+  .ptab-one .ptab-table .ptab-ex {
+    min-width: 96px;
+    max-width: 120px;
+    font-size: 0.8125rem;
+  }
+}
+
+/* podgląd Plan | Wykonano — dwie kolumny muszą się zmieścić w 358px */
+.ptab-two .ptab-table thead .ptab-week {
+  white-space: normal;
+  font-size: 1rem;
+}
+.ptab-two .ptab-table thead .ptab-week + .ptab-week:not(.is-next) {
+  box-shadow: inset 0 -3px 0 var(--color-ok);
+}
+@media (max-width: 640px) {
+  .ptab-two .ptab-table th,
+  .ptab-two .ptab-table td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .ptab-two .ptab-table tbody td.ptab-wk,
+  .ptab-two .ptab-table tbody td.ptab-load,
+  .ptab-two .ptab-table tbody td.ptab-rpe {
+    font-size: 1rem;
+  }
+  .ptab-two .ptab-table thead .ptab-sub {
+    font-size: 0.6875rem;
+  }
+  .ptab-two .ptab-table .ptab-ex {
+    min-width: 78px;
+    max-width: 92px;
+    font-size: 0.8125rem;
+    padding-left: 7px;
+  }
+  .ptab-two .ptab-table td.ptab-wk {
+    min-width: 30px;
+    white-space: normal;
+    line-height: 1.1;
+  }
+  .ptab-two .ptab-table td.ptab-load {
+    min-width: 44px;
+  }
+  .ptab-two .ptab-table td.ptab-rpe {
+    min-width: 26px;
+  }
+  .ptab-two .ptab-note {
+    font-size: 0.6875rem;
+  }
+}
+
+/* ---------- edytor planu ---------- */
+.pe-week {
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-6);
+  gap: var(--space-4);
+}
+.pe-week-head {
+  gap: var(--space-2);
+  min-height: 44px;
+}
+/* nazwa tygodnia / jednostki jak nagłówek; ramka pola widoczna dopiero przy najechaniu / edycji */
+.pe-week-head > .pe-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  background: transparent;
+  border-color: transparent;
+  padding-left: 8px;
+  min-height: 44px;
+}
+.pe-week-head > .pe-title:hover {
+  border-color: var(--color-divider);
+}
+.pe-week-head > .pe-title:focus {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+.pe-week > .pe-week-head > .pe-title {
+  font-size: 1.5rem;
+}
+.pe-workout.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+.pe-workout > .pe-week-head {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+}
+.pe-ex {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  gap: var(--space-2);
+}
+.pe-ex.in-block {
+  border-left: 1px solid var(--color-divider);
+  box-shadow: inset 3px 0 0 var(--color-accent-600);
+}
+.pe-ex-head {
+  gap: var(--space-2);
+}
+.pe-ex-head .ex-label {
+  height: 28px;
+  min-width: 32px;
+  font-size: 0.875rem;
+}
+.pe-ex-head > .muted.small {
+  font-variant-numeric: tabular-nums;
+}
+.pe-rest {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  text-align: center;
+}
+
+/* serie: wyrównane kolumny jak w arkuszu */
+.pe-sets {
+  display: grid;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+.pe-set {
+  margin-bottom: 0;
+  gap: 6px;
+}
+.pe-set-head {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-neutral-400);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--color-divider);
+  margin-bottom: 2px;
+}
+.pe-set-head > span:nth-child(n + 3) {
+  text-align: center;
+}
+.pe-set > span:first-child {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  color: var(--color-neutral-400);
+}
+.pe-set-head > span:first-child {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+}
+.pe-set .input {
+  min-height: 40px;
+}
+.pe-set > input.input {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.pe-set > input.input::placeholder {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+}
+.pe-set.is-warmup {
+  opacity: 1;
+}
+.pe-set.is-warmup .input {
+  background-color: transparent;
+  border-style: dashed;
+  color: var(--color-neutral-400);
+}
+.pe-set.is-warmup > span:first-child {
+  color: var(--color-neutral-500);
+}
+.pe-set .icon-btn {
+  color: var(--color-neutral-500);
+}
+.pe-set .icon-btn:hover {
+  color: var(--color-danger);
+}
+.pe-set-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.pe-set-actions .btn,
+.rb-add .btn {
+  border: 1px dashed var(--color-divider);
+  color: var(--color-neutral-300);
+}
+.pe-set-actions .btn:hover,
+.rb-add .btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.pe-link {
+  min-height: 32px;
+}
+.pe-workout > .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+@media (max-width: 640px) {
+  .pe-workout.card {
+    padding: var(--space-3);
+    margin-left: calc(-1 * var(--space-2));
+    margin-right: calc(-1 * var(--space-2));
+  }
+  .pe-set .input {
+    min-height: 44px;
+  }
+  .pe-set > input.input {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .pe-set > span:first-child {
+    font-size: 0.875rem;
+  }
+  /* nagłówek ćwiczenia: nazwa + strzałka + kosz w 1. wierszu, przerwa i liczba serii w 2. */
+  .pe-ex-head {
+    row-gap: var(--space-2);
+  }
+  .pe-ex-head > .input:not(.pe-rest) {
+    flex: 1 1 calc(100% - 140px);
+    min-width: 0;
+  }
+  .pe-ex-head > .icon-btn {
+    order: 1;
+  }
+  .pe-ex-head > .pe-rest-lbl,
+  .pe-ex-head > .pe-rest,
+  .pe-ex-head > .nowrap,
+  .pe-ex-head > .grow {
+    order: 2;
+  }
+  .pe-ex-head > .pe-rest {
+    flex: 0 0 76px;
+    margin-right: var(--space-2);
+  }
+  .pe-set select.input {
+    font-size: 0.75rem;
+  }
+}
+@media (min-width: 641px) {
+  .pe-set {
+    grid-template-columns: 28px 170px repeat(3, 104px) 36px;
+  }
+  .pe-set.cardio {
+    grid-template-columns: 28px 150px repeat(4, 104px) 36px;
+  }
+}
+
+/* ---------- zapis treningu (SessionModal) ---------- */
+.ex-head {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.ex-head > span:nth-child(n + 2) {
+  text-align: center;
+}
+.ex-row > .ex-opts-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin: 0;
+}
+.ex-row {
+  padding: var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+}
+.ex-row > input.input:not(:first-child):not(.ex-notes) {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.ex-row > input.input::placeholder {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+}
+.ex-row > input.input:first-child {
+  font-weight: 600;
+}
+.set-edit {
+  border-left: 2px solid color-mix(in srgb, var(--band) 80%, var(--color-divider));
+  background: color-mix(in srgb, var(--color-text) 2%, transparent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: var(--space-3);
+  gap: 6px;
+}
+.set-edit-head {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.set-edit-row .input {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  min-height: 40px;
+}
+.set-edit-row .input::placeholder {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+}
+.set-edit-row.warm .input {
+  opacity: 1;
+  background-color: transparent;
+  border-style: dashed;
+  color: var(--color-neutral-400);
+}
+.set-no {
+  height: 40px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  background: var(--color-surface-2);
+  border-color: transparent;
+  cursor: pointer;
+}
+.set-edit-row.warm .set-no {
+  background: transparent;
+  border-color: var(--color-divider);
+}
+@media (max-width: 600px) {
+  .set-edit-row .input,
+  .set-no {
+    min-height: 44px;
+    height: 44px;
+  }
+}
+
+/* ---------- zadaj trening ---------- */
+.assign-src {
+  gap: var(--space-2);
+}
+.assign-opt {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  background: var(--color-surface);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.assign-opt:hover {
+  border-color: var(--color-neutral-600);
+}
+.assign-opt.on {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+}
+.assign-opt > input[type='radio'] {
+  accent-color: var(--color-accent);
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+}
+.assign-opt b {
+  font-weight: 600;
+}
+
+/* ---------- kreator biegu ---------- */
+.rb {
+  gap: var(--space-2);
+}
+.rb-seg {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-left: 0;
+  box-shadow: inset 3px 0 0 var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--space-3) + 3px);
+}
+.rb-seg.rb-R,
+.rb-seg.rb-S {
+  box-shadow: inset 3px 0 0 var(--color-neutral-500);
+}
+.rb-seg.rb-P {
+  box-shadow: inset 3px 0 0 var(--color-neutral-700);
+  background: transparent;
+  border-style: dashed;
+}
+.rb-no {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--color-text);
+}
+.rb-reps .input {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+}
+.rb-grid .field > span {
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+}
+.rb-total {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* hantle: 1 hantel / suma */
+.load-per {
+  gap: var(--space-2);
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+/* ---------- pliki podopiecznego ---------- */
+.cfile {
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+}
+.cfile-thumb {
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.cfile-icon {
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+.cfile-name {
+  font-weight: 600;
+}

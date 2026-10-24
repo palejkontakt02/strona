@@ -231,12 +231,14 @@ function ApptTile({ a }: { a: Appointment }) {
       <span className="tile-name">
         {partners.length ? `👥 ${[c, ...partners.map((x) => clientById(db, x.clientId))].map((x) => x?.name.split(' ')[0] ?? '—').join(' + ')}` : c?.name ?? '—'}
       </span>
-      <LocationTag id={a.locationId} short />
-      {mixed ? (
-        <span className="tile-status">{all.filter((x) => x.status !== 'planned').map((x) => `${first(x.clientId)}: ${APPT_STATUS[x.status].label.toLowerCase()}`).join(', ')}</span>
-      ) : (
-        a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>
-      )}
+      <span className="tile-meta">
+        <LocationTag id={a.locationId} short />
+        {mixed ? (
+          <span className="tile-status">{all.filter((x) => x.status !== 'planned').map((x) => `${first(x.clientId)}: ${APPT_STATUS[x.status].label.toLowerCase()}`).join(', ')}</span>
+        ) : (
+          a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>
+        )}
+      </span>
     </button>
   );
 }
@@ -254,8 +256,10 @@ function SessionTile({ s }: { s: TrainingSession }) {
         {time || 'Trening'} <span className={`who-badge ${solo ? 'solo' : 'with'}`}>{solo ? 'sam' : 'ze mną'}</span>
       </span>
       <span className="tile-name">{c?.name ?? '—'}</span>
-      <LocationTag id={s.locationId} short />
-      <span className="tile-status">{s.workoutName || 'Trening'}</span>
+      <span className="tile-meta">
+        <LocationTag id={s.locationId} short />
+        <span className="tile-status">{s.workoutName || 'Trening'}</span>
+      </span>
     </button>
   );
 }
@@ -274,13 +278,15 @@ function AssignedTile({ x }: { x: Assigned }) {
   const { openModal } = useNav();
   const c = clientById(db, x.plan.clientId);
   return (
-    <button className="tile tile-loose" style={hueStyle(x.plan.clientId)} onClick={() => openModal({ kind: 'plan', plan: x.plan, focusWorkoutId: x.workout.id })} title={x.fromPlan ? 'Trening z planu na ten dzień — kliknij, by zmienić plan' : 'Trening zadany poza planem — kliknij, by zmienić'}>
+    <button className={`tile tile-loose ${x.state === 'overdue' ? 'tile-loose-overdue' : ''}`} style={hueStyle(x.plan.clientId)} onClick={() => openModal({ kind: 'plan', plan: x.plan, focusWorkoutId: x.workout.id })} title={x.fromPlan ? 'Trening z planu na ten dzień — kliknij, by zmienić plan' : 'Trening zadany poza planem — kliknij, by zmienić'}>
       <span className="tile-time">
         {x.fromPlan ? 'z planu · ' : ''}
         {x.state === 'overdue' ? 'zaległy' : 'do zrobienia'}
       </span>
       <span className="tile-name">{c?.name ?? '—'}</span>
-      <span className="tile-status">{x.workout.name}</span>
+      <span className="tile-meta">
+        <span className="tile-status">{x.workout.name}</span>
+      </span>
     </button>
   );
 }

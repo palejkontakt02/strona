@@ -1,1 +1,1261 @@
-/* athlete — nadpisania designu (ładowane po styles.css) */
+/* athlete — nadpisania designu (ładowane po styles.css)
+   Aplikacja podopiecznego „Kobalt”: telefon, jedna ręka, między seriami.
+   Zasady: zdania zamiast WERSALIKÓW, liczby treningu w Barlow Condensed (tabular-nums),
+   powierzchnie zamiast cieni, cele dotyku ≥ 44px, kolor = znaczenie
+   (akcent = co teraz, zielony = zrobione, żółty = zaległe). */
+
+.ath {
+  --ath-gutter: 16px;
+  --ath-field: 52px; /* wysokość pól w siatce serii */
+  --ath-ok-tint: color-mix(in srgb, var(--color-ok) 14%, var(--color-surface));
+  --ath-accent-tint: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  --ath-ok-text: var(--ok-fg, var(--color-ok));
+  padding-left: var(--ath-gutter);
+  padding-right: var(--ath-gutter);
+  line-height: 1.45;
+}
+
+/* ---------- typografia wspólna ---------- */
+.ath .eyebrow,
+.sheet .eyebrow {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.8125rem; /* 13 */
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-neutral-400);
+}
+.ath .eyebrow.first-cap::first-letter,
+.sheet .eyebrow.first-cap::first-letter {
+  text-transform: uppercase;
+}
+.ath .acard h3 {
+  font-family: var(--font-body);
+  font-size: 1.0625rem; /* 17 */
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+.ath .acard h3.first-cap::first-letter {
+  text-transform: uppercase;
+}
+.ath .btn-lg,
+.sheet .start-pair .btn-lg,
+.sheet > .btn-lg {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  min-height: 52px;
+}
+.ath .big {
+  font-variant-numeric: tabular-nums;
+}
+.ath .ath-sub {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+  margin: var(--space-6) 0 var(--space-2);
+}
+
+/* ---------- pasek podglądu / góra ---------- */
+.ath-preview {
+  border: 1px solid var(--card-border, var(--color-divider));
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  margin-bottom: var(--space-6);
+  line-height: 1.3;
+}
+.ath-preview .btn,
+.ath-top .btn {
+  min-height: 44px;
+}
+
+/* ---------- powitanie ---------- */
+.ath-hello {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+.ath-hello > :not(.msg-link) {
+  grid-column: 1 / -1;
+}
+.ath-hello h1 {
+  font-family: var(--font-display);
+  font-size: 2.125rem; /* 34 */
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0;
+  text-transform: none;
+  margin: 0;
+}
+.ath-hello p {
+  margin: 0 0 var(--space-2);
+}
+.ath-streak {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ath-hello > .ath-streak {
+  justify-self: start;
+  margin-bottom: var(--space-1);
+}
+.ath-hello .msg-link {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 6px 10px;
+  white-space: normal;
+  line-height: 1.2;
+  font-size: 0.8125rem;
+  border-color: var(--color-divider);
+}
+
+/* ---------- karty ---------- */
+.ath .acard {
+  background: var(--color-surface);
+  border: 1px solid var(--card-border, var(--color-divider));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  box-shadow: none;
+}
+.ath .acard > .muted.small,
+.ath .acard > p.small {
+  margin: 0 0 var(--space-3);
+}
+/* karta „co teraz zrobić”: płaska, akcentowa ramka, bez gradientu */
+.ath .acard-hero {
+  background: var(--ath-accent-tint);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ath .acard-hero > * {
+  margin: 0;
+}
+.ath .acard-hero .eyebrow {
+  color: var(--color-accent-300);
+}
+.ath .acard-hero h2 {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.05;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 2px 0 0;
+}
+.ath .acard-hero > .btn {
+  width: 100%;
+  margin-top: var(--space-3);
+  min-height: 56px;
+}
+.ath .acard-hero > .actions {
+  margin-top: var(--space-3);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+.ath .acard-hero > .actions .btn {
+  width: 100%;
+}
+.ath .acard-hero > .actions .btn-lg {
+  min-height: 56px;
+}
+.ath .acard-warn {
+  border-color: color-mix(in srgb, var(--color-warn) 55%, transparent);
+  background: color-mix(in srgb, var(--color-warn) 6%, var(--color-surface));
+}
+.ath .acard-warn .eyebrow {
+  color: var(--warn-fg, var(--color-warn));
+}
+.ath .acard-warn h3 {
+  margin-top: 2px;
+}
+.ath .acard .btn-block {
+  margin-top: var(--space-4);
+  min-height: 48px;
+}
+.own-btn {
+  min-height: 48px;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-6);
+  color: var(--color-neutral-300);
+  border: 1px dashed var(--color-divider);
+}
+
+/* następna wizyta */
+.next-visit {
+  gap: 4px;
+}
+.next-visit-when {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- cel tygodnia + kalendarz ---------- */
+.ath .ath-grid {
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.ath-grid + * {
+  margin-top: 0;
+}
+.ring-wrap .big {
+  font-size: 2.125rem;
+  line-height: 1;
+}
+.ring-wrap p {
+  margin: 4px 0 0;
+}
+
+.mini-cal-nav {
+  gap: 2px;
+}
+.ath .mini-cal-nav h3 {
+  font-size: 1.0625rem;
+  margin: 0 2px;
+  min-width: 0;
+}
+.ath .mini-cal-nav .icon-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+.mini-cal {
+  gap: 4px;
+  margin-top: var(--space-3);
+  font-size: 0.9375rem;
+}
+.mini-dow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  padding-bottom: 2px;
+}
+button.mini-day,
+.mini-day {
+  min-height: 42px;
+  padding: 0 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-300);
+}
+.mini-day.other {
+  color: var(--color-neutral-600);
+}
+.mini-day.has {
+  background: color-mix(in srgb, var(--color-ok) 20%, transparent);
+  color: var(--ath-ok-text);
+  font-weight: 600;
+}
+.mini-day.todo {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.mini-day.todo::after {
+  background: var(--color-accent);
+}
+.mini-day.todo.late::after {
+  background: var(--color-warn);
+}
+.mini-day.todo::after,
+.mini-day.visit::before {
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+}
+.mini-day.is-today {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+  color: var(--color-text);
+  font-weight: 700;
+}
+.mini-day.sel {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.mini-day.has.sel {
+  background: color-mix(in srgb, var(--color-ok) 34%, transparent);
+}
+.mini-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  align-items: center;
+  line-height: 1.6;
+}
+.mini-legend .dot.todo {
+  background: var(--color-accent);
+}
+.mini-day-list {
+  font-size: 0.9375rem;
+  gap: 6px;
+}
+
+/* ---------- samopoczucie (check-in) ---------- */
+.ath .checkin-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.ath .checkin-row:first-of-type {
+  margin-top: var(--space-2);
+}
+.ath .checkin-row > span:first-child {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.ath .checkin-ends {
+  display: inline;
+  font-weight: 400;
+  margin-left: 6px;
+}
+.ath .scale-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.ath .scale-5 button {
+  width: auto;
+  min-width: 0;
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.ath .scale-5 button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+}
+.readiness .big {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+/* ---------- ciało i postępy ---------- */
+.body-kpis .big {
+  font-size: 2rem;
+  line-height: 1.05;
+}
+.dist-cmp .big {
+  font-size: 2rem;
+}
+.ath .rows .row {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- lista treningów planu ---------- */
+.ath .ath-sel {
+  min-height: 44px;
+  max-width: 58%;
+}
+.ath .wk-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-neutral-400);
+  margin: var(--space-6) 0 var(--space-2);
+}
+.ath .wo-item {
+  min-height: 60px;
+  background: var(--color-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: 6px;
+  color: var(--color-text);
+}
+.ath .wo-item:nth-of-type(even) {
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+}
+.ath .wo-item.next {
+  background: var(--ath-accent-tint);
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+.ath .wo-item:disabled {
+  opacity: 0.55;
+}
+.ath .wo-tx b,
+.ath .wo-tx strong {
+  font-weight: 600;
+}
+.wo-st {
+  width: 32px;
+  height: 32px;
+  background: var(--color-surface-2);
+  color: var(--color-neutral-400);
+}
+.wo-item.next .wo-st {
+  background: var(--color-accent);
+  color: var(--on-accent);
+}
+.wo-item.done .wo-st {
+  background: color-mix(in srgb, var(--color-ok) 22%, transparent);
+  color: var(--ath-ok-text);
+  font-weight: 700;
+}
+.wo-go {
+  color: var(--color-accent-300);
+  white-space: nowrap;
+  font-size: 0.9375rem;
+}
+
+/* ---------- historia: jak dziennik treningowy ---------- */
+.hist-list {
+  gap: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-divider);
+  margin-top: var(--space-3);
+}
+.hist-list > li + li {
+  border-top: 1px solid var(--color-divider);
+}
+.hist-item {
+  min-height: 60px;
+  border-radius: 0;
+  border: 0;
+  background: var(--color-bg);
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-4);
+  color: var(--color-text);
+}
+.hist-list > li:nth-child(even) .hist-item {
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+}
+.hist-item:hover {
+  background: var(--color-surface-2);
+}
+.hist-date {
+  min-width: 58px;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.hist-date b {
+  font-weight: 600;
+}
+.hist-item .grow > b {
+  font-weight: 600;
+}
+.hist-item .grow .muted {
+  font-variant-numeric: tabular-nums;
+}
+.ath .acard:has(.hist-list) > .btn-block {
+  margin-top: var(--space-3);
+}
+
+/* arkusz zapisanego treningu */
+.hist-stats {
+  gap: var(--space-2) var(--space-6);
+  font-variant-numeric: tabular-nums;
+}
+.hist-stats b {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+.hist-ex {
+  flex: none;
+  gap: 0;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.hist-ex-row {
+  border-radius: 0;
+  background: var(--color-bg);
+  padding: var(--space-3) var(--space-4);
+}
+.hist-ex-row + .hist-ex-row {
+  border-top: 1px solid var(--color-divider);
+}
+.hist-ex-row:nth-child(even) {
+  background: color-mix(in srgb, var(--color-bg) 70%, var(--color-surface));
+}
+.hist-ex-row.linked {
+  margin-top: 0;
+  border-top-style: dashed;
+}
+.hist-ex-row b {
+  font-weight: 600;
+}
+.hist-sets {
+  gap: 6px;
+}
+.set-chip {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 2px 9px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.set-chip i {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-right: 1px;
+}
+
+/* ---------- zadania dnia i wiadomości ---------- */
+.ath .today-item {
+  border-radius: var(--radius-md);
+  min-height: 52px;
+}
+.ath .ath-thread li {
+  border-radius: var(--radius-lg);
+}
+
+/* ---------- ankieta (Intake) ---------- */
+.intake .ath-hello {
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+.intake .ath-hello .eyebrow {
+  color: var(--color-accent-300);
+}
+.intake .progress {
+  height: 8px;
+  margin: var(--space-2) 0;
+  background: var(--color-surface-2);
+}
+.intake .intake-fields {
+  gap: var(--space-8);
+}
+.intake .intake-q {
+  gap: var(--space-3);
+}
+.intake .intake-label {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.intake .intake-q > .muted.small {
+  margin-top: calc(-1 * var(--space-2));
+}
+.intake .intake-opts {
+  gap: var(--space-2);
+}
+.intake .intake-opts button {
+  min-height: 48px;
+  min-width: 72px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  font-size: 1rem;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+.intake .intake-opts button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+}
+.intake .intake-opts.scale5 button {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+.intake .intake-q .input {
+  min-height: 48px;
+  font-size: 1rem;
+}
+.intake .intake-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: var(--space-4) calc(-1 * var(--ath-gutter)) 0;
+  padding: var(--space-3) var(--ath-gutter) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-divider);
+}
+.intake .intake-nav .btn {
+  min-height: 52px;
+}
+.intake .intake-nav .btn-primary {
+  flex: 1;
+  max-width: 260px;
+  margin-left: auto;
+}
+.intake .intake-consent {
+  font-size: 0.9375rem;
+}
+.intake .intake-consent input {
+  width: 22px;
+  height: 22px;
+}
+
+/* ================= ODTWARZACZ ================= */
+.player > .between {
+  gap: var(--space-2);
+}
+.player > .between .btn {
+  min-height: 44px;
+}
+.player-head {
+  margin: var(--space-6) 0 var(--space-3);
+}
+.player-head h1 {
+  font-family: var(--font-display);
+  font-size: 2.125rem;
+  font-weight: 600;
+  line-height: 1.05;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+.player-head > p.small {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.player-head .rpe-legend {
+  margin-top: var(--space-2);
+}
+/* pasek postępu ćwiczeń: segmenty jak kolumny tygodni w arkuszu */
+.segs {
+  gap: 4px;
+  margin: var(--space-4) 0 var(--space-2);
+}
+.segs button,
+.segs button.cur {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  box-shadow: none;
+  cursor: pointer;
+}
+.segs button::before {
+  /* większe pole dotyku niż widoczny pasek */
+  content: '';
+  position: absolute;
+  inset: -14px 0;
+}
+.segs button.cur {
+  background: var(--color-accent);
+}
+.segs button.on {
+  background: var(--color-ok);
+}
+.player .upper {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+}
+
+/* karta ćwiczenia */
+.player .acard {
+  margin-top: var(--space-3);
+  padding: var(--space-6) var(--space-4) var(--space-3);
+}
+.run-ex-head h2 {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.08;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0;
+}
+.run-ex-head .ex-label-lg {
+  height: 28px;
+  min-width: 32px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--band);
+  color: var(--band-fg);
+  vertical-align: 4px;
+  margin-right: 2px;
+}
+.run-ex-head .muted.small {
+  font-variant-numeric: tabular-nums;
+}
+
+/* nagłówek siatki serii = pasek nagłówka arkusza */
+.sgrid {
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 42px 54px;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sgrid.cardio {
+  grid-template-columns: 28px repeat(4, minmax(0, 1fr)) 54px;
+}
+.sgrid-head {
+  margin-top: var(--space-4);
+  min-height: 32px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: var(--band);
+  color: var(--band-fg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+.sgrid-head > span {
+  padding: 6px 0;
+}
+.ghead {
+  margin-top: var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-accent-300);
+}
+.ghead b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* pola liczbowe */
+.sgrid input {
+  height: var(--ath-field);
+  padding: 0 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.625rem; /* 26 */
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s, background-color 0.2s;
+}
+.sgrid input::placeholder {
+  color: var(--color-neutral-600);
+  font-weight: 500;
+  opacity: 1;
+}
+.sgrid input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--focus, color-mix(in srgb, var(--color-accent) 50%, transparent));
+}
+.sgrid input.sugg {
+  color: var(--color-cyan);
+  border-color: color-mix(in srgb, var(--color-cyan) 45%, transparent);
+}
+.sgrid .lr input {
+  font-size: 1.375rem;
+}
+.sgrid .sn,
+.sgrid .sn-btn {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+}
+.sgrid .sn-btn {
+  height: var(--ath-field);
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+.sgrid .sn .ex-label {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  height: 22px;
+}
+.sgrid.warm .sn,
+.sgrid.warm .sn-btn {
+  color: var(--warn-fg, var(--color-warn));
+}
+
+/* nagranie serii */
+.sgrid .cam-btn {
+  height: var(--ath-field);
+  border-radius: var(--radius-md);
+  border-color: var(--color-divider);
+  color: var(--color-neutral-400);
+}
+.sgrid .cam-btn.has {
+  color: var(--color-accent-300);
+  border-color: var(--color-accent);
+  background: var(--ath-accent-tint);
+}
+
+/* ✓ — przycisk zaliczenia serii */
+.sgrid .ok {
+  height: var(--ath-field);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-neutral-500);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+.sgrid .ok:active {
+  transform: scale(0.94);
+}
+
+/* bieżąca seria: pierwsza niezaliczona (i ta po ostatniej zaliczonej) — akcent „co teraz” */
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done),
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done),
+.sgrid.is-next {
+  --row-accent: 1;
+}
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done) .ok,
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done) .ok,
+.sgrid.is-next .ok {
+  background: var(--ath-accent-tint);
+  border: 2px solid var(--color-accent);
+  color: var(--color-accent-300);
+  box-shadow: none;
+}
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done) .sn,
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done) .sn,
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done) .sn-btn,
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done) .sn-btn,
+.sgrid.is-next .sn,
+.sgrid.is-next .sn-btn {
+  color: var(--color-accent-300);
+}
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done) input,
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done) input,
+.sgrid.is-next input {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-divider));
+}
+.player .acard > .sgrid-head + div > div > .sgrid:not(.done) input:focus,
+.player .acard > div:has(> div > .sgrid.done) + div > div > .sgrid:not(.done) input:focus,
+.sgrid.is-next input:focus {
+  border-color: var(--color-accent);
+}
+
+/* seria zaliczona: cały wiersz w kolorze „zrobione” */
+.sgrid.done input {
+  opacity: 1;
+  background: var(--ath-ok-tint);
+  border-color: color-mix(in srgb, var(--color-ok) 35%, transparent);
+  color: var(--color-text);
+}
+.sgrid.done input::placeholder {
+  color: color-mix(in srgb, var(--ath-ok-text) 45%, transparent);
+}
+.sgrid.done .sn,
+.sgrid.done .sn-btn {
+  color: var(--ath-ok-text);
+}
+.sgrid.done .ok {
+  background: var(--color-ok);
+  border: 1px solid var(--color-ok);
+  color: var(--on-ok);
+  font-size: 1.5rem;
+  animation: ath-tick 0.28s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.sgrid.done .cam-btn:not(.has) {
+  border-color: color-mix(in srgb, var(--color-ok) 25%, transparent);
+}
+@keyframes ath-tick {
+  0% {
+    transform: scale(0.82);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* podpowiedzi pod wierszem — wyrównane do pierwszej kolumny pól */
+.sughint,
+.prevhint {
+  padding: 3px 0 0 34px;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.prevhint {
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+}
+.sughint {
+  color: var(--color-cyan);
+}
+.next-hint {
+  padding: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--ath-accent-tint);
+  color: var(--color-accent-300);
+}
+.hold-start,
+.warm-remove {
+  margin: 0 0 0 34px;
+}
+.player .link.small {
+  min-height: 44px;
+}
+
+/* seria na czas: pole + ⏱ */
+.sgrid .reps-hold {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
+  min-width: 0;
+}
+.sgrid .hold-btn {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 28px;
+  height: auto;
+  transform: none;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ath-accent-tint);
+  color: var(--color-accent-300);
+  font-size: 0.9rem;
+  padding: 0;
+  cursor: pointer;
+}
+.sgrid .reps-hold input {
+  padding-right: 30px;
+}
+
+/* superserie / obwody */
+.block-head {
+  align-items: baseline;
+}
+.block-head .eyebrow {
+  color: var(--color-accent-300);
+}
+.round {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+}
+.round-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-neutral-400);
+}
+
+/* + seria / − usuń ostatnią */
+.player .acard > .between:last-child {
+  margin-top: var(--space-2);
+}
+
+/* nawigacja między ćwiczeniami */
+.navrow {
+  gap: var(--space-2);
+  margin: var(--space-6) 0 var(--space-3);
+  align-items: stretch;
+}
+.navrow .btn {
+  min-height: 56px;
+}
+.navrow .btn-ghost {
+  flex: 0 0 auto;
+  border-color: var(--color-divider);
+}
+.add-ex {
+  min-height: 48px;
+  color: var(--color-neutral-300);
+  border: 1px dashed var(--color-divider);
+}
+.finish-early,
+.cancel-run {
+  min-height: 48px;
+}
+.nextup {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: transparent;
+  border-style: dashed;
+  font-weight: 600;
+}
+.nextup .muted {
+  flex: none;
+  font-weight: 500;
+}
+
+/* przerwa / odliczanie: pływający pasek, duży czas, spokojny kolor */
+.restbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  row-gap: 0;
+  align-items: center;
+  width: min(560px, calc(100% - 2 * var(--space-4)));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: var(--color-surface-2);
+}
+.restbar .rb-fill {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+.restbar.holdbar {
+  border-color: color-mix(in srgb, var(--color-ok) 40%, transparent);
+}
+.restbar.holdbar .rb-fill {
+  background: color-mix(in srgb, var(--color-ok) 20%, transparent);
+}
+.restbar > span {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-neutral-300);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.restbar b {
+  grid-column: 1;
+  grid-row: 2;
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.restbar button {
+  grid-row: 1 / span 2;
+  min-height: 48px;
+  min-width: 52px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.restbar button:last-child {
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+}
+.player:has(.restbar) {
+  padding-bottom: 120px;
+}
+
+/* metronom tempa */
+.tempo-ov .tbig .n {
+  font-variant-numeric: tabular-nums;
+}
+
+/* układ treningu */
+.layout-row .input {
+  min-height: 44px;
+}
+
+/* ---------- trening na żywo / w parze ---------- */
+.live-bar {
+  align-items: center;
+}
+.pair-bar {
+  gap: var(--space-2);
+  padding: 6px;
+}
+.pair-tabs {
+  gap: 6px;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+.pair-tab {
+  min-height: 44px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pair-tab.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.pair-tab.done {
+  opacity: 1;
+  color: var(--color-neutral-400);
+  border-style: dashed;
+}
+.pair-prog {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.pair-tab.active .pair-prog {
+  opacity: 0.85;
+}
+.pair-rest {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--warn-fg, var(--color-warn));
+}
+.pair-tab.active .pair-rest {
+  color: inherit;
+}
+.pair-rest.ready {
+  color: var(--ath-ok-text, var(--color-ok));
+}
+.pair-add {
+  min-width: 44px;
+  justify-content: center;
+}
+
+/* ---------- start (podgląd treningu) ---------- */
+.start-pair {
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.start-pair > .btn,
+.sheet > .btn-lg.btn-block {
+  min-height: 56px;
+}
+
+/* ---------- nagrania serii ---------- */
+.set-video {
+  border-radius: var(--radius-lg);
+}
+.rec-actions .btn,
+.video-choice .btn {
+  min-height: 48px;
+}
+
+/* ---------- szeroki ekran ---------- */
+@media (min-width: 700px) {
+  .ath {
+    --ath-gutter: 24px;
+  }
+  .player .acard {
+    padding: var(--space-6);
+  }
+  .sgrid {
+    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 48px 64px;
+    gap: 8px;
+  }
+  .sgrid.cardio {
+    grid-template-columns: 34px repeat(4, minmax(0, 1fr)) 64px;
+  }
+  .sughint,
+  .prevhint,
+  .hold-start,
+  .warm-remove {
+    padding-left: 42px;
+  }
+  .hold-start,
+  .warm-remove {
+    padding-left: 0;
+    margin-left: 42px;
+  }
+}
+
+/* ---------- wąski telefon (360) ---------- */
+@media (max-width: 380px) {
+  .ath {
+    --ath-field: 50px;
+  }
+  .ath .acard {
+    padding: var(--space-4);
+  }
+  .player .acard {
+    padding: var(--space-4) var(--space-3) var(--space-2);
+  }
+  .sgrid {
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 38px 50px;
+    gap: 5px;
+  }
+  .sgrid.cardio {
+    grid-template-columns: 24px repeat(4, minmax(0, 1fr)) 50px;
+  }
+  .sgrid input {
+    font-size: 1.5rem;
+  }
+  .sughint,
+  .prevhint {
+    padding-left: 29px;
+  }
+  .hold-start,
+  .warm-remove {
+    margin-left: 29px;
+  }
+  .restbar button {
+    min-width: 46px;
+    padding: 0 var(--space-2);
+  }
+  .ath .scale-5 button {
+    height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sgrid .ok,
+  .sgrid input,
+  .ath .scale-5 button,
+  .intake .intake-opts button {
+    transition: none;
+  }
+  .sgrid.done .ok {
+    animation: none;
+  }
+  .sgrid .ok:active {
+    transform: none;
+  }
+}

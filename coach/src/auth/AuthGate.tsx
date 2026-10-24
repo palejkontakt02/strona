@@ -164,16 +164,38 @@ export function Screen({ title, children }: { title: string; children: React.Rea
     <div className="auth-split">
       <aside className="auth-hero" aria-hidden="true">
         <div className="auth-logo">
-          FITOWA <span>/ coach</span>
+          Fitowa <span>/ coach</span>
         </div>
-        <svg className="auth-plate" viewBox="0 0 200 200">
-          <circle cx="100" cy="100" r="96" />
-          <circle cx="100" cy="100" r="78" />
-          <circle cx="100" cy="100" r="22" />
-          <circle cx="100" cy="100" r="10" className="hole" />
-          <text x="100" y="47" textAnchor="middle">20 KG</text>
-          <text x="100" y="164" textAnchor="middle">FITOWA</text>
-        </svg>
+        <div className="auth-sheet">
+          <div className="auth-sheet-band">
+            <span>Tydzień 3 · siła</span>
+            <span>pon</span>
+          </div>
+          <div className="auth-sheet-row done">
+            <span>Przysiad ze sztangą</span>
+            <b>4 × 6</b>
+            <b>100 kg</b>
+            <i>✓</i>
+          </div>
+          <div className="auth-sheet-row done">
+            <span>Wyciskanie leżąc</span>
+            <b>4 × 8</b>
+            <b>72,5 kg</b>
+            <i>✓</i>
+          </div>
+          <div className="auth-sheet-row next">
+            <span>Martwy ciąg rumuński</span>
+            <b>3 × 10</b>
+            <b>80 kg</b>
+            <i />
+          </div>
+          <div className="auth-sheet-row">
+            <span>Podciąganie</span>
+            <b>3 × 8</b>
+            <b>+10 kg</b>
+            <i />
+          </div>
+        </div>
         <div className="auth-claim">
           <h1>
             Trenuj
@@ -199,7 +221,7 @@ export function Screen({ title, children }: { title: string; children: React.Rea
       <main className="auth-side">
         <div className="auth-card">
           <div className="auth-logo auth-logo-mobile">
-            FITOWA <span>/ coach</span>
+            Fitowa <span>/ coach</span>
           </div>
           <h2 className="auth-h">{title}</h2>
           {children}

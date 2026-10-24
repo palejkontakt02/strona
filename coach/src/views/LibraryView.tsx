@@ -19,7 +19,7 @@ export function LibraryView() {
   const grouped = EXERCISE_CATEGORIES.map((c) => ({ c, items: list.filter((e) => e.cat === c) })).filter((g) => g.items.length);
 
   return (
-    <div className="page fade">
+    <div className="page fade page-lib">
       <div className="page-head">
         <div>
           <h2>Biblioteka ćwiczeń</h2>

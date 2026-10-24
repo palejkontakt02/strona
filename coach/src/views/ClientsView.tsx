@@ -6,7 +6,7 @@ import type { ClientStatus } from '../domain';
 import { lastSessionDate, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { needsReview } from '../data/videos';
-import { ago, ageOf, normalize } from '../format';
+import { ago, ageOf, fmtDay, fmtWeekday, normalize } from '../format';
 import { clientAlerts } from '../lib/alerts';
 import { healthFlags, trainerNotesOf } from './client/Health';
 import { todayISO } from '../lib/dates';
@@ -58,6 +58,10 @@ export function ClientsView() {
           {list.map((c) => {
             const alerts = c.status === 'aktywny' ? clientAlerts(c, sessionsOf(db, c.id), today, healthFlags(trainerNotesOf(db.trainer_notes, c.id).health, c.intake)) : [];
             const red = alerts.some((a) => a.level === 'red');
+            // najbliższa zaplanowana wizyta — tylko do wyświetlenia na karcie
+            const next = db.appointments
+              .filter((a) => a.clientId === c.id && a.status === 'planned' && a.date >= today)
+              .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
             return (
               <li key={c.id}>
                 <button className={`client-card ${c.id === clientId ? 'selected' : ''}`} onClick={() => openClient(c.id, clientTab)}>
@@ -83,8 +87,15 @@ export function ClientsView() {
                       </span>
                     </div>
                     <div className="muted small ellipsis">{[c.sport, c.goal].filter(Boolean).join(' · ')}</div>
-                    <div className="muted small row-inline">
-                      Ostatni trening: {ago(lastSessionDate(db, c.id))} <AccountBadge client={c} state={accounts} />
+                    <div className="muted small row-inline client-card-meta">
+                      <span className="client-last">Ostatni trening: {ago(lastSessionDate(db, c.id))}</span>
+                      {next && (
+                        <span className={`client-next ${next.date === today ? 'is-today' : ''}`} title="Najbliższa wizyta">
+                          <Icon name="cal" size={13} />
+                          {next.date === today ? 'dziś' : `${fmtWeekday(next.date)} ${fmtDay(next.date)}`}, {next.time}
+                        </span>
+                      )}
+                      <AccountBadge client={c} state={accounts} />
                     </div>
                   </div>
                 </button>

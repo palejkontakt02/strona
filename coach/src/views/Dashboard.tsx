@@ -49,7 +49,7 @@ export function Dashboard() {
   const recent = [...db.sessions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
 
   return (
-    <div className="page fade">
+    <div className="page fade page-dash">
       <div className="page-head">
         <div>
           <h2>Pulpit</h2>
@@ -57,7 +57,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-strip">
         <Kpi label="Aktywni klienci" value={active.length} sub={`${db.clients.length} łącznie`} />
         <Kpi label="Treningi – 7 dni" value={week} sub={plural(week, 'trening', 'treningi', 'treningów')} />
         <Kpi label="Wpłaty w tym miesiącu" value={pln(paidThisMonth)} />
@@ -74,7 +74,8 @@ export function Dashboard() {
           value={pln(overdue.reduce((a, p) => a + p.amount, 0))} sub={overdue.length ? `${overdue.length} ${plural(overdue.length, 'płatność', 'płatności', 'płatności')} po terminie` : 'brak'} tone={overdue.length ? 'danger' : undefined} />
       </div>
 
-      <div className="dash-grid">
+      <div className="dash-grid dash-split">
+        <div className="dash-col dash-col-main">
         <Card title={`Dziś w kalendarzu${todayAppts.length > 6 ? ` (${todayAppts.length})` : ''}`} className="span-2 dash-today">
           {todayAppts.length === 0 ? (
             <Empty>Brak wizyt na dziś.</Empty>
@@ -84,7 +85,7 @@ export function Dashboard() {
               {(showAllToday || todayAppts.length <= 8 ? todayAppts : (todayAppts.filter((a) => a.status === 'planned').length ? todayAppts.filter((a) => a.status === 'planned') : todayAppts).slice(0, 6)).map((a) => {
                 const c = clientById(db, a.clientId);
                 return (
-                  <li key={a.id} className="row">
+                  <li key={a.id} className="row dash-visit" data-status={a.status}>
                     <span className="row-time">{a.time}</span>
                     <div className="grow row-main">
                       <button className="link ellipsis" onClick={() => c && openClient(c.id)}>
@@ -128,7 +129,7 @@ export function Dashboard() {
           const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
           if (!notes.length) return null;
           return (
-            <Card title={`Wiadomości od podopiecznych (${notes.length})`} className="span-2">
+            <Card title={`Wiadomości od podopiecznych (${notes.length})`} className="span-2 dash-msgs">
               <ul className="rows">
                 {notes.slice(0, 6).map(({ c, n }) => (
                   <li key={n.id} className="row row-top">
@@ -165,7 +166,7 @@ export function Dashboard() {
           const todo = db.sessions.filter((x) => x.date >= from && needsReview(x)).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
           if (!todo.length) return null;
           return (
-            <Card title={`Nagrania do obejrzenia (${todo.length})`} className="span-2">
+            <Card title={`Nagrania do obejrzenia (${todo.length})`} className="span-2 dash-videos">
               <ul className="rows">
                 {todo.slice(0, 8).map((x) => {
                   const c = clientById(db, x.clientId);
@@ -196,7 +197,7 @@ export function Dashboard() {
           const overdueAppts = db.appointments.filter((a) => a.status === 'planned' && a.date < today && a.date >= from).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
           if (!overdueAppts.length) return null;
           return (
-            <Card title={`Do uzupełnienia (${overdueAppts.length})`} className="span-2">
+            <Card title={`Do uzupełnienia (${overdueAppts.length})`} className="span-2 dash-overdue">
               <p className="muted small">Minione wizyty bez zapisanego treningu — zapisz trening (zejdzie z pakietu / doliczy się klubowi) albo oznacz odwołanie.</p>
               <ul className="rows">
                 {overdueAppts.slice(0, 8).map((a) => {
@@ -221,6 +222,33 @@ export function Dashboard() {
           );
         })()}
 
+        <Card title="Ostatnie treningi" className="span-2 dash-recent">
+          {recent.length === 0 ? (
+            <Empty>Brak zapisanych treningów.</Empty>
+          ) : (
+            <ul className="rows">
+              {recent.map((s) => {
+                const c = clientById(db, s.clientId);
+                return (
+                  <li key={s.id} className="row">
+                    <span className="row-time">{fmtDay(s.date)}</span>
+                    <div className="grow">
+                      <button className="link" onClick={() => c && openClient(c.id, 'Treningi')}>
+                        {c?.name}
+                      </button>
+                      <div className="small muted">{s.workoutName || 'Trening'}</div>
+                    </div>
+                    {s.srpe != null && s.duration != null && <span className="small muted nowrap" title="Obciążenie treningu = RPE × minuty (AU — jednostki umowne)">{s.srpe * s.duration} AU</span>}
+                    <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+        </div>
+
+        <div className="dash-col dash-col-side">
         {(() => {
           // jedna pozycja na osobę (kilka sygnałów w jednej linii), czerwone najpierw
           const groups = [...new Map(alerts.map((a) => [a.client.id, a.client])).values()]
@@ -254,7 +282,7 @@ export function Dashboard() {
           );
         })()}
 
-        <Card title="Do zapłaty">
+        <Card title="Do zapłaty" className="dash-due">
           {due.length === 0 ? (
             <Empty>Wszystko opłacone.</Empty>
           ) : (
@@ -279,7 +307,7 @@ export function Dashboard() {
         </Card>
 
         {clubs.length > 0 && (
-          <Card title="Rozliczenia z klubami" action={<button className="btn btn-ghost btn-sm" onClick={() => go('Płatności')}>Szczegóły</button>}>
+          <Card title="Rozliczenia z klubami" className="dash-clubs" action={<button className="btn btn-ghost btn-sm" onClick={() => go('Płatności')}>Szczegóły</button>}>
             <ul className="rows">
               {clubs.map((c) => {
                 const out = clubOutstanding(c, db.sessions, today);
@@ -302,7 +330,7 @@ export function Dashboard() {
           </Card>
         )}
 
-        <Card title="Kończące się pakiety">
+        <Card title="Kończące się pakiety" className="dash-packages">
           {packages.length === 0 ? (
             <Empty>Brak.</Empty>
           ) : (
@@ -320,7 +348,7 @@ export function Dashboard() {
           )}
         </Card>
 
-        <Card title="Bez treningu 10+ dni">
+        <Card title="Bez treningu 10+ dni" className="dash-idle">
           {idle.length === 0 ? (
             <Empty>Wszyscy trenują regularnie.</Empty>
           ) : (
@@ -337,31 +365,7 @@ export function Dashboard() {
             </ul>
           )}
         </Card>
-
-        <Card title="Ostatnie treningi" className="span-2">
-          {recent.length === 0 ? (
-            <Empty>Brak zapisanych treningów.</Empty>
-          ) : (
-            <ul className="rows">
-              {recent.map((s) => {
-                const c = clientById(db, s.clientId);
-                return (
-                  <li key={s.id} className="row">
-                    <span className="row-time">{fmtDay(s.date)}</span>
-                    <div className="grow">
-                      <button className="link" onClick={() => c && openClient(c.id, 'Treningi')}>
-                        {c?.name}
-                      </button>
-                      <div className="small muted">{s.workoutName || 'Trening'}</div>
-                    </div>
-                    {s.srpe != null && s.duration != null && <span className="small muted nowrap" title="Obciążenie treningu = RPE × minuty (AU — jednostki umowne)">{s.srpe * s.duration} AU</span>}
-                    <IconBtn icon="edit" label="Edytuj trening" onClick={() => openModal({ kind: 'session', session: s })} />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+        </div>
       </div>
     </div>
   );

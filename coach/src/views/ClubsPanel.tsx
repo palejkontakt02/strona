@@ -31,7 +31,7 @@ export function ClubsPanel() {
 
   return (
     <>
-      <div className="kpi-grid kpi-grid-3">
+      <div className="kpi-grid kpi-grid-3 kpi-strip">
         <Kpi label="Do wypłaty od klubów" value={pln(outstanding)} sub="za zakończone miesiące" tone={outstanding ? 'warn' : undefined} />
         <Kpi label="W tym miesiącu" value={pln(thisMonth)} sub="narasta z każdym treningiem" />
         <Kpi label={`Wypłacono w ${year}`} value={pln(paidYear)} />

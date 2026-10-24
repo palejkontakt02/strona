@@ -98,6 +98,7 @@ export function ClientPlans({ client }: { client: Client }) {
           return (
             <Card
               key={p.id}
+              className={`plan-card ${p.active ? 'is-active' : ''}`}
               title={
                 <>
                   {p.name} {p.active && <Tag tone="accent">Aktywny</Tag>}

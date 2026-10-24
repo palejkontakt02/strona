@@ -44,7 +44,7 @@ export function PaymentsView() {
     .filter((p) => normalize(p.client.name).includes(normalize(q.trim())));
 
   return (
-    <div className="page fade">
+    <div className="page fade page-pay">
       <div className="page-head">
         <h2>Płatności</h2>
         <div className="actions">
@@ -65,7 +65,7 @@ export function PaymentsView() {
         <ClubsPanel />
       ) : (
         <>
-      <div className="kpi-grid">
+      <div className="kpi-grid kpi-strip">
         <Kpi label="Wpłaty w tym miesiącu" value={pln(all.filter((p) => p.status === 'paid' && (p.paidDate || p.date).startsWith(month)).reduce((a, p) => a + p.amount, 0))} />
         <Kpi label="Do zapłaty" value={pln(unpaid.reduce((a, p) => a + p.amount, 0))} sub={`${unpaid.length} pozycji`} />
         <Kpi label="Zaległe (po terminie)" value={pln(overdue.reduce((a, p) => a + p.amount, 0))} tone={overdue.length ? 'danger' : undefined} />
