@@ -86,6 +86,68 @@ export interface Injury {
 export interface RunProfile {
   hrMax?: number;
   t5k?: string;
+  /** Tętno progowe (LTHR) z testu, np. 30 min biegu — ostatnie 20 min średnio. Strefy liczone od niego (Friel). */
+  lthr?: number;
+}
+
+/** Cotygodniowy raport podopiecznego (wysyła on sam, np. w niedzielę). */
+export interface WeeklyReport {
+  id: string;
+  /** Poniedziałek tygodnia, którego dotyczy raport. */
+  week: ISODate;
+  /** Kiedy wysłany (ISO). */
+  at: string;
+  weight?: number;
+  /** 1–5: sen, stres (5 = spokój), energia, trzymanie planu / diety. */
+  sleep?: number;
+  stress?: number;
+  energy?: number;
+  adherence?: number;
+  /** Średnio kroków dziennie. */
+  steps?: number;
+  comment?: string;
+  /** Zdjęcia sylwetki dołączone do raportu — id z `progressPhotos`. */
+  photoIds?: string[];
+  /** Trener: przeczytany / odpowiedź. */
+  seenAt?: string;
+  coachNote?: string;
+}
+
+/** Zdjęcie sylwetki (plik w magazynie: „sb:…” albo „idb:…”). */
+export interface ProgressPhoto {
+  id: string;
+  date: ISODate;
+  ref: string;
+  pose: 'przód' | 'bok' | 'tył' | 'inne';
+  at: string;
+  hidden?: boolean;
+}
+
+/** Dzienny zapis makro i kroków (podopieczny). */
+export interface DayLog {
+  date: ISODate;
+  protein?: number;
+  kcal?: number;
+  steps?: number;
+  /** Woda w litrach. */
+  water?: number;
+}
+
+/** Cele dzienne ustawione przez trenera. */
+export interface DayTargets {
+  protein?: number;
+  kcal?: number;
+  steps?: number;
+  water?: number;
+}
+
+/** Miejsce bólu zaznaczone na sylwetce (przy treningu). */
+export interface PainSpot {
+  /** Obszar ciała z listy w lib/painMap (np. „kolano”, „odcinek lędźwiowy”). */
+  area: string;
+  side?: 'L' | 'P';
+  /** 0–10 */
+  level: number;
 }
 
 export interface Client {
@@ -138,6 +200,14 @@ export interface Client {
   noShowCharges?: string[];
   /** Odpowiedzi trenera (wątek z wiadomościami podopiecznego). */
   replies?: CoachReply[];
+  /** Raporty tygodniowe (zapisuje podopieczny przez funkcję w bazie). */
+  weeklyReports?: WeeklyReport[];
+  /** Zdjęcia sylwetki w czasie (zapisuje podopieczny przez funkcję w bazie). */
+  progressPhotos?: ProgressPhoto[];
+  /** Makro i kroki dzień po dniu (zapisuje podopieczny przez funkcję w bazie). */
+  dayLog?: DayLog[];
+  /** Cele dzienne: białko, kcal, kroki, woda (ustawia trener). */
+  targets?: DayTargets;
 }
 
 /** Kiedy zadanie obowiązuje: codziennie, w wybrane dni tygodnia (1 = pn … 7 = nd) albo dni miesiąca (1–31). */
@@ -313,6 +383,8 @@ export interface TrainingSession {
   srpe?: number;
   /** Ból 0–10. */
   pain?: number;
+  /** Gdzie bolało (mapa ciała) — szczegóły do `pain`. */
+  painMap?: PainSpot[];
   notes?: string;
   wellness?: Wellness;
   sleepH?: number;

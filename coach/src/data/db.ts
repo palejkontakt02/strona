@@ -1,5 +1,5 @@
 import type { Intake } from '../lib/intake';
-import type { Appointment, Checkin, Client, ClientNote, LibraryExercise, Location, Measurement, Plan, TrainerNotes, TrainingSession } from '../domain';
+import type { Appointment, Checkin, Client, ClientNote, DayLog, LibraryExercise, Location, Measurement, Plan, ProgressPhoto, TrainerNotes, TrainingSession, WeeklyReport } from '../domain';
 
 export interface Db {
   clients: Client[];
@@ -58,6 +58,9 @@ export function normalizeDb(db: Partial<Db>): Db {
       inbox: Array.isArray(r.inbox)
         ? r.inbox.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ ...n, id: typeof n.id === 'string' ? n.id : `n${i}`, at: typeof n.at === 'string' ? n.at : '' }))
         : undefined,
+      weeklyReports: Array.isArray(r.weeklyReports) ? r.weeklyReports.filter((x) => isRec(x) && typeof x.id === 'string' && isDate(x.week)) : undefined,
+      progressPhotos: Array.isArray(r.progressPhotos) ? r.progressPhotos.filter((x) => isRec(x) && typeof x.id === 'string' && isDate(x.date) && typeof x.ref === 'string' && /^(sb|idb):/.test(x.ref)) : undefined,
+      dayLog: Array.isArray(r.dayLog) ? r.dayLog.filter((x) => isRec(x) && isDate(x.date)) : undefined,
       replies: Array.isArray(r.replies)
         ? r.replies.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ id: typeof n.id === 'string' ? n.id : `r${i}`, at: typeof n.at === 'string' ? n.at : '', text: n.text as string }))
         : undefined,
@@ -124,4 +127,17 @@ export interface Repository {
   addMeasurement(clientId: string, m: Measurement): Promise<void>;
   /** Ankieta podopiecznego (zapis całości). */
   saveIntake(clientId: string, intake: Intake): Promise<void>;
+  /**
+   * Wpis podopiecznego w jego profilu: raport tygodniowy (po `id`), zdjęcie sylwetki (po `id`)
+   * albo dzienny zapis makro / kroków (po `date`). Zastępuje wpis o tym samym kluczu.
+   */
+  saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog): Promise<void>;
+}
+
+export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog';
+
+/** Wstawia albo podmienia wpis (raport / zdjęcie po id, dzień po dacie); najwyżej `max` ostatnich. */
+export function withEntry<T extends { id?: string; date?: string }>(list: T[] | undefined, entry: T, max = 400): T[] {
+  const key = (x: T) => x.id ?? x.date;
+  return [...(list ?? []).filter((x) => key(x) !== key(entry)), entry].slice(-max);
 }

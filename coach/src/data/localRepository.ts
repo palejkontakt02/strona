@@ -1,4 +1,4 @@
-import { applyChanges, normalizeDb, type Db, type Repository } from './db';
+import { applyChanges, normalizeDb, withEntry, type Db, type Repository } from './db';
 import { createSeed } from './seed';
 import { withDay } from '../lib/habits';
 
@@ -79,6 +79,10 @@ export function createLocalRepository(): Repository {
     },
     async addMeasurement(clientId, m) {
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, selfMeasurements: [...(c.selfMeasurements ?? []), m].slice(-500) } : c)) };
+      persist();
+    },
+    async saveClientEntry(clientId, kind, entry) {
+      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, [kind]: withEntry((c[kind] ?? []) as { id?: string; date?: string }[], entry as { id?: string; date?: string }) } : c)) };
       persist();
     },
     async addClientNote(clientId, note) {

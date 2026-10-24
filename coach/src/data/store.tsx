@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Checkin, ClientNote, Measurement } from '../domain';
+import type { Checkin, ClientNote, DayLog, Measurement, ProgressPhoto, WeeklyReport } from '../domain';
 import type { Intake } from '../lib/intake';
 import { uid } from '../format';
 import { withDay } from '../lib/habits';
 import { emailTrainer } from './mail';
 import { useDialog } from '../components/useDialog';
-import { applyChanges, type Change, type Db, type Repository } from './db';
+import { applyChanges, withEntry, type Change, type ClientEntryKind, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
 
 interface AskState {
@@ -28,6 +28,8 @@ interface StoreValue {
   saveCheckin: (clientId: string, checkin: Checkin) => Promise<void>;
   addMeasurement: (clientId: string, m: Measurement) => Promise<boolean>;
   saveIntake: (clientId: string, intake: Intake) => Promise<boolean>;
+  /** Wpis podopiecznego: raport tygodniowy, zdjęcie sylwetki albo dzień makro / kroków. */
+  saveClientEntry: (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog, okMessage?: string) => Promise<boolean>;
   saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
   sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
@@ -183,6 +185,24 @@ export function StoreProvider({
     [db, repo, toast],
   );
 
+  const saveClientEntry = useCallback(
+    async (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog, okMessage?: string) => {
+      const prev = db?.clients.find((c) => c.id === clientId)?.[kind];
+      const upd = (list: unknown) => withEntry((list ?? []) as { id?: string; date?: string }[], entry as { id?: string; date?: string });
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: upd(c[kind]) } : c)) } : cur));
+      try {
+        await repo.saveClientEntry(clientId, kind, entry);
+        if (okMessage) toast(okMessage);
+        return true;
+      } catch (e) {
+        setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: prev } : c)) } : cur));
+        toast((e as Error).message === 'DB_OUTDATED' ? 'Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 19 w hardening.sql).' : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        return false;
+      }
+    },
+    [db, repo, toast],
+  );
+
   // odhaczenia zapisywane po kolei — szybkie stuknięcia nie wyprzedzają się w sieci
   const habitQueue = useRef<Promise<unknown>>(Promise.resolve());
   const saveHabitDay = useCallback(
@@ -253,8 +273,8 @@ export function StoreProvider({
   );
 
   const value = useMemo(
-    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveHabitDay, sendClientNote, cloud, signOut } : null),
-    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveHabitDay, sendClientNote, cloud, signOut],
+    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut } : null),
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut],
   );
   if (loadError)
     return (

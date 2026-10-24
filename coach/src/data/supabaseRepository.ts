@@ -100,6 +100,13 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
       if (error) throw error;
     },
 
+    async saveClientEntry(clientId, kind, entry) {
+      // funkcja w bazie: sekcja 19 w hardening.sql (raporty tygodniowe, zdjęcia sylwetki, makro i kroki)
+      const { error } = await supabase.rpc('save_client_entry', { p_client_id: clientId, p_kind: kind, p_entry: entry });
+      if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');
+      if (error) throw error;
+    },
+
     async saveCheckin(clientId: string, checkin: Checkin) {
       const { error } = await supabase.rpc('save_checkin', { p_client_id: clientId, p_checkin: checkin });
       if (error) throw error;
