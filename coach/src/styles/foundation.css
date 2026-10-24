@@ -1,1 +1,54 @@
-/* foundation — nadpisania designu (ładowane po styles.css) */
+/* foundation — nadpisania designu (ładowane po styles.css).
+   Tokeny, skala pisma i prymitywy (.btn, .input, .seg, .tag, .chip, .card, .modal, .sheet, .toast)
+   są w src/styles.css. Tu tylko dodatki warstwy fundamentów. */
+
+/* okno potwierdzenia: działanie nieodwracalne = pełny kolor błędu */
+.ask-backdrop .btn-danger {
+  background: var(--color-danger);
+  color: var(--on-danger);
+}
+.ask-backdrop .btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 86%, var(--color-text));
+}
+.ask-backdrop .modal-sm {
+  max-width: 440px;
+}
+
+/* przewijane pola w modalach na telefonie: bez „gumy” całej strony */
+.modal,
+.sheet {
+  overscroll-behavior: contain;
+}
+
+/* pole liczbowe: równe cyfry */
+input[inputmode='decimal'].input,
+input[inputmode='numeric'].input,
+input[type='number'].input,
+input[type='time'].input,
+input[type='date'].input {
+  font-variant-numeric: tabular-nums;
+}
+
+/* stopka modala: „Anuluj” + główna akcja zawsze razem, po prawej */
+.modal-actions-main {
+  display: flex;
+  gap: var(--space-3);
+  margin-left: auto;
+  flex: none;
+}
+
+/* pola daty / godziny: ta sama wysokość co pozostałe pola */
+input[type='date'].input,
+input[type='time'].input,
+input[type='month'].input,
+input[type='datetime-local'].input {
+  height: var(--control-h);
+}
+@media (max-width: 600px) {
+  input[type='date'].input,
+  input[type='time'].input,
+  input[type='month'].input,
+  input[type='datetime-local'].input {
+    height: var(--tap);
+  }
+}

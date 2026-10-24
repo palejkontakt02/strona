@@ -133,14 +133,16 @@ export function Modal({
         <div className="modal-actions">
           {extraActions}
           <span className="grow" />
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            {onSubmit ? 'Anuluj' : 'Zamknij'}
-          </button>
-          {onSubmit && (
-            <button type="submit" className="btn btn-primary">
-              {submitLabel}
+          <span className="modal-actions-main">
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
+              {onSubmit ? 'Anuluj' : 'Zamknij'}
             </button>
-          )}
+            {onSubmit && (
+              <button type="submit" className="btn btn-primary">
+                {submitLabel}
+              </button>
+            )}
+          </span>
         </div>
       </form>
     </div>

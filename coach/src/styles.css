@@ -27,6 +27,7 @@
   --space-10: 32px;
   --tap: 44px;
   --control-h: 40px;
+  --on-danger: var(--on-accent);
   --topbar-h: 56px;
   --bottombar-h: 64px;
   /* tabele treningowe: pasek nagłówka (jak w arkuszu), zebra wierszy */

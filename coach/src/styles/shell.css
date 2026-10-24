@@ -412,11 +412,11 @@
   .dash-visit {
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 8px;
-    padding: 12px 0 12px 74px;
+    gap: 4px 6px;
+    padding: 9px 0 9px 74px;
   }
   .dash-visit .row-time {
-    top: 12px;
+    top: 9px;
     transform: none;
     width: 48px;
     font-size: 19px;
@@ -426,15 +426,15 @@
     left: 57px;
   }
   .dash-visit:first-child::before {
-    top: 18px;
+    top: 21px;
   }
   .dash-visit:last-child::before {
     bottom: auto;
-    height: 18px;
+    height: 21px;
   }
   .dash-visit::after {
     left: 52px;
-    top: 18px;
+    top: 21px;
   }
   .dash-visit .row-main {
     flex: 1 0 100%;
@@ -446,8 +446,12 @@
   .dash-visit .hide-xs {
     display: inline;
   }
+  .dash-visit .row-main {
+    gap: 1px;
+  }
   .dash-visit .btn-sm {
     min-height: 40px;
+    padding-inline: 14px;
   }
   .dash-visit .icon-btn {
     width: 44px;
@@ -971,4 +975,11 @@
     break-inside: avoid;
     margin: 0 0 var(--space-6);
   }
+}
+
+/* „Zaplanowana” przy każdej wizycie to tło — cicho; inne statusy zostają w kolorze */
+.dash-visit[data-status='planned'] .tag {
+  background: transparent;
+  color: var(--color-neutral-400);
+  padding-inline: 4px;
 }
