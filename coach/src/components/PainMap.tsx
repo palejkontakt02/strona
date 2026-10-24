@@ -197,7 +197,7 @@ export function PainMap({ spots, onChange, readOnly }: { spots: PainSpot[]; onCh
       )}
       {!ro && options.length > 0 && (
         <select
-          className="input pm-add"
+          className="input input-sm pm-add"
           aria-label="Dodaj miejsce"
           value=""
           onChange={(e) => {

@@ -896,6 +896,9 @@
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
 }
+.rv-sum .num {
+  font-size: 1.15em;
+}
 .rv-spike {
   margin: var(--space-2) 0 0;
 }

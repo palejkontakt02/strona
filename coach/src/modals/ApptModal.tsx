@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, groupOf, saveAppointment, saveGroupAppointments, sessionsOf, updateSeries } from '../data/ops';
+import { clientById, deleteAppointment, groupOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
+import { canMove, moveVisit, seriesEdit, visitsLeftInPackage } from '../lib/calendarMove';
 import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
-import { fmtShort, plural, uid } from '../format';
+import { fmtShort, fmtWeekday, plural, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
-import { todayISO } from '../lib/dates';
+import { addDays, todayISO } from '../lib/dates';
 import { num, numIn } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 import { APPT_STATUS } from '../views/CalendarView';
@@ -50,15 +51,18 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     groupId: partners.length ? editing?.groupId : undefined,
   };
   // Kolizje sprawdzamy dla każdego terminu serii (wizyty cykliczne), nie tylko pierwszego.
-  const repeatN = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
+  const repeatN = repeat && !editing ? Math.min(24, Math.max(2, num(weeks) ?? 8)) : 1;
+  // „do końca pakietu”: pozostałe treningi minus już zaplanowane wizyty
+  const untilPkg = pk && !editing ? Math.min(24, visitsLeftInPackage(db, clientId, pk.left, todayISO())) : 0;
+  const dateRef = useRef<HTMLInputElement>(null);
   const clash = weeklyDates(draft.date, repeatN).flatMap((d) => clashes({ ...draft, date: d }, db.appointments)).filter((c) => !partners.includes(c.clientId) || c.date !== draft.date || c.time !== draft.time);
 
   const save = async () => {
     if (!clientId) return;
     if (duration.trim() && numIn(duration, 5, 600) == null) return toast('Czas wizyty: od 5 do 600 minut.');
-    const n = repeat && !editing ? Math.min(24, Math.max(4, num(weeks) ?? 8)) : 1;
-    const seriesChanged = !!editing?.seriesId && (editing.time !== draft.time || (editing.duration ?? 60) !== draft.duration || editing.locationId !== draft.locationId);
-    const allNext = seriesChanged && (await ask('To wizyta cykliczna. Zmienić godzinę / czas / miejsce także w kolejnych zaplanowanych wizytach z tej serii?', { confirm: 'Ta i następne', danger: false }));
+    const n = repeatN;
+    const seriesChanged = !!editing?.seriesId && (editing.date !== draft.date || editing.time !== draft.time || (editing.duration ?? 60) !== draft.duration || editing.locationId !== draft.locationId);
+    const allNext = seriesChanged && (await ask(editing.date !== draft.date ? 'To wizyta cykliczna. Przesunąć także kolejne zaplanowane wizyty z tej serii (o tyle samo dni, z tą godziną, czasem i miejscem)?' : 'To wizyta cykliczna. Zmienić godzinę / czas / miejsce także w kolejnych zaplanowanych wizytach z tej serii?', { confirm: 'Ta i następne', danger: false }));
     // nieobecność / późne odwołanie: opcjonalnie 1 trening z pakietu
     const chargeNow = charged && (draft.status === 'noshow' || draft.status === 'cancel');
     const wasCharged = !!cl?.noShowCharges?.includes(draft.id);
@@ -69,7 +73,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const main = grouped ? saveGroupAppointments(db, d2, partners, allNext ? 1 : n, editing) : saveAppointment(d2, n);
     const pairMsg = partners.length ? ` W parze z: ${partners.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : '';
     const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
-    if (!(await apply([...main, ...(allNext ? updateSeries(db, d2) : []), ...chargeChange], msg + pairMsg))) return;
+    if (!(await apply([...main, ...(allNext && editing ? seriesEdit(db, editing, d2) : []), ...chargeChange], msg + pairMsg))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
       if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
@@ -94,6 +98,24 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   };
 
   const linkedSession = editing?.sessionId ? db.sessions.find((s) => s.id === editing.sessionId) : undefined;
+
+  /** Szybkie przesunięcie (telefon): od razu zapis, para razem, seria — pytanie „Ta i następne?”, z „Cofnij”. */
+  const quickMove = async (to: string) => {
+    if (!editing || to === editing.date) return;
+    const later = !!editing.seriesId && db.appointments.some((x) => x.seriesId === editing.seriesId && x.date > editing.date && x.status === 'planned');
+    const all = later && (await ask('To wizyta cykliczna. Przesunąć też kolejne zaplanowane wizyty z tej serii o tyle samo dni?', { confirm: 'Ta i następne', cancel: 'Tylko ta', danger: false }));
+    const changes = moveVisit(db, editing, to, editing.time, all);
+    const ids = changes.map((c) => (c as { item: Appointment }).item.id);
+    const before = db.appointments.filter((x) => ids.includes(x.id));
+    if (!(await apply(changes))) return;
+    closeModal();
+    toast(`Przeniesiono na ${fmtWeekday(to)} ${fmtShort(to)}, ${editing.time}${all ? ` (i ${ids.length - 1} kolejne)` : ''}.`, {
+      label: 'Cofnij',
+      run: () => void apply(before.map((x) => put('appointments', x)), 'Cofnięto przeniesienie.'),
+    });
+  };
+  const tomorrow = addDays(todayISO(), 1);
+  const plusOne = editing ? addDays(editing.date, 1) : '';
 
   return (
     <Modal
@@ -188,7 +210,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           {partners.length > 0 && <span className="muted small">Każda osoba ma swoją wizytę, status, trening i rozliczenie. Godzina, czas i miejsce są wspólne.</span>}
         </div>
         <Field label="Data">
-          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input ref={dateRef} className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
         <Field label="Godzina">
           <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
@@ -199,6 +221,36 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
         <Field label="Miejsce">
           <LocationSelect value={locationId} onChange={(v) => { setLocationId(v); setLocation(''); }} />
         </Field>
+        {editing && canMove(editing) && (
+          <div className="field field-wide appt-move">
+            <span>Przesuń{group.length ? ' (razem z parą)' : ''}</span>
+            <div className="appt-move-btns">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => void quickMove(plusOne)}>
+                +1 dzień
+              </button>
+              {tomorrow !== plusOne && tomorrow !== editing.date && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => void quickMove(tomorrow)}>
+                  Jutro, {editing.time}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  const el = dateRef.current;
+                  el?.focus();
+                  try {
+                    el?.showPicker?.();
+                  } catch {
+                    // przeglądarka bez okienka wyboru daty — pole ma fokus
+                  }
+                }}
+              >
+                Wybierz…
+              </button>
+            </div>
+          </div>
+        )}
         {editing && (
           <Field label={partners.length ? `Status — ${cl?.name.split(' ')[0] ?? ''}` : 'Status'} wide>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as AppointmentStatus)}>
@@ -223,14 +275,35 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
         </Field>
         {editing?.seriesId && <p className="muted small field-wide">↻ Wizyta cykliczna (co tydzień). Zmianę godziny, czasu lub miejsca możesz zastosować do kolejnych wizyt z serii.</p>}
         {!editing && (
-          <div className="field-wide check-row">
+          <div className="field-wide check-row repeat-row">
             <label className="check">
               <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} /> Powtarzaj co tydzień
             </label>
+            {/* jedno stuknięcie: liczba tygodni od razu (włącza powtarzanie) */}
+            <span className="repeat-chips" role="group" aria-label="Ile tygodni">
+              {[
+                ['×4', 4],
+                ['×8', 8],
+                ...(untilPkg >= 2 ? [[`do końca pakietu (${untilPkg})`, untilPkg] as const] : []),
+              ].map(([label, n]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={`chip-btn ${repeat && num(weeks) === n ? 'active' : ''}`}
+                  aria-pressed={repeat && num(weeks) === n}
+                  onClick={() => {
+                    setRepeat(true);
+                    setWeeks(String(n));
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
             {repeat && (
               <label className="check">
                 przez
-                <input className="input input-xs" inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} /> tyg. (4–24)
+                <input className="input input-xs" inputMode="numeric" value={weeks} onChange={(e) => setWeeks(e.target.value)} /> tyg. (2–24)
               </label>
             )}
           </div>
