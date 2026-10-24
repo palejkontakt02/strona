@@ -18,3 +18,10 @@ export function cloudMode(): boolean {
   }
   return /(^|\.)sebastianpalej\.pl$/.test(location.hostname);
 }
+
+/**
+ * Powiadomienia push (Web Push): klucz PUBLICZNY pary VAPID — jawny z założenia.
+ * Klucz prywatny jest tylko w sekretach funkcji Edge „send-push” (supabase/PUSH.md), nigdy w kodzie.
+ * Pusty klucz = powiadomienia wyłączone (przełącznik w ustawieniach się nie pokazuje).
+ */
+export const VAPID_PUBLIC_KEY = 'BK9HmOcEHVlUor9l9Bdh_fJAZULa-tgxz3Ux-RCbXvZ6jbC3dyQ8b9GFy-kFLrqni_wiFWambuc4d92O7TPlm6I';

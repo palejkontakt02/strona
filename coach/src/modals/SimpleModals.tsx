@@ -4,6 +4,7 @@ import { Field, Modal } from '../components/ui';
 import { EXERCISE_CATEGORIES, type Client, type ExerciseCategory, type Injury, type Measurement, type Payment, type TestResult } from '../domain';
 import { del, normalizeDb, put, type Db } from '../data/db';
 import { clientById } from '../data/ops';
+import { isTemplate } from '../lib/analytics';
 import { useStore } from '../data/store';
 import { fnum, uid } from '../format';
 import { addDays, todayISO } from '../lib/dates';
@@ -12,6 +13,7 @@ import { computeLsi } from '../lib/tests';
 import { useNav, type ModalState } from '../nav';
 import { MEASURE_FIELDS } from '../views/client/Measurements';
 import { PalettePicker } from '../components/PalettePicker';
+import { PushSettings } from '../components/PushSettings';
 import { ClientFields, fromDraft, toDraft } from '../views/client/Profile';
 import { ClientSelect } from './ModalHost';
 
@@ -51,18 +53,24 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
   const { apply, toast } = useStore();
   const { closeModal } = useNav();
   const client = useClient(m.clientId);
-  const [date, setDate] = useState(todayISO());
-  const [v, setV] = useState<Record<string, string>>({});
-  const [note, setNote] = useState('');
+  // edycja tylko pomiaru trenera; wpis podopiecznego baza chroni (trener może go tylko ukryć)
+  const editing = m.measurement && client?.measurements.some((x) => x.id === m.measurement!.id) ? m.measurement : undefined;
+  const [date, setDate] = useState(editing?.date ?? todayISO());
+  const [v, setV] = useState<Record<string, string>>(() => {
+    const o: Record<string, string> = {};
+    if (editing) for (const [k] of MEASURE_FIELDS) if (editing[k] != null) o[k] = String(editing[k]).replace('.', ',');
+    return o;
+  });
+  const [note, setNote] = useState(editing?.note ?? '');
   if (!client) return null;
   return (
     <Modal
-      title="Nowy pomiar"
+      title={editing ? 'Edycja pomiaru' : 'Nowy pomiar'}
       onClose={closeModal}
       onSubmit={async () => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Wybierz datę pomiaru.');
         if (date > todayISO()) return toast('Data pomiaru jest w przyszłości — sprawdź datę.');
-        const meas: Measurement = { id: uid(), date, note: note.trim() || undefined };
+        const meas: Measurement = { id: editing?.id ?? uid(), date, note: note.trim() || undefined };
         let any = false;
         for (const [k, label, unit, min, max] of MEASURE_FIELDS) {
           if (!v[k]?.trim()) continue;
@@ -72,7 +80,8 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
           any = true;
         }
         if (!any) return toast('Wpisz przynajmniej jeden pomiar.');
-        await apply([put('clients', { ...client, measurements: [...client.measurements, meas] })], 'Pomiar dodany.');
+        if (editing) await apply([put('clients', { ...client, measurements: client.measurements.map((x) => (x.id === editing.id ? meas : x)) })], 'Pomiar zapisany.');
+        else await apply([put('clients', { ...client, measurements: [...client.measurements, meas] })], 'Pomiar dodany.');
         closeModal();
       }}
     >
@@ -442,6 +451,7 @@ export function DataModal() {
     <Modal title="Ustawienia" onClose={closeModal}>
       <h4>Kolory</h4>
       <PalettePicker />
+      <PushSettings role="trainer" />
       <h4 className="form-section">Konta w aplikacji</h4>
       <AccountsPanel />
       <h4 className="form-section">Miejsca treningów</h4>
@@ -460,7 +470,7 @@ export function DataModal() {
         </p>
       )}
       <p className="muted small">
-        {db.clients.length} podopiecznych · {db.sessions.length} treningów · {db.appointments.length} wizyt · {db.plans.length} planów
+        {db.clients.length} podopiecznych · {db.sessions.length} treningów · {db.appointments.length} wizyt · {db.plans.filter((p) => !isTemplate(p)).length} planów
       </p>
       <div className="stack-sm">
         <button type="button" className="btn btn-secondary" onClick={exportAll}>

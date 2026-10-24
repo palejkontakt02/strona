@@ -776,3 +776,165 @@
 .cfile-name {
   font-weight: 600;
 }
+
+/* === funkcje: analiza i plany === */
+/* rekordy i e1RM (Monitoring) */
+.rec-pick {
+  margin: var(--space-2) 0;
+  max-width: 100%;
+}
+.rec-table {
+  margin-top: var(--space-3);
+}
+.rec-table td.num,
+.rec-table th.num {
+  text-align: right;
+}
+.rec-table td.num {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rec-table tr.rec-best td {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+/* historia bólu */
+.pain-hist-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.pain-history .painmap .pm-list,
+.pain-history .painmap .pm-hint {
+  display: none;
+}
+.pain-hist-list .num {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+}
+.pain-hist-list .danger-text {
+  color: var(--color-danger);
+}
+.pain-hist-list .row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+@media (max-width: 640px) {
+  .pain-hist-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* mapa bólu w edycji treningu */
+.pain-edit > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+/* % maksa w edytorze planu */
+.pe-load {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.pe-load > input.input {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  min-width: 0;
+  width: 100%;
+}
+.pe-pct {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--color-accent);
+  white-space: nowrap;
+  line-height: 1.1;
+}
+.pe-pct.none {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  color: var(--color-neutral-400);
+}
+.pe-max {
+  margin: var(--space-1) 0 0;
+}
+@media (max-width: 640px) {
+  .pe-load > input.input {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .pe-pct {
+    font-size: 0.75rem;
+  }
+}
+/* zadaj trening wielu osobom */
+.multi-pick {
+  display: grid;
+  gap: var(--space-2);
+}
+.multi-pick-chosen {
+  margin: 0;
+}
+.multi-pick-chosen .chip {
+  min-height: 36px;
+}
+.multi-pick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.multi-pick-list > li + li {
+  border-top: 1px solid var(--color-divider);
+}
+.multi-pick-list > li.muted {
+  padding: var(--space-3);
+}
+.multi-pick-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  cursor: pointer;
+}
+.multi-pick-opt:hover {
+  background: var(--color-surface-2);
+}
+.multi-pick-opt input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  flex: none;
+}
+.assign-many > .link {
+  justify-self: start;
+  min-height: 44px;
+}
+/* szablony planów (biblioteka) */
+.tpl-card {
+  margin-bottom: var(--space-4);
+}
+.tpl-row {
+  flex-wrap: wrap;
+}
+@media (min-width: 601px) {
+  .toolbar .actions select.plan-src-select {
+    max-width: 280px;
+  }
+}

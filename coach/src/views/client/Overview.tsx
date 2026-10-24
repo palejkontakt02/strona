@@ -1,6 +1,8 @@
 import { printReport } from '../../lib/print';
-import { ClientHabits, ClientInbox } from './Habits';
-import { Card, Dot, Empty, Kpi } from '../../components/ui';
+import { ClientHabits, ClientInbox, ClientTargets } from './Habits';
+import { CoachReports } from '../../components/WeeklyReport';
+import { CoachPhotos } from '../../components/ProgressPhotos';
+import { Card, Dot, Empty, Kpi, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
@@ -138,8 +140,25 @@ export function ClientOverview({ client }: { client: Client }) {
           )}
         </Card>
       </div>
+      <div className="two-col comms-cols">
+        <Card
+          title={
+            <>
+              Raporty tygodnia {(client.weeklyReports ?? []).some((r) => !r.seenAt) && <Tag tone="warn">{(client.weeklyReports ?? []).filter((r) => !r.seenAt).length} nowe</Tag>}
+            </>
+          }
+          className="wr-panel"
+        >
+          <CoachReports client={client} />
+        </Card>
+        <Card title="Zdjęcia sylwetki" className="pp-panel">
+          <CoachPhotos client={client} />
+        </Card>
+      </div>
       <div className="section-gap-sm" />
       <ClientHabits client={client} />
+      <div className="section-gap-sm" />
+      <ClientTargets client={client} />
     </>
   );
 }

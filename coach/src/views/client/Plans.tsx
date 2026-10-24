@@ -3,10 +3,11 @@ import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
 import { clonePlan, extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
 import { useState } from 'react';
-import { del } from '../../data/db';
+import { del, put } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDate, plural, uid } from '../../format';
-import { addDays, daysBetween, todayISO, weekStart } from '../../lib/dates';
+import { todayISO } from '../../lib/dates';
+import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf } from '../../lib/analytics';
 import { doneInPass, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
@@ -50,30 +51,44 @@ export function ClientPlans({ client }: { client: Client }) {
         <h3>Plany treningowe</h3>
         <div className="actions">
           {(() => {
+            // plan z szablonu: start od najbliższego poniedziałku, szablon bez zmian
+            const tpls = templatesOf(db.plans);
+            if (!tpls.length) return null;
+            return (
+              <select
+                className="input input-sm plan-src-select"
+                value=""
+                aria-label="Nowy plan z szablonu"
+                onChange={(e) => {
+                  const src = tpls.find((x) => x.id === e.target.value);
+                  if (!src) return;
+                  void apply(savePlan(db, planFromTemplate(src, client.id, todayISO(), plans.length === 0)), `Plan „${src.name}” z szablonu — start ${fmtDate(nextMonday(todayISO()))}. Możesz go dopasować.`);
+                }}
+              >
+                <option value="">Nowy plan z szablonu…</option>
+                {tpls.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} · {x.weeks.length} tyg.
+                  </option>
+                ))}
+              </select>
+            );
+          })()}
+          {(() => {
             // gotowy plan innego podopiecznego jako szablon (kopia — oryginał zostaje bez zmian)
             const who = (x: Plan) => db.clients.find((c) => c.id === x.clientId)?.name ?? '';
-            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra).sort((a, b) => who(a).localeCompare(who(b), 'pl') || a.name.localeCompare(b.name, 'pl'));
+            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra && !isTemplate(x) && db.clients.some((c) => c.id === x.clientId)).sort((a, b) => who(a).localeCompare(who(b), 'pl') || a.name.localeCompare(b.name, 'pl'));
             if (!others.length) return null;
             return (
               <select
-                className="input input-sm"
+                className="input input-sm plan-src-select"
                 value=""
                 aria-label="Skopiuj plan od innego podopiecznego"
                 onChange={(e) => {
                   const src = others.find((x) => x.id === e.target.value);
                   if (!src) return;
                   // start od najbliższego poniedziałku (nie data innego podopiecznego); daty jednostek przesunięte o tyle samo
-                  const start = weekStart(addDays(todayISO(), 6));
-                  const shift = src.startDate ? daysBetween(src.startDate, start) : 0;
-                  const base = clonePlan(src, src.name);
-                  const copy = {
-                    ...base,
-                    clientId: client.id,
-                    active: plans.length === 0,
-                    startDate: start,
-                    weeks: base.weeks.map((w) => ({ ...w, workouts: w.workouts.map((k) => (k.date ? { ...k, date: addDays(k.date, shift) } : k)) })),
-                  };
-                  void apply(savePlan(db, copy), `Skopiowano plan „${src.name}” — możesz go dopasować.`);
+                  void apply(savePlan(db, planFromTemplate(src, client.id, todayISO(), plans.length === 0)), `Skopiowano plan „${src.name}” — możesz go dopasować.`);
                 }}
               >
                 <option value="">Plan od innego podopiecznego…</option>
@@ -113,6 +128,16 @@ export function ClientPlans({ client }: { client: Client }) {
                   )}
                   <IconBtn icon="edit" label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })} />
                   <IconBtn icon="copy" label="Duplikuj plan" onClick={() => apply(savePlan(db, clonePlan(p, `${p.name} (kopia)`)), 'Plan zduplikowany.')} />
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Kopia planu do biblioteki szablonów — przypiszesz ją innym podopiecznym"
+                    onClick={() => {
+                      const taken = templatesOf(db.plans).some((t) => t.name === p.name);
+                      void apply([put('plans', templateFromPlan(p, taken ? `${p.name} (${fmtDate(todayISO())})` : p.name))], `Zapisano szablon „${p.name}” — znajdziesz go w „Nowy plan z szablonu…” i w Ćwiczeniach.`);
+                    }}
+                  >
+                    Zapisz jako szablon
+                  </button>
                   <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
                     🖨 Drukuj
                   </button>

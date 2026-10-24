@@ -132,6 +132,8 @@ export interface Repository {
    * albo dzienny zapis makro / kroków (po `date`). Zastępuje wpis o tym samym kluczu.
    */
   saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog): Promise<void>;
+  /** Czyja kolejka zapisów offline na tym urządzeniu (konto); brak = „local”. */
+  outboxScope?(): Promise<string>;
 }
 
 export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog';

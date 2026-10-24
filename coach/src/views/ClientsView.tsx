@@ -83,6 +83,11 @@ export function ClientsView() {
                             <span aria-label="nowe wiadomości">✉ {(c.inbox ?? []).filter((n) => !n.read).length}</span>
                           </Tag>
                         )}
+                        {(c.weeklyReports ?? []).some((r) => !r.seenAt) && (
+                          <Tag tone="accent">
+                            <span aria-label="nowy raport tygodniowy">📋 {(c.weeklyReports ?? []).filter((r) => !r.seenAt).length}</span>
+                          </Tag>
+                        )}
                         {alerts.length > 0 ? <Dot tone={red ? 'danger' : 'warn'} /> : <StatusTag status={c.status} />}
                       </span>
                     </div>

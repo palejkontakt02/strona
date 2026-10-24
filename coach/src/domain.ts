@@ -208,6 +208,8 @@ export interface Client {
   dayLog?: DayLog[];
   /** Cele dzienne: białko, kcal, kroki, woda (ustawia trener). */
   targets?: DayTargets;
+  /** Trener wymaga raportu tygodniowego (pt–pn karta u podopiecznego). Brak — tylko gdy są już raporty. */
+  weeklyReport?: boolean;
 }
 
 /** Kiedy zadanie obowiązuje: codziennie, w wybrane dni tygodnia (1 = pn … 7 = nd) albo dni miesiąca (1–31). */
@@ -316,6 +318,8 @@ export interface Plan {
   active: boolean;
   /** Dodatkowe treningi poza planem (osobna lista jednostek; nie wchodzi w kolejność planu). */
   extra?: boolean;
+  /** Szablon planu (zapisany z `clientId: '__template__'`) — nie jest planem żadnego podopiecznego. */
+  template?: boolean;
   notes?: string;
   updatedAt?: string;
   weeks: PlanWeek[];

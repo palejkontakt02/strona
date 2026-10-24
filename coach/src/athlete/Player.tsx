@@ -4,7 +4,10 @@ import { useDialog } from '../components/useDialog';
 import { IconBtn } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import { ChargeSelect, LocationSelect } from '../components/location';
-import type { Billing, Client, PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
+import type { Billing, Client, PainSpot, PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
+import { PlateCalc } from '../components/PlateCalc';
+import { PainMap } from '../components/PainMap';
+import { cleanPainMap, painSummary } from '../lib/painMap';
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 import { chargeProblem, isSolo, savePlan, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -12,7 +15,7 @@ import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { fmtSec as fmtHold, num, numIn, repsN, secOf, sidesOf, sumReps } from '../lib/parse';
-import { recentE1 } from '../lib/strength';
+import { barbellByName, checkRecord, recentE1, sessionRecords } from '../lib/strength';
 import { emptyRunExercise, fmtDur, paceText, parseDur, parseKm, recoverySec, targetText } from '../lib/running';
 import {
   adHocCardio,
@@ -25,6 +28,7 @@ import {
   buildRunExercise,
   completeSet,
   moveExercise,
+  nextBlockSet,
   removeExercise,
   renameExercise,
   runBlocks,
@@ -90,6 +94,26 @@ interface Finish {
   locationId: string;
   /** Samodzielnie czy z trenerem — wybór przy zapisie, do zmiany później w historii. */
   solo: boolean;
+  /** Gdzie boli (przy bólu > 0). */
+  painMap: PainSpot[];
+}
+
+/** Ćwiczenie na stronę: czas zmiany strony między lewą a prawą (s). */
+const SWITCH_SEC = 5;
+
+interface Hold {
+  end: number;
+  total: number;
+  what?: string;
+  /** Na stronę: lewa → zmiana → prawa (druga strona odlicza się sama). */
+  side?: 'L' | 'switch' | 'P';
+  second?: number;
+}
+
+/** Mapa bólu do zapisu: tylko przy bólu > 0 i z zaznaczonymi miejscami. */
+function painOf(f: Finish): PainSpot[] | undefined {
+  const m = Number(f.pain) > 0 ? cleanPainMap(f.painMap) : [];
+  return m.length ? m : undefined;
 }
 
 /** Płynne przewijanie, chyba że użytkownik wyłączył animacje. */
@@ -104,11 +128,16 @@ function elapsedMinutes(startedAt: number): string {
 
 export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId, onRest }: Props) {
   const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
-  const [rest, setRest] = useState<{ end: number; total: number } | null>(null);
+  const [rest, setRest] = useState<{ end: number; total: number; note?: string } | null>(null);
   useEffect(() => {
     onRest?.(rest?.end ?? null);
   }, [rest, onRest]);
-  const [hold, setHold] = useState<{ end: number; total: number; what?: string } | null>(null);
+  const [hold, setHold] = useState<Hold | null>(null);
+  const [plates, setPlates] = useState<{ kg: number; title: string } | null>(null);
+  // obwód / superseria: dokładnie ta seria jest następna (A1 → A2 → przerwa → A1)
+  const [nextSet, setNextSet] = useState<{ k: number; i: number } | null>(null);
+  /** Historia bez poprawianego treningu (do rekordów). */
+  const history = () => sessionsOf(db, client.id).filter((x) => x.id !== run.editSessionId);
   const [tempoOpen, setTempoOpen] = useState(false);
   const [finish, setFinish] = useState<Finish | null>(null);
   const [adding, setAdding] = useState(run.ex.length === 0);
@@ -132,6 +161,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const setSet = (k: number, i: number, patch: Partial<RunSet>) => update((r) => void Object.assign(r.ex[k].sets[i], patch));
   const go = (b: number) => {
     setHintNext(null);
+    setNextSet(null);
     update((r) => void (r.idx = blocks[b][0]));
     window.scrollTo(0, 0);
   };
@@ -147,9 +177,10 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     lastTick.current = { at: Date.now(), key };
     if (wasDone) {
       // cofnięcie serii zatrzymuje też odliczanie przerwy
-      update((r) => void (r.ex[k].sets = completeSet(r.ex[k], i).sets));
+      update((r) => void (r.ex[k].sets = completeSet(r.ex[k], i).sets.map((x, j) => (j === i ? { ...x, pr: undefined } : x))));
       setRest(null);
       setHintNext(null);
+      setNextSet(null);
       return;
     }
     if (s.rpe.trim() && numIn(s.rpe, 1, 10) == null) return toast('RPE: od 1 do 10 (jak ciężka była seria).');
@@ -189,11 +220,59 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const best = recentE1(sessionsOf(db, client.id), ex.name);
     if (load != null && (load > 400 || (best != null && load > best * 1.5)) && !(await ask(`${fnum(load)} kg to dużo więcej niż dotychczas${best ? ` (szacowane maks. ${fnum(best, 0)} kg)` : ''}. Na pewno?`, { confirm: 'Tak, zalicz', danger: false }))) return;
     const res = completeSet(ex, i);
+    // rekord: seria robocza z ciężarem (bez serii na czas i kompleksów) lepsza niż dotąd w historii i dziś
+    const ds = res.sets[i];
+    const hit =
+      !ds.warmup && !ex.cardio && !ex.timed && !ds.unit && !ds.reps.includes('+')
+        ? checkRecord(history(), ex.name, res.sets.slice(0, i).filter((x) => x.done && !x.warmup && !x.unit && !x.reps.includes('+')), ds)
+        : null;
+    res.sets[i] = { ...ds, pr: hit?.text };
     const next = update((r) => void (r.ex[k].sets = res.sets));
+    if (hit) {
+      vibrate([80, 60, 80, 60, 160]);
+      toast(`🏆 ${hit.text}`);
+    }
     const br = blockRest(next, k, i);
     setHintNext(br.next ?? null);
+    const allDone = next.ex.every((e) => e.sets.every((x) => x.done));
+    // obwód: wskaż następną serię (ta sama runda → kolejne ćwiczenie; runda zamknięta → A1 po przerwie)
+    const bl = runBlocks(next).find((b) => b.includes(k)) ?? [k];
+    const ns = bl.length > 1 && !s.warmup ? nextBlockSet(next, bl) : null;
+    setNextSet(ns ? { k: ns.k, i: ns.i } : null);
+    if (ns) {
+      setHintNext(ns.k);
+      window.setTimeout(() => {
+        const row = document.querySelector<HTMLElement>(`[data-set="${ns.k}-${ns.i}"]`);
+        row?.scrollIntoView({ behavior: smoothScroll(), block: 'center' });
+        row?.querySelector<HTMLButtonElement>('button.ok')?.focus({ preventScroll: true });
+      }, 60);
+    }
+    const roundClosed = ns && br.next == null;
     // po ostatniej serii całego treningu nie ma już przerwy — tylko „Zakończ”
-    if (br.rest && !next.ex.every((e) => e.sets.every((x) => x.done))) setRest({ end: Date.now() + br.rest * 1000, total: br.rest });
+    if (br.rest && !allDone) setRest({ end: Date.now() + br.rest * 1000, total: br.rest, note: roundClosed ? `dalej runda ${ns.round + 1} z ${ns.rounds}` : undefined });
+  };
+
+  /** Koniec odliczania serii na czas; na stronę: lewa → „Zmiana strony” → prawa. */
+  const onHoldEnd = () => {
+    const h = hold;
+    if (h?.side === 'L') {
+      vibrate([300, 120, 300]);
+      beep(660, 0.3);
+      toast('Zmiana strony');
+      setHold({ end: Date.now() + SWITCH_SEC * 1000, total: SWITCH_SEC, what: h.what, side: 'switch', second: h.second });
+      return;
+    }
+    if (h?.side === 'switch') {
+      vibrate(200);
+      beep(880, 0.12);
+      const sec = h.second || 1;
+      setHold({ end: Date.now() + sec * 1000, total: sec, what: h.what, side: 'P' });
+      return;
+    }
+    vibrate([200, 100, 200]);
+    beep(880, 0.25);
+    toast('Koniec — zalicz serię ✓');
+    setHold(null);
   };
 
   const editing = run.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
@@ -216,6 +295,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         duration: numIn(finish.duration, 1, 600) ?? undefined,
         srpe: Number(finish.srpe),
         pain: finish.pain === '' ? undefined : Number(finish.pain),
+        painMap: painOf(finish),
         notes: finish.notes.trim() || undefined,
         locationId: (trainer ? finish.locationId : editing.locationId) || undefined,
         exercises: runToExercises(run),
@@ -226,7 +306,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if (!(await apply(changes, 'Zapisano zmiany w treningu.'))) return; // trening zostaje — można ponowić zapis
       // ból podniesiony do ≥5 przy poprawce — trener dostaje informację tak samo jak przy pierwszym zapisie
       if (!trainer && updated.pain != null && updated.pain >= 5 && (editing.pain ?? 0) < 5) {
-        void sendClientNote(client.id, `Ból ${updated.pain}/10 po treningu „${updated.workoutName || 'Trening'}”${updated.notes ? `: ${updated.notes}` : ''}`, updated.id);
+        void sendClientNote(client.id, `Ból ${updated.pain}/10${updated.painMap?.length ? ` (${painSummary(updated.painMap)})` : ''} po treningu „${updated.workoutName || 'Trening'}”${updated.notes ? `: ${updated.notes}` : ''}`, updated.id);
         void ask(`Ból ${updated.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
       }
       setFinish(null);
@@ -244,6 +324,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       duration: numIn(finish.duration, 1, 600) ?? undefined,
       srpe: Number(finish.srpe),
       pain: finish.pain === '' ? undefined : Number(finish.pain),
+      painMap: painOf(finish),
       notes: finish.notes.trim() || undefined,
       wellness: check ? { sleep: check.sleep, energy: check.energy, muscle: check.muscle, stress: check.stress, mood: check.mood } : undefined,
       // samodzielnie (np. w domu) — bez miejsca klubu, żeby nie liczyło się do rozliczeń z klubem
@@ -278,7 +359,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     if (hurt || (!trainer && session.notes))
       void sendClientNote(
         client.id,
-        `${hurt ? `Ból ${session.pain}/10 po treningu` : 'Po treningu'} „${session.workoutName || 'Trening'}”${session.notes ? `: ${session.notes}` : ''}`,
+        `${hurt ? `Ból ${session.pain}/10${session.painMap?.length ? ` (${painSummary(session.painMap)})` : ''} po treningu` : 'Po treningu'} „${session.workoutName || 'Trening'}”${session.notes ? `: ${session.notes}` : ''}`,
         session.id,
       );
     if (hurt) void ask(`Ból ${session.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
@@ -321,6 +402,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         paidNow: true,
         locationId: editing.locationId ?? '',
         solo: isSolo(db, editing),
+        painMap: editing.painMap ?? [],
       });
       return;
     }
@@ -341,6 +423,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
       // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem
       solo,
+      painMap: [],
     });
   };
 
@@ -350,9 +433,31 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
   const setRow = (k: number, i: number, num: string, label?: string) => {
     const s = run.ex[k].sets[i];
+    const e = run.ex[k];
+    const isNext = nextSet ? nextSet.k === k && nextSet.i === i && !s.done : hintNext === k && !s.done;
+    // narzędzia serii: tempo z planu i kalkulator talerzy (sztanga)
+    const kg = numIn(s.load, 0.01, 2000);
+    const showTempo = !!e.tempoStr && !s.done && !s.warmup && !s.unit && !e.cardio;
+    // talerze tylko przy następnej serii ćwiczenia (bez powtarzania w każdym wierszu)
+    const showPlates = !s.done && !e.cardio && !e.timed && kg != null && kg > 20 && barbellByName(e.name) && e.sets.findIndex((x) => !x.done) === i;
+    const tools =
+      showTempo || showPlates ? (
+        <span className="setx">
+          {showTempo && (
+            <span className="tempo-chip" title="Tempo: opuszczanie – pauza w dole – podnoszenie – pauza w górze (s)">
+              tempo {e.tempoStr}
+            </span>
+          )}
+          {showPlates && (
+            <button type="button" className="plate-btn" aria-label={`Talerze, ${e.name}, seria ${num}`} onClick={() => setPlates({ kg: kg!, title: e.name })}>
+              talerze
+            </button>
+          )}
+        </span>
+      ) : null;
     return (
-      <div key={`${k}-${i}`}>
-        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${hintNext === k && !s.done ? 'is-next' : ''}`}>
+      <div key={`${k}-${i}`} data-set={`${k}-${i}`}>
+        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''}`}>
           {run.ex[k].sets.length > 1 ? (
             <button className="sn sn-btn" onClick={() => removeAt(k, i, num)} aria-label={`Usuń serię ${num}, ${run.ex[k].name}`} title="Usuń tę serię">
               {label ? <span className="ex-label">{label}</span> : num}
@@ -420,15 +525,33 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             {paceText(parseDur(s.reps), parseKm(s.dist)) && <b>tempo {paceText(parseDur(s.reps), parseKm(s.dist))}</b>}
           </div>
         )}
-        {s.sug && !s.done && !run.ex[k].cardio && <div className="sughint">{s.sug}</div>}
-        {s.prev && !s.sug && <div className="prevhint">poprzednio: {s.prev}</div>}
+        {s.pr && s.done && (
+          <div className="prhint" role="status">
+            <span aria-hidden="true">🏆</span> {s.pr}
+          </div>
+        )}
+        {(() => {
+          const hint = s.sug && !s.done && !e.cardio ? <div className="sughint">{s.sug}</div> : s.prev && !s.sug ? <div className="prevhint">poprzednio: {s.prev}</div> : null;
+          if (!tools) return hint;
+          return (
+            <div className="setline">
+              {hint ?? <span />}
+              {tools}
+            </div>
+          );
+        })()}
         {/* cardio i „na stronę” — odliczanie pod wierszem (seria na czas ma ⏱ w polu) */}
         {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : run.ex[k].perSide && holdSec(s) > 0) && (
           <button
             className="link small hold-start"
             onClick={() => {
               const sec = run.ex[k].cardio ? Math.round((parseDur(s.reps) ?? 0) * 60) : holdSec(s);
-              setHold({ end: Date.now() + sec * 1000, total: sec, what: `${run.ex[k].name.slice(0, 18)} · ${num}` });
+              const what = `${run.ex[k].name.slice(0, 18)} · ${num}`;
+              if (run.ex[k].cardio) return setHold({ end: Date.now() + sec * 1000, total: sec, what });
+              // na stronę: lewa, sygnał „Zmiana strony”, prawa — bez dotykania telefonu
+              const lr = sidesOf(s.reps);
+              const second = lr ? Math.round(lr[1] * (s.unit === 'min' ? 60 : 1)) : sec;
+              setHold({ end: Date.now() + sec * 1000, total: sec, what, side: 'L', second: second || sec });
             }}
           >
             ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
@@ -624,6 +747,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const warm = ks.flatMap((k) => run.ex[k].sets.map((s, i) => ({ k, s, i })).filter((x) => x.s.warmup));
     const rounds = Math.max(...work.map((w) => w.length));
     const lastRest = run.ex[ks[ks.length - 1]].rest;
+    const cur = nextBlockSet(run, ks);
+    // runda zamknięta: następna seria to pierwsze ćwiczenie bloku w kolejnej rundzie
+    const newRound = !!cur && cur.round > 0 && ks.indexOf(cur.k) === 0;
     return (
       <>
         <div className="block-head">
@@ -641,12 +767,20 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         </div>
         {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`))}
         {Array.from({ length: rounds }, (_, r) => (
-          <div key={r} className="round">
-            <div className="round-label">Runda {r + 1}</div>
+          <div key={r} className={`round ${cur && cur.round === r ? 'cur' : ''}`}>
+            <div className="round-label">
+              Runda {r + 1} z {rounds}
+            </div>
             {ks.map((k, j) => (work[j][r] ? setRow(k, work[j][r].i, String(r + 1), run.ex[k].label) : null))}
           </div>
         ))}
-        {hintNext != null && block.includes(hintNext) && <div className="sughint next-hint">Teraz {run.ex[hintNext].label} · {run.ex[hintNext].name} — {rest ? 'po krótkiej przerwie' : 'bez przerwy'}</div>}
+        {hintNext != null && block.includes(hintNext) && (
+          <div className="sughint next-hint">
+            {newRound && cur
+              ? `Runda ${cur.round + 1} z ${cur.rounds} — po przerwie ${run.ex[hintNext].label} · ${run.ex[hintNext].name}`
+              : `Teraz ${run.ex[hintNext].label} · ${run.ex[hintNext].name} — ${rest ? 'po krótkiej przerwie' : 'bez przerwy'}`}
+          </div>
+        )}
       </>
     );
   };
@@ -793,8 +927,21 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         </div>
       )}
 
-      {rest && !hold && <RestBar rest={rest} setRest={setRest} />}
-      {hold && <RestBar rest={hold} setRest={setHold} label={hold.what ? `Trzymaj · ${hold.what}` : 'Trzymaj'} endText="Koniec — zalicz serię ✓" />}
+      {rest && !hold && <RestBar rest={rest} setRest={setRest} note={rest.note} />}
+      {hold && (
+        <RestBar
+          rest={hold}
+          setRest={(h) => setHold(h && { ...hold, ...h })}
+          label={
+            hold.side === 'switch'
+              ? 'Zmiana strony'
+              : `${hold.side === 'L' ? 'Lewa strona' : hold.side === 'P' ? 'Prawa strona' : 'Trzymaj'}${hold.what ? ` · ${hold.what}` : ''}`
+          }
+          endText="Koniec — zalicz serię ✓"
+          onEnd={onHoldEnd}
+        />
+      )}
+      {plates && <PlateCalc kg={plates.kg} title={plates.title} onClose={() => setPlates(null)} />}
       {layoutOpen && (
         <LayoutSheet
           canSavePlan={trainer}
@@ -813,6 +960,28 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       {finish && (
         <Sheet label="Podsumowanie treningu" onClose={() => setFinish(null)}>
             <h2>Podsumowanie</h2>
+            {(() => {
+              const prs = sessionRecords(
+                history(),
+                run.ex.map((e) => ({ name: e.name, cardio: e.cardio, timed: e.timed, sets: e.sets.filter((x) => x.done).map((x) => ({ load: x.load, reps: x.reps, rpe: x.rpe, warmup: x.warmup, unit: x.unit })) })),
+              );
+              return prs.length ? (
+                <div className="pr-summary">
+                  <span className="eyebrow">🏆 Rekordy w tym treningu</span>
+                  <ul>
+                    {prs.map((p) => (
+                      <li key={p.name}>
+                        <span className="pr-name">{p.name}</span>
+                        <span className="pr-val">
+                          {p.hit.reps} × {fnum(p.hit.load)} kg
+                        </span>
+                        <span className="muted small">szac. max {Math.round(p.hit.e1)} kg</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null;
+            })()}
             <div className="scale-h">
               <span>Jak ciężki był cały trening? (wymagane)</span>
               <span className="muted small">0 = odpoczynek · 10 = maksimum</span>
@@ -835,6 +1004,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 </button>
               ))}
             </div>
+            {Number(finish.pain) > 0 && (
+              <div className="field pain-where">
+                <span>Gdzie boli?</span>
+                <PainMap spots={finish.painMap} onChange={(painMap) => setFinish({ ...finish, painMap })} />
+              </div>
+            )}
             <div className="field">
               <span>Z kim był trening?</span>
               <div className="seg" role="radiogroup" aria-label="Z kim był trening">
@@ -928,7 +1103,24 @@ function repsHead(e: RunExercise): string {
   return e.perSide ? (u ? `${base} L|P` : 'L | P') : base;
 }
 
-function RestBar({ rest, setRest, label = 'Przerwa', endText = 'Koniec przerwy – następna seria!' }: { rest: { end: number; total: number }; setRest: (r: { end: number; total: number } | null) => void; label?: string; endText?: string }) {
+function RestBar({
+  rest,
+  setRest,
+  label = 'Przerwa',
+  endText = 'Koniec przerwy – następna seria!',
+  note,
+  onEnd,
+}: {
+  rest: { end: number; total: number };
+  setRest: (r: { end: number; total: number; note?: string } | null) => void;
+  label?: string;
+  endText?: string;
+  /** Dopisek, np. „dalej runda 2 z 3”. */
+  note?: string;
+  /** Zamiast domyślnego końca (sygnał + komunikat + zamknięcie) — np. zmiana strony. */
+  onEnd?: () => void;
+}) {
+  const fired = useRef(0);
   const { toast } = useStore();
   const [, tick] = useState(0);
   const left = Math.max(0, Math.round((rest.end - Date.now()) / 1000));
@@ -937,20 +1129,24 @@ function RestBar({ rest, setRest, label = 'Przerwa', endText = 'Koniec przerwy �
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    if (left <= 0) {
-      vibrate([200, 100, 200]);
-      beep(880, 0.25);
-      toast(endText);
-      setRest(null);
-    }
-  }, [left, setRest, toast, endText]);
+    if (left > 0 || fired.current === rest.end) return;
+    fired.current = rest.end;
+    if (onEnd) return onEnd();
+    vibrate([200, 100, 200]);
+    beep(880, 0.25);
+    toast(endText);
+    setRest(null);
+  }, [left, rest.end, setRest, toast, endText, onEnd]);
   return (
     <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
       <div className="rb-fill" style={{ width: `${100 - (left / rest.total) * 100}%` }} />
-      <span>{label}</span>
+      <span>
+        {label}
+        {note && <small className="rb-note"> · {note}</small>}
+      </span>
       <b>{fmtSec(left)}</b>
-      <button aria-label="Skróć przerwę o 15 sekund" onClick={() => setRest({ ...rest, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
-      <button aria-label="Wydłuż przerwę o 15 sekund" onClick={() => setRest({ end: rest.end + 15000, total: rest.total + 15 })}>+15</button>
+      <button aria-label="Skróć przerwę o 15 sekund" onClick={() => setRest({ ...rest, note, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
+      <button aria-label="Wydłuż przerwę o 15 sekund" onClick={() => setRest({ ...rest, note, end: rest.end + 15000, total: rest.total + 15 })}>+15</button>
       <button aria-label="Pomiń przerwę" onClick={() => setRest(null)}>Pomiń</button>
     </div>
   );

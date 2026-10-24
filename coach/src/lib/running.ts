@@ -1,5 +1,7 @@
-import type { PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
+import type { ISODate, Plan, PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
 import { uid } from '../format';
+import { addDays, todayISO, weekStart } from './dates';
+import { workoutDate } from './plan';
 
 /**
  * Bieganie: zapis jak u trenerów biegowych — rozgrzewka, część główna (odcinki × dystans / czas
@@ -74,17 +76,24 @@ export interface Zone {
   name: string;
   /** % tętna maks. */
   hr: [number, number];
+  /**
+   * Ułamek tętna progowego (LTHR) wg stref biegowych Friela; 0 = bez granicy (Z1 od dołu, Z5 od góry).
+   * Friel ma 7 stref — łączymy je w 5 stref aplikacji:
+   * Z1 < 85% (Friel 1) · Z2 85–89% (Friel 2) · Z3 90–94% (Friel 3) · Z4 95–102% (Friel 4 + 5a: okolice progu)
+   * · Z5 ≥ 103% (Friel 5b + 5c: VO₂max i beztlenowo). Granice liczbowo ciągłe: górna = dolna następnej − 1 ud./min.
+   */
+  lthr: [number, number];
   /** Tempo jako wielokrotność tempa na 5 km (wolniej = więcej). */
   pace: [number, number];
 }
 
 /** 5 stref (% HRmax) z polskimi nazwami zakresów; tempo orientacyjne względem tempa 5 km. */
 export const ZONES: Zone[] = [
-  { z: 'Z1', name: 'trucht / regeneracja', hr: [0.5, 0.6], pace: [1.35, 1.5] },
-  { z: 'Z2', name: 'rozbieganie (OWB1)', hr: [0.6, 0.7], pace: [1.2, 1.35] },
-  { z: 'Z3', name: 'tempo (OWB2 / BC2)', hr: [0.7, 0.8], pace: [1.1, 1.2] },
-  { z: 'Z4', name: 'próg (BC3)', hr: [0.8, 0.9], pace: [1.03, 1.1] },
-  { z: 'Z5', name: 'interwały (VO₂max)', hr: [0.9, 1], pace: [0.95, 1.03] },
+  { z: 'Z1', name: 'trucht / regeneracja', hr: [0.5, 0.6], lthr: [0, 0.85], pace: [1.35, 1.5] },
+  { z: 'Z2', name: 'rozbieganie (OWB1)', hr: [0.6, 0.7], lthr: [0.85, 0.9], pace: [1.2, 1.35] },
+  { z: 'Z3', name: 'tempo (OWB2 / BC2)', hr: [0.7, 0.8], lthr: [0.9, 0.95], pace: [1.1, 1.2] },
+  { z: 'Z4', name: 'próg (BC3)', hr: [0.8, 0.9], lthr: [0.95, 1.03], pace: [1.03, 1.1] },
+  { z: 'Z5', name: 'interwały (VO₂max)', hr: [0.9, 1], lthr: [1.03, 0], pace: [0.95, 1.03] },
 ];
 
 const ALIAS: Record<string, string> = { OWB1: 'Z2', OWB2: 'Z3', BC1: 'Z2', BC2: 'Z3', BC3: 'Z4', WB1: 'Z2', WB2: 'Z3', WB3: 'Z4', TRUCHT: 'Z1' };
@@ -109,6 +118,44 @@ export function hrMaxOf(p?: RunProfile, birthDate?: string): { v: number; est: b
   if (!birthDate) return null;
   const age = (Date.now() - new Date(`${birthDate}T12:00:00`).getTime()) / (365.25 * 864e5);
   return age > 8 && age < 100 ? { v: Math.round(208 - 0.7 * age), est: true } : null;
+}
+
+/** Tętno progowe (LTHR) z profilu, jeśli w rozsądnym zakresie. */
+export function lthrOf(p?: RunProfile): number | null {
+  return p?.lthr && p.lthr >= 100 && p.lthr <= 215 ? Math.round(p.lthr) : null;
+}
+
+export interface ZoneHr {
+  /** Dolna / górna granica w ud./min; null — bez granicy (Z1 z progu: „poniżej”, Z5 z progu: „od”). */
+  lo: number | null;
+  hi: number | null;
+  /** Źródło: próg (LTHR), zmierzone tętno maks. albo szacowane z wieku. */
+  src: 'lthr' | 'hrmax' | 'age';
+  base: number;
+}
+
+/** Zakres tętna strefy: z progu (LTHR) gdy wpisany, inaczej z tętna maks. (zmierzonego lub z wieku). */
+export function zoneHr(z: Zone, p?: RunProfile, birthDate?: string): ZoneHr | null {
+  const lt = lthrOf(p);
+  if (lt) {
+    const lo = z.lthr[0] ? Math.round(lt * z.lthr[0]) : null;
+    const hi = z.lthr[1] ? Math.round(lt * z.lthr[1]) - 1 : null;
+    return { lo, hi, src: 'lthr', base: lt };
+  }
+  const hm = hrMaxOf(p, birthDate);
+  return hm ? { lo: Math.round(hm.v * z.hr[0]), hi: Math.round(hm.v * z.hr[1]), src: hm.est ? 'age' : 'hrmax', base: hm.v } : null;
+}
+
+/** Zakres strefy jako tekst: „146–154”, „poniżej 146”, „od 177”. */
+export function zoneHrRange(h: ZoneHr): string {
+  return h.lo == null ? `poniżej ${h.hi! + 1}` : h.hi == null ? `od ${h.lo}` : `${h.lo}–${h.hi}`;
+}
+
+/** Skąd strefy tętna — do podpisu: „z progu 172”, „z tętna maks. 190”, „z wieku (szac. 188)”. */
+export function zoneSourceText(p?: RunProfile, birthDate?: string): string {
+  const h = zoneHr(ZONES[1], p, birthDate);
+  if (!h) return '';
+  return h.src === 'lthr' ? `z progu ${h.base}` : h.src === 'hrmax' ? `z tętna maks. ${h.base}` : `z wieku (szac. maks. ${h.base})`;
 }
 
 /** Dystans startowy z celu: „5K”, „10 km”, „HM”, „półmaraton”, „M”, „maraton” → km. */
@@ -144,20 +191,20 @@ export function targetText(target: string | undefined, p?: RunProfile, birthDate
   // tempo: „5:30”, „5.30”, „5'30”, zakres „5:20-5:40”
   const pace = t.replace(/(\d{1,2})['.](\d{2})(''|")?/g, '$1:$2').replace(/\s*\/?\s*km$/i, '');
   if (!z) return /^\d{1,2}:\d{2}(\s*[-–]\s*\d{1,2}:\d{2})?$/.test(pace) ? `${pace.replace(/\s*[-–]\s*/, '–')}/km` : t;
-  const hm = hrMaxOf(p, birthDate);
+  // strefa z progu (LTHR) ma pierwszeństwo przed tętnem maks.; źródło dopisujemy, żeby było jasne skąd liczby
+  const zh = zoneHr(z, p, birthDate);
   const p5 = pace5k(p);
   return [
     `${z.z} ${z.name}`,
-    hm && `${Math.round(hm.v * z.hr[0])}–${Math.round(hm.v * z.hr[1])} ud./min`,
+    zh && `${zoneHrRange(zh)} ud./min${zh.src === 'lthr' ? ` (z progu ${zh.base})` : ''}`,
     p5 && `~${fmtClock(p5 * z.pace[0])}–${fmtClock(p5 * z.pace[1])}/km`,
   ]
     .filter(Boolean)
     .join(' · ');
 }
 
-/** Suma biegu w treningu: km, minuty i średnie tempo (z odcinków z czasem i dystansem). */
 /** Cardio, które nie jest bieganiem (do kilometrażu biegowego się nie liczy). */
-const NOT_RUN = /rower|bike|wiosł|ergometr|concept|orbitrek|crosstrainer|pływ|basen|skakank|stepper|schody|ski ?erg|kajak/i;
+export const NOT_RUN = /rower|bike|wiosł|wiośl|ergometr|concept|orbitrek|crosstrainer|pływ|basen|skakank|stepper|schody|ski ?erg|kajak/i;
 
 /** Suma cardio w treningu: km, minuty i średnie tempo. `onlyRun` — tylko bieg / marsz (bez roweru, wioślarza…). */
 export function runTotals(s: TrainingSession, onlyRun = false): { km: number; min: number; pace: string } | null {
@@ -274,3 +321,69 @@ export const RUN_TEMPLATES: RunTemplate[] = [
   },
   { id: 'bnp', name: 'Bieg z narastającą prędkością (BNP)', hint: '3 × 10 min: Z2 → Z3 → Z4', make: () => ({ id: uid(), name: 'BNP', cardio: true, rest: '', notes: 'Bez przerw — każdy odcinek szybciej.', groups: [g('Robocze', '1', '10', '', 'Z2', '4'), g('Robocze', '1', '10', '', 'Z3', '6'), g('Robocze', '1', '10', '', 'Z4', '7')] }) },
 ];
+
+/* ---------- Kilometraż tygodniowy: plan vs wykonanie ---------- */
+
+/** Planowane km biegu w jednostce planu (cardio bez roweru / wioślarza; brakujący dystans szacowany z tempa celu). */
+export function plannedRunKm(exercises: PlanExercise[], p?: RunProfile): number {
+  const groups = exercises.filter((e) => (e.cardio || isRunning(e.name)) && !NOT_RUN.test(e.name)).flatMap((e) => e.groups);
+  return groups.length ? planRunTotals(groups, p).km : 0;
+}
+
+export interface WeekVolume {
+  /** Poniedziałek tygodnia. */
+  week: ISODate;
+  planned: number;
+  done: number;
+}
+
+/**
+ * Kilometraż z ostatnich `n` tygodni (do bieżącego włącznie): plan (aktywny plan; starsze plany tylko przed jego
+ * startem; dodatkowe treningi z datą) i wykonanie (bieg / marsz z zapisanych treningów).
+ * Jednostka planu bez dnia trafia do swojego tygodnia planu (od daty startu).
+ */
+export function runVolume(plans: Plan[], sessions: TrainingSession[], p: RunProfile | undefined, n = 10, today: ISODate = todayISO()): WeekVolume[] {
+  const cur = weekStart(today);
+  const weeks = Array.from({ length: n }, (_, i) => addDays(cur, -7 * (n - 1 - i)));
+  const out = weeks.map((week) => ({ week, planned: 0, done: 0 }));
+  const idx = (d: ISODate) => out.find((w) => d >= w.week && d <= addDays(w.week, 6));
+  const main = plans.filter((x) => !x.extra);
+  const active = main.find((x) => x.active) ?? null;
+  const activeStart = active?.startDate ? weekStart(active.startDate) : null;
+  const newest = [...main].filter((x) => x.startDate).sort((a, b) => b.startDate!.localeCompare(a.startDate!))[0];
+  // aktywny plan + starsze plany z datą startu (tylko tygodnie przed aktywnym); bez aktywnego — najnowszy z datą
+  const used: Plan[] = [...(active ? [active, ...(activeStart ? main.filter((x) => x !== active && x.startDate) : [])] : newest ? [newest] : []), ...plans.filter((x) => x.extra)];
+  for (const plan of used) {
+    const older = !plan.extra && plan !== active && !!activeStart;
+    plan.weeks.forEach((w, wi) => {
+      for (const k of w.workouts) {
+        const d = workoutDate(plan, wi, k) ?? (!plan.extra && plan.startDate ? addDays(weekStart(plan.startDate), wi * 7) : undefined);
+        if (!d || (older && d >= activeStart!)) continue;
+        const b = idx(d);
+        if (b) b.planned += plannedRunKm(k.exercises, p);
+      }
+    });
+  }
+  for (const s of sessions) {
+    const b = idx(s.date);
+    if (b) b.done += runTotals(s, true)?.km ?? 0;
+  }
+  return out.map((w) => ({ ...w, planned: Math.round(w.planned * 10) / 10, done: Math.round(w.done * 10) / 10 }));
+}
+
+/**
+ * Skok kilometrażu tydzień do tygodnia (bieg / marsz): bieżący tydzień vs poprzedni, a jeśli bieżący jeszcze nie
+ * przeskoczył progu — ostatni pełny tydzień vs wcześniejszy. Tylko gdy tydzień bazowy ≥ 10 km (mniejsze to szum).
+ */
+export function kmSpike(sessions: TrainingSession[], today: ISODate = todayISO()): { level: 'yellow' | 'red'; from: number; to: number; pct: number } | null {
+  const v = runVolume([], sessions, undefined, 3, today).map((w) => w.done);
+  for (const [from, to] of [
+    [v[1], v[2]],
+    [v[0], v[1]],
+  ]) {
+    if (from < 10) continue;
+    const pct = (to - from) / from;
+    if (pct > 0.15) return { level: pct > 0.3 ? 'red' : 'yellow', from, to, pct };
+  }
+  return null;
+}

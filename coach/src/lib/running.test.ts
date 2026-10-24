@@ -92,3 +92,65 @@ describe('bieganie', () => {
   expect([targetText('5.30'), targetText("5'30"), targetText('5:20-5:40 /km')]).toEqual(['5:30/km', '5:30/km', '5:20–5:40/km']);
   });
 });
+
+describe('strefy z progu (LTHR), kilometraż tygodniowy, skok km', async () => {
+  const { ZONES, zoneHr, zoneHrRange, zoneSourceText, runVolume, kmSpike, plannedRunKm } = await import('./running');
+  const { clientAlerts } = await import('./alerts');
+  it('LTHR 172: ciągłe zakresy Friela zmapowane na Z1–Z5', () => {
+    const p = { lthr: 172, hrMax: 195 };
+    expect(ZONES.map((z) => zoneHrRange(zoneHr(z, p)!))).toEqual(['poniżej 146', '146–154', '155–162', '163–176', 'od 177']);
+    expect(zoneHr(ZONES[1], p)).toMatchObject({ src: 'lthr', base: 172 });
+  });
+  it('próg ma pierwszeństwo przed tętnem maks.; źródło w opisie celu', () => {
+    expect(targetText('Z2', { hrMax: 190, lthr: 172 })).toBe('Z2 rozbieganie (OWB1) · 146–154 ud./min (z progu 172)');
+    expect(targetText('Z1', { lthr: 172 })).toBe('Z1 trucht / regeneracja · poniżej 146 ud./min (z progu 172)');
+    expect(targetText('BC3', { lthr: 172, t5k: '25:00' })).toBe('Z4 próg (BC3) · 163–176 ud./min (z progu 172) · ~5:09–5:30/km');
+    // bez progu — jak dotąd z tętna maks.
+    expect(targetText('Z2', { hrMax: 190 })).toBe('Z2 rozbieganie (OWB1) · 114–133 ud./min');
+    // nierealny próg — pomijany
+    expect(targetText('Z2', { hrMax: 190, lthr: 60 })).toBe('Z2 rozbieganie (OWB1) · 114–133 ud./min');
+    expect(zoneSourceText({ lthr: 172 })).toBe('z progu 172');
+    expect(zoneSourceText({ hrMax: 190 })).toBe('z tętna maks. 190');
+    expect(zoneSourceText({})).toBe('');
+  });
+
+  const TODAY = '2026-10-22'; // czwartek; tydzień od 19.10
+  let n = 0;
+  const run = (date: string, km: number, name = 'Bieg') => ({ id: `r${++n}`, clientId: 'c1', date, charge: 'brak' as const, exercises: [{ name, cardio: true, setsLog: [{ reps: km * 6, dist: km, unit: 'min' as const }] }] });
+  it('plan vs wykonanie w tygodniach (dni z planu, km z tempa celu, bez roweru)', () => {
+    const plan = {
+      id: 'p1',
+      clientId: 'c1',
+      name: 'Plan',
+      active: true,
+      startDate: '2026-10-12',
+      weeks: [
+        { id: 'w1', name: 'T1', workouts: [{ id: 'k1', name: 'A', day: 2, exercises: [{ id: 'e1', name: 'Rozbieganie', cardio: true, groups: [{ type: 'Robocze' as const, sets: '1', reps: '40', load: '', rpe: '', pace: '5:00' }] }] }] },
+        {
+          id: 'w2',
+          name: 'T2',
+          workouts: [
+            { id: 'k2', name: 'B', day: 1, exercises: [{ id: 'e2', name: 'Interwały', cardio: true, groups: [{ type: 'Robocze' as const, sets: '6', reps: '', load: '800 m', rpe: '' }] }] },
+            { id: 'k3', name: 'C', day: 3, exercises: [{ id: 'e3', name: 'Rower', cardio: true, groups: [{ type: 'Robocze' as const, sets: '1', reps: '', load: '20', rpe: '' }] }] },
+          ],
+        },
+      ],
+    };
+    expect(plannedRunKm(plan.weeks[1].workouts[1].exercises)).toBe(0);
+    const v = runVolume([plan], [run('2026-10-14', 7), run('2026-10-20', 5), run('2026-10-21', 3, 'Wioślarz')], undefined, 3, TODAY);
+    expect(v).toEqual([
+      { week: '2026-10-05', planned: 0, done: 0 },
+      { week: '2026-10-12', planned: 8, done: 7 },
+      { week: '2026-10-19', planned: 4.8, done: 5 },
+    ]);
+  });
+  it('skok km: > 15% żółty, > 30% czerwony, tylko od 10 km', () => {
+    expect(kmSpike([run('2026-10-13', 10), run('2026-10-20', 11)], TODAY)).toBeNull();
+    expect(kmSpike([run('2026-10-13', 10), run('2026-10-20', 12)], TODAY)).toMatchObject({ level: 'yellow', from: 10, to: 12 });
+    expect(kmSpike([run('2026-10-13', 8), run('2026-10-20', 16)], TODAY)).toBeNull();
+    // bieżący tydzień jeszcze niski — liczy się ostatni pełny vs wcześniejszy
+    expect(kmSpike([run('2026-10-06', 24), run('2026-10-13', 32), run('2026-10-20', 4)], TODAY)).toMatchObject({ level: 'red', from: 24, to: 32 });
+    const c = { id: 'c1', name: 'T', status: 'aktywny' as const, payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] };
+    expect(clientAlerts(c, [run('2026-10-06', 24), run('2026-10-13', 32)], TODAY)).toContainEqual({ level: 'red', text: 'Kilometraż +33% (24 → 32 km)' });
+  });
+});

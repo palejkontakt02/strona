@@ -7,7 +7,10 @@ const CARDIO_TYPES: SetType[] = ['Rozgrzewka', 'Robocze', 'Schłodzenie'];
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
-import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, type Progression } from '../data/ops';
+import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, sessionsOf, type Progression } from '../data/ops';
+import { isTemplate, pctOf } from '../lib/analytics';
+import { currentMax, percentToKg, type MaxSource } from '../lib/strength';
+import { fnum } from '../format';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
 import { addDays, todayISO } from '../lib/dates';
@@ -36,6 +39,15 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   const { db, apply, ask, toast } = useStore();
   const { closeModal } = useNav();
   const client = db.clients.find((c) => c.id === m.plan.clientId);
+  const tpl = isTemplate(m.plan);
+  // „75%” → kg dla tego podopiecznego (z testu 1RM albo e1RM z treningów)
+  const clientSessions = client ? sessionsOf(db, client.id) : [];
+  const maxCache = new Map<string, MaxSource | null>();
+  const maxOf = (name: string) => {
+    if (!client || !name.trim()) return null;
+    if (!maxCache.has(name)) maxCache.set(name, currentMax(clientSessions, client.tests, name.trim()));
+    return maxCache.get(name)!;
+  };
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
   // Rozwinięty tylko pierwszy tydzień — reszta na kliknięcie (długie plany).
@@ -84,12 +96,12 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
             return toast(`${k.name} · ${e.name}, odcinek ${bad + 1}: czas „${e.groups[bad].reps}” / dystans „${e.groups[bad].load}” — popraw (czas: 40, 3:05, 1:20:00; dystans: 5, 400 m).`);
           }
         }
-    if (!clean.extra && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
+    if (!clean.extra && !tpl && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
     for (const w of clean.weeks)
       for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
     const focused = clean.weeks.flatMap((w) => w.workouts).find((k) => k.id === m.focusWorkoutId);
     // przy błędzie zapisu edytor zostaje otwarty — zmiany nie przepadają
-    if (await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.')) closeModal();
+    if (await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : tpl ? 'Szablon zapisany.' : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.')) closeModal();
   };
 
   const close = async () => {
@@ -97,7 +109,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
   };
 
   return (
-    <Modal wide title={p.extra ? (only ? 'Trening poza planem' : 'Treningi poza planem') : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
+    <Modal wide title={p.extra ? (only ? 'Trening poza planem' : 'Treningi poza planem') : tpl ? 'Szablon planu' : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
       {p.extra && (
         <p className="muted small">
           Poza planem — kolejność planu się nie zmienia. Z datą: podopieczny widzi trening na górze ekranu w tym dniu. Bez daty: na liście „poza planem”, do zrobienia w dowolnym momencie.
@@ -115,14 +127,14 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
         <Field label="Nazwa planu">
           <input className="input" value={p.name} onChange={(e) => upd((d) => void (d.name = e.target.value))} required />
         </Field>
-        <Field label="Start">
+        {!tpl && <Field label="Start">
           <input className="input" type="date" value={p.startDate ?? ''} onChange={(e) => upd((d) => void (d.startDate = e.target.value || undefined))} />
-        </Field>
-        <div className="field check-row self-end">
+        </Field>}
+        {!tpl && <div className="field check-row self-end">
           <label className="check">
             <input type="checkbox" checked={p.active} onChange={(e) => upd((d) => void (d.active = e.target.checked))} /> Plan aktywny
           </label>
-        </div>
+        </div>}
         <Field label="Notatki do planu" wide>
           <input className="input" value={p.notes ?? ''} onChange={(e) => upd((d) => void (d.notes = e.target.value || undefined))} />
         </Field>
@@ -358,12 +370,33 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                             ))}
                           </select>
                           <input className="input" value={g.reps} placeholder={cardio ? 'np. 40 / 3:00' : isTimed(e) ? 'np. 45' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label={cardio ? 'Czas' : 'Powtórzenia'} />
-                          <input className="input" value={g.load} placeholder={cardio ? 'np. 800 m' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label={cardio ? 'Dystans' : 'Ciężar'} />
+                          {(() => {
+                            const input = <input className="input" value={g.load} placeholder={cardio ? 'np. 800 m' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label={cardio ? 'Dystans' : 'Ciężar'} />;
+                            const pct = cardio ? null : pctOf(g.load);
+                            const mx = pct != null ? maxOf(e.name) : null;
+                            if (pct == null || !client) return input;
+                            return (
+                              <span className="pe-load">
+                                {input}
+                                <small className={`pe-pct ${mx ? '' : 'none'}`} title={mx ? `${fnum(pct, 1)}% · max ${mx.label}` : 'Brak testu 1RM i historii tego ćwiczenia — % policzy się po pierwszym treningu albo teście.'}>
+                                  {mx ? `≈ ${fnum(percentToKg(pct, mx.value, e.name, loadPerOf(e)), 2)} kg` : 'brak 1RM'}
+                                </small>
+                              </span>
+                            );
+                          })()}
                           {cardio && <input className="input" list="run-zones" value={g.pace ?? ''} placeholder="Z2 / 5:30" onChange={(ev) => setEx((x) => void (x.groups[gi].pace = ev.target.value || undefined))} aria-label="Strefa albo tempo" />}
                           <input className="input" inputMode="decimal" value={g.rpe} onChange={(ev) => setEx((x) => void (x.groups[gi].rpe = ev.target.value))} aria-label="RPE" />
                           <IconBtn icon="x" label="Usuń serię" onClick={() => setEx((x) => void x.groups.splice(gi, 1))} />
                         </div>
                       ))}
+                      {client && !cardio && e.groups.some((g) => pctOf(g.load) != null) && (() => {
+                        const mx = maxOf(e.name);
+                        return (
+                          <p className="muted small pe-max">
+                            {mx ? <>% liczone od maksa: {mx.label}</> : `Brak testu 1RM i historii „${e.name || 'ćwiczenia'}” — kg z % policzy odtwarzacz po pierwszym treningu.`}
+                          </p>
+                        );
+                      })()}
                       <div className="pe-set-actions">
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEx((x) => void x.groups.push(newRow(x.groups.at(-1)?.type === 'Rozgrzewka' ? 'Robocze' : x.groups.at(-1)?.type ?? 'Robocze', x.groups.at(-1))))}>
                           + seria

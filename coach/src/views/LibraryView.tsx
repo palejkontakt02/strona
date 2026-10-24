@@ -6,6 +6,10 @@ import { normalize, uid, nEx } from '../format';
 import { put } from '../data/db';
 import { missingFromAtlas } from '../data/atlas';
 import { useNav } from '../nav';
+import { del } from '../data/db';
+import { templatesOf } from '../lib/analytics';
+import { TemplateAssignModal } from '../modals/AssignModal';
+import type { Plan } from '../domain';
 
 export function LibraryView() {
   const { db, apply } = useStore();
@@ -40,6 +44,7 @@ export function LibraryView() {
           </button>
         </div>
       </div>
+      <PlanTemplates />
       <div className="filters">
         <input className="input input-sm" type="search" placeholder="Szukaj ćwiczenia…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input input-sm" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategoria">
@@ -74,5 +79,45 @@ export function LibraryView() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Szablony planów: edycja, usunięcie i przypisanie kilku podopiecznym naraz. */
+function PlanTemplates() {
+  const { db, apply, ask } = useStore();
+  const { openModal } = useNav();
+  const [assign, setAssign] = useState<Plan | null>(null);
+  const tpls = templatesOf(db.plans);
+  if (!tpls.length) return null;
+  return (
+    <section className="card tpl-card">
+      <div className="card-head">
+        <h4>Szablony planów</h4>
+        <span className="muted small">{tpls.length}</span>
+      </div>
+      <ul className="rows">
+        {tpls.map((t) => (
+          <li key={t.id} className="row tpl-row">
+            <span className="grow">
+              <strong>{t.name}</strong>
+              <span className="muted small"> · {t.weeks.length} tyg. · {t.weeks.reduce((a, w) => a + w.workouts.length, 0)} jedn.</span>
+            </span>
+            <button className="btn btn-secondary btn-sm" onClick={() => setAssign(t)}>
+              Przypisz…
+            </button>
+            <IconBtn icon="edit" label={`Edytuj szablon ${t.name}`} onClick={() => openModal({ kind: 'plan', plan: t })} />
+            <IconBtn
+              icon="trash"
+              label={`Usuń szablon ${t.name}`}
+              danger
+              onClick={async () => {
+                if (await ask(`Usunąć szablon „${t.name}”? Plany przypisane z niego zostają.`, { confirm: 'Usuń szablon' })) await apply([del('plans', t.id)], 'Szablon usunięty.');
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      {assign && <TemplateAssignModal template={assign} onClose={() => setAssign(null)} />}
+    </section>
   );
 }

@@ -1,6 +1,6 @@
 import type { RunStart } from './athlete/start';
 import { createContext, useContext } from 'react';
-import type { Appointment, Client, LibraryExercise, Location, Payment, PaymentType, Plan, TrainingSession } from './domain';
+import type { Appointment, Client, LibraryExercise, Location, Measurement, Payment, PaymentType, Plan, TrainingSession } from './domain';
 
 export const SECTIONS = ['Pulpit', 'Kalendarz', 'Klienci', 'Płatności', 'Ćwiczenia'] as const;
 export type Section = (typeof SECTIONS)[number];
@@ -12,7 +12,7 @@ export type ModalState =
   | { kind: 'appt'; appt?: Appointment; date?: string; time?: string; clientId?: string }
   | { kind: 'session'; session?: TrainingSession; clientId?: string; appt?: Appointment; date?: string; /** Otwórz od razu z polem „Wklej z notatki”. */ paste?: boolean }
   | { kind: 'client'; client?: Client }
-  | { kind: 'measurement'; clientId: string }
+  | { kind: 'measurement'; clientId: string; /** Edycja pomiaru trenera (pomiaru podopiecznego trener nie zmienia — może go tylko ukryć). */ measurement?: Measurement }
   | { kind: 'test'; clientId: string; name?: string }
   | { kind: 'payment'; clientId?: string; type: PaymentType; payment?: Payment }
   | { kind: 'injury'; clientId: string; injury?: Client['injuryLog'][number] }

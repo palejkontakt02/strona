@@ -24,6 +24,7 @@ export function toDraft(c: Partial<Client>): Draft {
   for (const k of NUM_FIELDS) d[k] = c[k] != null ? String(c[k]) : '';
   d.runHrMax = c.run?.hrMax != null ? String(c.run.hrMax) : '';
   d.runT5k = c.run?.t5k ?? '';
+  d.runLthr = c.run?.lthr != null ? String(c.run.lthr) : '';
   return d;
 }
 
@@ -34,10 +35,12 @@ export function fromDraft(base: Client, d: Draft): Client {
   for (const k of DATE_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k] || undefined;
   for (const k of NUM_FIELDS) (c as unknown as Record<string, unknown>)[k] = num(d[k]) ?? undefined;
   // bieganie: strefy tętna / tempa (pola z formularza; brak — bez zmian w zapisie)
-  if (d.runHrMax !== undefined || d.runT5k !== undefined) {
+  if (d.runHrMax !== undefined || d.runT5k !== undefined || d.runLthr !== undefined) {
     const hrMax = num(d.runHrMax ?? '') ?? undefined;
     const t5k = (d.runT5k ?? '').trim() || undefined;
-    c.run = hrMax || t5k ? { hrMax, t5k } : undefined;
+    // tętno progowe: pole może nie istnieć w starszych formularzach — wtedy zostaje zapisane
+    const lthr = d.runLthr !== undefined ? num(d.runLthr) ?? undefined : base.run?.lthr;
+    c.run = hrMax || t5k || lthr ? { ...base.run, hrMax, t5k, lthr } : undefined;
   }
   return c;
 }
@@ -76,6 +79,10 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Bieg: tętno maks.">
             {inp('runHrMax', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 192' })}
             {d.runHrMax?.trim() && !((num(d.runHrMax) ?? 0) > 120 && (num(d.runHrMax) ?? 0) < 230) && <span className="small warn-text">Tętno maks. zwykle 121–229 — przy tej wartości strefy liczą się z wieku.</span>}
+          </Field>
+          <Field label="Tętno progowe (LTHR)" hint="Test: 30 min biegu solo na maksa, równym tempem; LTHR = średnie tętno z ostatnich 20 min. Gdy wpisane, strefy liczą się od progu.">
+            {inp('runLthr', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 172' })}
+            {d.runLthr?.trim() && !((num(d.runLthr) ?? 0) >= 100 && (num(d.runLthr) ?? 0) <= 215) && <span className="small warn-text">Tętno progowe zwykle 100–215 — przy tej wartości strefy liczą się z tętna maks.</span>}
           </Field>
           <Field label="Bieg: czas na 5 km">
             {inp('runT5k', 'text', { placeholder: 'np. 25:30' })}

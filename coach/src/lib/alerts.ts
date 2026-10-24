@@ -1,6 +1,7 @@
 import type { Client, ISODate, TrainingSession } from '../domain';
 import { todayISO } from './dates';
 import { loadStats, type Level } from './load';
+import { kmSpike } from './running';
 import { wellnessTotal } from './wellness';
 
 export interface Alert {
@@ -15,7 +16,8 @@ const fmtD = (iso: ISODate) =>
 /**
  * Sygnały ostrzegawcze klienta: ACWR > 1,5 (czerwony) / > 1,3 (żółty); monotonia > 2;
  * wellness ≤ 12/25 lub spadek > 20% vs średnia 4 poprzednich; ból ≥ 4 (≥ 6 czerwony);
- * aktywne urazy; LSI < 90% (< 80% czerwony) z najnowszego wyniku każdego testu.
+ * aktywne urazy; LSI < 90% (< 80% czerwony) z najnowszego wyniku każdego testu;
+ * kilometraż biegu tydzień do tygodnia > 15% (> 30% czerwony), gdy poprzedni tydzień ≥ 10 km.
  */
 export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO(), extra: Alert[] = []): Alert[] {
   const a: Alert[] = [...extra];
@@ -25,6 +27,8 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
     a.push({ level: 'yellow', text: `ACWR ${fx(st.acwr, 2)} – obciążenie rośnie szybko` });
   if (st.monotony != null && st.monotony > 2)
     a.push({ level: 'yellow', text: `Monotonia ${fx(st.monotony, 1)} – mało zróżnicowane obciążenia` });
+  const km = kmSpike(sessions, today);
+  if (km) a.push({ level: km.level, text: `Kilometraż +${Math.round(km.pct * 100)}% (${Math.round(km.from)} → ${Math.round(km.to)} km)` });
 
   // ból i samopoczucie: tylko świeże dane (14 dni) — stary wynik nie świeci miesiącami
   const since = new Date(new Date(today + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);

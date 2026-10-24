@@ -3,6 +3,8 @@ import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { PalettePicker } from '../components/PalettePicker';
+import { PushSettings } from '../components/PushSettings';
+import { OfflineBadge } from '../components/OfflineBadge';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
 import { allMeasurements, clientById, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
@@ -22,7 +24,12 @@ import { Player } from './Player';
 import { IntakeWizard } from './Intake';
 import { WorkoutPreview } from './WorkoutPreview';
 import { NoteToTrainer, TodayHabits } from './Today';
+import { useAthleteUnread } from '../components/Chat';
+import { WeeklyReportCard } from '../components/WeeklyReport';
+import { DayLogCard } from '../components/DayLog';
+import { AthletePhotos } from '../components/ProgressPhotos';
 import { runFromStart, type RunStart } from './start';
+import { AthleteRunCards } from '../components/RunVolume'; // funkcje: bieg
 import { History, SessionSheet, Upcoming, upcomingVisits } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
@@ -162,6 +169,7 @@ export function AthleteApp({
             FITOWA <span>/ coach</span>
           </span>
           <span className="row-inline">
+            <OfflineBadge />
             <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Wygląd — kolory aplikacji">
               🎨 Wygląd
             </button>
@@ -193,6 +201,7 @@ export function AthleteApp({
           </div>
           <p className="muted small">Wybierz kolory aplikacji — zapisują się na tym telefonie.</p>
           <PalettePicker />
+          {mode === 'client' && <PushSettings role="client" />}
         </Sheet>
       )}
       {screen === 'intake' ? (
@@ -318,6 +327,7 @@ function Home({
   const extra = extraPlanOf(db, clientId);
   const st = streak(sessions, today);
   const first = client.name.split(' ')[0];
+  const unreadMsgs = useAthleteUnread(client);
 
   // cel tygodnia
   const ws = weekStart(today);
@@ -346,12 +356,15 @@ function Home({
           📋 {onTrainer ? 'Ankieta podopiecznego' : 'Moja ankieta'}
         </button>
         {(() => {
-          const lastReply = (client.replies ?? []).reduce((a, r) => (r.at > a ? r.at : a), '');
-          const lastMine = (client.inbox ?? []).reduce((a, n) => (n.at > a ? n.at : a), '');
-          const fresh = !!lastReply && lastReply > lastMine;
+          const fresh = !onTrainer && unreadMsgs > 0;
           return (
             <a href="#do-trenera" className={`btn btn-sm msg-link ${fresh ? 'btn-primary' : 'btn-ghost'}`}>
               {onTrainer ? '✉ Napisz (jako trener)' : fresh ? '✉ Nowa odpowiedź trenera' : '✉ Napisz do trenera'}
+              {fresh && (
+                <span className="msg-badge" aria-label={`${unreadMsgs} nowe`}>
+                  {unreadMsgs}
+                </span>
+              )}
             </a>
           );
         })()}
@@ -464,11 +477,25 @@ function Home({
           </button>
         </section>
       )}
-      {!run && nx && (
-        <button className="btn btn-ghost btn-block own-btn" onClick={onOwn}>
-          + Trening własny (poza planem)
-        </button>
+      {!run && (nx || sessions[0]) && (
+        <div className={`ath-quick ${nx && sessions[0] ? 'two' : ''}`}>
+          {nx && (
+            <button className="btn btn-ghost btn-block own-btn" onClick={onOwn}>
+              + Trening własny (poza planem)
+            </button>
+          )}
+          {sessions[0] && (
+            <button className="btn btn-ghost btn-block repeat-btn" onClick={() => onRepeat(sessions[0])} title={`${sessions[0].workoutName || 'Trening'} z ${fmtDay(sessions[0].date)} — te same ćwiczenia, ciężary z ostatniego razu`}>
+              <span>↻ Powtórz ostatni trening</span>
+              <span className="muted small ellipsis">
+                {sessions[0].workoutName || 'Trening'} · {fmtDay(sessions[0].date)}
+              </span>
+            </button>
+          )}
+        </div>
       )}
+      {/* funkcje: bieg — import z zegarka (GPX/TCX/FIT) + kilometraż plan vs wykonanie; tylko dla biegających (components/RunVolume.tsx) */}
+      <AthleteRunCards client={client} canImport={!run} />
 
       {!client.intake?.completedAt && (
         <section className="acard acard-warn">
@@ -480,7 +507,9 @@ function Home({
           </button>
         </section>
       )}
+      <WeeklyReportCard client={client} />
       <TodayHabits client={client} />
+      <DayLogCard client={client} />
       <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
       <Upcoming clientId={clientId} limit={2} />
 
@@ -501,6 +530,7 @@ function Home({
       </div>
 
       <BodyProgress client={client} />
+      <AthletePhotos client={client} />
       <Progress clientId={clientId} />
 
       <Workouts plan={plan} extra={extra} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id, planId) => (planId === plan?.id ? onStart(id) : onStartFrom({ planId, workoutId: id }))} onTrainer={onTrainer} />

@@ -4,13 +4,17 @@ import { Card, Empty, Kpi } from '../../components/ui';
 import type { Client } from '../../domain';
 import { sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { fmtDay, fnum, fx } from '../../format';
+import { fmtDay, fmtShort, fnum, fx } from '../../format';
 import { addDays, todayISO, weekStart } from '../../lib/dates';
 import { acwrZone, loadStats, sessionLoad, tonnage, weekly } from '../../lib/load';
 import { num } from '../../lib/parse';
-import { e1Series, exerciseE1, records } from '../../lib/strength';
+import { e1rmHistory, exerciseE1, exerciseRecords, RECORD_REPS, records, type LiftRecord } from '../../lib/strength';
+import { painHistory, painSpotsOf } from '../../lib/analytics';
+import { painLabel } from '../../lib/painMap';
+import { PainMap } from '../../components/PainMap';
 import { readiness, readinessNorm, wellnessTotal } from '../../lib/wellness';
 import { fmtClock, fmtKm, hrMaxOf, pace5k, runTotals, ZONES } from '../../lib/running';
+import { RunVolume } from '../../components/RunVolume'; // funkcje: bieg
 
 const toneOf = (l: string | null) => (l === 'red' ? 'danger' : l === 'yellow' ? 'warn' : l === 'green' ? 'ok' : undefined);
 
@@ -49,6 +53,9 @@ export function ClientMonitoring({ client }: { client: Client }) {
   const [ex, setEx] = useState<string | null>(null);
   const chosen = ex && exNames.includes(ex) ? ex : exNames[0];
   const recs = records(sessions).slice(0, 8);
+  const hist = chosen ? e1rmHistory(sessions, chosen) : [];
+  const exRec = chosen ? exerciseRecords(sessions, chosen) : null;
+  const pain = painHistory(sessions, today, 8);
 
   if (sessions.length === 0) return <Empty>Brak treningów — monitoring pojawi się po pierwszych zapisach z sRPE i czasem trwania.</Empty>;
 
@@ -95,6 +102,8 @@ export function ClientMonitoring({ client }: { client: Client }) {
         <Card title="Ból (0–10)">
           {painPts.length < 2 ? <Empty>Za mało danych.</Empty> : <LineChart label="Ból" series={[{ label: 'Ból', pts: painPts, tone: 'muted' }]} refs={[{ y: 4, label: '4', tone: 'warn' }]} minY={0} format={(v) => fnum(v, 0)} />}
         </Card>
+        {/* funkcje: bieg — km plan vs wykonanie (sam się ukrywa, gdy klient nie biega) */}
+        <RunVolume client={client} />
         {hasRun && (
           <Card title="Bieganie — kilometraż tygodniowy">
             <BarChart pts={weeklyKm} label="Kilometraż tygodniowy" format={(v) => fnum(v, 1)} />
@@ -151,20 +160,72 @@ export function ClientMonitoring({ client }: { client: Client }) {
         <Card title="Tonaż tygodniowy (kg)">
           <BarChart pts={weeklyTon} label="Tonaż tygodniowy" format={(v) => (v >= 1000 ? `${fnum(v / 1000, 1)}t` : String(Math.round(v)))} />
         </Card>
-        <Card title="Szacowane 1RM (e1RM)">
+        <Card title="Szacowane 1RM (e1RM) i rekordy" className="rec-card">
           {exNames.length === 0 ? (
             <Empty>Brak ćwiczeń z ciężarem i powtórzeniami.</Empty>
           ) : (
             <>
               <div className="chips">
-                {exNames.slice(0, 8).map((n) => (
+                {exNames.slice(0, 6).map((n) => (
                   <button key={n} className={`chip ${n === chosen ? 'active' : ''}`} onClick={() => setEx(n)}>
                     {n}
                   </button>
                 ))}
               </div>
-              <LineChart label={`e1RM ${chosen}`} series={[{ label: chosen, pts: e1Series(sessions, chosen) }]} format={(v) => `${fnum(v, 1)}`} />
+              {exNames.length > 6 && (
+                <select className="input input-sm rec-pick" value={exNames.slice(0, 6).includes(chosen) ? '' : chosen} onChange={(e) => e.target.value && setEx(e.target.value)} aria-label="Ćwiczenie do wykresu e1RM">
+                  <option value="">Inne ćwiczenie ({exNames.length - 6})…</option>
+                  {exNames.slice(6).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <LineChart label={`e1RM ${chosen}`} series={[{ label: chosen, pts: hist.map((h) => ({ x: h.date, y: h.e1 })) }]} format={(v) => `${fnum(v, 1)}`} />
+              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && (
+                <table className="table rec-table" aria-label={`Rekordy: ${chosen}`}>
+                  <thead>
+                    <tr>
+                      <th>Rekord</th>
+                      <th className="num">Seria</th>
+                      <th className="num">e1RM</th>
+                      <th className="num">Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...RECORD_REPS.map((n) => [`${n}RM`, exRec.rm[n]] as const), ['Najlepszy e1RM', exRec.e1] as const].map(([label, r]) => (
+                      <RecRow key={label} label={label} r={r} best={label === 'Najlepszy e1RM'} />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && <p className="muted small">3RM = najcięższa seria na co najmniej 3 powtórzenia (tak samo 1RM, 5RM). e1RM — szacowane maks. z serii (Epley z RPE).</p>}
+              {hist.length > 0 && (
+                <p className="muted small">
+                  {hist.length} {hist.length === 1 ? 'trening' : hist.length < 5 ? 'treningi' : 'treningów'} z tym ćwiczeniem · ostatnio {fmtDay(hist[hist.length - 1].date)}: {fnum(hist[hist.length - 1].load)} kg × {hist[hist.length - 1].reps} (e1RM {fnum(hist[hist.length - 1].e1, 1)})
+                </p>
+              )}
             </>
+          )}
+        </Card>
+        <Card title="Gdzie boli — ostatnie 8 tygodni" className="pain-history">
+          {pain.length === 0 ? (
+            <Empty>Brak zaznaczonych miejsc bólu w ostatnich 8 tygodniach. Podopieczny zaznacza je po treningu (mapa ciała), trener — w edycji treningu.</Empty>
+          ) : (
+            <div className="pain-hist-grid">
+              <PainMap spots={painSpotsOf(pain)} readOnly />
+              <ul className="rows pain-hist-list">
+                {pain.map((r) => (
+                  <li key={`${r.area}|${r.side ?? ''}`} className="row">
+                    <strong className="grow">{painLabel(r)}</strong>
+                    <span className="small">
+                      {r.count} {r.count === 1 ? 'raz' : 'razy'} · max <b className={`num ${r.max >= 6 ? 'danger-text' : r.max >= 4 ? 'warn-text' : ''}`}>{r.max}/10</b> · ostatnio {fmtShort(r.last)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </Card>
       </div>
@@ -190,5 +251,16 @@ export function ClientMonitoring({ client }: { client: Client }) {
         )}
       </Card>
     </>
+  );
+}
+
+function RecRow({ label, r, best }: { label: string; r: LiftRecord | null; best?: boolean }) {
+  return (
+    <tr className={best ? 'rec-best' : undefined}>
+      <td>{label}</td>
+      <td className="num">{r ? `${fnum(r.load)} kg × ${r.reps}` : '—'}</td>
+      <td className="num">{r ? fnum(r.e1, 1) : '—'}</td>
+      <td className="num">{r ? fmtShort(r.date) : '—'}</td>
+    </tr>
   );
 }

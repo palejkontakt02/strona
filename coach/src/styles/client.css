@@ -860,3 +860,148 @@
     background: var(--color-surface);
   }
 }
+
+/* === funkcje: bieg === */
+/* kilometraż: plan (obrys) vs zrobione (wypełnienie) */
+.rv-chart .rv-plan {
+  fill: color-mix(in srgb, var(--color-neutral-400) 14%, transparent);
+  stroke: var(--color-neutral-400);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.rv-chart .rv-over {
+  fill: var(--color-warn);
+}
+.rv-legend {
+  margin: var(--space-2) 0 0;
+}
+.rv-legend .rv-sw-plan {
+  height: 10px;
+  vertical-align: -1px;
+  background: color-mix(in srgb, var(--color-neutral-400) 14%, transparent);
+  outline: 1.5px dashed var(--color-neutral-400);
+  outline-offset: -1.5px;
+}
+.rv-legend .rv-sw-done {
+  height: 10px;
+  vertical-align: -1px;
+  background: var(--color-accent);
+}
+.rv-sum {
+  margin: var(--space-2) 0 0;
+}
+.rv-sum .num,
+.imp-kpis dd,
+.imp-table .num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.rv-spike {
+  margin: var(--space-2) 0 0;
+}
+.rv-red {
+  color: var(--color-danger);
+}
+.ath .rv-card .eyebrow {
+  display: block;
+  margin-bottom: var(--space-2);
+}
+.rb-zsrc {
+  margin: var(--space-2) 0 0;
+}
+
+/* import z zegarka (GPX / TCX / FIT) */
+.imp {
+  margin-bottom: var(--space-4);
+}
+.ath .imp:not(.imp-small) {
+  margin-bottom: var(--space-6);
+}
+.imp-btn {
+  min-height: 44px;
+}
+.imp-err {
+  margin: var(--space-2) 0 0;
+}
+.imp-preview {
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: 14px;
+  padding: var(--space-4);
+}
+.modal .imp-preview {
+  background: var(--color-surface-2);
+}
+.imp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-3);
+}
+.imp-head .eyebrow {
+  overflow-wrap: anywhere;
+}
+.imp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.imp-kpis div {
+  min-width: 0;
+}
+.imp-kpis dt {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+}
+.imp-kpis dd {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.imp-mode {
+  margin-bottom: var(--space-3);
+}
+.imp-table-wrap {
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 8px;
+}
+.imp-table {
+  width: 100%;
+}
+.imp-table th,
+.imp-table td {
+  text-align: right;
+}
+.imp-table th:first-child,
+.imp-table td:first-child {
+  text-align: left;
+  color: var(--color-neutral-400);
+}
+.imp-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.imp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+@media (max-width: 600px) {
+  .imp-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .imp-fields {
+    grid-template-columns: 1fr;
+  }
+  .imp-actions .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}

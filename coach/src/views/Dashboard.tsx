@@ -14,6 +14,7 @@ import { useNav } from '../nav';
 import { ApptStatusTag } from './CalendarView';
 import { LocationTag, locStyle } from '../components/location';
 import { clubAmount, clubOutstanding, clubSessions } from '../lib/club';
+import { reportStats, weekLabel } from '../lib/comms';
 
 export function Dashboard() {
   const { db, apply, toast } = useStore();
@@ -157,6 +158,48 @@ export function Dashboard() {
                 ))}
               </ul>
               {notes.length > 6 && <p className="muted small">I jeszcze {notes.length - 6} — otwórz podopiecznego, by zobaczyć wszystkie.</p>}
+            </Card>
+          );
+        })()}
+        {(() => {
+          // raporty tygodniowe: kto przysłał za bieżący (pt–nd) / miniony tydzień, nieprzeczytane
+          const rs = reportStats(db.clients, today);
+          if (!rs.expected.length && !rs.unread.length) return null;
+          return (
+            <Card title={`Raporty tygodnia: ${rs.sent.length} z ${rs.expected.length} przysłało`} className="span-2 dash-reports">
+              <p className="muted small">Tydzień {weekLabel(rs.week)}</p>
+              {rs.unread.length > 0 && (
+                <ul className="rows">
+                  {rs.unread
+                    .sort((a, b) => (b.r.at || '').localeCompare(a.r.at || ''))
+                    .slice(0, 5)
+                    .map(({ c, r }) => (
+                      <li key={r.id} className="row">
+                        <Tag tone="warn">nowy</Tag>
+                        <button className="link grow ellipsis" onClick={() => openClient(c.id, 'Przegląd')}>
+                          {c.name}
+                        </button>
+                        <span className="small muted nowrap">
+                          {weekLabel(r.week)}
+                          {r.weight != null ? ` · ${String(r.weight).replace('.', ',')} kg` : ''}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              {rs.missing.length > 0 && (
+                <p className="small dash-missing">
+                  <span className="muted">Nie przysłali: </span>
+                  {rs.missing.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ', '}
+                      <button className="link" onClick={() => openClient(c.id, 'Przegląd')}>
+                        {c.name}
+                      </button>
+                    </span>
+                  ))}
+                </p>
+              )}
             </Card>
           );
         })()}

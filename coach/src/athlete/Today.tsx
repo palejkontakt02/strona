@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { Chat } from '../components/Chat';
 import { Ring } from '../components/ring';
 import type { Client } from '../domain';
 import { useStore } from '../data/store';
-import { plural, uid } from '../format';
-import { put } from '../data/db';
+import { plural } from '../format';
 import { todayISO } from '../lib/dates';
 import { doneOn, dueOn, habitStreak, rangeProgress, toggleDone } from '../lib/habits';
 
@@ -53,57 +52,15 @@ export function TodayHabits({ client }: { client: Client }) {
   );
 }
 
-/** Wiadomość do trenera — zapisuje się w aplikacji i trafia na jego e-mail. */
 /**
- * Rozmowa z trenerem. W podglądzie trenera (`asTrainer`) piszesz jako trener — odpowiedź trafia
- * do podopiecznego, bez e-maila do siebie.
+ * Rozmowa z trenerem (dymki, nowe odpowiedzi, pole na dole). W podglądzie trenera (`asTrainer`)
+ * piszesz jako trener — odpowiedź trafia do podopiecznego, bez e-maila do siebie.
  */
 export function NoteToTrainer({ client, asTrainer }: { client: Client; asTrainer?: boolean }) {
-  const { sendClientNote, apply } = useStore();
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const first = client.name.split(' ')[0];
-  const send = async () => {
-    if (!asTrainer) return sendClientNote(client.id, text);
-    const r = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000) };
-    return apply([put('clients', { ...client, inbox: (client.inbox ?? []).map((n) => ({ ...n, read: true })), replies: [...(client.replies ?? []), r].slice(-200) })], `Wysłano — ${first} zobaczy wiadomość w aplikacji.`);
-  };
   return (
-    <section className="acard" id="do-trenera">
-      <h3>{asTrainer ? `Rozmowa: ${client.name}` : 'Napisz do trenera'}</h3>
-      <p className="muted small">
-        {asTrainer ? `To podgląd — piszesz jako trener. ${first} zobaczy wiadomość w swojej aplikacji.` : 'Jak się czujesz, co bolało, pytanie o ćwiczenie — trener dostanie to na e-mail.'}
-      </p>
-      {(() => {
-        const thread = [...(client.inbox ?? []).filter((n) => !n.hidden).map((n) => ({ ...n, mine: true })), ...(client.replies ?? []).map((r) => ({ ...r, mine: false }))]
-          .sort((a, b) => (b.at || '').localeCompare(a.at || ''))
-          .slice(0, 6);
-        if (!thread.length) return null;
-        return (
-          <ul className="ath-thread" aria-label="Rozmowa z trenerem">
-            {thread.map((n) => (
-              <li key={n.id} className={n.mine ? 'mine' : 'coach'}>
-                <span className="muted small">
-                  {asTrainer ? (n.mine ? first : 'Ty (trener)') : n.mine ? 'Ty' : 'Trener'} · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <p>{n.text}</p>
-              </li>
-            ))}
-          </ul>
-        );
-      })()}
-      <textarea className="input" rows={3} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={asTrainer ? 'Twoja wiadomość (jako trener)…' : 'Twoja wiadomość…'} aria-label={asTrainer ? 'Wiadomość od trenera' : 'Wiadomość do trenera'} />
-      <button
-        className="btn btn-primary btn-block"
-        disabled={!text.trim() || busy}
-        onClick={async () => {
-          setBusy(true);
-          if (await send()) setText('');
-          setBusy(false);
-        }}
-      >
-        {busy ? 'Wysyłam…' : 'Wyślij'}
-      </button>
+    <section className="acard chat-card" id="do-trenera">
+      <h3>{asTrainer ? `Rozmowa: ${client.name}` : 'Rozmowa z trenerem'}</h3>
+      <Chat client={client} side="client" asTrainer={asTrainer} />
     </section>
   );
 }

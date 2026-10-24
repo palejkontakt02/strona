@@ -36,6 +36,12 @@ async function selectAll(table: Collection): Promise<unknown[]> {
  */
 export function createSupabaseRepository(role: 'trainer' | 'client'): Repository {
   return {
+    async outboxScope() {
+      // sesja z pamięci przeglądarki — działa też bez sieci
+      const { data } = await supabase.auth.getSession();
+      return `${role}:${data.session?.user.id ?? 'anon'}`;
+    },
+
     async load() {
       const lists = await Promise.all(TABLES.map(selectAll));
       return normalizeDb(Object.fromEntries(TABLES.map((t, i) => [t, lists[i]])) as Partial<Db>);

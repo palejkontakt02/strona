@@ -1,5 +1,5 @@
 import type { RunProfile, SetGroup, SetType } from '../domain';
-import { fmtDur, fmtKm, parseDur, parseKm, planRunTotals, RUN_TEMPLATES, targetText, ZONES } from '../lib/running';
+import { fmtDur, fmtKm, parseDur, parseKm, planRunTotals, lthrOf, RUN_TEMPLATES, targetText, zoneOf, zoneSourceText, ZONES } from '../lib/running';
 import { IconBtn } from './ui';
 
 /** Rodzaje odcinków biegu (typ wiersza planu) z nazwami dla biegacza. */
@@ -35,6 +35,8 @@ export function RunTargetList() {
 export function RunBuilder({ groups, onChange, profile, dob }: { groups: SetGroup[]; onChange: (g: SetGroup[]) => void; profile?: RunProfile; dob?: string }) {
   const set = (i: number, patch: Partial<SetGroup>) => onChange(groups.map((g, j) => (j === i ? { ...g, ...patch } : g)));
   const tot = planRunTotals(groups, profile);
+  // skąd liczby tętna w strefach (próg / tętno maks. / wiek) — raz pod odcinkami, gdy jakiś cel to strefa
+  const zoneSrc = groups.some((g) => zoneOf(g.pace)) ? zoneSourceText(profile, dob) : '';
   return (
     <div className="rb">
       {groups.length === 0 && <p className="muted small">Dodaj pierwszy odcinek poniżej.</p>}
@@ -143,6 +145,7 @@ export function RunBuilder({ groups, onChange, profile, dob }: { groups: SetGrou
           {tot.approx && <span className="muted"> (brakujące z tempa celu)</span>}
         </p>
       )}
+      {zoneSrc && <p className="muted small rb-zsrc">Strefy tętna {zoneSrc}{lthrOf(profile) ? '' : ' — wpisz tętno progowe (LTHR) w profilu, by liczyć od progu'}.</p>}
     </div>
   );
 }

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Field, Modal, Seg } from '../components/ui';
-import type { PlanExercise, PlanWorkout } from '../domain';
-import { addExtraWorkout, clientById, extraPlanOf, newExtraPlan, plansOf, sessionToWorkout, sessionsOf } from '../data/ops';
+import type { Plan, PlanExercise, PlanWorkout } from '../domain';
+import { addExtraWorkout, clientById, extraPlanOf, newExtraPlan, plansOf, savePlan, sessionToWorkout, sessionsOf } from '../data/ops';
+import type { Change } from '../data/db';
+import { exercisesFor, matchName, nextMonday, planFromTemplate } from '../lib/analytics';
 import { useStore } from '../data/store';
 import { fmtDay, nEx, uid } from '../format';
 import { addDays, todayISO } from '../lib/dates';
@@ -39,6 +41,9 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
   // ciężary z oryginału albo puste (podpowiedź z historii tej osoby) — przy kopii dla kogoś innego domyślnie puste
   const [keepLoads, setKeepLoads] = useState<boolean | null>(null);
   const [time, setTime] = useState('');
+  // ten sam trening także dla innych osób (każda dostaje własną kopię; ciężary dobierze historia tej osoby)
+  const [others, setOthers] = useState<string[]>([]);
+  const [manyOpen, setManyOpen] = useState(false);
 
   const client = clientById(db, clientId);
   const plan = clientId ? currentPlan(plansOf(db, clientId)) : null;
@@ -97,11 +102,20 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     if (!wo || !client) return;
     if (!hasEx) return edit();
     // z godziną: także wizyta z trenerem tego dnia
-    const appt = time && date ? [put('appointments', { id: uid(), clientId: client.id, date, time: time.padStart(5, '0'), duration: 60, status: 'planned' as const, locationId: client.locationId })] : [];
-    if (await apply([...addExtraWorkout(db, client.id, wo), ...appt], `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyta ${time}` : ''} — ${client.name.split(' ')[0]} zobaczy go w aplikacji.`)) closeModal();
+    const apptFor = (cid: string, locationId?: string) => (time && date ? [put('appointments', { id: uid(), clientId: cid, date, time: time.padStart(5, '0'), duration: 60, status: 'planned' as const, locationId })] : []);
+    const appt = apptFor(client.id, client.locationId);
+    const rest = others.map((id) => clientById(db, id)).filter((c): c is NonNullable<typeof c> => !!c && c.id !== client.id);
+    const changes: Change[] = [...addExtraWorkout(db, client.id, wo), ...appt];
+    for (const c of rest) changes.push(...addExtraWorkout(db, c.id, { ...wo, id: uid(), exercises: exercisesFor(wo.exercises, false) }), ...apptFor(c.id, c.locationId));
+    const who = rest.length ? `${rest.length + 1} osobom` : client.name.split(' ')[0];
+    const msg = rest.length
+      ? `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyty ${time}` : ''} — ${who}.`
+      : `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyta ${time}` : ''} — ${who} zobaczy go w aplikacji.`;
+    if (await apply(changes, msg)) closeModal();
   };
   /** Do edytora: ułożenie albo dopasowanie ćwiczeń przed zapisem. */
   const edit = () => {
+    if (others.length) return toast('Kilka osób: najpierw wybierz trening (z planu, powtórkę albo bieg) — ćwiczenia zmienisz potem u każdej osoby.');
     const wo = build();
     if (!wo || !client) return;
     const extra = extraPlanOf(db, client.id);
@@ -119,7 +133,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
       onSubmit={() => void save()}
       submitLabel={hasEx ? 'Zadaj' : 'Dalej — ułóż ćwiczenia'}
       extraActions={
-        hasEx && (
+        hasEx && !others.length && (
           <button type="button" className="btn btn-secondary" onClick={edit}>
             Zmień ćwiczenia
           </button>
@@ -129,7 +143,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
       <p className="muted small">Trening poza planem — plan i jego kolejność zostają bez zmian. Podopieczny zobaczy go na górze ekranu w wybranym dniu (albo na liście „poza planem”, jeśli bez terminu).</p>
       {(!m.clientId || m.sessionId) && (
         <Field label={m.sessionId ? 'Dla kogo' : 'Podopieczny'}>
-          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setKeepLoads(null), srcSession ? undefined : (setSrc('empty'), setPick(''), setName('')))} />
+          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setKeepLoads(null), setOthers((o) => o.filter((x) => x !== id)), srcSession ? undefined : (setSrc('empty'), setPick(''), setName('')))} />
         </Field>
       )}
       <div className="field">
@@ -205,7 +219,20 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
             </span>
           </label>
         )}
-        {hasEx && <span className="muted small">{nEx(chosen!.exercises.filter((e) => e.name).length)} — możesz zadać od razu albo najpierw zmienić.</span>}
+        {hasEx && <span className="muted small">{nEx(chosen!.exercises.filter((e) => e.name).length)}{others.length ? '' : ' — możesz zadać od razu albo najpierw zmienić'}.</span>}
+      </div>
+      <div className="field assign-many">
+        {!manyOpen && !others.length ? (
+          <button type="button" className="link small" onClick={() => setManyOpen(true)} disabled={!clientId}>
+            + Ten sam trening także dla innych osób
+          </button>
+        ) : (
+          <>
+            <span>Także dla{others.length ? ` (${others.length})` : ''}</span>
+            <ClientMultiPick value={others} onChange={setOthers} exclude={clientId ? [clientId] : []} />
+            <span className="muted small">Każdy dostaje własną kopię na ten sam dzień{time ? ' i godzinę' : ''}. Kilogramy zostają puste — odtwarzacz podpowie je z historii każdej osoby (zapis w % zostaje).</span>
+          </>
+        )}
       </div>
       {when !== 'Kiedy chce' && (
         <Field label="Wizyta z trenerem o (opcjonalnie)">
@@ -215,6 +242,76 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
       <Field label="Nazwa">
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={chosen?.name || 'np. Mobilność + core'} />
       </Field>
+    </Modal>
+  );
+}
+
+/** Wybór kilku podopiecznych z wyszukiwarką (aktywni; po wpisaniu imienia — wszyscy). */
+export function ClientMultiPick({ value, onChange, exclude = [] }: { value: string[]; onChange: (ids: string[]) => void; exclude?: string[] }) {
+  const { db } = useStore();
+  const [q, setQ] = useState('');
+  const list = [...db.clients]
+    .filter((c) => !exclude.includes(c.id) && (value.includes(c.id) || (q.trim() ? matchName(c.name, q) : c.status === 'aktywny')))
+    .sort((a, b) => Number(value.includes(b.id)) - Number(value.includes(a.id)) || a.name.localeCompare(b.name, 'pl'));
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+  const shown = list.filter((c) => !value.includes(c.id));
+  return (
+    <div className="multi-pick">
+      {value.length > 0 && (
+        <div className="chips multi-pick-chosen">
+          {value.map((id) => (
+            <button key={id} type="button" className="chip active" onClick={() => toggle(id)} aria-label={`Usuń ${clientById(db, id)?.name ?? ''}`}>
+              {clientById(db, id)?.name ?? '—'} ✕
+            </button>
+          ))}
+        </div>
+      )}
+      <input className="input" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Szukaj podopiecznego…" aria-label="Szukaj podopiecznego" />
+      <ul className="multi-pick-list" role="listbox" aria-multiselectable="true" aria-label="Podopieczni">
+        {shown.length === 0 && <li className="muted small">{q.trim() ? 'Nikogo nie znaleziono.' : 'Brak innych aktywnych podopiecznych.'}</li>}
+        {shown.map((c) => (
+          <li key={c.id} role="option" aria-selected={false}>
+            <label className="multi-pick-opt">
+              <input type="checkbox" checked={false} onChange={() => toggle(c.id)} />
+              <span className="grow">{c.name}</span>
+              {c.status !== 'aktywny' && <span className="muted small">{c.status}</span>}
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Plan z szablonu dla kilku osób naraz: start od najbliższego poniedziałku. */
+export function TemplateAssignModal({ template, onClose }: { template: Plan; onClose: () => void }) {
+  const { db, apply, toast } = useStore();
+  const [ids, setIds] = useState<string[]>([]);
+  const [active, setActive] = useState(true);
+  const start = nextMonday(todayISO());
+  return (
+    <Modal
+      title={`Przypisz szablon „${template.name}”`}
+      onClose={onClose}
+      submitLabel={ids.length ? `Przypisz (${ids.length})` : 'Przypisz'}
+      onSubmit={async () => {
+        if (!ids.length) return toast('Wybierz przynajmniej jedną osobę.');
+        const changes: Change[] = [];
+        for (const id of ids) {
+          const has = plansOf(db, id).length > 0;
+          changes.push(...savePlan(db, planFromTemplate(template, id, todayISO(), active || !has)));
+        }
+        if (await apply(changes, `Plan „${template.name}” przypisany: ${ids.length} ${ids.length === 1 ? 'osoba' : ids.length < 5 ? 'osoby' : 'osób'} · start ${fmtDay(start)}.`)) onClose();
+      }}
+    >
+      <p className="muted small">Każda osoba dostaje własną kopię planu ze startem w poniedziałek {fmtDay(start)}. Szablon zostaje bez zmian.</p>
+      <div className="field">
+        <span>Dla kogo</span>
+        <ClientMultiPick value={ids} onChange={setIds} />
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Ustaw jako aktywny plan (dotychczasowy przestanie być aktywny)
+      </label>
     </Modal>
   );
 }

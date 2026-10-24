@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Ring } from '../../components/ring';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
-import type { Client, CoachReply, Habit, HabitSchedule } from '../../domain';
+import type { Client, Habit, HabitSchedule } from '../../domain';
+import { Chat } from '../../components/Chat';
+import { CoachTargets } from '../../components/DayLog';
+import { trainerUnread } from '../../lib/comms';
 import { useNav } from '../../nav';
 import { put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -180,74 +183,29 @@ export function ClientHabits({ client }: { client: Client }) {
   );
 }
 
-/** Notatki od podopiecznego (trafiają też na e-mail trenera). */
 /** Wątek z podopiecznym: jego wiadomości i odpowiedzi trenera (podopieczny widzi odpowiedzi u siebie). */
 export function ClientInbox({ client }: { client: Client }) {
-  const { apply, ask } = useStore();
   const { openModal } = useNav();
-  const [text, setText] = useState('');
-  const remove = async (id: string, mine: boolean) => {
-    if (!(await ask('Usunąć tę wiadomość z rozmowy?', { confirm: 'Usuń' }))) return;
-    await apply(
-      // wiadomość podopiecznego tylko ukrywamy (baza nie pozwala trenerowi nadpisać jego wiadomości)
-      [put('clients', mine ? { ...client, replies: (client.replies ?? []).filter((r) => r.id !== id) } : { ...client, inbox: (client.inbox ?? []).map((n) => (n.id === id ? { ...n, hidden: true, read: true } : n)) })],
-      'Wiadomość usunięta.',
-    );
-  };
-  const [busy, setBusy] = useState(false);
-  const thread = [
-    ...(client.inbox ?? []).filter((n) => !n.hidden).map((n) => ({ ...n, mine: false })),
-    ...(client.replies ?? []).map((r) => ({ ...r, mine: true, read: true, sessionId: undefined as string | undefined })),
-  ].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
-  const unread = (client.inbox ?? []).filter((n) => !n.read).length;
-  if (!thread.length) return null;
-  const readAll = () => (client.inbox ?? []).map((n) => ({ ...n, read: true }));
-  const reply = async () => {
-    if (!text.trim()) return;
-    setBusy(true);
-    const r: CoachReply = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000) };
-    if (await apply([put('clients', { ...client, inbox: readAll(), replies: [...(client.replies ?? []), r].slice(-200) })], 'Odpowiedź wysłana — podopieczny zobaczy ją w aplikacji.')) setText('');
-    setBusy(false);
-  };
+  const unread = trainerUnread(client);
   return (
     <Card
+      className="chat-panel"
       title={
         <>
-          Wiadomości {unread > 0 && <Tag tone="warn">{unread} nowe</Tag>}
+          Rozmowa {unread > 0 && <Tag tone="warn">{unread} nowe</Tag>}
         </>
       }
-      action={
-        unread > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={() => apply([put('clients', { ...client, inbox: readAll() })])}>
-            Oznacz przeczytane
-          </button>
-        )
-      }
     >
-      <div className="reply-box">
-        <textarea className="input" rows={2} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={`Odpowiedz ${client.name.split(' ')[0]}…`} aria-label="Odpowiedź dla podopiecznego" />
-        <button className="btn btn-primary btn-sm" disabled={!text.trim() || busy} onClick={() => void reply()}>
-          Wyślij odpowiedź
-        </button>
-      </div>
-      <ul className="rows">
-        {thread.slice(0, 30).map((n) => (
-          <li key={n.id} className={`row row-top note ${n.mine ? 'note-mine' : n.read ? '' : 'is-new'}`}>
-            <div className="grow">
-              <div className="muted small">
-                {n.mine ? 'Ty' : client.name.split(' ')[0]} · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </div>
-              <p className="pre">{n.text}</p>
-              {n.sessionId && (
-                <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: n.sessionId! })}>
-                  Zobacz ten trening ›
-                </button>
-              )}
-            </div>
-            <IconBtn icon="trash" label="Usuń wiadomość" danger onClick={() => void remove(n.id, n.mine)} />
-          </li>
-        ))}
-      </ul>
+      <Chat client={client} side="coach" onOpenSession={(sessionId) => openModal({ kind: 'review', sessionId })} />
+    </Card>
+  );
+}
+
+/** Cele dzienne (makro, kroki, woda) i realizacja z ostatnich dni. */
+export function ClientTargets({ client }: { client: Client }) {
+  return (
+    <Card title="Cele dzienne: jedzenie i ruch">
+      <CoachTargets client={client} />
     </Card>
   );
 }

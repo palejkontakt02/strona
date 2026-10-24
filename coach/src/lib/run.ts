@@ -1,7 +1,9 @@
 import type { PlanExercise, PlanWorkout, SetType, TestResult, TrainingSession } from '../domain';
 import { num, numIn, parseRest, parseTempo, repsN, secOf, sidesOf, sumReps, timeUnit } from './parse';
 import { exerciseBlocks, exerciseLabels, mergeGroups, moveInBlocks, removeFromBlocks } from './plan';
-import { e1rmRPE, loadFor, recentE1, resolveLoad, testedMax } from './strength';
+import { currentMax, dumbbellByName, e1rmRPE, loadFor, recentE1, resolveLoad, rounderFor, testedMax } from './strength';
+
+export { dumbbellByName };
 import { fmtClock, fmtKm, isRunning, parseDur, parseKm } from './running';
 
 /** Seria w trakcie treningu (tryb zawodnika). Pola tekstowe — to wartości z inputów. */
@@ -31,6 +33,8 @@ export interface RunSet {
   unit?: 's' | 'min';
   /** Ta sama seria na poprzednim treningu, np. „12 × 14 kg”. */
   prev?: string;
+  /** Pobity rekord przy zaliczeniu, np. „Nowy rekord: 5 × 100 kg (szac. max 117 kg)”. */
+  pr?: string;
   /** Cardio: dystans (km) i tętno. */
   dist?: string;
   hr?: string;
@@ -78,10 +82,6 @@ export function isTimed(e: Pick<PlanExercise, 'name' | 'timed' | 'cardio' | 'gro
   return e.timed ?? (timedByName(e.name) || e.groups.some((g) => g.type !== 'Rozgrzewka' && timeUnit(g.reps) != null));
 }
 
-/** Ćwiczenia z hantlami / kettlebell — przy nich ważne, czy ciężar to 1 hantel, czy suma. */
-export function dumbbellByName(name: string): boolean {
-  return /hantl|hantel|kettlebell|kettla|odważnik|dumbbell|\bdb\b|\bkb\b/i.test(name);
-}
 
 /** Jak liczony ciężar: jawnie ustawione albo z nazwy (hantle → 1 hantel). */
 export function loadPerOf(e: { name: string; loadPer?: 'one' | 'sum'; cardio?: boolean }): 'one' | 'sum' | undefined {
@@ -146,12 +146,14 @@ function cardioDesc(g: { type: string; sets?: string; reps: string; load: string
 export function buildRunExercise(e: PlanExercise, history: TrainingSession[], video?: string, tests: TestResult[] = []): RunExercise {
   const cardio = e.cardio ?? cardioByName(e.name);
   const timed = isTimed(e);
-  // %1RM: test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
+  // dobór z RPE (pusty zapis): test z maksem, jeśli nowszy niż ostatni trening z tym ćwiczeniem (albo brak historii); inaczej e1RM z treningów
   const tm = testedMax(tests, e.name);
   const lastDate = history.filter((s) => s.exercises.some((x) => x.name === e.name)).reduce((a, s) => (s.date > a ? s.date : a), '');
   const hist = lastE1(history, e.name);
-  const fromTest = !!tm && (tm.date >= lastDate || hist == null);
-  const e1 = fromTest ? tm!.value : hist;
+  const e1 = !!tm && (tm.date >= lastDate || hist == null) ? tm!.value : hist;
+  // „75%”: zawsze najnowszy test, a bez testu szacowane maks. z treningów
+  const max = currentMax(history, tests, e.name);
+  const round = rounderFor(e.name, e.loadPer ?? (dumbbellByName(e.name) ? 'one' : undefined));
   const sets: RunSet[] = [];
   let prev: number | null = null;
   // ostatni zapis tego ćwiczenia — podpowiedź „poprzednio” przy każdej serii roboczej
@@ -164,8 +166,10 @@ export function buildRunExercise(e: PlanExercise, history: TrainingSession[], vi
     const range = /\d\s*[-–]\s*\d/.test(String(g.sets || ''));
     const ref = prev;
     for (let i = 0; i < cnt; i++) {
-      const rl0 = resolveLoad(g.load, e1, g.reps, g.rpe, g.type === 'Drop set' ? prev : ref);
-      const rl = fromTest && rl0.why ? { ...rl0, why: rl0.why.replace('szac. 1RM', `1RM z testu (${String(e1).replace('.', ',')} kg)`) } : rl0;
+      const pct = /^\s*\d+(?:[.,]\d+)?\s*%/.test(g.load || '');
+      const rl = pct
+        ? resolveLoad(g.load, max?.value ?? null, g.reps, g.rpe, null, { round, maxLabel: max?.label })
+        : resolveLoad(g.load, e1, g.reps, g.rpe, g.type === 'Drop set' ? prev : ref, { round });
       if (rl.load != null) prev = rl.load;
       sets.push({
         load: rl.load != null ? String(rl.load) : '',
@@ -339,6 +343,21 @@ export function blockRest(run: Run, exIdx: number, setIdx: number): { rest: numb
 }
 
 /**
+ * Następna seria do zrobienia w bloku (superseria / obwód): najwcześniejsza runda z niezaliczoną serią,
+ * w niej pierwsze ćwiczenie w kolejności bloku (A1 → A2 → … → przerwa → A1). `round` od 0, `rounds` = liczba rund.
+ */
+export function nextBlockSet(run: Run, block: number[]): { k: number; i: number; round: number; rounds: number } | null {
+  const work = block.map((k) => run.ex[k].sets.map((s, i) => ({ s, i })).filter((x) => !x.s.warmup));
+  const rounds = Math.max(0, ...work.map((w) => w.length));
+  for (let r = 0; r < rounds; r++)
+    for (let j = 0; j < block.length; j++) {
+      const x = work[j][r];
+      if (x && !x.s.done) return { k: block[j], i: x.i, round: r, rounds };
+    }
+  return null;
+}
+
+/**
  * Zaliczenie serii `i` (lub cofnięcie). Zwraca nowe serie i czas przerwy (s) do odliczenia.
  * Autoregulacja następnej niezaliczonej serii roboczej (jeśli nie edytowana ręcznie):
  * - względna (±%) w tym samym bloku (nie Drop set) → ten sam ciężar, co faktycznie wykonany,
@@ -380,14 +399,14 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
       nxt.load = s.load;
       nxt.sug = '';
     } else if (/^[+-]\s*\d/.test(spec) && prev) {
-      const rl = resolveLoad(spec, e1, nxt.reps, nxt.tRpe, prev);
+      const rl = resolveLoad(spec, e1, nxt.reps, nxt.tRpe, prev, { round: rounderFor(ex.name, loadPerOf(ex)) });
       nxt.load = String(rl.load);
       nxt.sug = `${rl.why} (${String(prev).replace('.', ',')} kg)`;
     } else if (spec && (num(spec) != null || /%/.test(spec))) {
       // stały ciężar z planu — bez zmian
     } else if (e1) {
       const tr = nxt.tRpe || s.rpe || '8';
-      const nl = loadFor(e1, nxt.reps || s.reps, tr);
+      const nl = loadFor(e1, nxt.reps || s.reps, tr, rounderFor(ex.name, loadPerOf(ex)));
       const base = prev || nl;
       const diff = base ? Math.round(((nl - base) / base) * 100) : 0;
       nxt.load = String(nl);

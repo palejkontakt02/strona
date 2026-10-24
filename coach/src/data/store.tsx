@@ -7,6 +7,7 @@ import { emailTrainer } from './mail';
 import { useDialog } from '../components/useDialog';
 import { applyChanges, withEntry, type Change, type ClientEntryKind, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
+import { Outbox } from './outbox';
 
 interface AskState {
   message: string;
@@ -34,6 +35,10 @@ interface StoreValue {
   sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
+  /** Zapisy zrobione bez internetu, które czekają na wysłanie (kolejka offline). */
+  pending: number;
+  /** Ponów wysyłkę czekających zapisów teraz. */
+  sendPending: () => void;
   signOut?: () => void;
 }
 
@@ -60,16 +65,25 @@ export function StoreProvider({
   const toastId = useRef(0);
   const hasDb = useRef(false);
   hasDb.current = db != null;
+  // kolejka zapisów offline tego konta (tworzona przy pierwszym wczytaniu, gdy znamy konto)
+  const outbox = useRef<Outbox | null>(null);
+  const [pending, setPending] = useState(0);
 
   const load = useCallback(async () => {
     try {
+      if (!outbox.current) {
+        const scope = (await repo.outboxScope?.().catch(() => null)) ?? 'local';
+        outbox.current = new Outbox(repo, scope, setPending);
+        setPending(outbox.current.items.length);
+      }
       let next = await repo.load();
       const seeded = onEmpty?.(next);
       if (seeded) {
         await repo.replaceAll(seeded);
         next = seeded;
       }
-      setDb(next);
+      // zapisy offline, które jeszcze nie doszły do serwera, zostają na ekranie
+      setDb(outbox.current.merge(next));
       setLoadError(null);
     } catch (e) {
       // gdy dane już są (np. chwilowy brak sieci) — zostają na ekranie, bez ekranu błędu
@@ -109,6 +123,37 @@ export function StoreProvider({
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 9000 : Math.min(8000, 2600 + text.length * 45));
   }, []);
 
+  /** Wysyła czekające zapisy offline (po kolei); po sukcesie — powiadomienie. */
+  const sendPending = useCallback(async () => {
+    const box = outbox.current;
+    if (!box?.items.length) return;
+    const r = await box.flush();
+    if (r.failed.length) {
+      toast('Części zmian zapisanych bez internetu baza nie przyjęła — sprawdź je i zapisz ponownie.');
+      void load();
+    }
+    if (r.sent > 0 && !box.items.length) toast('Wysłano zapisane offline treningi.');
+  }, [toast, load]);
+
+  // ponowna wysyłka: powrót internetu, powrót do aplikacji, co 30 s
+  useEffect(() => {
+    if (!pending) return;
+    const go = () => {
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) void sendPending();
+    };
+    const onVis = () => document.visibilityState === 'visible' && go();
+    window.addEventListener('online', go);
+    window.addEventListener('focus', go);
+    document.addEventListener('visibilitychange', onVis);
+    const t = setInterval(go, 30_000);
+    return () => {
+      window.removeEventListener('online', go);
+      window.removeEventListener('focus', go);
+      document.removeEventListener('visibilitychange', onVis);
+      clearInterval(t);
+    };
+  }, [pending, sendPending]);
+
   /** Zapis zmian; zwraca false, gdy się nie udał (wtedy np. trening zostaje do ponownego zapisu). */
   const apply = useCallback(
     async (changes: Change[], message?: string): Promise<boolean> => {
@@ -118,8 +163,12 @@ export function StoreProvider({
         return cur ? applyChanges(cur, changes) : cur;
       });
       try {
-        await repo.apply(changes);
-        if (message) toast(message);
+        // brak sieci: zmiana zostaje na ekranie i w kolejce na tym urządzeniu, wyśle się sama
+        const had = outbox.current?.items.length ?? 0;
+        const res = outbox.current ? await outbox.current.submit(changes) : (await repo.apply(changes), 'sent');
+        if (res === 'queued') toast('Brak internetu — zapisane na tym telefonie. Wyślę, gdy wróci połączenie.');
+        else if (had > 0 && !outbox.current?.items.length) toast('Wysłano zapisane offline treningi.');
+        if (res === 'sent' && message) toast(message);
         return true;
       } catch {
         toast('Nie udało się zapisać — sprawdź połączenie z internetem i spróbuj ponownie.');
@@ -257,6 +306,7 @@ export function StoreProvider({
     async (mode: 'seed' | 'empty') => {
       const next = mode === 'seed' ? createSeed() : createEmpty();
       await repo.replaceAll(next);
+      outbox.current?.clear();
       setDb(next);
       toast(mode === 'seed' ? 'Wczytano dane przykładowe.' : 'Wyczyszczono dane.');
     },
@@ -266,6 +316,7 @@ export function StoreProvider({
   const importDb = useCallback(
     async (next: Db) => {
       await repo.replaceAll(next);
+      outbox.current?.clear();
       setDb(next);
       toast('Zaimportowano dane.');
     },
@@ -273,8 +324,11 @@ export function StoreProvider({
   );
 
   const value = useMemo(
-    () => (db ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut } : null),
-    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut],
+    () =>
+      db
+        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut, pending, sendPending: () => void sendPending() }
+        : null,
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut, pending, sendPending],
   );
   if (loadError)
     return (

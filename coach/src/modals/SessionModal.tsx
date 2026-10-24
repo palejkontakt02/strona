@@ -19,6 +19,10 @@ import { WELLNESS_ITEMS } from '../lib/wellness';
 import { useNav, type ModalState } from '../nav';
 import { ClientSelect } from './ModalHost';
 import { ChargeSelect, LocationSelect } from '../components/location';
+import { PainMap } from '../components/PainMap';
+import { cleanPainMap, painSummary } from '../lib/painMap';
+import type { PainSpot } from '../domain';
+import { ImportActivity } from '../components/ImportActivity'; // funkcje: bieg
 
 interface ExRow {
   key: string;
@@ -193,6 +197,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [duration, setDuration] = useState(s(existing?.duration ?? m.appt?.duration ?? (existing ? undefined : 60)));
   const [srpe, setSrpe] = useState(s(existing?.srpe));
   const [pain, setPain] = useState(s(existing?.pain));
+  const [painMap, setPainMap] = useState<PainSpot[]>(() => existing?.painMap ?? []);
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [charge, setCharge] = useState<Billing | ''>(existing?.charge ?? '');
   const [locationId, setLocationId] = useState(existing?.locationId ?? m.appt?.locationId ?? clientById(db, existing?.clientId ?? m.clientId ?? m.appt?.clientId)?.locationId ?? '');
@@ -298,7 +303,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       charge: effCharge,
       duration: numIn(duration, 1, 600) ?? undefined,
       srpe: num(srpe) ?? undefined,
-      pain: num(pain) ?? undefined,
+      pain: num(pain) ?? (cleanPainMap(painMap).length ? Math.max(...cleanPainMap(painMap).map((x) => x.level)) : undefined),
+      painMap: cleanPainMap(painMap).length ? cleanPainMap(painMap) : undefined,
       notes: notes.trim() || undefined,
       wellness: Object.keys(wellness).length ? wellness : undefined,
       sleepH: num(sleepH) ?? undefined,
@@ -457,6 +463,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           </button>
         )}
       </div>
+      {/* funkcje: bieg — import z zegarka (GPX/TCX/FIT): wstawia odcinki cardio (czas, km, tętno) */}
+      <ImportActivity small onImport={(ex, act) => { setRows((rs) => [...rs.filter((r) => r.name.trim()), toRow(ex)]); if (!workoutName.trim()) setWorkoutName(ex.name); setDuration(String(Math.round(act.elapsedMin || act.movingMin))); if (!existing && act.date) setDate(act.date); }} />
       {paste !== null && (
         <div className="paste-box">
           <textarea
@@ -629,6 +637,20 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           <span>Ból (0–10)</span>
           <Scale label="Ból" value={pain} onChange={setPain} max={10} />
         </div>
+        <details className="field field-wide pain-edit" open={painMap.length > 0}>
+          <summary>
+            Gdzie boli (mapa ciała){painMap.length > 0 && <span className="muted small"> · {painSummary(painMap)}</span>}
+          </summary>
+          <PainMap
+            spots={painMap}
+            onChange={(sp) => {
+              setPainMap(sp);
+              // ogólny ból nie niższy niż najmocniejsze zaznaczone miejsce
+              const top = Math.max(0, ...sp.map((x) => x.level));
+              if (top > (num(pain) ?? 0)) setPain(String(top));
+            }}
+          />
+        </details>
         <Field label="Notatki" wide>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { plural } from './format';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { OfflineBadge } from './components/OfflineBadge';
 import type { RunStart } from './athlete/start';
 import { Icon } from './components/ui';
 import { ModalHost } from './modals/ModalHost';
@@ -70,6 +71,28 @@ export function App() {
     [section, go, clientId, clientTab],
   );
 
+  // Powiadomienie push → podopieczny i zakładka (adres /app/?c=<id>&t=<zakładka>): przy starcie i z otwartej aplikacji.
+  const openClient = nav.openClient;
+  const clientsRef = useRef(db.clients);
+  clientsRef.current = db.clients;
+  useEffect(() => {
+    const open = (url: string) => {
+      const q = new URL(url, location.origin).searchParams;
+      const id = q.get('c');
+      if (id && clientsRef.current.some((c) => c.id === id)) openClient(id, (q.get('t') ?? 'Przegląd') as ClientTab);
+    };
+    if (location.search.includes('c=')) {
+      open(location.href);
+      history.replaceState(null, '', location.pathname);
+    }
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { type?: string; url?: string } | null;
+      if (d?.type === 'fitowa-open' && typeof d.url === 'string') open(d.url);
+    };
+    navigator.serviceWorker?.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
+  }, [openClient]);
+
   // trening w parze / grupie: z wizyty z partnerami albo wznowiony z paska „W toku”
   const liveAppt = live?.appointmentId ? db.appointments.find((a) => a.id === live.appointmentId) : undefined;
   const liveGroup = live && liveAppt && !live.editSessionId && !live.start ? groupOf(db.appointments, liveAppt).filter((a) => a.status !== 'cancel' && a.status !== 'noshow' && !a.sessionId) : [];
@@ -121,6 +144,7 @@ export function App() {
           ))}
         </div>
         <span className="grow" />
+        <OfflineBadge />
         <button className="btn btn-primary btn-sm hide-mobile" onClick={() => setModal({ kind: 'appt', clientId: section === 'Klienci' ? (clientId ?? undefined) : undefined })}>
           <Icon name="plus" size={16} /> Dodaj wizytę
         </button>

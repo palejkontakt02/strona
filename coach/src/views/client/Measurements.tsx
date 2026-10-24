@@ -104,6 +104,7 @@ export function ClientMeasurements({ client }: { client: Client }) {
                       </td>
                     ))}
                     <td className="actions">
+                      {m.by !== 'client' && client.measurements.some((x) => x.id === m.id) && <IconBtn icon="edit" label="Edytuj pomiar" onClick={() => openModal({ kind: 'measurement', clientId: client.id, measurement: m })} />}
                       <IconBtn icon="trash" label="Usuń pomiar" danger onClick={() => removeMeasurement(m.id)} />
                     </td>
                   </tr>
