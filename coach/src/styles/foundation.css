@@ -60,6 +60,9 @@ input[type='datetime-local'].input {
   .modal-actions > .btn {
     flex: 1 1 auto;
   }
+  .modal-actions > .grow {
+    display: none;
+  }
   .modal-actions-main {
     flex: 1 1 auto;
     gap: var(--space-2);
