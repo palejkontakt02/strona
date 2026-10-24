@@ -22,7 +22,7 @@ import { ChargeSelect, LocationSelect } from '../components/location';
 import { PainMap } from '../components/PainMap';
 import { cleanPainMap, painSummary } from '../lib/painMap';
 import type { PainSpot } from '../domain';
-import { ImportActivity } from '../components/ImportActivity'; // funkcje: bieg
+import { fillCardioRows, ImportActivity } from '../components/ImportActivity'; // funkcje: bieg
 
 interface ExRow {
   key: string;
@@ -464,7 +464,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         )}
       </div>
       {/* funkcje: bieg — import z zegarka (GPX/TCX/FIT): wstawia odcinki cardio (czas, km, tętno) */}
-      <ImportActivity small onImport={(ex, act) => { setRows((rs) => [...rs.filter((r) => r.name.trim()), toRow(ex)]); if (!workoutName.trim()) setWorkoutName(ex.name); setDuration(String(Math.round(act.elapsedMin || act.movingMin))); if (!existing && act.date) setDate(act.date); }} />
+      <ImportActivity small onImport={(ex, act) => { setRows((rs) => fillCardioRows(rs, toRow(ex))); if (!workoutName.trim()) setWorkoutName(ex.name); setDuration(String(Math.round(act.elapsedMin || act.movingMin))); if (!existing && act.date) setDate(act.date); }} />
       {paste !== null && (
         <div className="paste-box">
           <textarea

@@ -1449,6 +1449,19 @@ button.mini-day,
 .round.cur .round-label {
   color: var(--color-accent-300);
 }
+/* obwód: gdy wiadomo dokładnie, która seria jest następna — tylko ona w akcencie */
+.player .acard:has(.sgrid.is-next) .sgrid:not(.is-next):not(.done) .ok {
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  color: var(--color-neutral-500);
+}
+.player .acard:has(.sgrid.is-next) .sgrid:not(.is-next):not(.done) .sn,
+.player .acard:has(.sgrid.is-next) .sgrid:not(.is-next):not(.done) .sn-btn {
+  color: var(--color-neutral-400);
+}
+.player .acard:has(.sgrid.is-next) .sgrid:not(.is-next):not(.done) input:not(:focus) {
+  border-color: var(--color-divider);
+}
 .restbar .rb-note {
   font-size: inherit;
   font-weight: 500;

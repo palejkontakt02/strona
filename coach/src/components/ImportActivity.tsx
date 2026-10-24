@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import type { SessionExercise, TrainingSession } from '../domain';
 import { clientById, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
-import { fmtDay, fnum, uid } from '../format';
+import { fmtDay, fnum, plural, uid } from '../format';
 import type { Activity } from '../lib/activityImport';
 import { todayISO } from '../lib/dates';
-import { fmtClock, fmtDur, paceText, runTotals } from '../lib/running';
+import { fmtClock, paceText, runTotals } from '../lib/running';
 
 const ACCEPT = '.gpx,.tcx,.fit,application/gpx+xml,application/vnd.garmin.tcx+xml,application/octet-stream';
 
@@ -16,6 +16,16 @@ async function readActivity(file: File): Promise<{ act: Activity; lib: Parser }>
   if (file.size > 40 * 1024 * 1024) throw new Error('Plik jest za duży (ponad 40 MB).');
   const lib = (parser ??= await import('../lib/activityImport'));
   return { act: lib.parseActivity(file.name, await file.arrayBuffer()), lib };
+}
+
+/**
+ * Formularz treningu (trener): import wypełnia pierwsze ćwiczenie cardio bez wpisanych km / tętna (np. bieg z planu,
+ * zachowując nazwę z planu); gdy takiego nie ma — dopisuje nowe. Puste wiersze bez nazwy znikają.
+ */
+export function fillCardioRows<T extends { name: string; cardio?: boolean; series?: { dist?: string; hr?: string }[] }>(rows: T[], imported: T): T[] {
+  const kept = rows.filter((r) => r.name.trim());
+  const i = kept.findIndex((r) => r.cardio && !(r.series ?? []).some((x) => (x.dist ?? '').trim() || (x.hr ?? '').trim()));
+  return i < 0 ? [...kept, imported] : kept.map((r, j) => (j === i ? { ...r, series: imported.series } : r));
 }
 
 const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '');
@@ -69,7 +79,7 @@ export function ImportActivity({ clientId, onImport, small }: { clientId?: strin
     if (!a || !exercise) return;
     if (onImport) {
       onImport(exercise, a);
-      toast(`Wstawiono ${rows.length} ${rows.length === 1 ? 'odcinek' : 'odcinków'} z pliku.`);
+      toast(`Wstawiono ${rows.length} ${plural(rows.length, 'odcinek', 'odcinki', 'odcinków')} z pliku.`);
       return close();
     }
     const client = clientById(db, clientId);
@@ -165,7 +175,7 @@ export function ImportActivity({ clientId, onImport, small }: { clientId?: strin
                   <tr key={i}>
                     <td>{i + 1}</td>
                     <td className="num">{fnum(x.dist, 2)}</td>
-                    <td className="num">{fmtDur(x.reps ?? 0)}</td>
+                    <td className="num">{fmtClock(x.reps ?? 0)}</td>
                     <td className="num">{paceText(x.reps, x.dist) || '—'}</td>
                     <td className="num">{x.hr ?? '—'}</td>
                   </tr>

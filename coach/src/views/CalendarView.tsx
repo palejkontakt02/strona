@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type DragEvent } from 'react';
 import { Icon, Seg, Tag } from '../components/ui';
 import type { Appointment, AppointmentStatus, ISODate, Plan, PlanWorkout, TrainingSession } from '../domain';
 import { clientById, extraState, groupOf, isSolo, type ExtraState } from '../data/ops';
@@ -9,6 +9,12 @@ import { addDays, todayISO, weekStart } from '../lib/dates';
 import { useNav } from '../nav';
 import { workoutDate } from '../lib/plan';
 import { LocationTag, locStyle } from '../components/location';
+import { put } from '../data/db';
+import { canMove, moveVisit } from '../lib/calendarMove';
+
+/** Przeciąganie wizyt (komputer, mysz): typ danych przeciągania i czy urządzenie ma precyzyjny wskaźnik. */
+const DRAG_TYPE = 'application/x-fitowa-appt';
+const finePointer = () => typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
 
 export const APPT_STATUS: Record<AppointmentStatus, { label: string; tone: 'neutral' | 'ok' | 'muted' | 'warn' }> = {
   planned: { label: 'Zaplanowana', tone: 'neutral' },
@@ -29,7 +35,8 @@ const WHO = ['Wszyscy', 'Ze mną', 'Samodzielnie'] as const;
 type Who = (typeof WHO)[number];
 
 export function CalendarView() {
-  const { db } = useStore();
+  const { db, apply, ask, toast } = useStore();
+  const [dropDay, setDropDay] = useState<ISODate | null>(null);
   const { openModal } = useNav();
   const today = todayISO();
   // telefon: domyślnie jeden dzień (tydzień przy wielu podopiecznych to bardzo długa strona)
@@ -108,6 +115,42 @@ export function CalendarView() {
   // zadane poza planem robi się samodzielnie — nie w widoku „Ze mną”
   const assignedOn = (date: ISODate) => (who === 'Ze mną' ? [] : assigned.filter((x) => x.workout.date === date));
 
+  /** Upuszczenie wizyty na inny dzień: ta sama godzina; para razem; seria — pytanie „Ta i następne?”. */
+  const moveTo = async (id: string, date: ISODate) => {
+    const a = db.appointments.find((x) => x.id === id);
+    if (!a || !canMove(a) || a.date === date) return;
+    const later = !!a.seriesId && db.appointments.some((x) => x.seriesId === a.seriesId && x.date > a.date && x.status === 'planned');
+    const all = later && (await ask('To wizyta cykliczna. Przesunąć też kolejne zaplanowane wizyty z tej serii o tyle samo dni?', { confirm: 'Ta i następne', cancel: 'Tylko ta', danger: false }));
+    const changes = moveVisit(db, a, date, a.time, all);
+    const ids = changes.map((c) => (c as { item: Appointment }).item.id);
+    const before = db.appointments.filter((x) => ids.includes(x.id));
+    const clash = clashes({ ...a, date }, db.appointments.filter((x) => !ids.includes(x.id)));
+    if (!(await apply(changes))) return;
+    const who = clientById(db, a.clientId)?.name.split(' ')[0] ?? 'Wizyta';
+    toast(
+      `${who}: przeniesiono na ${fmtWeekday(date)} ${fmtShort(date)}, ${a.time}${all ? ` (i ${ids.length - 1} kolejne)` : ''}.${clash.length ? ` Uwaga: kolizja z ${clash.map((c) => `${clientById(db, c.clientId)?.name.split(' ')[0] ?? '—'} ${c.time}`).join(', ')}.` : ''}`,
+      { label: 'Cofnij', run: () => void apply(before.map((x) => put('appointments', x)), 'Cofnięto przeniesienie.') },
+    );
+  };
+  const dropProps = (date: ISODate) => ({
+    onDragOver: (e: DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dropDay !== date) setDropDay(date);
+    },
+    onDragLeave: (e: DragEvent) => {
+      if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setDropDay((d) => (d === date ? null : d));
+    },
+    onDrop: (e: DragEvent) => {
+      const id = e.dataTransfer.getData(DRAG_TYPE);
+      setDropDay(null);
+      if (!id) return;
+      e.preventDefault();
+      void moveTo(id, date);
+    },
+  });
+
   const ws = weekStart(anchor);
   const title =
     mode === 'Dzień' ? `${fmtWeekday(anchor)} ${fmtShort(anchor)}` : mode === 'Tydzień' ? `${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}` : fmtMonth(anchor.slice(0, 7));
@@ -164,7 +207,7 @@ export function CalendarView() {
       {mode !== 'Miesiąc' ? (
         <div className={`week ${mode === 'Dzień' ? 'week-one' : ''}`}>
           {(mode === 'Dzień' ? [anchor] : Array.from({ length: 7 }, (_, i) => addDays(ws, i))).map((date) => (
-            <section key={date} data-date={date} className={`week-day ${date === today ? 'is-today' : ''}`}>
+            <section key={date} data-date={date} className={`week-day ${date === today ? 'is-today' : ''} ${dropDay === date ? 'drop-over' : ''}`} {...dropProps(date)}>
               <header>
                 <span className="first-cap">{fmtWeekday(date)}</span> <strong>{fmtShort(date)}</strong>
                 <button className="icon-btn icon-btn-sm" aria-label={`Dodaj wizytę ${fmtShort(date)}`} onClick={() => openModal({ kind: 'appt', date })}>
@@ -173,7 +216,7 @@ export function CalendarView() {
               </header>
               <div className="week-items">
                 {apptsOn(date).map((a) => (
-                  <ApptTile key={a.id} a={a} />
+                  <ApptTile key={a.id} a={a} onDragEnd={() => setDropDay(null)} />
                 ))}
                 {looseOn(date).map((s) => (
                   <SessionTile key={s.id} s={s} />
@@ -205,7 +248,7 @@ export function CalendarView() {
   );
 }
 
-function ApptTile({ a }: { a: Appointment }) {
+function ApptTile({ a, onDragEnd }: { a: Appointment; onDragEnd?: () => void }) {
   const { db } = useStore();
   const { openModal } = useNav();
   const c = clientById(db, a.clientId);
@@ -216,11 +259,33 @@ function ApptTile({ a }: { a: Appointment }) {
   const status = mixed && all.some((x) => x.status === 'planned') ? 'planned' : a.status;
   const first = (id: string) => clientById(db, id)?.name.split(' ')[0] ?? '—';
   const clash = a.status === 'planned' && clashes(a, db.appointments).length > 0;
+  // komputer: wizytę zaplanowaną można przeciągnąć na inny dzień (godzina zostaje)
+  const drag = !!onDragEnd && canMove(a) && finePointer();
+  const [dragging, setDragging] = useState(false);
   return (
     <button
-      className={`tile tile-${status} ${clash ? 'tile-clash' : ''} ${a.status === 'planned' && a.date < todayISO() ? 'tile-overdue' : ''}`}
+      className={`tile tile-${status} ${clash ? 'tile-clash' : ''} ${a.status === 'planned' && a.date < todayISO() ? 'tile-overdue' : ''} ${drag ? 'tile-draggable' : ''} ${dragging ? 'is-dragging' : ''}`}
       style={hueStyle(a.clientId)}
-      title={clash ? 'Kolizja z inną wizytą o tej porze' : undefined}
+      title={clash ? 'Kolizja z inną wizytą o tej porze' : drag ? 'Przeciągnij na inny dzień, by przesunąć wizytę' : undefined}
+      draggable={drag || undefined}
+      onDragStart={
+        drag
+          ? (e) => {
+              e.dataTransfer.setData(DRAG_TYPE, a.id);
+              e.dataTransfer.setData('text/plain', `${c?.name ?? ''} ${a.time}`);
+              e.dataTransfer.effectAllowed = 'move';
+              setDragging(true);
+            }
+          : undefined
+      }
+      onDragEnd={
+        drag
+          ? () => {
+              setDragging(false);
+              onDragEnd?.();
+            }
+          : undefined
+      }
       onClick={() => openModal({ kind: 'appt', appt: a })}
     >
       <span className="tile-time">
