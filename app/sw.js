@@ -58,3 +58,40 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match(e.request).then((hit) => hit || caches.match('/app/'))),
   );
 });
+
+// Powiadomienia push (funkcja Edge „send-push”): treść = JSON { title, body, url, tag }.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try {
+    d = e.data ? e.data.json() : {};
+  } catch {
+    d = { body: e.data ? e.data.text() : '' };
+  }
+  const url = typeof d.url === 'string' && d.url.startsWith('/app/') ? d.url : '/app/';
+  e.waitUntil(
+    self.registration.showNotification(d.title || 'Fitowa', {
+      body: d.body || '',
+      icon: '/app/icon-192.png',
+      badge: '/app/icon-192.png',
+      tag: d.tag || undefined,
+      renotify: !!d.tag,
+      data: { url },
+    }),
+  );
+});
+
+// Stuknięcie w powiadomienie: otwarta aplikacja dostaje adres (przejdzie do podopiecznego), inaczej nowe okno.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/app/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const win = list.find((c) => new URL(c.url).pathname.startsWith('/app/'));
+      if (win) {
+        win.postMessage({ type: 'fitowa-open', url });
+        return win.focus();
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});
