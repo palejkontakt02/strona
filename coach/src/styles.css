@@ -14,6 +14,10 @@
   --space-8: 22.4px;
   --topbar-h: 56px;
   --bottombar-h: 64px;
+  /* tabele treningowe: pasek nagłówka (jak w arkuszu), zebra wierszy */
+  --band: color-mix(in srgb, var(--color-accent) 30%, var(--color-surface));
+  --band-fg: var(--color-text);
+  --zebra: color-mix(in srgb, var(--color-text) 3%, transparent);
 }
 /* Motywy kolorystyczne — wybór w ustawieniach (data-palette na <html>). Domyślny: „morski” (ciemny), ustawiany przy starcie. */
 :root {
@@ -142,6 +146,52 @@
   --on-accent: #0f1b1e;
   --toast-bg: #f1f6f5;
   --toast-fg: #0f1b1e;
+  color-scheme: dark;
+}
+:root[data-palette="kobalt"] {
+  /* Kobalt — domyślny: granat jak tablica na sali, kobaltowy akcent jak nagłówki arkusza treningowego */
+  --color-bg: #0e1726;
+  --color-surface: #16223a;
+  --color-surface-2: #1f2e4a;
+  --color-text: #e8eef7;
+  --color-divider: color-mix(in srgb, #e8eef7 13%, transparent);
+  --color-accent: #5b8cff;
+  --color-accent-100: #eaf0ff;
+  --color-accent-200: #cbdaff;
+  --color-accent-300: #a3bdff;
+  --color-accent-400: #7ea2ff;
+  --color-accent-500: #5b8cff;
+  --color-accent-600: #3f6fe6;
+  --color-accent-700: #2f56b8;
+  --color-accent-800: #233f86;
+  --color-accent-900: #1a2c5c;
+  --color-neutral-100: #f2f5fa;
+  --color-neutral-200: #dde4ef;
+  --color-neutral-300: #c0cbdc;
+  --color-neutral-400: #9aa8c0;
+  --color-neutral-500: #7a89a3;
+  --color-neutral-600: #5d6c86;
+  --color-neutral-700: #43516b;
+  --color-neutral-800: #2e3a52;
+  --color-neutral-900: #202b40;
+  --color-ok: #3ccf91;
+  --color-warn: #f2ab3c;
+  --color-danger: #f2607a;
+  --color-cyan: #4cc9e0;
+  --on-ok: #0b1a12;
+  --ok-fg: #a9eccd;
+  --warn-fg: #f8d79a;
+  --danger-fg: #ffc4cf;
+  --overlay: rgb(6 10 18 / 0.72);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.16);
+  --shadow-lg: 0 10px 34px rgb(0 0 0 / 0.5);
+  --tile-l: 68%;
+  --on-accent: #0b1428;
+  --toast-bg: #f2f5fa;
+  --toast-fg: #0e1726;
+  --band: #24447f;
+  --band-fg: #e3ebff;
+  --zebra: color-mix(in srgb, #e8eef7 3.5%, transparent);
   color-scheme: dark;
 }
 :root[data-palette="fiolet"] {
