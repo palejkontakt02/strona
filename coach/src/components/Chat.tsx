@@ -323,7 +323,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
       if (cur && cur.url !== d?.url) URL.revokeObjectURL(cur.url);
       return d;
     });
-  useEffect(() => () => draft && URL.revokeObjectURL(draft.url), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => void (draft && URL.revokeObjectURL(draft.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
   const attach = useAttach((d) => setDraftSafe(d));
   const voice = useVoiceRecorder(
     (c: VoiceClip) => setDraftSafe({ kind: 'audio', blob: c.blob, url: c.url, dur: c.dur }),

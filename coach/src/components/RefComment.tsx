@@ -49,7 +49,7 @@ function RefCommentSheet({ clientId, sessionId, exIndex, label, onClose }: { cli
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const attach = useAttach((d) => setDraft((cur) => (cur && URL.revokeObjectURL(cur.url), d)));
-  useEffect(() => () => draft && URL.revokeObjectURL(draft.url), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => void (draft && URL.revokeObjectURL(draft.url)), []); // eslint-disable-line react-hooks/exhaustive-deps
   const earlier = sessionId ? threadForSession(client, sessionId).filter((m) => !forEx || m.ref?.exIndex === exIndex || m.replyTo) : [];
   const title = forEx ? `Komentarz: ${ref.exName ?? 'ćwiczenie'}` : 'Komentarz do treningu';
   const submit = async () => {

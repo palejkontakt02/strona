@@ -579,7 +579,7 @@ function TodayTab({
             <p className="small ath-hero-visit">
               <Icon name="cal" size={16} />
               <span>
-                <b className="first-cap">Wizyta z trenerem: {visitText}</b>
+                <b>Wizyta z trenerem: {visitText}</b>
                 {loc ? ` · ${loc}` : ''}. Zrobicie ten trening razem — Start tylko, jeśli ćwiczysz sam(a).
               </span>
             </p>

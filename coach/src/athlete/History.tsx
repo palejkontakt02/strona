@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
 import { Icon } from '../components/ui';
+import { RefComment, RefThread } from '../components/RefComment';
 import type { Appointment, TrainingSession } from '../domain';
 import { put } from '../data/db';
 import { isSolo, sessionsOf } from '../data/ops';
@@ -305,6 +306,11 @@ export function SessionSheet({
                   </div>
                 )}
                 {e.notes && <div className="muted small">{e.notes}</div>}
+                {plain && live && (
+                  <div className="hist-ex-ref">
+                    <RefComment clientId={s.clientId} sessionId={s.id} exIndex={i} label={e.name} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -313,6 +319,12 @@ export function SessionSheet({
           <div className="hist-note">
             <span className="eyebrow">Notatka</span>
             <p>{s.notes}</p>
+          </div>
+        )}
+        {live && <RefThread clientId={s.clientId} sessionId={s.id} side={plain ? 'client' : 'coach'} />}
+        {plain && live && (
+          <div className="hist-ref">
+            <RefComment clientId={s.clientId} sessionId={s.id} label="Komentarz do treningu" />
           </div>
         )}
         {onRepeat && s.exercises.length > 0 && <StartButtons onStart={onRepeat} onTrainer={onTrainer} label="Zrób ten trening jeszcze raz" />}
