@@ -30,9 +30,13 @@ interface StoreValue {
   addMeasurement: (clientId: string, m: Measurement) => Promise<boolean>;
   saveIntake: (clientId: string, intake: Intake) => Promise<boolean>;
   /** Wpis podopiecznego: raport tygodniowy, zdjęcie sylwetki albo dzień makro / kroków. */
-  saveClientEntry: (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog, okMessage?: string) => Promise<boolean>;
+  saveClientEntry: (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry, okMessage?: string) => Promise<boolean>;
   saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
   sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
+  /** Wiadomość z kontekstem treningu / ćwiczenia i załącznikami (zdjęcie, wideo, głos). */
+  sendClientMessage: (clientId: string, text: string, extra: Pick<ClientNote, 'ref' | 'media' | 'textAuto' | 'sessionId'>) => Promise<boolean>;
+  /** Podopieczny potwierdza / odwołuje wizytę (funkcja w bazie, sekcja 23). */
+  respondAppointment: (id: string, kind: 'confirm' | 'cancel', reason?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
   /** Zapisy zrobione bez internetu, które czekają na wysłanie (kolejka offline). */
@@ -235,7 +239,7 @@ export function StoreProvider({
   );
 
   const saveClientEntry = useCallback(
-    async (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog, okMessage?: string) => {
+    async (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry, okMessage?: string) => {
       const prev = db?.clients.find((c) => c.id === clientId)?.[kind];
       const upd = (list: unknown) => withEntry((list ?? []) as { id?: string; date?: string }[], entry as { id?: string; date?: string });
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: upd(c[kind]) } : c)) } : cur));
@@ -245,7 +249,8 @@ export function StoreProvider({
         return true;
       } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: prev } : c)) } : cur));
-        toast((e as Error).message === 'DB_OUTDATED' ? 'Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 19 w hardening.sql).' : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        const m = (e as Error).message;
+        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },
@@ -270,9 +275,9 @@ export function StoreProvider({
   );
 
   /** Notatka od podopiecznego: zapis w aplikacji + e-mail do trenera. */
-  const sendClientNote = useCallback(
-    async (clientId: string, text: string, sessionId?: string): Promise<boolean> => {
-      const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000), ...(sessionId ? { sessionId } : {}) };
+  const sendClientMessage = useCallback(
+    async (clientId: string, text: string, extra: Pick<ClientNote, 'ref' | 'media' | 'textAuto' | 'sessionId'>): Promise<boolean> => {
+      const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000), ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v != null)) };
       const client = db?.clients.find((c) => c.id === clientId);
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note] } : c)) } : cur));
       let saved = true;
@@ -292,6 +297,26 @@ export function StoreProvider({
       return true;
     },
     [db, repo, toast, load],
+  );
+  const sendClientNote = useCallback(
+    (clientId: string, text: string, sessionId?: string) => sendClientMessage(clientId, text, sessionId ? { sessionId } : {}),
+    [sendClientMessage],
+  );
+
+  const respondAppointment = useCallback(
+    async (id: string, kind: 'confirm' | 'cancel', reason?: string): Promise<boolean> => {
+      if (!repo.respondAppointment) return false;
+      try {
+        const saved = await repo.respondAppointment(id, kind, reason);
+        if (saved) setDb((cur) => (cur ? { ...cur, appointments: cur.appointments.map((a) => (a.id === id ? { ...a, ...saved, id: a.id, clientId: a.clientId } : a)) } : cur));
+        return true;
+      } catch (e) {
+        const m = (e as Error).message;
+        toast(m === 'DB_OUTDATED' ? 'Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 23 w hardening.sql).' : /odbyła|zaplanowana/.test(m) ? m + '.' : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        return false;
+      }
+    },
+    [repo, toast],
   );
 
   const ask = useCallback(
@@ -326,9 +351,9 @@ export function StoreProvider({
   const value = useMemo(
     () =>
       db
-        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut, pending, sendPending: () => void sendPending() }
+        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, cloud, signOut, pending, sendPending: () => void sendPending() }
         : null,
-    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, cloud, signOut, pending, sendPending],
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, cloud, signOut, pending, sendPending],
   );
   if (loadError)
     return (

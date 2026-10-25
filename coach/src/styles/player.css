@@ -1,0 +1,304 @@
+/* ================= ODTWARZACZ TRENINGU (agent „player”) ================= */
+
+/* ćwiczenie bez ciężaru: numer, powtórzenia / czas, RPE, ✓ — bez kg i kamery w wierszu */
+.sgrid.noload {
+  grid-template-columns: 28px minmax(0, 1.4fr) minmax(0, 1fr) 54px;
+}
+.sgrid.noload .lr.wide,
+.sgrid-head.noload .wide {
+  grid-column: span 1;
+}
+
+/* na stronę z ciężarem: pola L i P min. 44 px, kosztem węższego RPE */
+.sgrid.sides {
+  grid-template-columns: 24px minmax(94px, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) 40px 50px;
+  gap: 4px;
+}
+.sgrid .lr input {
+  min-width: 44px;
+}
+.sgrid.noload .lr,
+.sgrid.sides .lr {
+  gap: 4px;
+}
+
+/* „ostatnio 60×8” (stuknięcie wpisuje) i strzałka względem poprzedniego razu */
+.lastline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 0;
+}
+.last-btn {
+  min-height: 44px;
+  margin: -8px 0 -8px -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-neutral-400);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.last-btn b {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-color: var(--color-divider);
+  text-underline-offset: 3px;
+}
+.last-btn:active {
+  background: var(--color-surface-2);
+}
+.last-txt {
+  font-variant-numeric: tabular-nums;
+}
+.delta {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.delta.is-pr {
+  color: var(--ath-ok-text, var(--color-ok));
+}
+.hintcol {
+  min-width: 0;
+}
+.hintcol .lastline {
+  padding-left: 0;
+}
+
+/* nagłówek ćwiczenia: kamera raz na ćwiczenie, komentarz, rodzaj (podopieczny) */
+.ex-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+.ex-tools:empty {
+  display: none;
+}
+.ex-cam {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ex-cam .cam-btn {
+  width: 48px;
+  height: 44px;
+  border-color: var(--color-divider);
+}
+.ex-kg-on {
+  min-height: 44px;
+}
+.ex-kind {
+  margin-top: var(--space-1, 4px);
+}
+
+/* górny pasek: Więcej */
+.more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.more-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.more-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.more-switch > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.more-switch-state {
+  flex: none;
+  min-width: 52px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  text-align: center;
+  font-weight: 600;
+}
+.more-switch.on .more-switch-state {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* przyklejona nawigacja ćwiczeń (bezpieczny margines paska iOS) */
+.player .pnav {
+  position: sticky;
+  bottom: 0;
+  z-index: 25;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2) 0 calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+  box-shadow: 0 -1px 0 var(--color-divider);
+}
+.player .pnav .btn {
+  min-height: 56px;
+}
+.player .pnav .pnav-prev {
+  flex: 0 0 64px;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.player .pnav .btn-primary {
+  flex: 1;
+}
+.player .cancel-run {
+  display: block;
+  margin: var(--space-2) auto 0;
+  min-height: 44px;
+  width: auto;
+  font-size: 0.875rem;
+}
+.player .finish-early {
+  margin-top: var(--space-3);
+}
+/* przerwa nad przyklejoną nawigacją, nie na niej */
+.player:has(.pnav) .restbar {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+.player:has(.pnav):has(.restbar) {
+  padding-bottom: 0;
+}
+.player:has(.restbar) .pnav {
+  margin-top: 104px;
+}
+
+/* podsumowanie: skala 0–10 — jedna linia, a na telefonie stała siatka 6 + 5 */
+.sheet .scale-fit {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 6px;
+}
+.sheet .scale-fit button {
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  .sheet .scale-fit {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* ================= TRENING ZAKOŃCZONY ================= */
+.wdone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: calc(100dvh - 120px);
+  padding: var(--space-6) 0 calc(var(--space-6) + env(safe-area-inset-bottom));
+}
+.wdone-top h1 {
+  font-family: var(--font-display);
+  font-size: 2.125rem;
+  font-weight: 600;
+  line-height: 1.05;
+  margin: var(--space-3) 0 4px;
+  outline: none;
+}
+.wdone-top p {
+  margin: 0;
+}
+.wdone-check {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-ok);
+  color: var(--on-ok, var(--color-bg));
+}
+.wdone-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+.wdone-stats > div {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+}
+.wdone-stats dt {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+}
+.wdone-stats dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wdone-stats dd small {
+  font-size: 1.125rem;
+  color: var(--color-neutral-400);
+}
+.wdone-stats dd.is-pr {
+  color: var(--ath-ok-text, var(--color-ok));
+}
+.wdone-cmp {
+  margin: 0;
+}
+.wdone-cmp p {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.wdone-cmp b {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.wdone-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+.wdone-actions .btn {
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+@media (min-width: 700px) {
+  .wdone-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

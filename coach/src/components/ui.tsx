@@ -251,6 +251,11 @@ const ICONS: Record<string, ReactNode> = {
   chat: <path d="M4 5h16v11H9l-5 4z" />,
   star: <path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4l-5.5 2.9 1-6.2L3 9.7l6.2-.9z" />,
   dumbbell: <path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11" />,
+  // rozmowa: głos, pauza, stop, pobieranie
+  mic: <path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />,
+  pause: <path d="M8 5v14M16 5v14" />,
+  stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
+  download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS | string; size?: number }) {

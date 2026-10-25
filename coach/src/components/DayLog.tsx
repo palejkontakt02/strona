@@ -5,6 +5,7 @@ import { useStore } from '../data/store';
 import { fmtDay, fnum } from '../format';
 import { todayISO } from '../lib/dates';
 import { numIn } from '../lib/parse';
+import { hasMacroTargets } from '../lib/nutrition';
 import { adherence, bump, dayScore, hasTargets, metricHit, METRICS, type MetricKey } from '../lib/comms';
 import { Ring } from './ring';
 import { Empty } from './ui';
@@ -13,7 +14,10 @@ const fmtV = (k: MetricKey, v?: number) => (v == null ? '—' : k === 'steps' ? 
 const pctTxt = (p: number | null) => (p == null ? '—' : `${Math.round(p * 100)}%`);
 const wdShort = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('pl-PL', { weekday: 'short' }).replace('.', '');
 
-/** Podopieczny: „Dziś” — białko, kcal, kroki, woda względem celów trenera (+/− albo wpis), tydzień w skrócie. */
+/** Klucze wpisywane w tej karcie — jedzenie (kcal, makro, zrzut) wpisuje się w karcie „Jedzenie” (athlete/Nutrition.tsx). */
+const MOVE_KEYS: MetricKey[] = ['steps', 'water'];
+
+/** Podopieczny: „Dziś” — kroki i woda względem celów trenera (+/− albo wpis), tydzień w skrócie. */
 export function DayLogCard({ client }: { client: Client }) {
   const { saveClientEntry } = useStore();
   const today = todayISO();
@@ -31,22 +35,25 @@ export function DayLogCard({ client }: { client: Client }) {
     if (d) void saveClientEntry(client.id, 'dayLog', d);
   };
   useEffect(() => () => flush(), []); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!hasTargets(t)) return null;
-  const keys = METRICS.filter(([k]) => (t![k] ?? 0) > 0);
+  const keys = METRICS.filter(([k]) => MOVE_KEYS.includes(k) && (t?.[k] ?? 0) > 0);
+  if (!keys.length) return null;
   const set = (k: MetricKey, v: number | undefined) => {
-    const next = { ...draft, date: today, [k]: v };
+    // wpis dnia jest jeden: bierzemy aktualny zapis (np. jedzenie z karty obok) i podmieniamy tylko kroki / wodę
+    const latest = (client.dayLog ?? []).find((l) => l.date === today);
+    const next: DayLog = { ...latest, ...Object.fromEntries(MOVE_KEYS.map((m) => [m, draft[m]])), date: today, [k]: v };
+    for (const key of Object.keys(next) as (keyof DayLog)[]) if (next[key] === undefined) delete next[key];
     setDraft(next);
     pending.current = next;
     window.clearTimeout(timer.current);
     // seria stuknięć +/− zapisuje się raz, po chwili
     timer.current = window.setTimeout(flush, 900);
   };
-  const sc = dayScore(draft, t);
+  const sc = dayScore(draft, Object.fromEntries(MOVE_KEYS.map((m) => [m, t?.[m]])));
   const adh = adherence(client.dayLog, t, today, 7);
   return (
     <section className="acard dl-card">
       <div className="between">
-        <h3>Dziś: jedzenie i ruch</h3>
+        <h3>Dziś: ruch i woda</h3>
         <span className={`tag ${sc.hit === sc.total ? 'tag-ok' : 'tag-neutral'}`}>
           {sc.hit}/{sc.total} celów
         </span>
@@ -98,7 +105,7 @@ export function DayLogCard({ client }: { client: Client }) {
         })}
       </ul>
       <button className="btn btn-ghost btn-block" aria-expanded={week} onClick={() => setWeek(!week)}>
-        {week ? 'Zwiń tydzień' : `Ostatnie 7 dni: ${pctTxt(adh.pct)} celów`}
+        {week ? 'Zwiń tydzień' : `Ostatnie 7 dni: ${pctTxt(adh.pct)} wszystkich celów`}
       </button>
       {week && <WeekStrip client={client} days={7} />}
     </section>
@@ -120,22 +127,26 @@ function WeekStrip({ client, days }: { client: Client; days: number }) {
   );
 }
 
+/** Pola celów w formularzu trenera: białko, kcal, kroki, woda + tłuszcze i węglowodany (karta „Jedzenie”). */
+const TARGET_FIELDS: [MetricKey, string, string, number, number][] = [...METRICS, ['fat', 'Tłuszcze', 'g', 5, 600], ['carbs', 'Węglowodany', 'g', 10, 1500]];
+const anyTarget = (t?: DayTargets) => hasTargets(t) || hasMacroTargets(t);
+
 /** Trener: cele dzienne i realizacja z 7 / 28 dni. */
 export function CoachTargets({ client }: { client: Client }) {
   const { apply, toast } = useStore();
   const t = client.targets ?? {};
-  const [edit, setEdit] = useState(!hasTargets(client.targets));
-  const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries(METRICS.map(([k]) => [k, t[k] != null ? String(t[k]).replace('.', ',') : ''])));
+  const [edit, setEdit] = useState(!anyTarget(client.targets));
+  const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries(TARGET_FIELDS.map(([k]) => [k, t[k] != null ? String(t[k]).replace('.', ',') : ''])));
   const [range, setRange] = useState<7 | 28>(7);
   const save = async () => {
     const next: DayTargets = {};
-    for (const [k, label, unit, , max] of METRICS) {
+    for (const [k, label, unit, , max] of TARGET_FIELDS) {
       if (!v[k]?.trim()) continue;
       const n = numIn(v[k], 0, max);
       if (n == null) return toast(`${label}: wpisz liczbę od 0 do ${max.toLocaleString('pl-PL')} ${unit}.`);
       if (n > 0) next[k] = n;
     }
-    if (await apply([put('clients', { ...client, targets: hasTargets(next) ? next : undefined })], hasTargets(next) ? 'Cele zapisane — podopieczny zobaczy je w karcie „Dziś”.' : 'Cele usunięte.')) setEdit(false);
+    if (await apply([put('clients', { ...client, targets: anyTarget(next) ? next : undefined })], anyTarget(next) ? 'Cele zapisane — podopieczny zobaczy je w karcie „Dziś”.' : 'Cele usunięte.')) setEdit(false);
   };
   const a = adherence(client.dayLog, client.targets, todayISO(), range);
   return (
@@ -143,7 +154,7 @@ export function CoachTargets({ client }: { client: Client }) {
       {edit ? (
         <div className="dl-form">
           <div className="dl-form-grid">
-            {METRICS.map(([k, label, unit]) => (
+            {TARGET_FIELDS.map(([k, label, unit]) => (
               <label key={k} className="field">
                 <span>
                   {label}
@@ -154,7 +165,7 @@ export function CoachTargets({ client }: { client: Client }) {
             ))}
           </div>
           <div className="actions">
-            {hasTargets(client.targets) && (
+            {anyTarget(client.targets) && (
               <button className="btn btn-ghost btn-sm" onClick={() => setEdit(false)}>
                 Anuluj
               </button>
@@ -163,7 +174,7 @@ export function CoachTargets({ client }: { client: Client }) {
               Zapisz cele
             </button>
           </div>
-          <p className="muted small">Puste pole = bez celu. Podopieczny wpisuje wartości w karcie „Dziś”. Cel osiągnięty: kcal ±10%, reszta min. 90%.</p>
+          <p className="muted small">Puste pole = bez celu. Podopieczny wpisuje wartości w karcie „Dziś”. Cel osiągnięty: kcal ±10%, reszta min. 90%. Tłuszcze i węglowodany widać w karcie „Jedzenie” (bez wliczania do realizacji).</p>
         </div>
       ) : (
         <>

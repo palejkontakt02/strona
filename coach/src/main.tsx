@@ -9,6 +9,10 @@ import './styles/shell.css';
 import './styles/client.css';
 import './styles/tables.css';
 import './styles/athlete.css';
+import './styles/habits.css';
+import './styles/rodo.css';
+import './styles/progress.css';
+import './styles/player.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

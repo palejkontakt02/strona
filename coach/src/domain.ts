@@ -132,6 +132,12 @@ export interface DayLog {
   steps?: number;
   /** Woda w litrach. */
   water?: number;
+  /** Tłuszcze (g) — wpis z aplikacji do liczenia kalorii (np. Fitatu). */
+  fat?: number;
+  /** Węglowodany (g). */
+  carbs?: number;
+  /** Zrzut ekranu z aplikacji do liczenia kalorii: odnośnik do pliku („sb:…” / „idb:…”, jak zdjęcia sylwetki). */
+  shot?: string;
 }
 
 /** Cele dzienne ustawione przez trenera. */
@@ -140,6 +146,10 @@ export interface DayTargets {
   kcal?: number;
   steps?: number;
   water?: number;
+  /** Tłuszcze (g). */
+  fat?: number;
+  /** Węglowodany (g). */
+  carbs?: number;
 }
 
 /** Miejsce bólu zaznaczone na sylwetce (przy treningu). */
@@ -211,6 +221,25 @@ export interface Client {
   targets?: DayTargets;
   /** Trener wymaga raportu tygodniowego (pt–pn karta u podopiecznego). Brak — tylko gdy są już raporty. */
   weeklyReport?: boolean;
+  /** RODO: zgody podopiecznego (dane o zdrowiu, zdjęcia/nagrania) i prośba o usunięcie konta — zapisuje tylko on sam (lib/rodo.ts). */
+  consents?: ConsentEntry[];
+}
+
+/** Zgoda RODO: `health` — dane o zdrowiu (art. 9), `media` — zdjęcia sylwetki i nagrania techniki; `erasure` — prośba o usunięcie konta. */
+export type ConsentKind = 'health' | 'media';
+export interface ConsentEntry {
+  id: ConsentKind | 'erasure';
+  /** Udzielona (prośba wysłana) / wycofana. */
+  on: boolean;
+  /** Ostatnia zmiana (ISO; w chmurze ustawia baza). */
+  at: string;
+  /** Kiedy ostatnio udzielona / wycofana. */
+  givenAt?: string;
+  withdrawnAt?: string;
+  /** Wersja klauzuli informacyjnej, którą podopieczny widział. */
+  v?: number;
+  /** Historia zmian (najwyżej 20 ostatnich). */
+  log?: { on: boolean; at: string }[];
 }
 
 /** Kiedy zadanie obowiązuje: codziennie, w wybrane dni tygodnia (1 = pn … 7 = nd) albo dni miesiąca (1–31). */
@@ -244,6 +273,12 @@ export interface ClientNote {
   sessionId?: string;
   /** Trener usunął z rozmowy (ukryte u obu stron). */
   hidden?: boolean;
+  /** Przypięta do treningu / ćwiczenia (komentarz z odtwarzacza albo historii). */
+  ref?: MsgRef;
+  /** Zdjęcie, wideo albo wiadomość głosowa (pliki w magazynie podopiecznego). */
+  media?: MsgMedia[];
+  /** Tekst wstawiony automatycznie (np. „Wiadomość głosowa”) — w dymku nie jest pokazywany. */
+  textAuto?: boolean;
 }
 
 /** Odpowiedź trenera na wiadomości podopiecznego (widoczna u podopiecznego). */
@@ -251,6 +286,32 @@ export interface CoachReply {
   id: string;
   at: string;
   text: string;
+  ref?: MsgRef;
+  media?: MsgMedia[];
+  textAuto?: boolean;
+  /** Odpowiedź na konkretną wiadomość (np. z nagraniem techniki — znaczniki czasu przewijają to wideo). */
+  replyTo?: string;
+}
+
+/** Kontekst wiadomości: trening (sesja) i ewentualnie ćwiczenie. */
+export interface MsgRef {
+  sessionId?: string;
+  /** Indeks ćwiczenia w treningu. */
+  exIndex?: number;
+  /** Nazwa ćwiczenia (zostaje, nawet gdy trening zostanie zmieniony). */
+  exName?: string;
+  /** Nazwa treningu, np. „Trening 1”. */
+  workout?: string;
+  date?: ISODate;
+}
+
+export interface MsgMedia {
+  kind: 'image' | 'video' | 'audio';
+  /** „sb:<ścieżka>” (Supabase Storage) albo „idb:<id>” (ta przeglądarka). */
+  ref: string;
+  mime?: string;
+  /** Sekundy (wideo, głos). */
+  dur?: number;
 }
 
 /* ---------- Plany ---------- */
@@ -430,6 +491,19 @@ export interface Appointment {
   seriesId?: string;
   /** Trening w parze / małej grupie: wizyty z tym samym `groupId` i datą to jeden termin (każdy ma swój status i rozliczenie). */
   groupId?: string;
+  /**
+   * Odpowiedź podopiecznego z aplikacji: potwierdzenie albo odwołanie (z powodem). Przy odwołaniu `status` = 'cancel';
+   * `late` — odwołanie krócej niż 24 h przed wizytą (trening może przepaść). Zapis przez funkcję client_respond_appointment.
+   */
+  reply?: ApptReply;
+}
+
+export interface ApptReply {
+  kind: 'confirm' | 'cancel';
+  /** Kiedy (ISO). */
+  at: string;
+  reason?: string;
+  late?: boolean;
 }
 
 /* ---------- Biblioteka ćwiczeń ---------- */

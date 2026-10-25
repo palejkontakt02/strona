@@ -90,3 +90,54 @@ export function scheduleLabel(s: HabitSchedule): string {
   }
   return `w dni miesiąca: ${[...s.days].sort((a, b) => a - b).join(', ')}`;
 }
+
+/**
+ * Seria jednego zadania: ile obowiązujących dni z rzędu odhaczono (dni, w których zadanie nie obowiązuje,
+ * nie przerywają serii; dzisiejszy, jeszcze nieodhaczony dzień też nie).
+ */
+export function habitItemStreak(h: Habit, log: HabitDay[] | undefined, today: ISODate): number {
+  const byDate = new Map((log ?? []).map((d) => [d.date, d.done]));
+  let n = 0;
+  for (let i = 0; i < 400; i++) {
+    const date = addDays(today, -i);
+    if (h.since && date < h.since) break;
+    if (!isDue(h, date)) continue;
+    if (byDate.get(date)?.includes(h.id)) n++;
+    else if (i === 0) continue;
+    else break;
+  }
+  return n;
+}
+
+/**
+ * Zgodność jednego zadania w ostatnich `days` dniach (łącznie z dziś): odhaczone / obowiązujące.
+ * Dzisiejszy dzień liczy się tylko, gdy zadanie już odhaczono (trwający dzień nie zaniża wyniku).
+ * `pct` = null, gdy w tym okresie zadanie ani razu nie obowiązywało.
+ */
+export function habitRate(h: Habit, log: HabitDay[] | undefined, today: ISODate, days: number): { done: number; total: number; pct: number | null } {
+  const byDate = new Map((log ?? []).map((d) => [d.date, d.done]));
+  let done = 0;
+  let total = 0;
+  for (let i = 0; i < days; i++) {
+    const date = addDays(today, -i);
+    if (!isDue(h, date)) continue;
+    const ok = !!byDate.get(date)?.includes(h.id);
+    if (i === 0 && !ok) continue;
+    total++;
+    if (ok) done++;
+  }
+  return { done, total, pct: total ? done / total : null };
+}
+
+/** Gotowe zadania do wyboru przez trenera (białko — z celu dziennego, jeśli jest ustawiony). */
+export function habitLibrary(proteinTarget?: number): { key: string; title: string }[] {
+  return [
+    { key: 'water', title: 'Woda 2 l' },
+    { key: 'steps', title: '8 000 kroków' },
+    { key: 'sleep', title: 'Sen 7 h' },
+    { key: 'protein', title: `Białko ${proteinTarget ? Math.round(proteinTarget) : 120} g` },
+    { key: 'veg', title: '5 porcji warzyw i owoców' },
+    { key: 'stretch', title: 'Rozciąganie 10 min' },
+    { key: 'alcohol', title: 'Bez alkoholu' },
+  ];
+}

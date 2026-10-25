@@ -62,7 +62,7 @@ export function normalizeDb(db: Partial<Db>): Db {
       progressPhotos: Array.isArray(r.progressPhotos) ? r.progressPhotos.filter((x) => isRec(x) && typeof x.id === 'string' && isDate(x.date) && typeof x.ref === 'string' && /^(sb|idb):/.test(x.ref)) : undefined,
       dayLog: Array.isArray(r.dayLog) ? r.dayLog.filter((x) => isRec(x) && isDate(x.date)) : undefined,
       replies: Array.isArray(r.replies)
-        ? r.replies.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ id: typeof n.id === 'string' ? n.id : `r${i}`, at: typeof n.at === 'string' ? n.at : '', text: n.text as string }))
+        ? r.replies.filter((n): n is Rec => isRec(n) && typeof n.text === 'string').map((n, i) => ({ ...n, id: typeof n.id === 'string' ? n.id : `r${i}`, at: typeof n.at === 'string' ? n.at : '', text: n.text as string }))
         : undefined,
     })),
     plans: clean<Plan>(db.plans, (r) => typeof r.clientId === 'string', (r) => ({
@@ -131,12 +131,14 @@ export interface Repository {
    * Wpis podopiecznego w jego profilu: raport tygodniowy (po `id`), zdjęcie sylwetki (po `id`)
    * albo dzienny zapis makro / kroków (po `date`). Zastępuje wpis o tym samym kluczu.
    */
-  saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog): Promise<void>;
+  saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry): Promise<void>;
   /** Czyja kolejka zapisów offline na tym urządzeniu (konto); brak = „local”. */
   outboxScope?(): Promise<string>;
+  /** Podopieczny potwierdza albo odwołuje wizytę (funkcja client_respond_appointment, sekcja 23). Zwraca zapisaną wizytę. */
+  respondAppointment?(id: string, kind: 'confirm' | 'cancel', reason?: string): Promise<Appointment | null>;
 }
 
-export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog';
+export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog' | 'consents';
 
 /** Wstawia albo podmienia wpis (raport / zdjęcie po id, dzień po dacie); najwyżej `max` ostatnich. */
 export function withEntry<T extends { id?: string; date?: string }>(list: T[] | undefined, entry: T, max = 400): T[] {

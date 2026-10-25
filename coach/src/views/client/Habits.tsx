@@ -10,21 +10,32 @@ import { put } from '../../data/db';
 import { useStore } from '../../data/store';
 import { fmtDay, plural, uid } from '../../format';
 import { todayISO } from '../../lib/dates';
-import { dayProgress, habitStreak, rangeProgress, scheduleLabel, WEEKDAYS } from '../../lib/habits';
+import { dayProgress, habitItemStreak, habitLibrary, habitRate, habitStreak, rangeProgress, scheduleLabel, WEEKDAYS } from '../../lib/habits';
+import { NutritionTable } from './NutritionTable';
 
 type Kind = HabitSchedule['kind'];
 
 /** Formularz zadania: nazwa i kiedy (codziennie / dni tygodnia / dni miesiąca). */
-function HabitForm({ initial, onSave, onCancel }: { initial?: Habit; onSave: (h: Habit) => void; onCancel: () => void }) {
+function HabitForm({ initial, onSave, onCancel, protein, taken = [] }: { initial?: Habit; onSave: (h: Habit) => void; onCancel: () => void; protein?: number; taken?: string[] }) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [kind, setKind] = useState<Kind>(initial?.schedule.kind ?? 'daily');
   const [week, setWeek] = useState<number[]>(initial?.schedule.kind === 'week' ? initial.schedule.days : [1, 2, 3, 4, 5]);
   const [month, setMonth] = useState<number[]>(initial?.schedule.kind === 'month' ? initial.schedule.days : [1]);
   const toggle = (list: number[], d: number) => (list.includes(d) ? list.filter((x) => x !== d) : [...list, d].sort((a, b) => a - b));
   const valid = title.trim() && (kind === 'daily' || (kind === 'week' ? week.length : month.length));
+  const lib = habitLibrary(protein).filter((x) => !taken.includes(x.title.toLowerCase()));
   return (
     <div className="habit-form">
-      <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="np. 10 000 kroków, 2 l wody, mobilność bioder 10 min" aria-label="Zadanie" autoFocus />
+      {!initial && lib.length > 0 && (
+        <div className="hb-lib" role="group" aria-label="Gotowe nawyki">
+          {lib.map((x) => (
+            <button key={x.key} type="button" className={`chip hb-chip ${title === x.title ? 'active' : ''}`} aria-pressed={title === x.title} onClick={() => setTitle(x.title)}>
+              {x.title}
+            </button>
+          ))}
+        </div>
+      )}
+      <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Wybierz gotowy albo wpisz własny, np. mobilność bioder 10 min" aria-label="Zadanie" autoFocus={!!initial} />
       <div className="seg" role="radiogroup" aria-label="Kiedy">
         {(
           [
@@ -146,7 +157,7 @@ export function ClientHabits({ client }: { client: Client }) {
           </div>
         </>
       )}
-      {editing === 'new' && <HabitForm onCancel={() => setEditing(null)} onSave={(h) => void save([...(client.habits ?? []), h], 'Dodano zadanie.').then(() => setEditing(null))} />}
+      {editing === 'new' && <HabitForm protein={client.targets?.protein} taken={habits.map((h) => h.title.toLowerCase())} onCancel={() => setEditing(null)} onSave={(h) => void save([...(client.habits ?? []), h], 'Dodano zadanie.').then(() => setEditing(null))} />}
       {habits.length === 0 && !editing && <Empty>Dodaj zadania, które podopieczny ma odhaczać każdego dnia (kroki, woda, sen, mobilność…). Zobaczy je w swojej aplikacji jako koło do zamknięcia.</Empty>}
       <ul className="rows">
         {habits.map((h) =>
@@ -163,6 +174,7 @@ export function ClientHabits({ client }: { client: Client }) {
               <div className="grow">
                 <strong>{h.title}</strong>
                 <div className="muted small">{scheduleLabel(h.schedule)}</div>
+                <HabitStats habit={h} client={client} today={today} />
               </div>
               {(client.habitLog ?? []).some((d) => d.date === today && d.done.includes(h.id)) && <Tag tone="ok">✓ dziś</Tag>}
               <IconBtn icon="edit" label={`Edytuj „${h.title}”`} onClick={() => setEditing(h)} />
@@ -180,6 +192,31 @@ export function ClientHabits({ client }: { client: Client }) {
         )}
       </ul>
     </Card>
+  );
+}
+
+const pctOf = (p: number | null) => (p == null ? '—' : `${Math.round(p * 100)}%`);
+const tone = (p: number | null) => (p == null ? '' : p >= 0.8 ? 'ok-text' : p < 0.5 ? 'warn-text' : '');
+
+/** Zgodność jednego nawyku (7 / 30 dni) i jego seria. */
+function HabitStats({ habit, client, today }: { habit: Habit; client: Client; today: string }) {
+  const w = habitRate(habit, client.habitLog, today, 7);
+  const m = habitRate(habit, client.habitLog, today, 30);
+  const s = habitItemStreak(habit, client.habitLog, today);
+  return (
+    <div className="hb-stats small">
+      <span title={`Ostatnie 7 dni: ${w.done} z ${w.total}`}>
+        7 dni <b className={tone(w.pct)}>{pctOf(w.pct)}</b>
+      </span>
+      <span title={`Ostatnie 30 dni: ${m.done} z ${m.total}`}>
+        30 dni <b className={tone(m.pct)}>{pctOf(m.pct)}</b>
+      </span>
+      {s > 0 && (
+        <span>
+          seria <b>{s}</b> {plural(s, 'dzień', 'dni', 'dni')}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -206,6 +243,7 @@ export function ClientTargets({ client }: { client: Client }) {
   return (
     <Card title="Cele dzienne: jedzenie i ruch">
       <CoachTargets client={client} />
+      <NutritionTable client={client} />
     </Card>
   );
 }

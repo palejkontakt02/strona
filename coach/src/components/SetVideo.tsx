@@ -6,6 +6,41 @@ import { canRecordInApp, VideoRecorder } from './VideoRecorder';
 import { shrinkVideo } from './videoShrink';
 import { Icon } from './ui';
 
+/**
+ * Film gotowy do zapisu: za duży z galerii — przekodowany w telefonie do limitu (postęp w `onProgress`, null = koniec);
+ * nie da się — błąd z komunikatem do pokazania.
+ */
+export async function fitVideoFile(file: File, onProgress: (p: number | null) => void): Promise<File> {
+  if (!videoProblem(file, true) && file.size > VIDEO_MAX_MB * 1024 * 1024 && canRecordInApp()) {
+    onProgress(0);
+    try {
+      const small = await shrinkVideo(file, (VIDEO_MAX_MB - 2) * 1024 * 1024, (p) => onProgress(p));
+      if (small && small.size <= VIDEO_MAX_MB * 1024 * 1024) file = small;
+    } catch (e) {
+      throw new Error(`Nie udało się zmniejszyć nagrania: ${(e as Error).message}.`);
+    } finally {
+      onProgress(null);
+    }
+  }
+  const problem = videoProblem(file);
+  if (problem) throw new Error(problem);
+  return file;
+}
+
+/** Postęp przekodowania za dużego filmu. */
+export function ShrinkSheet({ progress }: { progress: number }) {
+  return (
+    <Sheet label="Przygotowanie nagrania" onClose={() => undefined}>
+      <h3>Przygotowuję nagranie…</h3>
+      <p className="muted small">Film jest większy niż {VIDEO_MAX_MB} MB — zapisuję go w wysokiej jakości w limicie. Nie zamykaj aplikacji.</p>
+      <div className="progress" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${Math.round(progress * 100)}%` }} />
+      </div>
+      <p className="center">{Math.round(progress * 100)}%</p>
+    </Sheet>
+  );
+}
+
 /** Odtwarzacz nagrania serii (arkusz od dołu). `onRemove` — przycisk usunięcia nagrania. */
 export function VideoViewer({ video, title, onClose, onRemove, onReplace }: { video: string; title: string; onClose: () => void; onRemove?: () => void; onReplace?: () => void }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -76,26 +111,14 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
   const add = () => (canRecordInApp() ? setChoose(true) : input.current?.click());
 
   const [shrink, setShrink] = useState<number | null>(null);
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
-    // za duży film z galerii: przekodowanie w telefonie do limitu w wysokiej jakości zamiast odrzucenia
-    if (!videoProblem(file, true) && file.size > VIDEO_MAX_MB * 1024 * 1024 && canRecordInApp()) {
-      setShrink(0);
-      try {
-        const small = await shrinkVideo(file, (VIDEO_MAX_MB - 2) * 1024 * 1024, (p) => setShrink(p));
-        if (small && small.size <= VIDEO_MAX_MB * 1024 * 1024) file = small;
-      } catch (e) {
-        setShrink(null);
-        await ask(`Nie udało się zmniejszyć nagrania: ${(e as Error).message}.`, { confirm: 'Rozumiem' });
-        if (input.current) input.current.value = '';
-        return;
-      }
-      setShrink(null);
-    }
-    const problem = videoProblem(file);
-    if (problem) {
+  const pick = async (picked: File | undefined) => {
+    if (!picked) return;
+    let file: File;
+    try {
+      file = await fitVideoFile(picked, setShrink);
+    } catch (e) {
       // długi komunikat — okno do przeczytania zamiast znikającego paska
-      await ask(problem, { confirm: 'Rozumiem' });
+      await ask((e as Error).message, { confirm: 'Rozumiem' });
       if (input.current) input.current.value = '';
       return;
     }
@@ -126,16 +149,7 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
         {busy ? <span className="cam-spin" /> : <Icon name={video ? 'play' : 'cam'} size={18} />}
       </button>
       <input ref={input} type="file" accept="video/*,video/quicktime,video/mp4,.mov,.mp4,.m4v" hidden onChange={(e) => void pick(e.target.files?.[0])} />
-      {shrink != null && (
-        <Sheet label="Przygotowanie nagrania" onClose={() => undefined}>
-          <h3>Przygotowuję nagranie…</h3>
-          <p className="muted small">Film jest większy niż {VIDEO_MAX_MB} MB — zapisuję go w wysokiej jakości w limicie. Nie zamykaj aplikacji.</p>
-          <div className="progress" role="progressbar" aria-valuenow={Math.round(shrink * 100)} aria-valuemin={0} aria-valuemax={100}>
-            <span style={{ width: `${Math.round(shrink * 100)}%` }} />
-          </div>
-          <p className="center">{Math.round(shrink * 100)}%</p>
-        </Sheet>
-      )}
+      {shrink != null && <ShrinkSheet progress={shrink} />}
       {choose && (
         <Sheet label="Dodaj nagranie" onClose={() => setChoose(false)}>
           <h3>{title}</h3>

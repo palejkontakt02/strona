@@ -1,3 +1,4 @@
+import { apptWithReply } from '../lib/appts';
 import { applyChanges, normalizeDb, withEntry, type Db, type Repository } from './db';
 import { createSeed } from './seed';
 import { withDay } from '../lib/habits';
@@ -88,6 +89,14 @@ export function createLocalRepository(): Repository {
     async addClientNote(clientId, note) {
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
       persist();
+    },
+    async respondAppointment(id, kind, reason) {
+      const a = db.appointments.find((x) => x.id === id);
+      if (!a || a.status !== 'planned') throw new Error('Wizyta nie jest już zaplanowana');
+      const next = apptWithReply(a, kind, reason);
+      db = { ...db, appointments: db.appointments.map((x) => (x.id === id ? next : x)) };
+      persist();
+      return next;
     },
   };
 }

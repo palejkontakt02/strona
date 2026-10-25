@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LineChart } from '../components/charts';
 import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
@@ -16,21 +16,26 @@ import { num, numIn, repsN } from '../lib/parse';
 import { currentPlan, nextWorkout, planSequence, workoutDate } from '../lib/plan';
 import { fmtWeekdayDate } from '../lib/planGrid';
 import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
-import { fmtDur, fmtKm, planRunTotals } from '../lib/running';
+import { fmtDur, fmtKm, planRunTotals, runVolume } from '../lib/running';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
+import { checkinAdvice, firstOpenWeek, planDue, weekStrip } from '../lib/athleteToday';
 import { Player } from './Player';
 import { IntakeWizard } from './Intake';
 import { WorkoutPreview } from './WorkoutPreview';
-import { NoteToTrainer, TodayHabits } from './Today';
+import { TodayHabits } from './TodayHabits';
+import { NutritionCard } from './Nutrition';
+import { TrainerTab } from './TrainerTab';
+import { MyData } from './MyData';
+import { ProgressExtra } from './progress/ProgressExtra';
 import { useAthleteUnread } from '../components/Chat';
 import { WeeklyReportCard } from '../components/WeeklyReport';
 import { DayLogCard } from '../components/DayLog';
 import { AthletePhotos } from '../components/ProgressPhotos';
 import { runFromStart, type RunStart } from './start';
-import { AthleteRunCards } from '../components/RunVolume'; // funkcje: bieg
-import { History, SessionSheet, Upcoming, upcomingVisits } from './History';
+import { AthleteRunCards, isRunner } from '../components/RunVolume'; // funkcje: bieg
+import { History, SessionSheet, upcomingVisits } from './History';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
 export type RunKind = 'run' | 'live';
@@ -52,6 +57,62 @@ export function storeRun(id: string, run: Run | null, kind: RunKind = 'run') {
   }
 }
 
+/** Dolne zakładki panelu podopiecznego. */
+type Tab = 'today' | 'progress' | 'history' | 'trainer';
+const TABS: [Tab, string][] = [
+  ['today', 'Dziś'],
+  ['progress', 'Postępy'],
+  ['history', 'Historia'],
+  ['trainer', 'Trener'],
+];
+const TAB_KEY = (id: string) => `fitowa-ath-tab:${id}`;
+function loadTab(id: string): Tab {
+  try {
+    const t = sessionStorage.getItem(TAB_KEY(id));
+    return TABS.some(([k]) => k === t) ? (t as Tab) : 'today';
+  } catch {
+    return 'today';
+  }
+}
+
+/** Ikony zakładek i drobne piktogramy (ten sam rysunek co `Icon`: obrys 2px, 24×24). */
+function Glyph({ name, size = 22 }: { name: Tab | 'repeat'; size?: number }) {
+  const d: Record<string, ReactNode> = {
+    today: (
+      <>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" />
+      </>
+    ),
+    progress: <path d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
+    history: (
+      <>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M3 10h18M8 3v4M16 3v4M8 14h3M8 17h6" />
+      </>
+    ),
+    trainer: <path d="M4 5h16v11H9l-5 4z" />,
+    repeat: <path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" />,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+      {d[name]}
+    </svg>
+  );
+}
+
+/** Jeden styl nagłówka arkusza: tytuł po lewej, „×” (Zamknij) po prawej. */
+function SheetTop({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div className="between sheet-top">
+      <h2>{title}</h2>
+      <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>
+        <Icon name="x" />
+      </button>
+    </div>
+  );
+}
+
 export function AthleteApp({
   clientId,
   onExit,
@@ -67,7 +128,7 @@ export function AthleteApp({
   /** Podgląd trenera: „Prowadź jako trener” przełącza do treningu na żywo. */
   onTrainer?: (st: RunStart) => void;
 }) {
-  const { db, toast, ask, apply } = useStore();
+  const { db, toast, ask, apply, saveCheckin } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
   // ankieta startowa: przy pierwszym wejściu podopiecznego (raz na sesję, „Uzupełnię później” odkłada)
@@ -80,8 +141,11 @@ export function AthleteApp({
     }
     return 'home';
   });
+  const [tab, setTabState] = useState<Tab>(() => loadTab(clientId));
   const [planId, setPlanId] = useState<string | null>(null);
   const [look, setLook] = useState(false);
+  /** Trening czekający na krótki check-in samopoczucia (krok przed Start). */
+  const [pre, setPre] = useState<Run | null>(null);
 
   useEffect(() => {
     storeRun(clientId, run);
@@ -103,10 +167,24 @@ export function AthleteApp({
   const plan = plans.find((p) => p.id === planId) ?? currentPlan(plans);
   const sessions = sessionsOf(db, clientId);
 
-  const begin = (r: Run) => {
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    try {
+      sessionStorage.setItem(TAB_KEY(clientId), t);
+    } catch {
+      // brak sessionStorage — zakładka tylko w pamięci
+    }
+    window.scrollTo(0, 0);
+  };
+  const go = (r: Run) => {
     setRun(r);
     setScreen('run');
     window.scrollTo(0, 0);
+  };
+  // check-in przed treningiem: tylko podopieczny (trener w podglądzie nie wpisuje cudzego samopoczucia) i tylko raz dziennie
+  const begin = (r: Run) => {
+    if (mode === 'client' && !r.editSessionId && !client.checkins.some((c) => c.date === todayISO())) return setPre(r);
+    go(r);
   };
   /** Zastępuje trening w toku tylko po potwierdzeniu. */
   const replaceRun = async (r: Run) => {
@@ -136,7 +214,6 @@ export function AthleteApp({
     const removePayment = !!sp && mode === 'preview' && (await ask(`Usunąć też płatność „${paymentLabel(sp.payment)}” za ten trening?`, { confirm: 'Usuń płatność' }));
     const appts = db.appointments.filter((a) => a.sessionId === s.id);
     const prevExtra = extraPlanOf(db, s.clientId);
-    // konto podopiecznego zapisuje tylko treningi — listę dodatkowych uzupełnia trener
     // konto podopiecznego może zapisać tylko treningi — bez zmian wizyt i planów (inaczej znikałyby po cichu)
     const changes = mode === 'preview' ? undoSession(db, s.id, removePayment) : deleteSession(db, s.id, false).filter((c) => c.col === 'sessions');
     if (!(await apply(changes))) return;
@@ -157,24 +234,29 @@ export function AthleteApp({
         ),
     });
   };
-  // Podopieczny cofa tylko swoje treningi (bez rozliczenia); trener w podglądzie — każdy.
-  // podopieczny: tylko własny zapis — bez rozliczenia, wizyty i komentarza trenera (przywrócenie by go nie odtworzyło)
+  // Podopieczny cofa tylko swoje treningi (bez rozliczenia, wizyty i komentarza trenera); trener w podglądzie — każdy.
   const canUndo = (s: TrainingSession) => mode === 'preview' || (s.charge === 'brak' && !s.reviewedAt && !s.coachNote && !db.appointments.some((a) => a.sessionId === s.id));
+  const openIntake = () => {
+    setLook(false);
+    setScreen('intake');
+    window.scrollTo(0, 0);
+  };
+  const home = screen === 'home' || (screen === 'run' && !run);
 
   return (
-    <div className="ath">
+    <div className={`ath ${home ? 'ath-tabbed' : ''}`}>
       {mode === 'client' ? (
         <div className="ath-top">
-          <span className="auth-logo small-logo">
-            FITOWA <span>/ coach</span>
+          <span className="ath-coach">
+            <span className="ath-coach-av" aria-hidden>
+              <Icon name="user" size={16} />
+            </span>
+            Twój trener
           </span>
           <span className="row-inline">
             <OfflineBadge />
-            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
-              <Icon name="settings" size={16} /> Ustawienia
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={onExit}>
-              Wyloguj
+            <button className="icon-btn ath-gear" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
+              <Icon name="settings" size={20} />
             </button>
           </span>
         </div>
@@ -193,17 +275,37 @@ export function AthleteApp({
       )}
       {look && (
         <Sheet label="Ustawienia" onClose={() => setLook(false)}>
-          <div className="between">
-            <h2>Ustawienia</h2>
-            <button className="btn btn-ghost btn-sm" onClick={() => setLook(false)}>
-              Gotowe
-            </button>
-          </div>
+          <SheetTop title="Ustawienia" onClose={() => setLook(false)} />
           {mode === 'client' && <PushSettings role="client" />}
           <h3 className="form-section">Kolory</h3>
-          <p className="muted small">Wybierz kolory aplikacji — zapisują się na tym telefonie.</p>
           <PalettePicker />
+          <h3 className="form-section">Ankieta</h3>
+          <button className="btn btn-secondary btn-block ath-set-row" onClick={openIntake}>
+            <Icon name="clipboard" size={18} /> {mode === 'preview' ? 'Ankieta podopiecznego' : 'Moja ankieta'}
+          </button>
+          {mode === 'client' && <MyData client={client} />}
+          {mode === 'client' && (
+            <button className="btn btn-ghost btn-block ath-logout" onClick={onExit}>
+              Wyloguj
+            </button>
+          )}
         </Sheet>
+      )}
+      {pre && (
+        <PreCheckin
+          client={client}
+          onCancel={() => setPre(null)}
+          onGo={async (w) => {
+            const r = pre;
+            setPre(null);
+            if (w) {
+              await saveCheckin(client.id, { date: todayISO(), ...w });
+              const a = checkinAdvice(readiness(w), readinessNorm(client.checkins, sessions, todayISO()));
+              if (a?.lighter) toast(`Samopoczucie ${fx(readiness(w)!, 1)}/5. ${a.text}`);
+            }
+            go(r);
+          }}
+        />
       )}
       {screen === 'intake' ? (
         <IntakeWizard
@@ -243,29 +345,74 @@ export function AthleteApp({
           }}
         />
       ) : (
-        <Home
-          clientId={clientId}
-          plan={plan}
-          plans={plans}
-          onPlan={setPlanId}
-          run={run}
-          onStart={start}
-          onOwn={startOwn}
-          onEdit={editSession}
-          onRepeat={(s) => startFrom({ repeatSessionId: s.id })}
-          onStartFrom={startFrom}
-          onTrainer={onTrainer}
-          onUndo={undo}
-          canUndo={canUndo}
-          onResume={() => setScreen('run')}
-          onIntake={() => setScreen('intake')}
-          onDiscard={() => {
-            if (run) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
-            setRun(null);
-          }}
-        />
+        <>
+          {tab === 'today' && (
+            <TodayTab
+              clientId={clientId}
+              plan={plan}
+              run={run}
+              onStart={start}
+              onOwn={startOwn}
+              onRepeat={(s) => startFrom({ repeatSessionId: s.id })}
+              onStartFrom={startFrom}
+              onResume={() => setScreen('run')}
+              onIntake={openIntake}
+              onDiscard={() => {
+                if (run) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
+                setRun(null);
+              }}
+            />
+          )}
+          {tab === 'progress' && <ProgressTab client={client} canImport={!run} />}
+          {tab === 'history' && (
+            <div className="ath-page fade">
+              <h1 className="ath-page-title">Historia</h1>
+              <MonthCalendar done={sessions.reduce((m, s) => m.set(s.date, [...(m.get(s.date) ?? []), s.workoutName || 'Trening']), new Map<string, string[]>())} today={todayISO()} planned={plannedByDay(db, clientId, plan, extraPlanOf(db, clientId), sessions, todayISO())} />
+              <History plain={!onTrainer} clientId={clientId} onEdit={editSession} onRepeat={(s) => startFrom({ repeatSessionId: s.id })} onTrainer={onTrainer && ((s) => onTrainer({ repeatSessionId: s.id }))} onUndo={undo} canUndo={canUndo} />
+              <Workouts
+                plan={plan}
+                extra={extraPlanOf(db, clientId)}
+                plans={plans}
+                onPlan={setPlanId}
+                sessions={sessions}
+                nextId={nextWorkout(plan, sessions)?.workout.id}
+                onStart={(id, pid) => (pid === plan?.id ? void start(id) : startFrom({ planId: pid, workoutId: id }))}
+                onTrainer={onTrainer}
+              />
+            </div>
+          )}
+          {tab === 'trainer' && (
+            <div className="ath-page fade">
+              <h1 className="ath-page-title">Trener</h1>
+              <TrainerTab client={client} mode={mode} />
+            </div>
+          )}
+          <TabBar client={client} tab={tab} onTab={setTab} badge={!onTrainer} />
+        </>
       )}
     </div>
+  );
+}
+
+/** Dolny pasek zakładek (styl jak menu trenera: ikona w „pigułce” + podpis). */
+function TabBar({ client, tab, onTab, badge }: { client: Client; tab: Tab; onTab: (t: Tab) => void; badge: boolean }) {
+  const unread = useAthleteUnread(client);
+  return (
+    <nav className="ath-tabbar" aria-label="Zakładki">
+      {TABS.map(([k, label]) => (
+        <button key={k} type="button" className={tab === k ? 'active' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => onTab(k)}>
+          <span className="ath-tab-ic">
+            <Glyph name={k} />
+            {k === 'trainer' && badge && unread > 0 && (
+              <span className="ath-tab-badge" aria-label={`${unread} nowe`}>
+                {unread}
+              </span>
+            )}
+          </span>
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -285,37 +432,27 @@ function workoutSummary(k: PlanWorkout, client: { run?: Client['run'] }): string
   return nEx(ex.length);
 }
 
-function Home({
+const nf1 = new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 });
+
+function TodayTab({
   clientId,
   plan,
-  plans,
-  onPlan,
   run,
   onStart,
   onOwn,
-  onEdit,
   onRepeat,
   onStartFrom,
-  onTrainer,
-  onUndo,
-  canUndo,
   onResume,
   onDiscard,
   onIntake,
 }: {
   clientId: string;
   plan: ReturnType<typeof currentPlan>;
-  plans: ReturnType<typeof plansOf>;
-  onPlan: (id: string) => void;
   run: Run | null;
   onStart: (workoutId?: string) => void;
   onOwn: () => void;
-  onEdit: (s: TrainingSession) => void;
   onRepeat: (s: TrainingSession) => void;
   onStartFrom: (st: RunStart) => void;
-  onTrainer?: (st: RunStart) => void;
-  onUndo: (s: TrainingSession) => void;
-  canUndo: (s: TrainingSession) => boolean;
   onResume: () => void;
   onDiscard: () => void;
   onIntake: () => void;
@@ -326,58 +463,38 @@ function Home({
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
   const extra = extraPlanOf(db, clientId);
-  const st = streak(sessions, today);
   const first = client.name.split(' ')[0];
-  const unreadMsgs = useAthleteUnread(client);
 
-  // cel tygodnia
-  const ws = weekStart(today);
-  const thisWeek = sessions.filter((s) => s.date >= ws).length;
-  const goal = client.daysPerWeek || 2;
   const visit = upcomingVisits(db.appointments, clientId)[0];
   const visitText = visit && `${visit.date === today ? 'dziś' : fmtLong(visit.date)}, ${visit.time}`;
   const loc = visit && db.locations.find((l) => l.id === visit.locationId)?.name;
-  // wizyta dziś albo jutro → ten trening zwykle robi się z trenerem
+  // wizyta dziś albo jutro → ten trening zwykle robi się z trenerem (wizyta pokazana raz: w karcie treningu)
   const withTrainer = !!visit && visit.date <= addDays(today, 1);
+  const visitInHero = withTrainer && !run && !!nx;
+
+  const ci = client.checkins.find((c) => c.date === today);
+  const advice = checkinAdvice(readiness(ci), readinessNorm(client.checkins, sessions, today));
+
+  // tydzień: zrobione / zaplanowane / odpoczynek + najwyżej 3 liczby
+  const planned = plannedByDay(db, clientId, plan, extra, sessions, today);
+  const strip = weekStrip(
+    today,
+    sessions.map((s) => s.date),
+    [...planned.keys()],
+  );
+  const thisWeek = sessions.filter((s) => s.date >= weekStart(today)).length;
+  const goal = client.daysPerWeek || 2;
+  const st = streak(sessions, today);
+  const lastWeight = allMeasurements(client)
+    .filter((m) => m.weight != null)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
 
   return (
     <div className="ath-home fade">
       <header className="ath-hello">
         <h1>Cześć, {first}!</h1>
-        <p className="muted">
-          {plan ? plan.name : 'Brak planu'}
-          {nx && ` · ${nx.week.name}`}
-        </p>
-        {st.weeks > 0 && (
-          <span className="ath-streak">
-            <Icon name="flame" size={15} /> {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
-          </span>
-        )}
-        <button className="btn btn-ghost btn-sm msg-link" onClick={onIntake}>
-          <Icon name="clipboard" size={16} /> {onTrainer ? 'Ankieta podopiecznego' : 'Moja ankieta'}
-        </button>
-        {(() => {
-          const fresh = !onTrainer && unreadMsgs > 0;
-          return (
-            <a href="#do-trenera" className={`btn btn-sm msg-link ${fresh ? 'btn-primary' : 'btn-ghost'}`}>
-              <Icon name="mail" size={16} /> {onTrainer ? 'Napisz (jako trener)' : fresh ? 'Nowa odpowiedź trenera' : 'Napisz do trenera'}
-              {fresh && (
-                <span className="msg-badge" aria-label={`${unreadMsgs} nowe`}>
-                  {unreadMsgs}
-                </span>
-              )}
-            </a>
-          );
-        })()}
+        <p className="muted first-cap">{fmtLong(today)}</p>
       </header>
-
-      {visit && (
-        <section className="acard next-visit" aria-label="Następna wizyta">
-          <span className="eyebrow">Następna wizyta z trenerem</span>
-          <strong className="next-visit-when first-cap">{visitText}</strong>
-          {loc && <span className="muted">{loc}</span>}
-        </section>
-      )}
 
       {(() => {
         // treningi zadane przez trenera na konkretny dzień (poza planem), niezrobione: zaległe do 7 dni wstecz i do 7 dni naprzód
@@ -388,8 +505,8 @@ function Home({
         if (!due.length || run) return null;
         const when = (d: string) => (d === today ? 'na dziś' : d === addDays(today, 1) ? 'na jutro' : d < today ? `zaległy z ${fmtDay(d)}` : `na ${fmtDay(d)}`);
         return due.map((k) => (
-          <section key={k.id} className={`acard ${k.date! <= today ? 'acard-hero' : ''}`}>
-            <span className="eyebrow">Od trenera · {when(k.date!)}</span>
+          <section key={k.id} className={`acard ${k.date! <= today ? 'acard-hero' : 'acard-extra'}`}>
+            <span className={`eyebrow ${k.date! < today ? 'warn-text' : ''}`}>Od trenera · {when(k.date!)}</span>
             <h2>{k.name}</h2>
             <p className="muted small">{workoutSummary(k, client)} · poza planem</p>
             <button className={`btn ${k.date! <= today ? 'btn-primary btn-lg' : 'btn-secondary'}`} onClick={() => onStartFrom({ planId: extra!.id, workoutId: k.id })}>
@@ -401,7 +518,9 @@ function Home({
       {run?.editSessionId && (
         <section className="acard">
           <span className="eyebrow">Poprawki zapisanego treningu</span>
-          <h3>{run.name} · {fmtDay(run.date)}</h3>
+          <h3>
+            {run.name} · {fmtDay(run.date)}
+          </h3>
           <div className="actions">
             <button className="btn btn-secondary" onClick={onResume}>
               Wróć do poprawek
@@ -425,7 +544,8 @@ function Home({
             <p className="small warn-text">Ten trening jest już zapisany dziś (np. z trenerem). Jeśli to ten sam — porzuć ten, żeby nie było dwóch zapisów.</p>
           )}
           <p className="muted small">
-            {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {run.date !== todayISO() ? `${fmtDay(run.date)}, ` : ''}{new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
+            {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {run.date !== todayISO() ? `${fmtDay(run.date)}, ` : ''}
+            {new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
           </p>
           <div className="actions">
             <button className="btn btn-primary btn-lg" onClick={onResume}>
@@ -446,21 +566,30 @@ function Home({
           <span className="eyebrow">Następny trening</span>
           <h2>{nx.workout.name}</h2>
           <p className="muted small">
-            {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.length)} · jednostka {nx.index + 1} z {nx.total}
+            {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
           </p>
           {(() => {
-            // dzień z planu (ustawiony przez trenera)
+            // dzień z planu (ustawiony przez trenera); „zaległy” tylko gdy od terminu nie było treningu z tego planu
             const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
-            if (!d) return null;
-            return <p className={`small ${d < today ? 'warn-text' : ''}`}>{d < today ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>;
+            const due = planDue(d, today, sessions, plan?.id);
+            if (!d || !due) return null;
+            return <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>;
           })()}
-          {withTrainer && <p className="small">Ten trening zrobicie razem na wizycie ({visitText}). Start tylko, jeśli ćwiczysz dziś sam(a).</p>}
-          {(() => {
-            const ci = client.checkins.find((c) => c.date === today);
-            const r = readiness(ci);
-            return r != null && r <= 2.5 ? <p className="small warn-text">Gorsze samopoczucie dziś ({fx(r, 1)}/5) — zrób lżej: mniej serii albo ciężar o RPE niżej. Ból lub zawroty głowy → nie trenuj i napisz do trenera.</p> : null;
-          })()}
-          <button className={`btn ${withTrainer ? 'btn-secondary' : 'btn-primary'} btn-lg`} onClick={() => onStart(nx.workout.id)}>
+          {visitInHero && (
+            <p className="small ath-hero-visit">
+              <Icon name="cal" size={16} />
+              <span>
+                <b className="first-cap">Wizyta z trenerem: {visitText}</b>
+                {loc ? ` · ${loc}` : ''}. Zrobicie ten trening razem — Start tylko, jeśli ćwiczysz sam(a).
+              </span>
+            </p>
+          )}
+          {advice?.lighter && (
+            <p className="small warn-text">
+              Samopoczucie {fx(readiness(ci)!, 1)}/5 — {advice.text}
+            </p>
+          )}
+          <button className="btn btn-primary btn-lg" onClick={() => onStart(nx.workout.id)}>
             <Icon name="play" /> {withTrainer ? 'Start samodzielnie' : 'Start'}
           </button>
         </section>
@@ -468,11 +597,12 @@ function Home({
         <section className="acard acard-hero">
           <span className="eyebrow">Trening własny</span>
           <h2>Zacznij trening</h2>
-          <p className="muted small">
-            {extra?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name)))
-              ? 'Poza treningami od trenera możesz zrobić własny — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.'
-              : 'Trener nie przygotował jeszcze planu — dodawaj ćwiczenia w trakcie, a trener zobaczy cały zapis.'}
-          </p>
+          <p className="muted small">{extra?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name))) ? 'Dodawaj ćwiczenia w trakcie — trener zobaczy zapis.' : 'Plan od trenera jeszcze się przygotowuje. Dodawaj ćwiczenia w trakcie — trener zobaczy zapis.'}</p>
+          {advice?.lighter && (
+            <p className="small warn-text">
+              Samopoczucie {fx(readiness(ci)!, 1)}/5 — {advice.text}
+            </p>
+          )}
           <button className="btn btn-primary btn-lg" onClick={onOwn}>
             <Icon name="play" /> Start
           </button>
@@ -481,85 +611,137 @@ function Home({
       {!run && (nx || sessions[0]) && (
         <div className={`ath-quick ${nx && sessions[0] ? 'two' : ''}`}>
           {nx && (
-            <button className="btn btn-ghost btn-block own-btn" onClick={onOwn}>
-              + Trening własny (poza planem)
+            <button className="btn btn-secondary own-btn" onClick={onOwn} title="Trening poza planem — dodajesz ćwiczenia w trakcie">
+              <Icon name="plus" size={18} /> Trening własny
             </button>
           )}
           {sessions[0] && (
-            <button className="btn btn-ghost btn-block repeat-btn" onClick={() => onRepeat(sessions[0])} title={`${sessions[0].workoutName || 'Trening'} z ${fmtDay(sessions[0].date)} — te same ćwiczenia, ciężary z ostatniego razu`}>
-              <span>↻ Powtórz ostatni trening</span>
-              <span className="muted small ellipsis">
-                {sessions[0].workoutName || 'Trening'} · {fmtDay(sessions[0].date)}
-              </span>
+            <button className="btn btn-secondary repeat-btn" onClick={() => onRepeat(sessions[0])} title={`${sessions[0].workoutName || 'Trening'} z ${fmtDay(sessions[0].date)} — te same ćwiczenia, ciężary z ostatniego razu`}>
+              <Glyph name="repeat" size={18} /> Powtórz ostatni
             </button>
           )}
         </div>
       )}
-      {/* funkcje: bieg — import z zegarka (GPX/TCX/FIT) + kilometraż plan vs wykonanie; tylko dla biegających (components/RunVolume.tsx) */}
-      <AthleteRunCards client={client} canImport={!run} />
 
       {!client.intake?.completedAt && (
-        <section className="acard acard-warn">
+        <section className="acard acard-warn ath-intake">
           <span className="eyebrow">Ankieta startowa</span>
-          <h3>Zdrowie, styl życia, jedzenie, sport i cele</h3>
-          <p className="muted small">Ok. 5 minut. Dzięki niej trener dopasuje treningi bezpiecznie do Ciebie.</p>
+          <h3>Zdrowie, styl życia i cele — ok. 5 minut</h3>
           <button className="btn btn-primary" onClick={onIntake}>
             Wypełnij ankietę
           </button>
         </section>
       )}
-      <WeeklyReportCard client={client} />
-      <TodayHabits client={client} />
-      <DayLogCard client={client} />
-      <Checkin client={client} onSave={(c) => saveCheckin(client.id, c)} />
-      <Upcoming clientId={clientId} limit={2} />
 
-      <div className="ath-grid">
-        <section className="acard">
-          <h3>Cel tygodnia</h3>
-          <div className="ring-wrap">
-            <Ring value={thisWeek} max={goal} />
-            <div>
-              <strong className="big">
-                {thisWeek}/{goal}
-              </strong>
-              <p className="muted small">{thisWeek >= goal ? 'Cel osiągnięty' : `Zostało ${goal - thisWeek}`}</p>
-            </div>
-          </div>
+      {visit && !visitInHero && (
+        <section className="acard next-visit" aria-label="Następna wizyta">
+          <Icon name="cal" size={20} />
+          <span>
+            <span className="eyebrow">Wizyta z trenerem</span>
+            <strong className="next-visit-when first-cap">{visitText}</strong>
+            {loc && <span className="muted small"> · {loc}</span>}
+          </span>
         </section>
-        <MonthCalendar done={sessions.reduce((m, s) => m.set(s.date, [...(m.get(s.date) ?? []), s.workoutName || 'Trening']), new Map<string, string[]>())} today={today} planned={plannedByDay(db, clientId, plan, extra, sessions, today)} />
-      </div>
+      )}
 
-      <BodyProgress client={client} />
-      <AthletePhotos client={client} />
-      <Progress clientId={clientId} />
+      <section className="acard ath-week" aria-label="Ten tydzień">
+        <ol className="wk-strip">
+          {strip.map((d) => (
+            <li key={d.date} className={`wk-day ${d.state} ${d.today ? 'is-today' : ''}`} aria-label={`${fmtLong(d.date)}: ${d.state === 'done' ? 'trening zrobiony' : d.state === 'planned' ? 'zaplanowany' : 'odpoczynek'}${d.today ? ' (dziś)' : ''}`}>
+              <span className="wk-dow" aria-hidden>
+                {d.label}
+              </span>
+              <i className="wk-mark" aria-hidden>
+                {d.state === 'done' && <Icon name="check" size={14} />}
+              </i>
+            </li>
+          ))}
+        </ol>
+        <dl className="ath-stats">
+          <div>
+            <dt>W tym tygodniu</dt>
+            <dd className={thisWeek >= goal ? 'ok-text' : ''}>
+              {thisWeek}
+              <small>/{goal}</small>
+            </dd>
+          </div>
+          <div>
+            <dt>{plural(st.weeks, 'Tydzień', 'Tygodnie', 'Tygodni')} z rzędu</dt>
+            <dd>{st.weeks}</dd>
+          </div>
+          {lastWeight && (
+            <div>
+              <dt>Waga · {fmtDay(lastWeight.date)}</dt>
+              <dd>
+                {nf1.format(lastWeight.weight!)}
+                <small> kg</small>
+              </dd>
+            </div>
+          )}
+        </dl>
+      </section>
 
-      <Workouts plan={plan} extra={extra} plans={plans} onPlan={onPlan} sessions={sessions} nextId={nx?.workout.id} onStart={(id, planId) => (planId === plan?.id ? onStart(id) : onStartFrom({ planId, workoutId: id }))} onTrainer={onTrainer} />
-
-      <History
-        plain={!onTrainer}
-        clientId={clientId}
-        onEdit={onEdit}
-        onRepeat={onRepeat}
-        onTrainer={onTrainer && ((s) => onTrainer({ repeatSessionId: s.id }))}
-        onUndo={onUndo}
-        canUndo={canUndo}
-      />
-      <NoteToTrainer client={client} asTrainer={!!onTrainer} />
+      <CheckinCard client={client} onSave={(c) => saveCheckin(client.id, c)} />
+      <TodayHabits client={client} />
+      <NutritionCard client={client} />
+      <DayLogCard client={client} />
     </div>
   );
 }
 
-/** Opis końców skali (1 … 5), żeby nie trzeba było zgadywać kierunku. */
-const ENDS: Record<string, string> = {
-  sleep: '1 źle spałem/am · 5 świetnie',
-  energy: '1 brak sił · 5 pełno energii',
-  muscle: '1 bardzo obolałe · 5 świeże',
-  stress: '1 duży stres · 5 spokój',
-  mood: '1 kiepski · 5 świetny',
-};
+/** Kompaktowe 5 skal 1–5: jeden opis skali u góry, wiersz = etykieta + 5 przycisków. */
+function CheckinScales({ w, onChange }: { w: Wellness; onChange: (w: Wellness) => void }) {
+  return (
+    <div className="ci-compact">
+      <p className="ci-legend muted small">1 = źle · 5 = świetnie (przy stresie 5 = spokój)</p>
+      {WELLNESS_ITEMS.map(([k, label]) => (
+        <div key={k} className="checkin-row ci-row">
+          <span className="ci-label">{label}</span>
+          <div className="scale scale-5" role="radiogroup" aria-label={label}>
+            {[1, 2, 3, 4, 5].map((v) => (
+              <button key={v} type="button" role="radio" aria-checked={w[k] === v} className={w[k] === v ? 'active' : ''} onClick={() => onChange({ ...w, [k]: v })} aria-label={`${label} ${v}`}>
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+const isComplete = (w: Wellness) => WELLNESS_ITEMS.every(([k]) => w[k] != null);
 
-function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof clientById>>; onSave: (c: Checkin) => void }) {
+/** Krok przed Start: krótki check-in (jeden ekran), „Zapisz i zacznij” albo „Pomiń”. */
+function PreCheckin({ client, onGo, onCancel }: { client: Client; onGo: (w: Wellness | null) => void; onCancel: () => void }) {
+  const [w, setW] = useState<Wellness>({});
+  const [busy, setBusy] = useState(false);
+  void client;
+  return (
+    <Sheet label="Samopoczucie przed treningiem" onClose={onCancel}>
+      <div className="ci-sheet">
+        <SheetTop title="Jak się dziś czujesz?" onClose={onCancel} />
+        <CheckinScales w={w} onChange={setW} />
+        <div className="ci-actions">
+          <button
+            className="btn btn-primary btn-lg"
+            disabled={!isComplete(w) || busy}
+            onClick={() => {
+              setBusy(true);
+              onGo(w);
+            }}
+          >
+            <Icon name="play" /> Zapisz i zacznij
+          </button>
+          <button className="btn btn-ghost" onClick={() => onGo(null)}>
+            Pomiń
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+function CheckinCard({ client, onSave }: { client: Client; onSave: (c: Checkin) => void }) {
   const { db } = useStore();
   const today = todayISO();
   const existing = client.checkins.find((c) => c.date === today);
@@ -569,11 +751,11 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
   const r = readiness(existing);
 
   if (!editing && existing && r != null) {
-    const diff = norm != null ? r - norm : null;
+    const a = checkinAdvice(r, norm)!;
     return (
-      <section className="acard">
-        <div className="between">
-          <h3>Gotowość dziś</h3>
+      <section className="acard ci-done" aria-label="Samopoczucie dziś">
+        <div className="ci-done-head">
+          <span className="eyebrow">Samopoczucie dziś</span>
           <button className="link small" onClick={() => setEditing(true)}>
             zmień
           </button>
@@ -581,40 +763,20 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
         <div className="readiness">
           <strong className="big">{fx(r, 1)}</strong>
           <span className="muted">/ 5</span>
-          {diff != null && (
-            <span className={`tag ${diff >= 0 ? 'tag-ok' : diff > -0.5 ? 'tag-neutral' : 'tag-warn'}`}>
-              {diff >= 0.25 ? 'lepiej niż zwykle' : diff > -0.25 ? 'jak zwykle' : diff > -0.5 ? 'trochę gorzej niż zwykle' : 'gorzej niż zwykle'}
-            </span>
-          )}
+          <span className={`tag tag-${a.tone}`}>{a.tag}</span>
         </div>
-        <p className="muted small">{diff == null ? 'Porównanie z Twoim zwykłym samopoczuciem pojawi się po kilku dniach wpisów.' : diff >= 0 ? 'Jesteś w formie — trenuj zgodnie z planem.' : diff > -0.5 ? 'Trochę gorzej niż zwykle — nie forsuj ciężarów, jeśli serie idą ciężko.' : 'Wyraźnie poniżej normy — rozważ lżejszy trening i daj znać trenerowi.'}</p>
+        <p className="muted small">{a.text}</p>
       </section>
     );
   }
 
-  const complete = WELLNESS_ITEMS.every(([k]) => w[k] != null);
   return (
-    <section className="acard">
+    <section className="acard" aria-label="Samopoczucie">
       <h3>Jak się dziś czujesz?</h3>
-      <p className="muted small">Im wyżej, tym lepiej: 1 = źle · 5 = świetnie</p>
-      {WELLNESS_ITEMS.map(([k, label]) => (
-        <div key={k} className="checkin-row">
-          <span>
-            {label}
-            <span className="muted small checkin-ends">{ENDS[k]}</span>
-          </span>
-          <div className="scale scale-5" role="radiogroup" aria-label={label}>
-            {[1, 2, 3, 4, 5].map((v) => (
-              <button key={v} type="button" role="radio" aria-checked={w[k] === v} className={w[k] === v ? 'active' : ''} onClick={() => setW({ ...w, [k]: v })} aria-label={`${label} ${v}`}>
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
+      <CheckinScales w={w} onChange={setW} />
       <button
         className="btn btn-primary btn-block"
-        disabled={!complete}
+        disabled={!isComplete(w)}
         onClick={() => {
           onSave({ date: today, ...w });
           setEditing(false);
@@ -622,20 +784,53 @@ function Checkin({ client, onSave }: { client: NonNullable<ReturnType<typeof cli
       >
         Zapisz
       </button>
-      {!complete && <p className="muted small center">Zaznacz odpowiedź w każdym z {WELLNESS_ITEMS.length} wierszy ({WELLNESS_ITEMS.filter(([k]) => w[k] != null).length}/{WELLNESS_ITEMS.length}).</p>}
     </section>
   );
 }
 
-function Ring({ value, max }: { value: number; max: number }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const p = Math.min(1, value / Math.max(1, max));
+/** Zakładka „Postępy”: podsumowania (ProgressExtra), siła, rekordy, ciało, bieg, raport tygodnia. */
+function ProgressTab({ client, canImport }: { client: Client; canImport: boolean }) {
+  const { db } = useStore();
+  const sessions = sessionsOf(db, client.id);
+  const recs = records(sessions).slice(0, 5);
+  const extra = extraPlanOf(db, client.id);
+  const runner = isRunner(client, runVolume([...plansOf(db, client.id), ...(extra ? [extra] : [])], sessions, client.run, 8));
   return (
-    <svg width={76} height={76} viewBox="0 0 76 76" aria-hidden>
-      <circle cx={38} cy={38} r={r} className="ring-bg" />
-      <circle cx={38} cy={38} r={r} className="ring-fg" strokeDasharray={`${c * p} ${c}`} transform="rotate(-90 38 38)" />
-    </svg>
+    <div className="ath-page fade">
+      <h1 className="ath-page-title">Postępy</h1>
+      <ProgressExtra client={client} />
+      <h2 className="ath-sec">Siła i wysiłek</h2>
+      <Progress clientId={client.id} />
+      {recs.length > 0 && (
+        <>
+          <h2 className="ath-sec">Ostatnie rekordy</h2>
+          <section className="acard ath-recs">
+            <ul className="rows">
+              {recs.map((r, i) => (
+                <li key={i} className="row">
+                  <span className="text-green">
+                    <Icon name="star" size={16} />
+                  </span>
+                  <span className="grow">
+                    {r.name}
+                    <span className="muted small"> · {fmtDay(r.date)}</span>
+                  </span>
+                  <span className="small rec-val">
+                    {String(r.reps)} × {fnum(num(r.load))} kg
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </>
+      )}
+      <h2 className="ath-sec">Ciało</h2>
+      <BodyProgress client={client} />
+      <AthletePhotos client={client} />
+      {runner && <h2 className="ath-sec">Bieganie</h2>}
+      <AthleteRunCards client={client} canImport={canImport} />
+      <WeeklyReportCard client={client} />
+    </div>
   );
 }
 
@@ -656,7 +851,8 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
     plan.weeks.forEach((w, wi) =>
       w.workouts.forEach((k) => {
         const d = workoutDate(plan, wi, k);
-        if (d && !done.has(k.id) && k.exercises.some((e) => e.name)) add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
+        // minione terminy pomijamy, gdy podopieczny od tego czasu trenował z planu (idzie po kolei — nie „zaległy”)
+        if (d && !done.has(k.id) && k.exercises.some((e) => e.name) && planDue(d, today, sessions, plan.id)) add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
       }),
     );
   }
@@ -724,7 +920,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
         })}
       </div>
       <p className="mini-legend muted small">
-        <span className="dot todo" /> trening do zrobienia · <span className="dot visit" /> wizyta · <span className="dot done" /> zrobiony
+        <span className="dot todo" /> do zrobienia · <span className="dot visit" /> wizyta · <span className="dot done" /> zrobiony
       </p>
       {pick && (items.length > 0 || dates.has(pick)) && (
         <ul className="mini-day-list">
@@ -736,8 +932,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
           ))}
           {items.map((x, i) => (
             <li key={i} className={x.kind}>
-              <Icon name={x.kind === 'visit' ? 'cal' : pick < today ? 'alert' : x.run ? 'run' : 'dumbbell'} size={15} />{' '}
-              {x.text}
+              <Icon name={x.kind === 'visit' ? 'cal' : pick < today ? 'alert' : x.run ? 'run' : 'dumbbell'} size={15} /> {x.text}
               {x.kind !== 'visit' && pick < today ? ' — zaległy' : ''}
             </li>
           ))}
@@ -748,7 +943,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
 }
 
 /** Pomiary ciała dla podopiecznego: waga i obwody — zmiana od pierwszego pomiaru, przebieg i własny wpis. */
-function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof clientById>> }) {
+function BodyProgress({ client }: { client: Client }) {
   const [adding, setAdding] = useState(false);
   const ms = allMeasurements(client).sort((a, b) => a.date.localeCompare(b.date));
   const field = ms.some((m) => m.weight != null) ? 'weight' : ms.some((m) => m.waist != null) ? 'waist' : null;
@@ -756,15 +951,9 @@ function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof client
   const waist = ms.filter((m) => m.waist != null);
   const wd = waist.length >= 2 ? waist[waist.length - 1].waist! - waist[0].waist! : null;
   return (
-    <section className="acard">
-      <div className="between">
-        <h3>Twoje ciało</h3>
-        <button className="btn btn-secondary btn-sm" onClick={() => setAdding(true)}>
-          + Dodaj pomiar
-        </button>
-      </div>
+    <section className="acard ath-body" aria-label="Pomiary">
       {!field || !vals.length ? (
-        <p className="muted small">Wpisuj wagę i obwody (np. raz w tygodniu, rano na czczo) — zobaczysz tu zmianę, a trener dostanie pomiar.</p>
+        <p className="muted small">Waga i obwody raz w tygodniu, rano na czczo — zobaczysz tu zmianę.</p>
       ) : (
         <>
           <div className="body-kpis">
@@ -790,6 +979,9 @@ function BodyProgress({ client }: { client: NonNullable<ReturnType<typeof client
           {vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />}
         </>
       )}
+      <button className="btn btn-secondary btn-block" onClick={() => setAdding(true)}>
+        <Icon name="plus" size={18} /> Dodaj pomiar
+      </button>
       {adding && <AddMeasurement client={client} onClose={() => setAdding(false)} />}
     </section>
   );
@@ -804,7 +996,7 @@ const SELF_FIELDS: ['weight' | 'waist' | 'hips' | 'chest' | 'arm' | 'thigh', str
   ['thigh', 'Udo', 'cm', 30, 100],
 ];
 
-function AddMeasurement({ client, onClose }: { client: NonNullable<ReturnType<typeof clientById>>; onClose: () => void }) {
+function AddMeasurement({ client, onClose }: { client: Client; onClose: () => void }) {
   const { addMeasurement, toast } = useStore();
   const [date, setDate] = useState(todayISO());
   const [v, setV] = useState<Record<string, string>>({});
@@ -827,18 +1019,13 @@ function AddMeasurement({ client, onClose }: { client: NonNullable<ReturnType<ty
   };
   return (
     <Sheet label="Nowy pomiar" onClose={onClose}>
-      <div className="between">
-        <h3>Nowy pomiar</h3>
-        <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>
-          <Icon name="x" />
-        </button>
-      </div>
+      <SheetTop title="Nowy pomiar" onClose={onClose} />
       <div className="meas-form">
         <label className="field">
           <span>Data</span>
           <input className="input" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <p className="muted small meas-hint">Wpisz tylko to, co mierzysz — resztę zostaw pustą.</p>
+        <p className="muted small meas-hint">Wypełnij tylko to, co mierzysz.</p>
         <div className="meas-grid">
           {SELF_FIELDS.map(([k, label, unit]) => (
             <label key={k} className="field">
@@ -875,7 +1062,6 @@ function Progress({ clientId }: { clientId: string }) {
   const [ex, setEx] = useState<string | null>(null);
   const chosen = ex && names.includes(ex) ? ex : names[0];
   const series = chosen ? e1Series(sessions, chosen) : [];
-  const recs = records(sessions).slice(0, 5);
 
   // Dystrybucja: RPE serii vs RPE sesji (ostatnie 4 tygodnie).
   const from = addDays(todayISO(), -27);
@@ -910,11 +1096,13 @@ function Progress({ clientId }: { clientId: string }) {
       </div>
       {tab === 'est' ? (
         names.length === 0 ? (
-          <p className="muted small">Szacowany maksymalny ciężar pojawi się po pierwszych treningach z ciężarem.</p>
+          <p className="muted small">Wykres pojawi się po pierwszych treningach z ciężarem.</p>
         ) : (
           <>
             <div className="between">
-              <span className="muted small" title="Szacowany ciężar na 1 powtórzenie (e1RM), liczony z Twoich serii">Szacowany maks. ciężar (1 powt.)</span>
+              <span className="muted small" title="Szacowany ciężar na 1 powtórzenie (e1RM), liczony z Twoich serii">
+                Szacowany maks. ciężar (1 powt.)
+              </span>
               <strong className="text-cyan">{fnum(series[series.length - 1]?.y)} kg</strong>
             </div>
             <LineChart label={`e1RM ${chosen}`} series={[{ label: chosen, pts: series, tone: 'cyan' }]} height={170} />
@@ -956,25 +1144,6 @@ function Progress({ clientId }: { clientId: string }) {
           </div>
         </>
       )}
-      {recs.length > 0 && (
-        <>
-          <h3 className="ath-sub">Ostatnie rekordy</h3>
-          <ul className="rows">
-            {recs.map((r, i) => (
-              <li key={i} className="row">
-                <span className="text-green"><Icon name="star" size={16} /></span>
-                <span className="grow">
-                  {r.name}
-                  <span className="muted small"> · {fmtDay(r.date)}</span>
-                </span>
-                <span className="small">
-                  {String(r.reps)} × {fnum(num(r.load))} kg
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
     </section>
   );
 }
@@ -1001,6 +1170,7 @@ function Workouts({
 }) {
   const [preview, setPreview] = useState<{ workout: PlanWorkout; planId: string } | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
+  const [past, setPast] = useState(false);
   // zadane na dzień i już zrobione są w historii — z listy znikają; bez terminu zostają (do powtarzania)
   const extraWorkouts = (extra?.weeks.flatMap((w) => w.workouts) ?? []).filter((k) => extraState(k, extra?.id, sessions, todayISO()).state !== 'done');
   if (!plan && extraWorkouts.length === 0) return null;
@@ -1008,6 +1178,8 @@ function Workouts({
   // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
   const seqIds = plan ? planSequence(plan).map((x) => x.workout.id) : [];
   const nextIdx = nextId ? seqIds.indexOf(nextId) : -1;
+  // minione tygodnie (przed tygodniem następnej jednostki) — zwinięte
+  const open = plan ? firstOpenWeek(plan.weeks, nextId) : 0;
   const item = (k: PlanWorkout, planId: string, isNext: boolean) => {
     const n = k.exercises.filter((e) => e.name).length;
     const dn = done(planId, k.id);
@@ -1022,7 +1194,7 @@ function Workouts({
           <span className="muted small">
             {n ? `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}` : 'brak ćwiczeń'}
             {planned ? ` · ${fmtWeekdayDate(planned)}` : ''}
-            {isNext ? ` · następny — do zrobienia${dn ? ` (ostatnio ${fmtDay(dn)})` : ''}` : dn ? ` · ${doneNow && planId !== extra?.id ? 'zrobione' : 'ostatnio'} ${fmtDay(dn)}` : ''}
+            {isNext ? ` · następny${dn ? ` (ostatnio ${fmtDay(dn)})` : ''}` : dn ? ` · ${doneNow && planId !== extra?.id ? 'zrobione' : 'ostatnio'} ${fmtDay(dn)}` : ''}
           </span>
         </span>
         <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>
@@ -1030,7 +1202,7 @@ function Workouts({
     );
   };
   return (
-    <section className="acard">
+    <section className="acard ath-plan">
       <div className="between">
         <h3>Treningi</h3>
         {plan && plans && onPlan && plans.length > 1 ? (
@@ -1046,12 +1218,22 @@ function Workouts({
           plan && <span className="muted small">{plan.name}</span>
         )}
       </div>
-      {plan?.weeks.map((w) => (
-        <div key={w.id}>
-          <div className="wk-label">{w.name}</div>
-          {w.workouts.map((k) => item(k, plan.id, nextId === k.id))}
-        </div>
-      ))}
+      {plan && open > 0 && (
+        <button type="button" className="wk-past-toggle" aria-expanded={past} onClick={() => setPast(!past)}>
+          <span>
+            {past ? 'Ukryj' : 'Pokaż'} minione tygodnie ({open})
+          </span>
+          <span aria-hidden>{past ? '▴' : '▾'}</span>
+        </button>
+      )}
+      {plan?.weeks.map((w, wi) =>
+        wi < open && !past ? null : (
+          <div key={w.id} className={wi < open ? 'wk-past' : ''}>
+            <div className="wk-label">{w.name}</div>
+            {w.workouts.map((k) => item(k, plan.id, nextId === k.id))}
+          </div>
+        ),
+      )}
       {extra && extraWorkouts.length > 0 && (
         <div>
           <div className="wk-label">Poza planem</div>
@@ -1091,5 +1273,3 @@ function Workouts({
     </section>
   );
 }
-
-

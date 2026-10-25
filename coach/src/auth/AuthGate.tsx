@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App } from '../App';
-import { AthleteApp } from '../athlete/AthleteApp';
+import { ClientEntry } from './ClientEntry';
 import { cloudMode } from '../data/config';
 import { createLocalRepository } from '../data/localRepository';
 import { createEmpty } from '../data/seed';
@@ -14,6 +14,14 @@ import { LoginScreen, NewPassword } from './LoginScreen';
 /** Punkt wejścia: lokalnie (podgląd) bez logowania, na stronie — logowanie przez Supabase. */
 export function Root() {
   const local = useMemo(() => (cloudMode() ? null : createLocalRepository()), []);
+  // podgląd lokalny konta podopiecznego (zgody, tryb „współpraca zakończona”): ?athlete=<id klienta>
+  const athlete = useMemo(() => (local ? new URLSearchParams(location.search).get('athlete') : null), [local]);
+  if (local && athlete)
+    return (
+      <StoreProvider repo={local}>
+        <ClientEntry clientId={athlete} onExit={() => location.assign(location.pathname)} />
+      </StoreProvider>
+    );
   if (local)
     return (
       <StoreProvider repo={local}>
@@ -97,7 +105,7 @@ function RoleGate({ email }: { email: string }) {
     case 'client':
       return (
         <StoreProvider repo={clientRepo} cloud signOut={signOut}>
-          <AthleteApp clientId={role.clientId} onExit={signOut} mode="client" />
+          <ClientEntry clientId={role.clientId} onExit={signOut} />
         </StoreProvider>
       );
     case 'unclaimed':

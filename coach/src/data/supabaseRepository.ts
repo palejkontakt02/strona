@@ -1,4 +1,4 @@
-import type { Checkin, ClientNote, Measurement } from '../domain';
+import type { Appointment, Checkin, ClientNote, Measurement } from '../domain';
 import type { Intake } from '../lib/intake';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
@@ -98,6 +98,14 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
       if (error) throw error;
     },
 
+    async respondAppointment(id, kind, reason) {
+      // funkcja w bazie: sekcja 23 w hardening.sql (podopieczny nie zapisuje wizyt bezpośrednio)
+      const { data, error } = await supabase.rpc('client_respond_appointment', { p_id: id, p_kind: kind, p_reason: reason ?? null });
+      if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');
+      if (error) throw error;
+      return (data as Appointment | null) ?? null;
+    },
+
     async saveIntake(clientId: string, intake: Intake) {
       const { error } = await supabase.rpc('save_intake', { p_client_id: clientId, p_intake: intake });
       if (error) throw error;
@@ -116,9 +124,17 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
 
     async saveClientEntry(clientId, kind, entry) {
       // funkcja w bazie: sekcja 19 w hardening.sql (raporty tygodniowe, zdjęcia sylwetki, makro i kroki)
-      const { error } = await supabase.rpc('save_client_entry', { p_client_id: clientId, p_kind: kind, p_entry: entry });
+      // zgody RODO i prośba o usunięcie konta — osobna funkcja (sekcja 24), tylko sam podopieczny
+      const { error } = await supabase.rpc(kind === 'consents' ? 'save_consent' : 'save_client_entry', { p_client_id: clientId, p_kind: kind, p_entry: entry });
       if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');
       if (error) throw error;
+      // tłuszcze, węglowodany i zrzut w dayLog — sekcja 22; starsza wersja funkcji po cichu je pomija
+      const d = entry as { date?: string; fat?: number; carbs?: number; shot?: string };
+      if (kind === 'dayLog' && (d.fat != null || d.carbs != null || d.shot)) {
+        const { data } = await supabase.from('clients').select('data').eq('id', clientId).maybeSingle();
+        const row = ((data as { data?: { dayLog?: typeof d[] } } | null)?.data?.dayLog ?? []).find((x) => x.date === d.date);
+        if (data && (!row || (d.fat != null && row.fat == null) || (d.carbs != null && row.carbs == null) || (!!d.shot && !row.shot))) throw new Error('DB_OUTDATED_22');
+      }
     },
 
     async saveCheckin(clientId: string, checkin: Checkin) {

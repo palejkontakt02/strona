@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { useDialog } from '../components/useDialog';
 import { Icon, IconBtn } from '../components/ui';
@@ -39,6 +39,11 @@ import {
   type RunSet,
 } from '../lib/run';
 import { LoadPerToggle } from '../components/LoadPerToggle';
+import { RefComment } from '../components/RefComment';
+import { compareWorkouts, fillFromLast, fmtLast, isNoLoad, lastExerciseLog, previousWorkout, resultDelta, srpeFromSets, workIndex, workoutStats } from '../lib/lastResult';
+import type { SetLog } from '../domain';
+import { primeRestAudio, restAudioPlaying, restSoundOn, setRestSound, startRestAudio, stopRestAudio, useWakeLock } from './playerDevice';
+import { WorkoutDone, type DoneInfo } from './WorkoutDone';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -126,7 +131,7 @@ function elapsedMinutes(startedAt: number): string {
   return m >= 10 && m <= 240 ? String(m) : '';
 }
 
-export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Start', appointmentId, onRest }: Props) {
+export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Wróć', appointmentId, onRest }: Props) {
   const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number; note?: string } | null>(null);
   useEffect(() => {
@@ -151,6 +156,43 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const last = bi >= blocks.length - 1;
   const tempoEx = block.map((k) => run.ex[k]).find((x) => x.tempo);
   const [hintNext, setHintNext] = useState<number | null>(null);
+  // ekran „Trening zakończony” (podopieczny, nowy trening) — po zapisie, przed powrotem do Dziś
+  const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  // wysiłek podpowiedziany z RPE serii (żeby opisać, skąd domyślna wartość)
+  const [srpeHint, setSrpeHint] = useState<string | null>(null);
+  const [sound, setSound] = useState(restSoundOn);
+  // ćwiczenia bez ciężaru, przy których ktoś jednak chce wpisać kg
+  const [kgOn, setKgOn] = useState<Set<number>>(new Set());
+
+  // ekran nie gaśnie w trakcie treningu (zwolnienie po zakończeniu / wyjściu)
+  useWakeLock(!doneInfo);
+  // przerwa: plik „cisza + sygnał” gra przy zablokowanym ekranie; pominięcie / zmiana — nowy plik albo stop
+  useEffect(() => {
+    if (rest && sound && !doneInfo) startRestAudio(rest.end, { title: rest.note ? `Przerwa (${rest.note})` : 'Przerwa', subtitle: run.name });
+    else stopRestAudio(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rest?.end, sound, doneInfo]);
+  useEffect(() => () => stopRestAudio(), []);
+
+  /** Ostatnie wykonanie ćwiczenia (serie robocze) — „ostatnio 60×8” i strzałki przy wyniku. */
+  const lastCache = useRef<{ key: string; map: Map<string, SetLog[]> }>({ key: '', map: new Map() });
+  const lastOf = useCallback(
+    (name: string): SetLog[] => {
+      const key = `${db.sessions.length}|${run.date}|${run.editSessionId ?? ''}`;
+      if (lastCache.current.key !== key) lastCache.current = { key, map: new Map() };
+      const m = lastCache.current.map;
+      if (!m.has(name)) m.set(name, lastExerciseLog(sessionsOf(db, client.id), name, { before: run.date, excludeId: run.editSessionId }));
+      return m.get(name)!;
+    },
+    [db, client.id, run.date, run.editSessionId],
+  );
+  /** Bez kolumny kg i bez kamery w każdym wierszu (masa ciała, skoki, deska…). */
+  const noLoad = (k: number) => {
+    const e = run.ex[k];
+    if (!e || kgOn.has(k)) return false;
+    return isNoLoad(e, { cat: db.library.find((l) => l.name.toLowerCase() === e.name.toLowerCase())?.cat, last: lastOf(e.name) });
+  };
 
   const update = (fn: (r: Run) => void) => {
     const next = structuredClone(run);
@@ -360,6 +402,26 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       else apptId = undefined;
     }
     const { changes, message } = saveSession(db, { session, isNew: true, appointmentId: apptId, matchAppointment: trainer && !(appointmentId && !apptId), amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
+    // podsumowanie liczone przed zapisem — po nim ten trening jest już w historii (rekordy porównują się z wcześniejszymi)
+    const before = history();
+    const summary: DoneInfo | null = trainer
+      ? null
+      : (() => {
+          const stats = workoutStats(session);
+          const prev = previousWorkout(before, session);
+          const cmp = compareWorkouts(stats, prev ? workoutStats(prev) : undefined);
+          return {
+            sessionId: session.id,
+            clientId: client.id,
+            name: session.workoutName || 'Trening',
+            date: session.date,
+            duration: session.duration,
+            stats,
+            records: recordsOf(before).map((p) => ({ name: p.name, text: `${p.hit.reps} × ${fnum(p.hit.load)} kg` })),
+            diff: cmp && prev ? { ...cmp, date: prev.date } : null,
+            brand: 'Fitowa',
+          };
+        })();
     if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota!'))) return; // trening zostaje — można ponowić zapis
     // notatka z podsumowania trafia też do wiadomości trenera (z odnośnikiem do treningu)
     // zadanie dzienne o tej samej nazwie co trening (np. „Ćwiczenia na kręgosłup”) odhacza się samo
@@ -380,8 +442,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       );
     if (hurt) void ask(`Ból ${session.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
     setFinish(null);
+    if (summary) {
+      // ekran „Trening zakończony”; trening w toku przechodzi w poprawki zapisanego — zamknięcie aplikacji
+      // na tym ekranie i powrót nie zapisze go drugi raz
+      setRest(null);
+      setHold(null);
+      setRun({ ...run, editSessionId: session.id });
+      setDoneInfo(summary);
+      return;
+    }
     onSaved();
   };
+  /** Rekordy w tym treningu względem historii `hist`. */
+  const recordsOf = (hist: TrainingSession[]) =>
+    sessionRecords(
+      hist,
+      run.ex.map((e) => ({ name: e.name, cardio: e.cardio, timed: e.timed, sets: e.sets.filter((x) => x.done).map((x) => ({ load: x.load, reps: x.reps, rpe: x.rpe, warmup: x.warmup, unit: x.unit })) })),
+    );
 
   /** Przed podsumowaniem: nagrania na niezaliczonych seriach i trening skończony dużo wcześniej. */
   const openFinish = async () => {
@@ -424,8 +501,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       return;
     }
     const solo = !trainer && !db.appointments.some((a) => a.clientId === client.id && a.date === run.date && a.status !== 'cancel' && a.status !== 'noshow');
+    // wysiłek całego treningu podpowiedziany ze średniego RPE serii — zwykle wystarczy „Zapisz”
+    const fromRpe = srpeFromSets(run.ex.flatMap((e) => e.sets.filter((x) => x.done && !x.warmup).map((x) => x.rpe)));
+    setSrpeHint(fromRpe != null ? String(fromRpe) : null);
     setFinish({
-      srpe: '',
+      srpe: !trainer && fromRpe != null ? String(fromRpe) : '',
       pain: '',
       // bieg wpisany po fakcie: czas z odcinków (suma wpisanych minut)
       duration: elapsedMinutes(run.startedAt) || (() => {
@@ -448,9 +528,35 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const doneSets = run.ex.reduce((a, x) => a + x.sets.filter((s) => s.done).length, 0);
   const blockName = (b: number[]) => b.map((k) => run.ex[k].name).join(' + ');
 
-  const setRow = (k: number, i: number, num: string, label?: string) => {
+  /** Długie przytrzymanie numeru serii (trener) — usunięcie z potwierdzeniem; zwykłe stuknięcie nic nie usuwa. */
+  const pressRef = useRef<number | null>(null);
+  const pressProps = (k: number, i: number, num: string) => ({
+    onPointerDown: () => {
+      if (pressRef.current) clearTimeout(pressRef.current);
+      pressRef.current = window.setTimeout(() => {
+        pressRef.current = null;
+        vibrate(30);
+        void removeAt(k, i, num);
+      }, 650);
+    },
+    onPointerUp: () => {
+      if (pressRef.current) {
+        clearTimeout(pressRef.current);
+        pressRef.current = null;
+        toast('Przytrzymaj numer serii, żeby ją usunąć.');
+      }
+    },
+    onPointerLeave: () => {
+      if (pressRef.current) clearTimeout(pressRef.current);
+      pressRef.current = null;
+    },
+    onContextMenu: (ev: React.MouseEvent) => ev.preventDefault(),
+  });
+
+  const setRow = (k: number, i: number, num: string, label?: string, blockNoLoad?: boolean) => {
     const s = run.ex[k].sets[i];
     const e = run.ex[k];
+    const bare = blockNoLoad ?? noLoad(k);
     const isNext = nextSet ? nextSet.k === k && nextSet.i === i && !s.done : hintNext === k && !s.done;
     // narzędzia serii: tempo z planu i kalkulator talerzy (sztanga)
     const kg = numIn(s.load, 0.01, 2000);
@@ -472,15 +578,47 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           )}
         </span>
       ) : null;
+    // ta sama seria poprzednim razem: „ostatnio 60×8” (stuknięcie kopiuje do pól) i strzałka po zaliczeniu
+    const wi = e.cardio ? null : workIndex(e.sets, i);
+    const lastSet = wi != null ? lastOf(e.name)[wi] : undefined;
+    const lastText = fmtLast(lastSet);
+    const deltas = s.done && lastSet ? resultDelta(lastSet, { load: bare ? '' : s.load, reps: s.reps, unit: s.unit }) : [];
+    const lastLine =
+      lastText || deltas.length ? (
+        <div className="prevhint lastline">
+          {lastText &&
+            (s.done ? (
+              <span className="last-txt">ostatnio {lastText}</span>
+            ) : (
+              <button
+                type="button"
+                className="last-btn"
+                aria-label={`Wpisz wynik z ostatniego razu: ${lastText}, ${e.name}, seria ${num}`}
+                onClick={() => {
+                  const f = fillFromLast(lastSet!);
+                  setSet(k, i, { reps: f.reps || s.reps, ...(bare || !f.load ? {} : { load: f.load, edited: true }) });
+                }}
+              >
+                ostatnio <b>{lastText}</b>
+              </button>
+            ))}
+          {deltas.map((d) => (
+            <span key={d.text} className={`delta ${s.pr && d.dir === 'up' ? 'is-pr' : ''}`}>
+              {d.text}
+            </span>
+          ))}
+        </div>
+      ) : null;
+    const snInner = label ? <span className="ex-label">{label}</span> : num;
     return (
       <div key={`${k}-${i}`} data-set={`${k}-${i}`}>
-        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''}`}>
-          {run.ex[k].sets.length > 1 ? (
-            <button className="sn sn-btn" onClick={() => removeAt(k, i, num)} aria-label={`Usuń serię ${num}, ${run.ex[k].name}`} title="Usuń tę serię">
-              {label ? <span className="ex-label">{label}</span> : num}
+        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${bare && !e.cardio ? 'noload' : ''} ${blockNoLoad === undefined && e.perSide && !e.cardio && !bare && !sidesWide(e) ? 'sides' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''}`}>
+          {trainer && run.ex[k].sets.length > 1 ? (
+            <button type="button" className="sn sn-btn" {...pressProps(k, i, num)} aria-label={`Seria ${num}, ${run.ex[k].name} — przytrzymaj, żeby usunąć`} title="Przytrzymaj, żeby usunąć tę serię">
+              {snInner}
             </button>
           ) : (
-            <span className="sn">{label ? <span className="ex-label">{label}</span> : num}</span>
+            <span className="sn">{snInner}</span>
           )}
           {run.ex[k].cardio ? (
             // cardio: czas, dystans, tętno, RPE (bez ciężaru i nagrania)
@@ -525,9 +663,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           )}
           {!run.ex[k].cardio && (
             <>
-              {!sidesWide(run.ex[k]) && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
+              {!sidesWide(run.ex[k]) && !bare && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
               <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
-              <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />
+              {!bare && <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />}
             </>
           )}
           <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(k, i)}>
@@ -548,7 +686,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </div>
         )}
         {(() => {
-          const hint = s.sug && !s.done && !e.cardio ? <div className="sughint">{s.sug}</div> : s.prev && !s.sug ? <div className="prevhint">poprzednio: {s.prev}</div> : null;
+          const sug = s.sug && !s.done && !e.cardio ? <div className="sughint">{s.sug}</div> : null;
+          const hint = sug || lastLine ? (sug && lastLine ? <div className="hintcol">{sug}{lastLine}</div> : sug ?? lastLine) : null;
           if (!tools) return hint;
           return (
             <div className="setline">
@@ -575,12 +714,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             {run.ex[k].perSide ? ' — jedna strona, potem druga' : ''}
           </button>
         )}
-        {s.warmup && !s.done && (
+        {trainer && s.warmup && !s.done && (
           <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
             ✕ usuń tę serię wstępną
           </button>
         )}
-        {!s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
+        {trainer && !s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
           <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, num) : removeWarmup(k, i))}>
             ✕ usuń tę serię
           </button>
@@ -630,6 +769,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
   const header = (k: number) => {
     const e = run.ex[k];
+    const bare = noLoad(k);
+    // bez ciężaru: jedna kamera na ćwiczenie — nagranie trafia do bieżącej serii
+    const camAt = (() => {
+      const i = e.sets.findIndex((x) => !x.done && !x.warmup);
+      return i >= 0 ? i : e.sets.length - 1;
+    })();
+    const kind = [e.cardio && 'cardio', e.timed && 'na czas', e.perSide && 'na każdą stronę'].filter(Boolean).join(' · ');
     return (
       <div key={`h${k}`} className="run-ex-head">
         <div className="between">
@@ -642,13 +788,28 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </a>
           )}
         </div>
-        {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone */}
-        {!optsOpen.has(k) && !e.sets.some((x) => x.done) && (
+        <div className="ex-tools">
+          {bare && camAt >= 0 && !e.cardio && (
+            <span className="ex-cam">
+              <SetVideoButton clientId={client.id} video={e.sets[camAt]?.video} title={`${e.name} · nagranie techniki`} onChange={(video) => setSet(k, camAt, { video })} />
+              <span className="muted small">{e.sets.some((x) => x.video) ? 'nagranie dodane' : 'nagraj technikę'}</span>
+            </span>
+          )}
+          {bare && !e.cardio && (
+            <button type="button" className="link small ex-kg-on" onClick={() => setKgOn((o) => new Set([...o, k]))}>
+              + ciężar
+            </button>
+          )}
+          <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />
+        </div>
+        {!trainer && kind && <div className="ex-kind muted small">{kind}</div>}
+        {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone; podopieczny go nie zmienia */}
+        {trainer && !optsOpen.has(k) && !e.sets.some((x) => x.done) && (
           <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, k]))}>
             <Icon name="settings" size={14} /> Typ ćwiczenia
           </button>
         )}
-        {(optsOpen.has(k) || e.cardio) && !e.sets.some((x) => x.done) && (
+        {trainer && (optsOpen.has(k) || e.cardio) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
             className={`side-toggle ${e.cardio ? 'on' : ''}`}
@@ -666,8 +827,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <Icon name="heart" size={14} /> {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
           </button>
         )}
-        {!e.cardio && !e.timed && (optsOpen.has(k) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
-        {!e.cardio && (optsOpen.has(k) || e.timed) && !e.sets.some((x) => x.done) && (
+        {trainer && !e.cardio && !e.timed && (optsOpen.has(k) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
+        {trainer && !e.cardio && (optsOpen.has(k) || e.timed) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
             className={`side-toggle ${e.timed ? 'on' : ''}`}
@@ -685,7 +846,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <Icon name="timer" size={14} /> {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
           </button>
         )}
-        {!e.cardio && (optsOpen.has(k) || e.perSide) && (
+        {trainer && !e.cardio && (optsOpen.has(k) || e.perSide) && (
         <button
           type="button"
           className={`side-toggle ${e.perSide ? 'on' : ''}`}
@@ -715,7 +876,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       <>
         {header(k)}
         <div className="muted small">{e.rest && `przerwa ${fmtRest(e.rest)}`}</div>
-        {!e.cardio && (
+        {trainer && !e.cardio && (
           <button className="link small" onClick={() => addWarmup(k)}>
             + seria wstępna
           </button>
@@ -730,12 +891,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <span />
           </div>
         ) : (
-          <div className="sgrid sgrid-head">
+          <div className={`sgrid sgrid-head ${noLoad(k) ? 'noload' : e.perSide && !sidesWide(e) ? 'sides' : ''}`}>
             <span />
             <span className={sidesWide(e) ? 'wide' : undefined}>{repsHead(e)}</span>
-            {!sidesWide(e) && <span>{kgHead(e)}</span>}
+            {!sidesWide(e) && !noLoad(k) && <span>{kgHead(e)}</span>}
             <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
-            <span />
+            {!noLoad(k) && <span />}
             <span />
           </div>
         )}
@@ -767,6 +928,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const cur = nextBlockSet(run, ks);
     // runda zamknięta: następna seria to pierwsze ćwiczenie bloku w kolejnej rundzie
     const newRound = !!cur && cur.round > 0 && ks.indexOf(cur.k) === 0;
+    // kolumna kg znika tylko, gdy żadne ćwiczenie bloku nie ma ciężaru (jedna siatka dla całego bloku)
+    const bare = ks.every((k) => noLoad(k));
     return (
       <>
         <div className="block-head">
@@ -774,21 +937,21 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           <span className="muted small">przerwa po rundzie {lastRest || '2:00'}</span>
         </div>
         {ks.map((k) => header(k))}
-        <div className="sgrid sgrid-head">
+        <div className={`sgrid sgrid-head ${bare ? 'noload' : ''}`}>
           <span />
           <span>powt. / czas</span>
-          <span>kg</span>
+          {!bare && <span>kg</span>}
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
-          <span />
+          {!bare && <span />}
           <span />
         </div>
-        {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`))}
+        {warm.length > 0 && warm.map(({ k, i }) => setRow(k, i, 'W', `${run.ex[k].label}·W`, bare))}
         {Array.from({ length: rounds }, (_, r) => (
           <div key={r} className={`round ${cur && cur.round === r ? 'cur' : ''}`}>
             <div className="round-label">
               Runda {r + 1} z {rounds}
             </div>
-            {ks.map((k, j) => (work[j][r] ? setRow(k, work[j][r].i, String(r + 1), run.ex[k].label) : null))}
+            {ks.map((k, j) => (work[j][r] ? setRow(k, work[j][r].i, String(r + 1), run.ex[k].label, bare) : null))}
           </div>
         ))}
         {hintNext != null && block.includes(hintNext) && (
@@ -802,8 +965,25 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     );
   };
 
+  if (doneInfo)
+    return (
+      <div className="player">
+        <WorkoutDone info={doneInfo} onDone={onSaved} />
+      </div>
+    );
+
+  // podopieczny: „+ Dodaj ćwiczenie” na wierzchu tylko w treningu własnym; w treningu z planu — w menu „Więcej”
+  const addInline = trainer || !run.planId;
+  const cancelRun = async () => {
+    const n = run.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0);
+    const msg = editing
+      ? 'Anulować poprawki? Zapisany trening zostanie bez zmian.'
+      : `Anulować ten trening? ${n ? `Zaliczone serie (${n}) i nagrania nie zostaną zapisane.` : 'Nic nie zostanie zapisane.'}`;
+    if (await ask(msg, { confirm: editing ? 'Anuluj poprawki' : 'Anuluj trening', danger: true, cancel: editing ? 'Wróć do poprawek' : 'Wróć do treningu' })) onCancel?.();
+  };
+
   return (
-    <div className="player fade">
+    <div className="player fade" onPointerDownCapture={primeRestAudio}>
       {trainer &&
         (() => {
           // trener prowadzi trening: przeciwwskazania i ograniczenia z wywiadu (podopieczny tego nie widzi)
@@ -821,13 +1001,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           {homeLabel}
         </button>
         <span className="actions">
-          {run.ex.length > 0 && (trainer || !run.editSessionId) && (
+          {trainer && run.ex.length > 0 && (
             <button className="btn btn-secondary btn-sm" onClick={() => setLayoutOpen(true)}>
               ✎ Układ
             </button>
           )}
-          <button className="btn btn-ghost btn-sm" disabled={!tempoEx} onClick={() => setTempoOpen(true)}>
-            ◷ Tempo
+          {tempoEx && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setTempoOpen(true)}>
+              ◷ Tempo
+            </button>
+          )}
+          <button className="btn btn-ghost btn-sm more-btn" aria-haspopup="dialog" aria-label="Więcej" onClick={() => setMoreOpen(true)}>
+            <Icon name="more" size={20} /> Więcej
           </button>
         </span>
       </div>
@@ -836,7 +1021,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         <p className="muted small">
           {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
-        {!trainer && <p className="muted small rpe-legend" style={doneSets === 0 ? undefined : { visibility: 'hidden' }} aria-hidden={doneSets > 0}>{run.ex.every((x) => x.cardio) ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.' : run.ex.some((x) => x.cardio) ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.' : 'Wpisz powtórzenia i kg, potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'}</p>}
+        {!trainer && doneSets === 0 && <p className="muted small rpe-legend">{run.ex.every((x) => x.cardio) ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.' : run.ex.some((x) => x.cardio) ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.' : 'Wpisz wynik, potem ✓. „ostatnio” pod serią wpisuje wynik z poprzedniego razu. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'}</p>}
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
@@ -864,7 +1049,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <button className="link small" onClick={() => addSet(block)}>
               {block.length > 1 ? '+ runda' : '+ seria'}
             </button>
-            {(trainer || !run.editSessionId) && block.some((k) => run.ex[k].sets.length > 1) && (
+            {trainer && block.some((k) => run.ex[k].sets.length > 1) && (
               <button className="link small muted" onClick={() => removeSet(block)}>
                 − usuń ostatnią
               </button>
@@ -898,52 +1083,86 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           }}
         />
       ) : (
-        <button className="btn btn-ghost btn-block add-ex" onClick={() => setAdding(true)}>
-          + Dodaj ćwiczenie
-        </button>
+        addInline && (
+          <button className="btn btn-ghost btn-block add-ex" onClick={() => setAdding(true)}>
+            + Dodaj ćwiczenie
+          </button>
+        )
       )}
 
-      <div className="navrow">
-        <button className="btn btn-ghost" disabled={bi === 0} onClick={() => go(bi - 1)}>
-          ‹ poprzednie
-        </button>
-        {last ? (
-          <button className="btn btn-primary btn-lg" onClick={() => void openFinish()}>
-            {editing ? 'Zapisz zmiany' : 'Zakończ trening'}
-          </button>
-        ) : (
-          <>
-          <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
-            następne ›
-          </button>
-          </>
-        )}
-      </div>
+      {!last && blocks[bi + 1] && (
+        <div className="acard nextup">
+          <span className="muted small">Dalej</span> {blockName(blocks[bi + 1])}
+        </div>
+      )}
       {!last && (
         <button className="btn btn-ghost btn-block finish-early" onClick={() => void openFinish()}>
           {editing ? 'Zapisz zmiany' : 'Zakończ trening wcześniej'}
         </button>
       )}
       {onCancel && (
-        <button
-          className="btn btn-ghost btn-block btn-danger-text cancel-run"
-          onClick={async () => {
-            const n = run.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0);
-            const msg = editing
-              ? 'Anulować poprawki? Zapisany trening zostanie bez zmian.'
-              : `Anulować ten trening? ${n ? `Zaliczone serie (${n}) i nagrania nie zostaną zapisane.` : 'Nic nie zostanie zapisane.'}`;
-            if (await ask(msg, { confirm: editing ? 'Anuluj poprawki' : 'Anuluj trening', danger: true, cancel: editing ? 'Wróć do poprawek' : 'Wróć do treningu' })) onCancel();
-          }}
-        >
-          ✕ {editing ? 'Anuluj poprawki' : 'Anuluj trening'}
+        // anulowanie: mały link z potwierdzeniem — nie konkuruje z „Zakończ”
+        <button type="button" className="link small btn-danger-text cancel-run" onClick={() => void cancelRun()}>
+          {editing ? 'Anuluj poprawki' : 'Anuluj trening'}
         </button>
       )}
-      {!last && blocks[bi + 1] && (
-        <div className="acard nextup">
-          <span className="muted small">Dalej</span> {blockName(blocks[bi + 1])}
-        </div>
-      )}
 
+      {/* przyklejone do dołu ekranu: poprzednie / następne ćwiczenie, na ostatnim — zakończenie */}
+      <nav className="navrow pnav" aria-label="Ćwiczenia">
+        <button className="btn btn-ghost pnav-prev" disabled={bi === 0} aria-label="Poprzednie ćwiczenie" onClick={() => go(bi - 1)}>
+          ‹
+        </button>
+        {last ? (
+          <button className="btn btn-primary btn-lg" onClick={() => void openFinish()}>
+            {editing ? 'Zapisz zmiany' : 'Zakończ trening'}
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
+            Następne ćwiczenie ›
+          </button>
+        )}
+      </nav>
+
+      {moreOpen && (
+        <Sheet label="Więcej" onClose={() => setMoreOpen(false)}>
+          <h2>Więcej</h2>
+          <div className="more-list">
+            {!addInline && !adding && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                onClick={() => {
+                  setMoreOpen(false);
+                  setAdding(true);
+                  setTimeout(() => document.querySelector('.add-form')?.scrollIntoView({ behavior: smoothScroll() }), 50);
+                }}
+              >
+                + Dodaj ćwiczenie
+              </button>
+            )}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={sound}
+              className={`more-switch ${sound ? 'on' : ''}`}
+              onClick={() => {
+                setRestSound(!sound);
+                setSound(!sound);
+              }}
+            >
+              <span>
+                <b>Sygnał końca przerwy</b>
+                <span className="muted small">Słychać go także przy zablokowanym ekranie. Może ściszyć muzykę na czas przerwy.</span>
+              </span>
+              <span className="more-switch-state">{sound ? 'wł.' : 'wył.'}</span>
+            </button>
+            <RefComment clientId={client.id} sessionId={run.editSessionId} label="Komentarz do treningu" />
+          </div>
+          <button type="button" className="btn btn-ghost btn-block" onClick={() => setMoreOpen(false)}>
+            Zamknij
+          </button>
+        </Sheet>
+      )}
       {rest && !hold && <RestBar rest={rest} setRest={setRest} note={rest.note} />}
       {hold && (
         <RestBar
@@ -1001,9 +1220,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             })()}
             <div className="scale-h">
               <span>Jak ciężki był cały trening? (wymagane)</span>
-              <span className="muted small">0 = odpoczynek · 10 = maksimum</span>
+              <span className="muted small">0 = odpoczynek · 10 = maksimum{!trainer && !editing && finish.srpe !== '' && srpeHint === finish.srpe ? ' · podpowiedź ze średniego RPE serii' : ''}</span>
             </div>
-            <div className="scale scale-11">
+            <div className="scale scale-11 scale-fit">
               {Array.from({ length: 11 }, (_, v) => String(v)).map((v) => (
                 <button key={v} className={finish.srpe === v ? 'active' : ''} onClick={() => setFinish({ ...finish, srpe: v })}>
                   {v}
@@ -1014,7 +1233,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               <span>Ból / dyskomfort</span>
               <span className="muted small">0 = brak · 10 = bardzo silny</span>
             </div>
-            <div className="scale scale-11">
+            <div className="scale scale-11 scale-fit">
               {Array.from({ length: 11 }, (_, v) => String(v)).map((v) => (
                 <button key={v} className={finish.pain === v ? 'active' : ''} onClick={() => setFinish({ ...finish, pain: v })}>
                   {v}
@@ -1153,7 +1372,8 @@ function RestBar({
     fired.current = rest.end;
     if (onEnd) return onEnd();
     vibrate([200, 100, 200]);
-    beep(880, 0.25);
+    // sygnał z pliku przerwy już gra — bez drugiego piknięcia
+    if (!restAudioPlaying()) beep(880, 0.25);
     toast(endText);
     setRest(null);
   }, [left, rest.end, setRest, toast, endText, onEnd]);

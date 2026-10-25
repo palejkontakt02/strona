@@ -2189,3 +2189,495 @@ button.mini-day,
 .dl-list {
   gap: var(--space-5);
 }
+
+/* =========================================================
+   Runda 3 — shell: zakładki, ekran „Dziś”, check-in, arkusze
+   ========================================================= */
+
+/* miejsce na dolny pasek zakładek */
+.ath.ath-tabbed {
+  padding-bottom: calc(var(--bottombar-h) + env(safe-area-inset-bottom) + var(--space-8));
+}
+
+/* ---------- dolne zakładki (jak menu trenera: ikona w „pigułce” + podpis) ---------- */
+.ath-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 max(0px, calc((100vw - 560px) / 2)) env(safe-area-inset-bottom);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-divider);
+}
+.ath-tabbar > button {
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: 0;
+  padding: 6px 0 8px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ath-tab-ic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 3px 18px;
+  border-radius: 999px;
+  transition: background-color 0.15s;
+}
+.ath-tabbar > button.active {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.ath-tabbar > button.active .ath-tab-ic {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+}
+.ath-tabbar > button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+}
+.ath-tab-badge {
+  position: absolute;
+  top: -2px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--color-danger);
+  color: var(--on-danger, var(--color-surface));
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+/* ---------- górny pasek (konto podopiecznego) ---------- */
+.ath .ath-top {
+  min-height: 48px;
+  margin-bottom: var(--space-4);
+}
+.ath-coach {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  min-width: 0;
+}
+.ath-coach-av {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-2);
+  color: var(--color-neutral-300);
+}
+.ath .ath-gear {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+}
+
+/* ---------- jeden styl nagłówka arkusza: tytuł + „×” ---------- */
+.sheet .sheet-top {
+  gap: var(--space-3);
+}
+.sheet .sheet-top h2 {
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.1;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0;
+}
+.sheet .sheet-top .icon-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  margin-right: -8px;
+  color: var(--color-text);
+}
+.sheet .ath-set-row {
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: 48px;
+}
+.sheet .ath-logout {
+  min-height: 48px;
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-divider);
+}
+
+/* ---------- tytuły stron i sekcji ---------- */
+.ath .ath-page-title {
+  font-family: var(--font-display);
+  font-size: 2.125rem;
+  font-weight: 600;
+  line-height: 1.05;
+  text-transform: none;
+  letter-spacing: 0;
+  margin: var(--space-2) 0 var(--space-6);
+}
+.ath .ath-sec {
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text);
+  margin: var(--space-8) 0 var(--space-3);
+}
+.ath .ath-page-title + .ath-sec {
+  margin-top: 0;
+}
+
+/* ---------- powitanie (krótkie) ---------- */
+.ath .ath-home .ath-hello {
+  display: block;
+  margin: var(--space-2) 0 var(--space-6);
+}
+.ath .ath-home .ath-hello p {
+  margin: 4px 0 0;
+}
+
+/* ---------- karta treningu: „Start” zawsze najmocniejszy ---------- */
+.ath .ath-home .acard-hero {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-text);
+}
+.ath .acard-hero .eyebrow {
+  color: var(--color-neutral-400);
+}
+.ath .acard-hero > .btn-primary,
+.ath .acard-hero > .actions .btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+  min-height: 60px;
+  font-size: 1.5rem;
+}
+.ath .acard-hero .muted.small + .small {
+  margin-top: -2px;
+}
+.ath-hero-visit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  line-height: 1.4;
+}
+.ath-hero-visit svg {
+  margin-top: 1px;
+}
+.ath-hero-visit b {
+  font-weight: 600;
+  display: inline-block;
+}
+.ath .acard-extra h2 {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 2px 0;
+  text-transform: none;
+}
+
+/* szybkie akcje: spójna para drugorzędnych przycisków, jedna linia */
+.ath .ath-home .ath-quick {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-6);
+}
+.ath .ath-home .ath-quick .btn {
+  min-height: 48px;
+  margin: 0;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  padding: 0 var(--space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ankieta (niewypełniona) — jedna bursztynowa karta */
+.ath .ath-intake {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.ath .ath-intake h3 {
+  margin: 0;
+}
+.ath .ath-intake .btn {
+  min-height: 44px;
+}
+
+/* wizyta — jeden zwarty wiersz */
+.ath .ath-home .next-visit {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.ath .ath-home .next-visit > svg {
+  color: var(--color-neutral-300);
+}
+.ath .ath-home .next-visit .next-visit-when {
+  font-size: 1.125rem;
+  display: inline;
+}
+.ath .ath-home .next-visit .eyebrow {
+  margin-bottom: 2px;
+}
+
+/* ---------- tydzień: Pn–Nd + 3 liczby ---------- */
+.ath .ath-week {
+  padding: var(--space-4);
+}
+.wk-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.wk-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-radius: var(--radius-md);
+}
+.wk-dow {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-neutral-400);
+}
+.wk-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+}
+.wk-day.done .wk-mark {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+.wk-day.planned .wk-mark {
+  border: 2px solid var(--color-text);
+}
+.wk-day.rest .wk-mark::before {
+  content: '';
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-neutral-500, var(--color-divider));
+}
+.wk-day.is-today {
+  background: var(--color-surface-2);
+}
+.wk-day.is-today .wk-dow {
+  color: var(--color-text);
+  font-weight: 700;
+}
+.ath-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+.ath-stats > div {
+  min-width: 0;
+}
+.ath-stats dt {
+  font-size: 0.8125rem;
+  color: var(--color-neutral-400);
+  line-height: 1.25;
+  min-height: 2.5em;
+}
+.ath-stats dd {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.ath-stats dd small {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--color-neutral-400);
+}
+.ath-stats dd.ok-text {
+  color: var(--ath-ok-text);
+}
+
+/* ---------- check-in: kompaktowe 5 skal ---------- */
+.ath .ci-compact .ci-legend,
+.sheet .ci-compact .ci-legend {
+  margin: 0 0 var(--space-2);
+}
+.ci-compact .checkin-row.ci-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 0;
+  margin: 0;
+  border-top: 0;
+}
+.ci-compact .ci-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+.ci-compact .scale-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.ci-compact .scale-5 button {
+  min-width: 0;
+  width: auto;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ci-compact .scale-5 button.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--on-accent);
+}
+.ci-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ci-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.ci-actions .btn-lg {
+  min-height: 56px;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+.ci-actions .btn-ghost {
+  min-height: 48px;
+}
+.ath .ci-done .ci-done-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ath .ci-done .ci-done-head .link {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  margin-right: calc(-1 * var(--space-2));
+}
+.ath .ci-done .readiness {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+.ath .ci-done .tag {
+  align-self: center;
+}
+.ath .ci-done .tag-neutral {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.ath .ci-done > p {
+  margin: 0;
+}
+
+/* ---------- postępy ---------- */
+.ath .ath-body .btn-block {
+  gap: var(--space-2);
+}
+.ath .ath-body > p.muted:first-child {
+  margin: 0;
+}
+.ath .ath-recs .rows {
+  margin: 0;
+}
+.ath .rec-val {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- lista planu: minione tygodnie zwinięte ---------- */
+.wk-past-toggle {
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-neutral-300);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.wk-past .wo-item {
+  opacity: 0.85;
+}
+
+@media (min-width: 901px) {
+  .ath-tabbar > button {
+    min-height: 64px;
+    font-size: 0.8125rem;
+  }
+}

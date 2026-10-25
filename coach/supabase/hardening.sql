@@ -975,3 +975,283 @@ begin
   end if;
 end $$;
 notify pgrst, 'reload schema';
+
+-- 22. Żywienie dzień po dniu (dayLog): oprócz białka, kcal, kroków i wody także tłuszcze (fat), węglowodany (carbs)
+--     i zrzut ekranu z aplikacji do liczenia kalorii (shot = plik w koszyku „client-files”, folder podopiecznego — sekcja 18).
+--     Ta sama funkcja co w sekcji 19, rozszerzona tylko w części dayLog. Można uruchomić ponownie.
+--     Zadania dzienne (habits / habitLog) nie wymagają zmian — działają przez save_habit_day (sekcja 10).
+create or replace function public.save_client_entry(p_client_id text, p_kind text, p_entry jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  trainer boolean := is_trainer();
+  e jsonb;
+  old_e jsonb;
+  key text;
+  keyval text;
+  k text;
+  v numeric;
+  lo numeric;
+  hi numeric;
+begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
+  if not (trainer or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if jsonb_typeof(p_entry) is distinct from 'object' then raise exception 'Nieprawidłowy wpis'; end if;
+  key := case p_kind when 'dayLog' then 'date' when 'weeklyReports' then 'id' when 'progressPhotos' then 'id' end;
+  if key is null then raise exception 'Nieznany rodzaj wpisu: %', p_kind; end if;
+  keyval := p_entry ->> key;
+  if key = 'id' and (coalesce(keyval, '') = '' or length(keyval) > 64) then raise exception 'Brak id wpisu'; end if;
+  -- dotychczasowy wpis o tym samym kluczu (poprawka) — zostają z niego pola trenera
+  select x into old_e from clients c,
+    jsonb_array_elements(case when jsonb_typeof(c.data -> p_kind) = 'array' then c.data -> p_kind else '[]'::jsonb end) x
+  where c.id = p_client_id and x ->> key = keyval limit 1;
+
+  if p_kind = 'weeklyReports' then
+    if coalesce(p_entry ->> 'week', '') !~ '^\d{4}-\d{2}-\d{2}$' or (p_entry ->> 'week')::date > current_date + 7
+       or (p_entry ->> 'week')::date < date '2000-01-01' then raise exception 'Zły tydzień'; end if;
+    e := jsonb_build_object('id', keyval, 'week', p_entry ->> 'week', 'at', coalesce(old_e -> 'at', to_jsonb(now())));
+    foreach k in array array['sleep', 'stress', 'energy', 'adherence', 'weight', 'steps'] loop
+      if p_entry ? k and jsonb_typeof(p_entry -> k) <> 'null' then
+        if jsonb_typeof(p_entry -> k) <> 'number' then raise exception 'Zła wartość: %', k; end if;
+        v := (p_entry ->> k)::numeric;
+        lo := case k when 'weight' then 20 when 'steps' then 0 else 1 end;
+        hi := case k when 'weight' then 400 when 'steps' then 100000 else 5 end;
+        if v < lo or v > hi then raise exception 'Zła wartość: %', k; end if;
+        e := e || jsonb_build_object(k, v);
+      end if;
+    end loop;
+    if length(coalesce(p_entry ->> 'comment', '')) > 2000 then raise exception 'Komentarz za długi (najwyżej 2000 znaków)'; end if;
+    if length(trim(coalesce(p_entry ->> 'comment', ''))) > 0 then e := e || jsonb_build_object('comment', p_entry ->> 'comment'); end if;
+    if jsonb_typeof(p_entry -> 'photoIds') = 'array' then
+      if jsonb_array_length(p_entry -> 'photoIds') > 3 then raise exception 'Najwyżej 3 zdjęcia w raporcie'; end if;
+      e := e || jsonb_build_object('photoIds', coalesce((select jsonb_agg(left(x #>> '{}', 64)) from jsonb_array_elements(p_entry -> 'photoIds') x
+                                                         where jsonb_typeof(x) = 'string'), '[]'::jsonb));
+    end if;
+    -- pola trenera: trener ustawia je sam, podopieczny ich nie zmienia (zostają z poprzedniej wersji raportu)
+    e := e || jsonb_strip_nulls(jsonb_build_object(
+      'seenAt', case when trainer then left(p_entry ->> 'seenAt', 40) else old_e ->> 'seenAt' end,
+      'coachNote', case when trainer then left(p_entry ->> 'coachNote', 2000) else old_e ->> 'coachNote' end));
+
+  elsif p_kind = 'progressPhotos' then
+    if coalesce(p_entry ->> 'date', '') !~ '^\d{4}-\d{2}-\d{2}$' or (p_entry ->> 'date')::date > current_date + 1 then raise exception 'Zła data'; end if;
+    -- tylko plik z folderu tego podopiecznego w magazynie albo z pamięci przeglądarki
+    if length(coalesce(p_entry ->> 'ref', '')) > 300
+       or not ((p_entry ->> 'ref') like 'sb:' || p_client_id || '/%' or (p_entry ->> 'ref') like 'idb:%')
+       or (p_entry ->> 'ref') like '%..%' then raise exception 'Zły plik zdjęcia'; end if;
+    if coalesce(p_entry ->> 'pose', '') not in ('przód', 'bok', 'tył', 'inne') then raise exception 'Zła poza'; end if;
+    e := jsonb_build_object('id', keyval, 'date', p_entry ->> 'date', 'ref', p_entry ->> 'ref', 'pose', p_entry ->> 'pose',
+                            'at', coalesce(old_e -> 'at', to_jsonb(now())));
+    if (case when trainer then (p_entry ->> 'hidden') else (old_e ->> 'hidden') end) = 'true' then
+      e := e || '{"hidden": true}'::jsonb;
+    end if;
+
+  else -- dayLog: jeden wpis na dzień
+    if coalesce(keyval, '') !~ '^\d{4}-\d{2}-\d{2}$' or keyval::date > current_date + 1 then raise exception 'Zła data'; end if;
+    e := jsonb_build_object('date', keyval);
+    foreach k in array array['protein', 'kcal', 'steps', 'water', 'fat', 'carbs'] loop
+      if p_entry ? k and jsonb_typeof(p_entry -> k) <> 'null' then
+        if jsonb_typeof(p_entry -> k) <> 'number' then raise exception 'Zła wartość: %', k; end if;
+        v := (p_entry ->> k)::numeric;
+        hi := case k when 'protein' then 600 when 'kcal' then 10000 when 'steps' then 100000 when 'fat' then 600 when 'carbs' then 1500 else 15 end;
+        if v < 0 or v > hi then raise exception 'Zła wartość: %', k; end if;
+        e := e || jsonb_build_object(k, v);
+      end if;
+    end loop;
+    -- zrzut ekranu z aplikacji do liczenia kalorii (np. Fitatu): tylko plik z folderu tego podopiecznego albo z pamięci przeglądarki
+    if coalesce(p_entry ->> 'shot', '') <> '' then
+      if length(p_entry ->> 'shot') > 300
+         or not ((p_entry ->> 'shot') like 'sb:' || p_client_id || '/%' or (p_entry ->> 'shot') like 'idb:%')
+         or (p_entry ->> 'shot') like '%..%' then raise exception 'Zły plik zrzutu'; end if;
+      e := e || jsonb_build_object('shot', p_entry ->> 'shot');
+    end if;
+  end if;
+
+  update clients
+  set data = jsonb_set(data, array[p_kind],
+        coalesce((select jsonb_agg(x order by ord) from (
+          select x, ord from jsonb_array_elements(case when jsonb_typeof(data -> p_kind) = 'array' then data -> p_kind else '[]'::jsonb end)
+            with ordinality t(x, ord)
+          where x ->> key is distinct from keyval
+          order by ord desc limit 399) s), '[]'::jsonb)
+        || jsonb_build_array(e)),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.save_client_entry from public, anon;
+grant execute on function public.save_client_entry to authenticated;
+notify pgrst, 'reload schema';
+
+-- 23. Rozmowa z mediami, komentarze do treningu i odpowiedź podopiecznego na wizytę. Można uruchomić ponownie.
+--     a) Wiadomości głosowe zapisują się w koszyku „client-files” (sekcja 18) — dopuszczony typ audio/*.
+--        Zdjęcia — też „client-files”, wideo — „set-videos” (sekcja 12); folder = id podopiecznego, te same reguły dostępu.
+--     b) Wiadomość podopiecznego może mieć: kontekst treningu / ćwiczenia (ref) i do 4 załączników (media) — tylko pliki
+--        z folderu tego podopiecznego. Sama wiadomość głosowa / zdjęcie bez tekstu dostaje opis („Wiadomość głosowa”)
+--        z flagą textAuto — powiadomienie push do trenera (sekcja 20) działa bez zmian.
+--     c) Wizyty: podopieczny nie zmienia kalendarza (sekcja 4), ale przez funkcję client_respond_appointment może
+--        potwierdzić albo odwołać SWOJĄ zaplanowaną wizytę (z powodem). Zmienia się tylko status (odwołanie → 'cancel')
+--        i pole reply {kind, at, reason, late}; late = odwołanie krócej niż 24 h przed wizytą. Trener dostaje push.
+update storage.buckets set allowed_mime_types = array['image/*', 'application/pdf', 'audio/*'] where id = 'client-files';
+
+create or replace function public.add_client_note(p_client_id text, p_note jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  txt text := left(coalesce(p_note ->> 'text', ''), 2000);
+  r jsonb := p_note -> 'ref';
+  ref jsonb;
+  med jsonb := '[]'::jsonb;
+  m jsonb;
+  auto boolean := false;
+begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  -- załączniki: zdjęcie / wideo / głos, tylko pliki z folderu tego podopiecznego (albo z pamięci przeglądarki)
+  if jsonb_typeof(p_note -> 'media') = 'array' then
+    if jsonb_array_length(p_note -> 'media') > 4 then raise exception 'Najwyżej 4 załączniki'; end if;
+    for m in select x from jsonb_array_elements(p_note -> 'media') x loop
+      if jsonb_typeof(m) <> 'object' or coalesce(m ->> 'kind', '') not in ('image', 'video', 'audio') then raise exception 'Zły załącznik'; end if;
+      if length(coalesce(m ->> 'ref', '')) > 300 or (m ->> 'ref') like '%..%'
+         or not ((m ->> 'ref') like 'sb:' || p_client_id || '/%' or (m ->> 'ref') like 'idb:%') then raise exception 'Zły plik załącznika'; end if;
+      med := med || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+        'kind', m ->> 'kind', 'ref', m ->> 'ref', 'mime', left(m ->> 'mime', 80),
+        'dur', case when jsonb_typeof(m -> 'dur') = 'number' and (m ->> 'dur')::numeric between 0 and 3600 then round((m ->> 'dur')::numeric, 1) end)));
+    end loop;
+  end if;
+  if length(trim(txt)) = 0 then
+    if jsonb_array_length(med) = 0 then raise exception 'Pusta notatka'; end if;
+    txt := case med -> 0 ->> 'kind' when 'audio' then 'Wiadomość głosowa' when 'video' then 'Nagranie wideo' else 'Zdjęcie' end;
+    auto := true;
+  end if;
+  -- kontekst: trening / ćwiczenie
+  if jsonb_typeof(r) = 'object' then
+    ref := jsonb_strip_nulls(jsonb_build_object(
+      'sessionId', left(r ->> 'sessionId', 40),
+      'exIndex', case when jsonb_typeof(r -> 'exIndex') = 'number' and (r ->> 'exIndex')::numeric between 0 and 200 then (r ->> 'exIndex')::numeric::int end,
+      'exName', left(r ->> 'exName', 120),
+      'workout', left(r ->> 'workout', 120),
+      'date', case when (r ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' then r ->> 'date' end));
+    if ref = '{}'::jsonb then ref := null; end if;
+  end if;
+  update clients
+  set data = jsonb_set(data, '{inbox}',
+        coalesce((select jsonb_agg(n) from (select n from jsonb_array_elements(coalesce(data -> 'inbox', '[]'::jsonb)) n offset greatest(0, jsonb_array_length(coalesce(data -> 'inbox', '[]'::jsonb)) - 199)) t), '[]'::jsonb)
+        || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+             'id', left(coalesce(p_note ->> 'id', md5(random()::text)), 40), 'at', now(), 'text', txt,
+             'sessionId', left(coalesce(p_note ->> 'sessionId', ref ->> 'sessionId'), 40),
+             'ref', ref,
+             'media', case when jsonb_array_length(med) > 0 then med end,
+             'textAuto', case when auto then true end)))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.add_client_note from public, anon;
+grant execute on function public.add_client_note to authenticated;
+
+-- Odpowiedź podopiecznego na wizytę: p_kind = 'confirm' | 'cancel'. Zwraca zapisaną wizytę (data).
+create or replace function public.client_respond_appointment(p_id text, p_kind text, p_reason text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  a record;
+  trainer boolean := is_trainer();
+  start_at timestamptz;
+  late boolean;
+  why text := nullif(trim(left(coalesce(p_reason, ''), 300)), '');
+  nd jsonb;
+begin
+  if p_kind not in ('confirm', 'cancel') then raise exception 'Nieznana odpowiedź'; end if;
+  select id, client_id, data into a from appointments where id = p_id for update;
+  if not found or not (trainer or a.client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if coalesce(a.data ->> 'status', 'planned') <> 'planned' then raise exception 'Wizyta nie jest już zaplanowana'; end if;
+  if (a.data ->> 'date') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Zła data wizyty'; end if;
+  start_at := ((a.data ->> 'date') || ' ' || case when (a.data ->> 'time') ~ '^\d{1,2}:\d{2}$' then a.data ->> 'time' else '00:00' end)::timestamp
+              at time zone 'Europe/Warsaw';
+  if start_at + make_interval(mins => coalesce(case when jsonb_typeof(a.data -> 'duration') = 'number' then (a.data ->> 'duration')::numeric::int end, 60)) < now() then
+    raise exception 'Wizyta już się odbyła';
+  end if;
+  late := p_kind = 'cancel' and start_at - now() < interval '24 hours';
+  nd := a.data || jsonb_build_object('reply', jsonb_strip_nulls(jsonb_build_object(
+          'kind', p_kind, 'at', to_jsonb(now()), 'reason', case when p_kind = 'cancel' then why end, 'late', case when late then true end)));
+  if p_kind = 'cancel' then nd := nd || '{"status": "cancel"}'::jsonb; end if;
+  update appointments set data = nd, updated_at = now() where id = p_id;
+  if not trainer then
+    perform push_send('trainer', a.client_id,
+      case when p_kind = 'cancel' then (case when late then 'Późne odwołanie: ' else 'Odwołanie: ' end) else 'Potwierdzenie: ' end || push_first_name(a.client_id),
+      push_dm(a.data ->> 'date') || ' ' || coalesce(a.data ->> 'time', '') || case when why is not null and p_kind = 'cancel' then ' — ' || why else '' end,
+      '/app/?c=' || a.client_id || '&t=Przegląd', 'appt-reply-' || a.client_id);
+  end if;
+  return nd;
+end $$;
+revoke all on function public.client_respond_appointment from public, anon;
+grant execute on function public.client_respond_appointment to authenticated;
+notify pgrst, 'reload schema';
+
+-- 24. RODO: zgody podopiecznego (dane o zdrowiu — art. 9, zdjęcia i nagrania) i prośba o usunięcie konta.
+--     Lista clients.data.consents — zapis tylko przez save_consent i tylko przez SAMEGO podopiecznego
+--     (trener nie zaznaczy zgody za niego); daty ustawia baza. Zapis profilu przez trenera jej nie nadpisze.
+--     Współpraca zakończona (status „zakończony”): podopieczny dalej się loguje, czyta i pobiera swoją historię
+--     (reguły odczytu nie zależą od statusu), ale nie zapisuje nowych treningów ani nie zmienia starych.
+--     Uwaga: nie usuwaj e-maila z profilu zakończonego klienta — po e-mailu baza łączy konto z danymi.
+--     Można uruchomić ponownie.
+create or replace function public.save_consent(p_client_id text, p_kind text, p_entry jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  cid text := p_entry ->> 'id';
+  turn_on boolean;
+  old_e jsonb;
+  ts text := to_jsonb(now()) #>> '{}';
+begin
+  if p_client_id is null or p_client_id not in (select my_client_ids()) then raise exception 'Brak dostępu'; end if;
+  if p_kind is distinct from 'consents' then raise exception 'Nieznany rodzaj wpisu: %', p_kind; end if;
+  if jsonb_typeof(p_entry) is distinct from 'object' or coalesce(cid, '') not in ('health', 'media', 'erasure')
+     or jsonb_typeof(p_entry -> 'on') is distinct from 'boolean' then raise exception 'Nieprawidłowa zgoda'; end if;
+  turn_on := (p_entry ->> 'on')::boolean;
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned / guard_client_consents)
+  select x into old_e from clients c,
+    jsonb_array_elements(case when jsonb_typeof(c.data -> 'consents') = 'array' then c.data -> 'consents' else '[]'::jsonb end) x
+  where c.id = p_client_id and x ->> 'id' = cid limit 1;
+  if old_e is not null and (old_e ->> 'on') = turn_on::text then return; end if; -- bez zmiany — data zostaje
+  update clients
+  set data = jsonb_set(data, '{consents}',
+        coalesce((select jsonb_agg(x) from jsonb_array_elements(case when jsonb_typeof(data -> 'consents') = 'array' then data -> 'consents' else '[]'::jsonb end) x
+                  where x ->> 'id' is distinct from cid), '[]'::jsonb)
+        || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+             'id', cid, 'on', turn_on, 'at', ts,
+             'givenAt', case when turn_on then ts else old_e ->> 'givenAt' end,
+             'withdrawnAt', case when turn_on then old_e ->> 'withdrawnAt' else ts end,
+             'v', case when jsonb_typeof(p_entry -> 'v') = 'number' then least(greatest((p_entry ->> 'v')::numeric, 0), 1000)::int end,
+             -- historia zmian (dowód zgody, art. 7 ust. 1) — 20 ostatnich
+             'log', coalesce((select jsonb_agg(l order by ord) from (
+                      select l, ord from jsonb_array_elements(case when jsonb_typeof(old_e -> 'log') = 'array' then old_e -> 'log' else '[]'::jsonb end)
+                        with ordinality h(l, ord) order by ord desc limit 19) s), '[]'::jsonb)
+                    || jsonb_build_array(jsonb_build_object('on', turn_on, 'at', ts)))))),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.save_consent from public, anon;
+grant execute on function public.save_consent to authenticated;
+
+-- Strażnik zgód: zapis profilu (trener, import) nie zmienia listy zgód — zostaje wersja z bazy.
+create or replace function public.guard_client_consents() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := (new.data - 'consents') || case when old.data ? 'consents' then jsonb_build_object('consents', old.data -> 'consents') else '{}'::jsonb end;
+  return new;
+end $$;
+drop trigger if exists guard_client_consents on public.clients;
+create trigger guard_client_consents before update on public.clients
+  for each row execute function public.guard_client_consents();
+
+-- Współpraca zakończona: konto podopiecznego tylko do odczytu (bez nowych treningów i poprawek starych).
+create or replace function public.guard_session_archived() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if is_trainer() then return new; end if;
+  if exists (select 1 from clients where id = new.client_id and data ->> 'status' = 'zakończony') then
+    raise exception 'Współpraca zakończona — nowe treningi są wyłączone';
+  end if;
+  return new;
+end $$;
+revoke all on function public.guard_session_archived from public, anon, authenticated;
+drop trigger if exists guard_session_archived on public.sessions;
+create trigger guard_session_archived before insert or update on public.sessions
+  for each row execute function public.guard_session_archived();
+notify pgrst, 'reload schema';

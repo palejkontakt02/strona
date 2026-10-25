@@ -3,6 +3,8 @@ import type { Client } from '../domain';
 import { useStore } from '../data/store';
 import { INTAKE, INTAKE_PARQ, intakeProgress, type Intake, type IntakeField, type IntakeFile } from '../lib/intake';
 import { ClientFiles } from '../components/ClientFiles';
+import { Consents } from '../components/Consents';
+import { CONSENT_TEXT, consentDate, hasConsent } from '../lib/rodo';
 
 const DRAFT = (id: string) => `fitowa-intake-draft:${id}`;
 const DRAFT_FILES = (id: string) => `fitowa-intake-files:${id}`;
@@ -33,7 +35,8 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     return client.intake?.files ?? [];
   });
   const [step, setStep] = useState(0);
-  const [consent, setConsent] = useState(!!client.intake?.consentAt);
+  // dane o zdrowiu (art. 9 RODO): ankieta tylko po aktywnej zgodzie podopiecznego (zgody: components/Consents.tsx)
+  const consent = hasConsent(client, 'health');
   const [busy, setBusy] = useState(false);
   // kroki: sekcje ankiety → zdjęcia i dokumenty → zgoda i zapis
   const steps = INTAKE.length + 2;
@@ -63,11 +66,11 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
   const prog = intakeProgress({ answers });
 
   const finish = async () => {
-    if (!consent && !asTrainer) return toast('Zaznacz zgodę na przetwarzanie danych o zdrowiu, żeby zapisać ankietę.');
+    if (!consent && !asTrainer) return toast('Bez zgody na przetwarzanie danych o zdrowiu nie zapiszesz ankiety — zaznaczysz ją w Ustawieniach → Moje dane.');
     setBusy(true);
     const now = new Date().toISOString();
     const clean = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim().slice(0, 2000)]).filter(([, v]) => v));
-    const intake: Intake = { answers: clean, files: files.length ? files : undefined, consentAt: client.intake?.consentAt ?? (consent ? now : undefined), completedAt: client.intake?.completedAt ?? now, updatedAt: now };
+    const intake: Intake = { answers: clean, files: files.length ? files : undefined, consentAt: client.intake?.consentAt ?? (consent ? (consentDate(client, 'health') ?? now) : undefined), completedAt: client.intake?.completedAt ?? now, updatedAt: now };
     const ok = await saveIntake(client.id, intake);
     setBusy(false);
     if (!ok) return;
@@ -86,6 +89,33 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     else toast('Ankieta zapisana.');
     onClose();
   };
+
+  // najpierw zgoda na dane o zdrowiu (krótka forma + „Więcej” = pełna klauzula)
+  if (!consent && !asTrainer)
+    return (
+      <div className="ath-home fade intake">
+        <header className="ath-hello">
+          <span className="eyebrow">{first ? 'Witaj! Zacznijmy od krótkiej ankiety' : 'Moja ankieta'}</span>
+          <h1>Twoja zgoda</h1>
+          <p className="muted small">Ankieta pyta o zdrowie — urazy, choroby, ból. To dane szczególnie chronione, więc potrzebujemy Twojej wyraźnej zgody.</p>
+        </header>
+        <section className="acard">
+          <Consents
+            client={client}
+            variant="prompt"
+            only={['health']}
+            saveLabel="Dalej ›"
+            onLater={onClose}
+            onDone={(c) => {
+              if (!c.health) {
+                toast(CONSENT_TEXT.health.needed);
+                onClose();
+              }
+            }}
+          />
+        </section>
+      </div>
+    );
 
   return (
     <div className="ath-home fade intake">
@@ -120,14 +150,10 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
           <p>
             Odpowiedziano na <b>{prog.done}</b> z {prog.total} pytań{files.length ? `, dołączone pliki: ${files.length}` : ''}. Puste pola możesz uzupełnić później w „Moja ankieta”.
           </p>
-          {!asTrainer && (
-            <label className="check intake-consent">
-              <input type="checkbox" checked={consent} disabled={!!client.intake?.consentAt} onChange={(e) => setConsent(e.target.checked)} />
-              <span>
-                Zgadzam się na przetwarzanie podanych danych o moim zdrowiu przez mojego trenera wyłącznie w celu prowadzenia treningów (art. 9 ust. 2 lit. a RODO). Zgodę mogę wycofać w każdej chwili, pisząc do trenera.
-              </span>
-            </label>
+          {!asTrainer && consent && (
+            <p className="muted small intake-consent">Zgoda na przetwarzanie danych o zdrowiu: udzielona. Wycofasz ją w każdej chwili w Ustawieniach → Moje dane.</p>
           )}
+          {asTrainer && !consent && <p className="small warn-text">Podopieczny nie udzielił w aplikacji zgody na przetwarzanie danych o zdrowiu.</p>}
           {answers.parq_heart === 'tak' || answers.parq_chest === 'tak' || answers.parq_dizzy === 'tak' || answers.parq_supervised === 'tak' ? (
             <p className="small warn-text">Zaznaczyłeś(-aś) „tak” przy pytaniu o serce, ból w klatce, omdlenia albo nadzór lekarza — przed intensywnym treningiem skonsultuj się z lekarzem. Trener o tym wie.</p>
           ) : null}
