@@ -86,6 +86,9 @@ export function allPayments(db: Db): PaymentRow[] {
 }
 
 export function paymentLabel(p: Payment): string {
+  // własna nazwa wpisana przez trenera ma pierwszeństwo
+  if (p.desc?.trim() && p.type !== 'pojedyncza') return p.desc.trim();
+  if (p.type === 'inna') return 'Inna płatność';
   if (p.type === 'pakiet') return p.sessions ? `Pakiet ${p.sessions} ${plural(p.sessions, 'sesja', 'sesje', 'sesji')}` : 'Pakiet';
   if (p.type === 'abonament') {
     const m = p.month ? new Date(p.month + '-15T12:00:00').toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' }) : '';

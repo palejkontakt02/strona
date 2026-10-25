@@ -60,6 +60,9 @@ export function ClientPayments({ client }: { client: Client }) {
           <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'pojedyncza' })}>
             + Sesja
           </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'inna' })}>
+            + Inna płatność
+          </button>
         </div>
       </div>
 

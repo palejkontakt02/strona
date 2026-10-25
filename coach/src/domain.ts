@@ -25,7 +25,8 @@ export interface Checkin extends Wellness {
   date: ISODate;
 }
 
-export type PaymentType = 'pakiet' | 'abonament' | 'pojedyncza';
+/** „inna” — dowolna pozycja z własną nazwą (np. plan dietetyczny, konsultacja online). */
+export type PaymentType = 'pakiet' | 'abonament' | 'pojedyncza' | 'inna';
 
 export interface Payment {
   id: string;

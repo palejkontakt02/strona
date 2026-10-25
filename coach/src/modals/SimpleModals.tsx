@@ -199,7 +199,7 @@ export function TestModal({ m }: { m: Extract<ModalState, { kind: 'test' }> }) {
 }
 
 /* ---------- płatność ---------- */
-const PAY_TITLE = { pakiet: 'Pakiet', abonament: 'Abonament', pojedyncza: 'Sesja pojedyncza' } as const;
+const PAY_TITLE = { pakiet: 'Pakiet', abonament: 'Abonament', pojedyncza: 'Sesja pojedyncza', inna: 'Inna płatność' } as const;
 
 export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }> }) {
   const { db, apply, toast } = useStore();
@@ -208,7 +208,7 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
   const [clientId, setClientId] = useState(m.clientId ?? '');
   const client = clientById(db, clientId);
   const today = todayISO();
-  const defAmount = (c?: Client) => (m.type === 'pakiet' ? c?.pkgPrice : m.type === 'abonament' ? c?.subRate : c?.singleRate);
+  const defAmount = (c?: Client) => (m.type === 'pakiet' ? c?.pkgPrice : m.type === 'abonament' ? c?.subRate : m.type === 'inna' ? undefined : c?.singleRate);
   const [amount, setAmount] = useState(p ? String(p.amount) : String(defAmount(client) ?? ''));
   const [sessions, setSessions] = useState(String(p?.sessions ?? client?.pkgSize ?? 10));
   const [month, setMonth] = useState(p?.month ?? today.slice(0, 7));
@@ -216,14 +216,16 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
   const [date, setDate] = useState(p?.date ?? today);
   const [dueDate, setDueDate] = useState(p?.dueDate ?? addDays(today, 7));
   const [dueTouched, setDueTouched] = useState(false);
-  const [paid, setPaid] = useState(p ? p.status === 'paid' : m.type !== 'abonament');
+  // abonament i inna pozycja — zwykle do zapłaty; pakiet i sesja — zwykle płacone od razu
+  const [paid, setPaid] = useState(p ? p.status === 'paid' : m.type !== 'abonament' && m.type !== 'inna');
 
   return (
     <Modal
       title={`${p ? 'Edytuj' : 'Nowa płatność'} – ${PAY_TITLE[m.type]}`}
       onClose={closeModal}
       onSubmit={async () => {
-        if (!client) return;
+        if (!client) return toast('Wybierz podopiecznego.');
+        if (m.type === 'inna' && !desc.trim()) return toast('Wpisz nazwę płatności, np. Plan dietetyczny.');
         if (numIn(amount, 0.01, 1_000_000) == null) return toast('Podaj kwotę większą od zera, np. 1500 albo 1 500,00.');
         const pay: Payment = {
           id: p?.id ?? uid(),
@@ -270,11 +272,16 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
         <Field label="Kwota (zł)">
           <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </Field>
-        {m.type === 'pojedyncza' && (
-          <Field label="Opis">
-            <input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Sesja pojedyncza" />
-          </Field>
-        )}
+        <Field label={m.type === 'inna' ? 'Nazwa' : 'Nazwa (opcjonalnie)'}>
+          <input
+            className="input"
+            value={desc}
+            maxLength={120}
+            onChange={(e) => setDesc(e.target.value)}
+            placeholder={m.type === 'inna' ? 'np. Plan dietetyczny, Konsultacja online' : m.type === 'pojedyncza' ? 'Sesja pojedyncza' : PAY_TITLE[m.type]}
+            required={m.type === 'inna'}
+          />
+        </Field>
         <Field label="Data">
           <input className="input" type="date" value={date} onChange={(e) => {
             setDate(e.target.value);

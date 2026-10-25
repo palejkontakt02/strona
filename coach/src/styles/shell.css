@@ -1203,3 +1203,14 @@
     transition: none;
   }
 }
+/* filtry płatności na telefonie: typy (5 opcji) przewijają się w poziomie zamiast wychodzić poza ekran */
+@media (max-width: 640px) {
+  .page-pay .filters .seg {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .page-pay .filters .seg button {
+    flex: 0 0 auto;
+  }
+}

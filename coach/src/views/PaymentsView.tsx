@@ -10,8 +10,8 @@ import { useNav } from '../nav';
 import { ClubsPanel } from './ClubsPanel';
 
 const FILTERS = ['Wszystkie', 'Do zapłaty', 'Zaległe', 'Opłacone'] as const;
-const TYPES = ['Każdy typ', 'Pakiety', 'Abonamenty', 'Sesje'] as const;
-const TYPE_KEY = { Pakiety: 'pakiet', Abonamenty: 'abonament', Sesje: 'pojedyncza' } as const;
+const TYPES = ['Każdy typ', 'Pakiety', 'Abonamenty', 'Sesje', 'Inne'] as const;
+const TYPE_KEY = { Pakiety: 'pakiet', Abonamenty: 'abonament', Sesje: 'pojedyncza', Inne: 'inna' } as const;
 
 export function PaymentsView() {
   const { db, apply, toast } = useStore();
@@ -56,6 +56,9 @@ export function PaymentsView() {
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', type: 'pojedyncza' })}>
             + Sesja
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', type: 'inna' })}>
+            + Inna płatność
           </button>
         </div>
       </div>
