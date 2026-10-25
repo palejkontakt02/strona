@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SessionSheet } from '../../athlete/History';
 import type { TrainingSession } from '../../domain';
-import { Empty, IconBtn, Tag } from '../../components/ui';
+import { Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { isSolo, sessionsOf } from '../../data/ops';
 import { needsReview, sessionVideos } from '../../data/videos';
@@ -20,10 +20,10 @@ export function SessionBadges({ s }: { s: TrainingSession }) {
   const n = sessionVideos(s).length;
   return (
     <>
-      {n > 0 && <Tag tone={needsReview(s) ? 'accent' : 'muted'}>{`🎥 ${n}${needsReview(s) ? ' · nowe' : ''}`}</Tag>}{' '}
+      {n > 0 && <Tag tone={needsReview(s) ? 'accent' : 'muted'}><Icon name="cam" size={13} /> {`${n}${needsReview(s) ? ' · nowe' : ''}`}</Tag>}{' '}
       {isSolo(db, s) && <Tag tone="muted">samodzielnie</Tag>}{' '}
-      {s.coachNote && <Tag tone="muted">💬</Tag>}{' '}
-      {s.withIds?.length ? <Tag tone="muted">👥 w parze: {s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0] ?? '—').join(', ')}</Tag> : null}
+      {s.coachNote && <Tag tone="muted"><span title="Komentarz trenera" aria-label="komentarz trenera"><Icon name="chat" size={13} /></span></Tag>}{' '}
+      {s.withIds?.length ? <Tag tone="muted"><Icon name="users" size={13} /> w parze: {s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0] ?? '—').join(', ')}</Tag> : null}
     </>
   );
 }
@@ -40,7 +40,7 @@ export function ClientSessions({ client }: { client: Client }) {
         <h3>Zapisane treningi ({sessions.length})</h3>
         <div className="actions">
           <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
-            📋 Wklej z notatki
+            <Icon name="clipboard" size={16} /> Wklej z notatki
           </button>
           <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
             + Zapisz wykonany trening

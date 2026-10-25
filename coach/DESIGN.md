@@ -1,37 +1,36 @@
-# Fitowa / coach — system wizualny „Kobalt”
+# Fitowa / coach — system wizualny „Czarno-biały”
 
 Aplikacja dla trenera personalnego i jego podopiecznych: plany siłowe i biegowe, odtwarzacz treningu
 seria po serii, kalendarz wizyt, pakiety, zdrowie. Używana głównie na telefonie, często na sali,
-jedną ręką, między seriami. Trener i podopieczni są przyzwyczajeni do arkuszy (Excel / Google Sheets)
-z kolorowymi paskami tygodni — to jest punkt wyjścia, nie strona SaaS.
+jedną ręką, między seriami.
 
 ## Kierunek
 
-**Tablica na sali + arkusz treningowy.** Granatowe tło (nie czerń), kobaltowy akcent, dane treningowe
-podane jak w dobrze zrobionym arkuszu: pasek nagłówka w kolorze, zebra wierszy, duże wąskie cyfry.
+**Czerń, biel i odcienie szarości.** Kolor pojawia się wyłącznie jako sygnał — nigdy jako ozdoba.
+Hierarchię budują kontrast, grubość pisma i odcień szarości tła, nie barwa.
 
-Jedna rzecz ma być zapamiętywalna: **tabele i liczby treningu** (plan, serie w odtwarzaczu, historia).
-Wszystko wokół — spokojne, równe, bez ozdobników.
+## Kolor (tokeny w `src/styles.css`)
 
-## Kolor (tokeny w `src/styles.css`, motyw `kobalt` jest domyślny)
+Domyślne motywy: `biel` (jasny) i `mono` (ciemny) — wybierany automatycznie wg ustawień telefonu,
+dopóki użytkownik nie wybierze motywu sam (klucz `fitowa-palette2`).
 
-| rola | token | Kobalt |
-|---|---|---|
-| tło strony | `--color-bg` | `#0e1726` |
-| karta / panel | `--color-surface` | `#16223a` |
-| pole, wiersz wyróżniony | `--color-surface-2` | `#1f2e4a` |
-| tekst | `--color-text` | `#e8eef7` |
-| tekst drugorzędny | `--color-neutral-400` | `#9aa8c0` |
-| akcent (akcja, aktywne, „następny”) | `--color-accent` | `#5b8cff` |
-| zrobione / OK | `--color-ok` | `#3ccf91` |
-| uwaga | `--color-warn` | `#f2ab3c` |
-| błąd / ból | `--color-danger` | `#f2607a` |
-| pasek nagłówka tabeli | `--band` / `--band-fg` | `#24447f` / `#e3ebff` |
-| zebra wierszy | `--zebra` | tekst 3,5% |
+| rola | token | Biały | Czarny |
+|---|---|---|---|
+| tło strony | `--color-bg` | `#f3f3f3` | `#000000` |
+| karta / panel | `--color-surface` | `#ffffff` | `#141414` |
+| pole, wiersz wyróżniony | `--color-surface-2` | `#ececec` | `#222222` |
+| tekst | `--color-text` | `#111111` | `#f5f5f5` |
+| akcja główna | `--color-accent` | `#111111` | `#f5f5f5` |
+| **potwierdzenie / zrobione / OK** | `--color-ok` | `#1a7f37` | `#3ccf6e` |
+| **uwaga / zaległe** | `--color-warn` | `#b26a00` | `#ffb340` |
+| **błąd / złe dane / ból** | `--color-danger` | `#d1242f` | `#ff5c57` |
 
-Zasady: kolor niesie znaczenie (akcent = co teraz zrobić, zielony = zrobione, żółty = zaległe,
-czerwony = problem). Żadnych gradientów dekoracyjnych. Używaj tokenów, nigdy wpisanych hexów —
-wszystkie motywy (Kobalt, Morski, Grafit, Fiolet, Jasny, Czarno-biały) muszą dalej działać.
+Zasady:
+- Tylko trzy kolory mają barwę: zielony (potwierdzenie), bursztyn (na co zwrócić uwagę), czerwony
+  (błąd, złe dane). Wszystko inne — w tym akcent, wykresy, kolory podopiecznych i miejsc — jest szare.
+- Bez emoji w interfejsie — ikony SVG (`Icon` w `components/ui.tsx`) w kolorze tekstu.
+- Bez gradientów i cieni dekoracyjnych. Używaj tokenów, nigdy wpisanych hexów.
+- Kolorowe motywy (Kobalt, Morski, Grafit, Fiolet, Jasny) zostają do wyboru w ustawieniach.
 
 ## Typografia
 
@@ -62,5 +61,5 @@ każdej karty. Szanuj `prefers-reduced-motion`.
    automatyczne. Nowe klasy dodawaj obok istniejących.
 3. Style piszesz w **swoim pliku** w `src/styles/` (ładowany po `styles.css`, więc nadpisuje).
    `src/styles.css` zmienia tylko warstwa fundamentów.
-4. Każdy ekran sprawdź na 390px (telefon) i 1366px (komputer), w motywie Kobalt i Jasny.
+4. Każdy ekran sprawdź na 390px (telefon) i 1366px (komputer), w motywie Biały i Czarny.
    Bez poziomego przewijania strony, bez uciętych tekstów.

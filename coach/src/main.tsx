@@ -9,9 +9,17 @@ import './styles/shell.css';
 import './styles/client.css';
 import './styles/tables.css';
 import './styles/athlete.css';
-import { applyPalette, getPalette } from './theme';
+import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());
+// motyw domyślny podąża za trybem jasny / ciemny telefonu (dopóki ktoś nie wybierze motywu sam)
+try {
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (!hasOwnPalette()) applyPalette(systemPalette());
+  });
+} catch {
+  // starsze przeglądarki — motyw ustawiony przy starcie
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -2,7 +2,7 @@ import { printReport } from '../../lib/print';
 import { ClientHabits, ClientInbox, ClientTargets } from './Habits';
 import { CoachReports } from '../../components/WeeklyReport';
 import { CoachPhotos } from '../../components/ProgressPhotos';
-import { Card, Dot, Empty, Kpi, Tag } from '../../components/ui';
+import { Card, Dot, Empty, Icon, Kpi, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
@@ -53,7 +53,7 @@ export function ClientOverview({ client }: { client: Client }) {
           title="Raport treningowy do druku / PDF — np. dla lekarza lub fizjoterapeuty"
           onClick={() => printReport(client, sessions, { plan: currentPlan(plansOf(db, client.id)) })}
         >
-          🖨 Raport dla lekarza / fizjo
+          <Icon name="print" size={16} /> Raport dla lekarza / fizjo
         </button>
       </div>
       <ClientInbox client={client} />

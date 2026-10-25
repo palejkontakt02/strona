@@ -280,7 +280,7 @@ function workoutSummary(k: PlanWorkout, client: { run?: Client['run'] }): string
   if (ex.length && ex.every((e) => e.cardio ?? cardioByName(e.name))) {
     const t = planRunTotals(ex.flatMap((e) => e.groups), client.run);
     const parts = [t.km > 0 && `${t.approx ? '~' : ''}${fmtKm(t.km)}`, t.min > 0 && `${t.approx ? '~' : ''}${fmtDur(t.min)}`].filter(Boolean);
-    return `🏃 ${parts.join(' · ') || 'bieg'}`;
+    return parts.length ? `bieg · ${parts.join(' · ')}` : 'bieg';
   }
   return nEx(ex.length);
 }
@@ -350,17 +350,17 @@ function Home({
         </p>
         {st.weeks > 0 && (
           <span className="ath-streak">
-            🔥 {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
+            <Icon name="flame" size={15} /> {st.weeks} {plural(st.weeks, 'tydzień', 'tygodnie', 'tygodni')} z rzędu · {st.sessions} {plural(st.sessions, 'trening', 'treningi', 'treningów')}
           </span>
         )}
         <button className="btn btn-ghost btn-sm msg-link" onClick={onIntake}>
-          📋 {onTrainer ? 'Ankieta podopiecznego' : 'Moja ankieta'}
+          <Icon name="clipboard" size={16} /> {onTrainer ? 'Ankieta podopiecznego' : 'Moja ankieta'}
         </button>
         {(() => {
           const fresh = !onTrainer && unreadMsgs > 0;
           return (
             <a href="#do-trenera" className={`btn btn-sm msg-link ${fresh ? 'btn-primary' : 'btn-ghost'}`}>
-              {onTrainer ? '✉ Napisz (jako trener)' : fresh ? '✉ Nowa odpowiedź trenera' : '✉ Napisz do trenera'}
+              <Icon name="mail" size={16} /> {onTrainer ? 'Napisz (jako trener)' : fresh ? 'Nowa odpowiedź trenera' : 'Napisz do trenera'}
               {fresh && (
                 <span className="msg-badge" aria-label={`${unreadMsgs} nowe`}>
                   {unreadMsgs}
@@ -523,7 +523,7 @@ function Home({
               <strong className="big">
                 {thisWeek}/{goal}
               </strong>
-              <p className="muted small">{thisWeek >= goal ? 'Cel osiągnięty 💪' : `Zostało ${goal - thisWeek}`}</p>
+              <p className="muted small">{thisWeek >= goal ? 'Cel osiągnięty' : `Zostało ${goal - thisWeek}`}</p>
             </div>
           </div>
         </section>
@@ -736,7 +736,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
           ))}
           {items.map((x, i) => (
             <li key={i} className={x.kind}>
-              {x.kind === 'visit' ? '🗓 ' : pick < today ? '⚠ ' : x.run ? '🏃 ' : '🏋 '}
+              <Icon name={x.kind === 'visit' ? 'cal' : pick < today ? 'alert' : x.run ? 'run' : 'dumbbell'} size={15} />{' '}
               {x.text}
               {x.kind !== 'visit' && pick < today ? ' — zaległy' : ''}
             </li>
@@ -962,7 +962,7 @@ function Progress({ clientId }: { clientId: string }) {
           <ul className="rows">
             {recs.map((r, i) => (
               <li key={i} className="row">
-                <span className="text-green">★</span>
+                <span className="text-green"><Icon name="star" size={16} /></span>
                 <span className="grow">
                   {r.name}
                   <span className="muted small"> · {fmtDay(r.date)}</span>

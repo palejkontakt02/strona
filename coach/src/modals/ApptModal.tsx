@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Field, Modal } from '../components/ui';
+import { Field, Icon, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
 import { clientById, deleteAppointment, groupOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
@@ -182,7 +182,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
               const pa = group.find((x) => x.clientId === id);
               return (
                 <span key={id} className="pair-chip">
-                  👥 {clientById(db, id)?.name ?? '—'}
+                  <Icon name="users" size={14} /> {clientById(db, id)?.name ?? '—'}
                   {pa && pa.status !== 'planned' && <i className="muted small"> · {APPT_STATUS[pa.status].label.toLowerCase()}</i>}
                   <button type="button" className="icon-btn icon-btn-sm" aria-label={`Usuń ${clientById(db, id)?.name ?? ''} z pary`} onClick={() => setPartners(partners.filter((x) => x !== id))}>
                     ×

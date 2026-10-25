@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Field, Modal, Seg } from '../components/ui';
+import { Field, Icon, Modal, Seg } from '../components/ui';
 import type { Plan, PlanExercise, PlanWorkout } from '../domain';
 import { addExtraWorkout, clientById, extraPlanOf, newExtraPlan, plansOf, savePlan, sessionToWorkout, sessionsOf } from '../data/ops';
 import type { Change } from '../data/db';
@@ -165,7 +165,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
           <label className={`assign-opt ${src === 'run' ? 'on' : ''}`}>
             <input type="radio" checked={src === 'run'} onChange={() => choose('run', 'custom')} />
             <span>
-              <b>🏃 Bieg</b>
+              <b><Icon name="run" size={15} /> Bieg</b>
               <select className="input input-sm" value={src === 'run' ? pick : ''} onChange={(e) => choose('run', e.target.value)} aria-label="Rodzaj biegu">
                 {src !== 'run' && <option value="">wybierz…</option>}
                 <option value="custom">Własny — ułożę odcinki</option>

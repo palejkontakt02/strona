@@ -86,10 +86,59 @@
   --tile-s: 60%;
   color-scheme: light;
 }
+:root[data-palette="biel"] {
+  /* Biały — domyślny jasny: czerń, biel, szarości; kolor tylko dla stanów (zielony ok, czerwony błąd, żółty uwaga) */
+  --color-bg: #f3f3f3;
+  --color-surface: #ffffff;
+  --color-surface-2: #ececec;
+  --color-text: #111111;
+  --color-divider: color-mix(in srgb, #111 12%, transparent);
+  --color-accent: #111111;
+  --color-accent-100: #000000;
+  --color-accent-200: #111111;
+  --color-accent-300: #262626;
+  --color-accent-400: #111111;
+  --color-accent-500: #3d3d3d;
+  --color-accent-600: #595959;
+  --color-accent-700: #8a8a8a;
+  --color-accent-800: #cfcfcf;
+  --color-accent-900: #ededed;
+  --color-neutral-100: #141414;
+  --color-neutral-200: #2b2b2b;
+  --color-neutral-300: #454545;
+  --color-neutral-400: #6b6b6b;
+  --color-neutral-500: #8c8c8c;
+  --color-neutral-600: #ababab;
+  --color-neutral-700: #c9c9c9;
+  --color-neutral-800: #e2e2e2;
+  --color-neutral-900: #f0f0f0;
+  --color-ok: #1a7f37;
+  --color-warn: #b26a00;
+  --color-danger: #d1242f;
+  --color-cyan: #6b6b6b;
+  --on-accent: #ffffff;
+  --on-ok: #ffffff;
+  --ok-fg: #116329;
+  --warn-fg: #7d4a00;
+  --danger-fg: #a40e26;
+  --toast-bg: #111111;
+  --toast-fg: #ffffff;
+  --overlay: rgb(0 0 0 / 0.45);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 16px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 8px 30px rgb(0 0 0 / 0.18);
+  --tile-l: 40%;
+  --tile-s: 0%;
+  --card-border: color-mix(in srgb, #111 10%, transparent);
+  --band: #111111;
+  --band-fg: #ffffff;
+  --zebra: color-mix(in srgb, #111 3%, transparent);
+  --focus: color-mix(in srgb, #111 55%, transparent);
+  color-scheme: light;
+}
 :root[data-palette="mono"] {
-  --color-bg: #0b0b0c;
-  --color-surface: #161618;
-  --color-surface-2: #202023;
+  --color-bg: #000000;
+  --color-surface: #141414;
+  --color-surface-2: #222222;
   --color-text: #f2f2f2;
   --color-divider: color-mix(in srgb, #f2f2f2 12%, transparent);
   --color-accent: #f2f2f2;
@@ -111,9 +160,9 @@
   --color-neutral-700: #4d4d4f;
   --color-neutral-800: #333336;
   --color-neutral-900: #1f1f21;
-  --color-ok: #7fbf9a;
-  --color-warn: #d4b26a;
-  --color-danger: #e07a86;
+  --color-ok: #3ccf6e;
+  --color-warn: #ffb340;
+  --color-danger: #ff5c57;
   --color-cyan: #b9c6d2;
   --on-accent: #0b0b0c;
   --on-ok: #0b0b0c;
@@ -126,7 +175,7 @@
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.25);
   --shadow-lg: 0 8px 30px rgb(0 0 0 / 0.6);
   --tile-l: 72%;
-  --tile-s: 16%;
+  --tile-s: 0%;
   --card-border: color-mix(in srgb, #f2f2f2 9%, transparent);
   --band: #2c2c30;
   --band-fg: #f5f5f5;
@@ -3362,8 +3411,15 @@ h2 {
 :root[data-palette='mono'] .tile,
 :root[data-palette='mono'] .month-item,
 :root[data-palette='mono'] [style*='--hue'],
-:root[data-palette='mono'] [style*='--lhue'] {
-  --tile-s: 42%;
+:root[data-palette='mono'] [style*='--lhue'],
+:root[data-palette='biel'] .loc-dot,
+:root[data-palette='biel'] .loc-filter i,
+:root[data-palette='biel'] .tile,
+:root[data-palette='biel'] .month-item,
+:root[data-palette='biel'] [style*='--hue'],
+:root[data-palette='biel'] [style*='--lhue'] {
+  /* czarno-biały: paski klientów i kropki miejsc w szarościach (kolor tylko dla stanów) */
+  --tile-s: 0%;
 }
 @media (max-width: 600px) {
   /* edytor planu: nazwa ćwiczenia w całym wierszu, mniej zagnieżdżonych odstępów */
@@ -4147,7 +4203,8 @@ h2 {
 .dash-grid {
   align-items: start;
 }
-:root[data-palette="mono"] .line-cyan polyline {
+:root[data-palette="mono"] .line-cyan polyline,
+:root[data-palette="biel"] .line-cyan polyline {
   stroke-dasharray: 5 4;
 }
 :root[data-palette="mono"] {

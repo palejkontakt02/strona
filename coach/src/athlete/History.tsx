@@ -4,6 +4,7 @@ import { needsReview, sessionVideos } from '../data/videos';
 import { useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { LocationTag } from '../components/location';
+import { Icon } from '../components/ui';
 import type { Appointment, TrainingSession } from '../domain';
 import { put } from '../data/db';
 import { isSolo, sessionsOf } from '../data/ops';
@@ -198,7 +199,7 @@ export function SessionSheet({
         )}
         {onReview && (
           <button className={`btn ${needsReview(s) ? 'btn-primary' : 'btn-secondary'} btn-block`} onClick={onReview}>
-            {nVid ? `🎥 Przejrzyj nagrania (${nVid})` : '💬 Komentarz dla podopiecznego'}
+            <Icon name={nVid ? 'cam' : 'chat'} size={16} /> {nVid ? `Przejrzyj nagrania (${nVid})` : 'Komentarz dla podopiecznego'}
             {s.reviewedAt ? ' · obejrzane ✓' : ''}
           </button>
         )}
@@ -220,7 +221,7 @@ export function SessionSheet({
           </span>}
           {s.withIds?.length ? (
             <span>
-              👥 w parze{(() => {
+              <Icon name="users" size={15} /> w parze{(() => {
                 // podopieczny w aplikacji nie widzi innych osób — wtedy samo „w parze”
                 const names = s.withIds.map((id) => db.clients.find((c) => c.id === id)?.name.split(' ')[0]).filter(Boolean);
                 return names.length ? `: ${names.join(', ')}` : '';
@@ -233,7 +234,7 @@ export function SessionSheet({
             if (!t) return null;
             return (
               <span>
-                {t.km ? '🏃' : '🫀'} {t.km ? <b>{fmtKm(t.km)}</b> : null}
+                <Icon name={t.km ? 'run' : 'heart'} size={15} /> {t.km ? <b>{fmtKm(t.km)}</b> : null}
                 {t.km && t.min ? ' · ' : ''}
                 {t.min ? <b>{fmtDur(t.min)}</b> : null}
                 {t.pace ? ` · śr. ${t.pace}` : ''}

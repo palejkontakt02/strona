@@ -6,6 +6,7 @@ import { fmtDay, fnum, plural, uid } from '../format';
 import type { Activity } from '../lib/activityImport';
 import { todayISO } from '../lib/dates';
 import { fmtClock, paceText, runTotals } from '../lib/running';
+import { Icon } from './ui';
 
 const ACCEPT = '.gpx,.tcx,.fit,application/gpx+xml,application/vnd.garmin.tcx+xml,application/octet-stream';
 
@@ -112,7 +113,7 @@ export function ImportActivity({ clientId, onImport, small }: { clientId?: strin
       <input ref={input} type="file" accept={ACCEPT} hidden onChange={(e) => void pick(e.target.files?.[0])} aria-label="Plik z zegarka (GPX, TCX, FIT)" />
       {!a && (
         <button type="button" className={small ? 'btn btn-ghost btn-sm' : 'btn btn-ghost btn-block imp-btn'} disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? 'Wczytuję plik…' : small ? '⌚ Importuj z zegarka' : '⌚ Importuj z zegarka (GPX, TCX, FIT)'}
+          {busy ? 'Wczytuję plik…' : <><Icon name="watch" size={16} /> {small ? 'Importuj z zegarka' : 'Importuj z zegarka (GPX, TCX, FIT)'}</>}
         </button>
       )}
       {err && (

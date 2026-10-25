@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Card, Field, IconBtn, Tag } from '../../components/ui';
+import { Card, Field, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, HealthIntake, TrainerNotes } from '../../domain';
 import { put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -48,7 +48,7 @@ export function ClientIntakeCard({ client }: { client: Client }) {
         <>
           Ankieta podopiecznego {i?.completedAt ? <Tag tone="ok">wypełniona</Tag> : <Tag tone="warn">niewypełniona</Tag>}{' '}
           {parqYesCount(i) > 0 && <Tag tone="danger">PAR-Q: {parqYesCount(i)}× tak</Tag>}{' '}
-          {i?.files?.length ? <Tag tone="muted">📎 {i.files.length}</Tag> : null}
+          {i?.files?.length ? <Tag tone="muted"><Icon name="clip" size={13} /> {i.files.length}</Tag> : null}
         </>
       }
       action={

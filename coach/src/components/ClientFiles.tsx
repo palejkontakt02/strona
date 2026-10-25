@@ -3,7 +3,7 @@ import { useStore } from '../data/store';
 import { deleteClientFile, fileProblem, fileUrl, fmtSize, isImage, saveClientFile } from '../data/files';
 import { fmtDay, uid } from '../format';
 import { FILE_KINDS, type FileKind, type IntakeFile } from '../lib/intake';
-import { IconBtn } from './ui';
+import { Icon, IconBtn } from './ui';
 
 /** Adresy plików (podpisane linki w chmurze, ważne godzinę) — ładowane raz na listę. */
 function useFileUrls(files: IntakeFile[]) {
@@ -83,7 +83,7 @@ export function ClientFiles({ clientId, files, onChange, editable = true }: { cl
             return (
               <li key={f.id} className="cfile">
                 <a className="cfile-thumb" href={u || undefined} target="_blank" rel="noreferrer" aria-label={`Otwórz ${f.name}`} onClick={(e) => !u && e.preventDefault()}>
-                  {img && u ? <img src={u} alt={f.name} loading="lazy" /> : <span className="cfile-icon">{img ? '🖼' : 'PDF'}</span>}
+                  {img && u ? <img src={u} alt={f.name} loading="lazy" /> : <span className="cfile-icon">{img ? <Icon name="image" size={22} /> : 'PDF'}</span>}
                 </a>
                 <div className="cfile-info">
                   <a className="cfile-name" href={u || undefined} target="_blank" rel="noreferrer" onClick={(e) => !u && e.preventDefault()}>
@@ -113,10 +113,10 @@ export function ClientFiles({ clientId, files, onChange, editable = true }: { cl
           <input ref={pick} type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" multiple hidden onChange={(e) => (void add(e.target.files), (e.target.value = ''))} />
           <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => (void add(e.target.files), (e.target.value = ''))} />
           <button type="button" className="btn btn-secondary" onClick={() => cam.current?.click()} disabled={busy > 0}>
-            📷 Zrób zdjęcie
+            <Icon name="photo" size={16} /> Zrób zdjęcie
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => pick.current?.click()} disabled={busy > 0}>
-            📎 Dodaj plik / zdjęcie
+            <Icon name="clip" size={16} /> Dodaj plik / zdjęcie
           </button>
           {busy > 0 && <span className="muted small">Wysyłanie… ({busy})</span>}
         </div>

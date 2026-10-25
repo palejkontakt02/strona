@@ -386,7 +386,7 @@ export function PairLive({ people: initial, onExit }: { people: { clientId: stri
                   const end = rests[id];
                   if (end == null || active === id || isDone) return null;
                   const sec = Math.round((end - Date.now()) / 1000);
-                  return sec > 0 ? <span className="pair-rest">⏱ {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span> : <span className="pair-rest ready">gotowy</span>;
+                  return sec > 0 ? <span className="pair-rest"><Icon name="timer" size={14} /> {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}</span> : <span className="pair-rest ready">gotowy</span>;
                 })()}
               </button>
             );

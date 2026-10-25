@@ -198,11 +198,76 @@ const ICONS: Record<string, ReactNode> = {
   more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
   user: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c0-4 4-6 8-6s8 2 8 6" />,
   settings: <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-2-4-2 1-2-1V5h-4v2l-2 1-2-1-2 4 2 1v0l-2 1 2 4 2-1 2 1v2h4v-2l2-1 2 1 2-4z" />,
+  // monochromatyczne piktogramy zamiast emoji (dziedziczą kolor tekstu)
+  run: (
+    <>
+      <circle cx="15" cy="4.5" r="2" />
+      <path d="M14 8l-3 5 3 3-1 5M11 13l-2 4-4 1M14 8l3 3h3M14 8l-4 1-2 2.5" />
+    </>
+  ),
+  heart: <path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z" />,
+  clipboard: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 2.5h6v3H9zM9 11h6M9 15h4" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3.5 7l8.5 6 8.5-6" />
+    </>
+  ),
+  timer: (
+    <>
+      <circle cx="12" cy="13.5" r="7.5" />
+      <path d="M12 10v3.5l2.5 2M9.5 2.5h5M12 2.5V6M19 6l1.5-1.5" />
+    </>
+  ),
+  flame: <path d="M12 21.5a7 7 0 0 0 7-7c0-4.5-3.5-7-5-11.5-1.5 3-2 4.5-3.5 6-1-1-1.5-2-1.8-3.2C6.5 8 5 10.8 5 14.5a7 7 0 0 0 7 7z" />,
+  trophy: <path d="M8 4h8v6a4 4 0 0 1-8 0zM8 6H4.5v1A3.5 3.5 0 0 0 8 10.5M16 6h3.5v1a3.5 3.5 0 0 1-3.5 3.5M12 14v4M8 21h8M10 18h4" />,
+  link: <path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />,
+  image: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M21 15l-5-5-10 10" />
+    </>
+  ),
+  photo: (
+    <>
+      <path d="M4 7.5h3l2-3h6l2 3h3a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13.5" r="3.5" />
+    </>
+  ),
+  clip: <path d="M20 11.5l-8.5 8.5a5 5 0 0 1-7-7L13 4.5a3.5 3.5 0 0 1 5 5L9.5 18a2 2 0 0 1-3-3L14 7.5" />,
+  watch: (
+    <>
+      <rect x="6" y="6" width="12" height="12" rx="3" />
+      <path d="M9 6l1-4h4l1 4M9 18l1 4h4l1-4M12 9.5V12l1.5 1.5" />
+    </>
+  ),
+  print: <path d="M7 9V3h10v6M7 18H4.5a1.5 1.5 0 0 1-1.5-1.5v-6A1.5 1.5 0 0 1 4.5 9h15a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H17M7 14h10v7H7z" />,
+  chat: <path d="M4 5h16v11H9l-5 4z" />,
+  star: <path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4l-5.5 2.9 1-6.2L3 9.7l6.2-.9z" />,
+  dumbbell: <path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11" />,
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS | string; size?: number }) {
+  // vertical-align: w zwykłym tekście ikona siada na linii pisma; we flexie (przyciski) nie ma znaczenia
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      style={{ verticalAlign: '-0.18em', flexShrink: 0 }}
+    >
       {ICONS[name]}
     </svg>
   );

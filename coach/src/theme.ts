@@ -1,7 +1,11 @@
-/** Motywy kolorystyczne aplikacji (zapisywane na tym urządzeniu). Domyślny: „Kobalt”. */
+/**
+ * Motywy kolorystyczne (zapisywane na tym urządzeniu). Domyślnie czarno-biały: „Biały” albo „Czarny”
+ * według ustawienia jasny / ciemny w telefonie. Kolor w nich tylko dla stanów (ok / uwaga / błąd).
+ */
 export const PALETTES = [
+  { id: 'biel', name: 'Biały', bg: '#f3f3f3', accent: '#111111' },
+  { id: 'mono', name: 'Czarny', bg: '#000000', accent: '#f5f5f5' },
   { id: 'kobalt', name: 'Kobalt', bg: '#0e1726', accent: '#5b8cff' },
-  { id: 'mono', name: 'Czarno-biały', bg: '#0b0b0c', accent: '#f2f2f2' },
   { id: 'morski', name: 'Morski', bg: '#0f1b1e', accent: '#3cc4ad' },
   { id: 'grafit', name: 'Grafit', bg: '#19191b', accent: '#f0a43a' },
   { id: 'fiolet', name: 'Fiolet', bg: '#161826', accent: '#9184d9' },
@@ -9,7 +13,8 @@ export const PALETTES = [
 ] as const;
 export type PaletteId = (typeof PALETTES)[number]['id'];
 
-const KEY = 'fitowa-palette';
+// v2: przejście na czarno-biały — wcześniejszy wybór (domyślny Kobalt) nie przenosi się
+const KEY = 'fitowa-palette2';
 
 export function getPalette(): PaletteId {
   try {
@@ -18,7 +23,25 @@ export function getPalette(): PaletteId {
   } catch {
     // brak localStorage — motyw domyślny
   }
-  return 'kobalt';
+  return systemPalette();
+}
+
+/** Bez własnego wyboru: jasny albo ciemny czarno-biały, jak w ustawieniach telefonu. */
+export function systemPalette(): PaletteId {
+  try {
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'mono' : 'biel';
+  } catch {
+    return 'biel';
+  }
+}
+
+/** Czy użytkownik sam wybrał motyw (wtedy nie podążamy za zmianą jasny / ciemny w telefonie). */
+export function hasOwnPalette(): boolean {
+  try {
+    return !!localStorage.getItem(KEY);
+  } catch {
+    return false;
+  }
 }
 
 export function applyPalette(id: PaletteId) {

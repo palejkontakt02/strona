@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Field, IconBtn, Modal, Seg } from '../components/ui';
+import { Field, Icon, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
 import { chargeProblem, clientById, groupOf, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
@@ -408,7 +408,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <div className="pair-chips">
               {withIds.map((id) => (
                 <span key={id} className="pair-chip">
-                  👥 {clientById(db, id)?.name ?? '—'}
+                  <Icon name="users" size={14} /> {clientById(db, id)?.name ?? '—'}
                   <button type="button" className="icon-btn icon-btn-sm" aria-label={`Usuń ${clientById(db, id)?.name ?? ''}`} onClick={() => setWithIds(withIds.filter((x) => x !== id))}>
                     ×
                   </button>
@@ -460,7 +460,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         <h4>Ćwiczenia</h4>
         {paste === null && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPaste('')}>
-            📋 Wklej z notatki
+            <Icon name="clipboard" size={16} /> Wklej z notatki
           </button>
         )}
       </div>
@@ -521,12 +521,12 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             {r.hint && !r.series && <span className="ex-hint">Podpowiedź: {r.hint}</span>}
             {!optsOpen.has(r.key) && (
               <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, r.key]))}>
-                ⚙ Typ ćwiczenia
+                <Icon name="settings" size={14} /> Typ ćwiczenia
               </button>
             )}
             {!r.cardio && (optsOpen.has(r.key) || r.timed) && (
               <button type="button" className={`side-toggle ${r.timed ? 'on' : ''}`} aria-pressed={!!r.timed} onClick={() => setRow(i, { timed: !r.timed || undefined })}>
-                ⏱ {r.timed ? 'Na czas — sekundy w miejscu powtórzeń' : 'Na czas?'}
+                <Icon name="timer" size={14} /> {r.timed ? 'Na czas — sekundy w miejscu powtórzeń' : 'Na czas?'}
               </button>
             )}
             {!r.cardio && (optsOpen.has(r.key) || r.perSide) && (
@@ -546,7 +546,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                 setRow(i, { cardio: !r.cardio || undefined, perSide: undefined, series: [{ key: uid(), load: '', reps: '', rpe: '' }] });
               }}
             >
-              🫀 {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
+              <Icon name="heart" size={14} /> {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
             </button>}
             {r.series ? (
               <div className="set-edit">

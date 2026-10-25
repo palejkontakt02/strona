@@ -74,18 +74,18 @@ export function ClientsView() {
                           const n = db.sessions.filter((x) => x.clientId === c.id && needsReview(x)).length;
                           return n > 0 ? (
                             <Tag tone="accent">
-                              <span aria-label="nagrania do obejrzenia">🎥 {n}</span>
+                              <span aria-label="nagrania do obejrzenia"><Icon name="cam" size={13} /> {n}</span>
                             </Tag>
                           ) : null;
                         })()}
                         {(c.inbox ?? []).some((n) => !n.read) && (
                           <Tag tone="warn">
-                            <span aria-label="nowe wiadomości">✉ {(c.inbox ?? []).filter((n) => !n.read).length}</span>
+                            <span aria-label="nowe wiadomości"><Icon name="mail" size={13} /> {(c.inbox ?? []).filter((n) => !n.read).length}</span>
                           </Tag>
                         )}
                         {(c.weeklyReports ?? []).some((r) => !r.seenAt) && (
                           <Tag tone="accent">
-                            <span aria-label="nowy raport tygodniowy">📋 {(c.weeklyReports ?? []).filter((r) => !r.seenAt).length}</span>
+                            <span aria-label="nowy raport tygodniowy"><Icon name="clipboard" size={13} /> {(c.weeklyReports ?? []).filter((r) => !r.seenAt).length}</span>
                           </Tag>
                         )}
                         {alerts.length > 0 ? <Dot tone={red ? 'danger' : 'warn'} /> : <StatusTag status={c.status} />}

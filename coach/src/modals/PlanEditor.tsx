@@ -142,7 +142,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       <p className="muted small">
         Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
         Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
-        Bieg: „🏃 + Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
+        Bieg: „+ Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
       </p>
       <RunTargetList />
 
@@ -275,7 +275,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         onClick={() => setEx((x) => void (x.linked = !x.linked))}
                         title="Ćwiczenia w bloku robi się na zmianę (A1 → A2 → A3), przerwa po całej rundzie"
                       >
-                        {e.linked ? `⛓ w bloku z ${labels[ei - 1]} · rozłącz` : '+ połącz z poprzednim (superseria / obwód)'}
+                        {e.linked ? <><Icon name="link" size={14} /> w bloku z {labels[ei - 1]} · rozłącz</> : '+ połącz z poprzednim (superseria / obwód)'}
                       </button>
                     )}
                   <div className={`pe-ex ${inBlock ? 'in-block' : ''}`}>
@@ -316,7 +316,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     {/* typ ćwiczenia schowany — na wierzchu tylko włączony */}
                     {!optsOpen.has(e.id) && (
                       <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, e.id]))}>
-                        ⚙ Typ ćwiczenia
+                        <Icon name="settings" size={14} /> Typ ćwiczenia
                       </button>
                     )}
                     {(optsOpen.has(e.id) || !!(e.cardio ?? cardioByName(e.name))) && <button type="button" className={`side-toggle ${e.cardio ?? cardioByName(e.name) ? 'on' : ''}`} aria-pressed={!!(e.cardio ?? cardioByName(e.name))} onClick={() => setEx((x) => {
@@ -324,7 +324,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       // bieg: przerwy są przy odcinkach — domyślne „2:00” siłowe by się wliczało
                       if (x.cardio && x.rest === '2:00') x.rest = '';
                     })}>
-                      🫀 {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
+                      <Icon name="heart" size={14} /> {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
                     </button>}
 {!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || isTimed(e)) && (
                     <button
@@ -334,7 +334,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       onClick={() => setEx((x) => void (x.timed = !isTimed(x)))}
                       title="Ćwiczenie na czas (deska, wall sit, zwis): w kolumnie „Czas” sekundy, m:ss albo „2 min”"
                     >
-                      ⏱ {isTimed(e) ? 'Na czas (czas zamiast powtórzeń)' : 'Na czas?'}
+                      <Icon name="timer" size={14} /> {isTimed(e) ? 'Na czas (czas zamiast powtórzeń)' : 'Na czas?'}
                     </button>
                     )}
 {!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || !!(e.perSide ?? perSideByName(e.name))) && (
@@ -431,7 +431,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     if (t || v === 'custom') upd((d) => void findWorkout(d, wi, ki).exercises.push(t ? t.make() : emptyRunExercise()));
                   }}
                 >
-                  <option value="">🏃 + Bieg…</option>
+                  <option value="">+ Bieg…</option>
                   <option value="custom">Własny — ułożę odcinki</option>
                   {RUN_TEMPLATES.map((t) => (
                     <option key={t.id} value={t.id}>

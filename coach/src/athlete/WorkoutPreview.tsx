@@ -20,7 +20,7 @@ function doneWorkout(s: TrainingSession): PlanWorkout {
         groups: e.groups.map((g, j) => {
           const x = log[j];
           const pace = x?.dist && x.reps ? x.reps / x.dist : null;
-          return { ...g, pace: [pace ? `${fmtClock(pace)}/km` : '', x?.hr ? `♥ ${x.hr}` : ''].filter(Boolean).join(' · ') || undefined, rpe: x?.rpe != null ? String(x.rpe) : '' };
+          return { ...g, pace: [pace ? `${fmtClock(pace)}/km` : '', x?.hr ? `tętno ${x.hr}` : ''].filter(Boolean).join(' · ') || undefined, rpe: x?.rpe != null ? String(x.rpe) : '' };
         }),
       };
     }),

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { useDialog } from '../components/useDialog';
-import { IconBtn } from '../components/ui';
+import { Icon, IconBtn } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
 import { ChargeSelect, LocationSelect } from '../components/location';
 import type { Billing, Client, PainSpot, PlanExercise, RunProfile, SetGroup, TrainingSession } from '../domain';
@@ -230,7 +230,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const next = update((r) => void (r.ex[k].sets = res.sets));
     if (hit) {
       vibrate([80, 60, 80, 60, 160]);
-      toast(`🏆 ${hit.text}`);
+      toast(hit.text);
     }
     const br = blockRest(next, k, i);
     setHintNext(br.next ?? null);
@@ -360,7 +360,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       else apptId = undefined;
     }
     const { changes, message } = saveSession(db, { session, isNew: true, appointmentId: apptId, matchAppointment: trainer && !(appointmentId && !apptId), amount: trainer ? num(finish.amount) ?? undefined : undefined, paidNow: finish.paidNow });
-    if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota! 💪'))) return; // trening zostaje — można ponowić zapis
+    if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota!'))) return; // trening zostaje — można ponowić zapis
     // notatka z podsumowania trafia też do wiadomości trenera (z odnośnikiem do treningu)
     // zadanie dzienne o tej samej nazwie co trening (np. „Ćwiczenia na kręgosłup”) odhacza się samo
     if (!trainer) {
@@ -516,7 +516,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                   title={`Odliczaj ${fmtHold(holdSec(s))}`}
                   onClick={() => setHold({ end: Date.now() + holdSec(s) * 1000, total: holdSec(s), what: `${label ?? run.ex[k].label ?? ''} ${run.ex[k].name.slice(0, 18)} · seria ${num}`.trim() })}
                 >
-                  ⏱
+                  <Icon name="timer" size={16} />
                 </button>
               </span>
             ) : (
@@ -544,7 +544,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         )}
         {s.pr && s.done && (
           <div className="prhint" role="status">
-            <span aria-hidden="true">🏆</span> {s.pr}
+            <Icon name="trophy" size={15} /> {s.pr}
           </div>
         )}
         {(() => {
@@ -557,7 +557,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </div>
           );
         })()}
-        {/* cardio i „na stronę” — odliczanie pod wierszem (seria na czas ma ⏱ w polu) */}
+        {/* cardio i „na stronę” — odliczanie pod wierszem (seria na czas ma stoper w polu) */}
         {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : run.ex[k].perSide && holdSec(s) > 0) && (
           <button
             className="link small hold-start"
@@ -571,7 +571,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               setHold({ end: Date.now() + sec * 1000, total: sec, what, side: 'L', second: second || sec });
             }}
           >
-            ⏱ Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
+            <Icon name="timer" size={16} /> Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
             {run.ex[k].perSide ? ' — jedna strona, potem druga' : ''}
           </button>
         )}
@@ -645,7 +645,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone */}
         {!optsOpen.has(k) && !e.sets.some((x) => x.done) && (
           <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, k]))}>
-            ⚙ Typ ćwiczenia
+            <Icon name="settings" size={14} /> Typ ćwiczenia
           </button>
         )}
         {(optsOpen.has(k) || e.cardio) && !e.sets.some((x) => x.done) && (
@@ -663,7 +663,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }
             title="Cardio: czas, dystans i tętno zamiast powtórzeń i ciężaru"
           >
-            🫀 {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
+            <Icon name="heart" size={14} /> {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
           </button>
         )}
         {!e.cardio && !e.timed && (optsOpen.has(k) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
@@ -682,7 +682,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }
             title="Ćwiczenie na czas (deska, wall sit, zwis): wpisujesz sekundy zamiast powtórzeń"
           >
-            ⏱ {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
+            <Icon name="timer" size={14} /> {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
           </button>
         )}
         {!e.cardio && (optsOpen.has(k) || e.perSide) && (
@@ -984,7 +984,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               );
               return prs.length ? (
                 <div className="pr-summary">
-                  <span className="eyebrow">🏆 Rekordy w tym treningu</span>
+                  <span className="eyebrow"><Icon name="trophy" size={14} /> Rekordy w tym treningu</span>
                   <ul>
                     {prs.map((p) => (
                       <li key={p.name}>
@@ -1308,8 +1308,8 @@ function AddExercise({
       {(
         [
           ['sila', 'Siłowe'],
-          ['bieg', '🏃 Bieg'],
-          ['cardio', '🫀 Cardio'],
+          ['bieg', <><Icon name="run" size={15} /> Bieg</>],
+          ['cardio', <><Icon name="heart" size={15} /> Cardio</>],
         ] as const
       ).map(([k, l]) => (
         <button key={k} type="button" role="tab" className={kind === k ? 'active' : ''} aria-selected={kind === k} onClick={() => setKind(k)}>
@@ -1445,7 +1445,7 @@ function AddExercise({
               if (!v && reps === '30') setReps('8');
             }}
           >
-            {v ? '⏱ Na czas' : 'Powtórzenia'}
+            {v ? <><Icon name="timer" size={15} /> Na czas</> : 'Powtórzenia'}
           </button>
         ))}
       </div>
@@ -1513,7 +1513,7 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
             Gotowe
           </button>
         </div>
-        <p className="muted small">⛓ łączy ćwiczenie z poprzednim w superserię / obwód — robi się je na zmianę, przerwa po całej rundzie.</p>
+        <p className="muted small"><Icon name="link" size={14} /> łączy ćwiczenie z poprzednim w superserię / obwód — robi się je na zmianę, przerwa po całej rundzie.</p>
         <ul className="layout-list">
           {run.ex.map((e, k) => (
             <li key={k} className={`layout-row ${e.linked ? 'linked' : ''}`}>
@@ -1523,7 +1523,7 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
               <span className="layout-actions">
                 {k > 0 && (
                   <button className={`chain ${e.linked ? 'on' : ''}`} aria-pressed={!!e.linked} aria-label={e.linked ? `Rozłącz ${e.name} z poprzednim` : `Połącz ${e.name} z poprzednim w superserię`} title={e.linked ? 'Rozłącz z poprzednim' : 'Połącz z poprzednim (superseria / obwód)'} onClick={() => setRun(toggleLink(run, k))}>
-                    ⛓
+                    <Icon name="link" size={16} />
                   </button>
                 )}
                 <IconBtn icon="up" label={`W górę: ${e.name}`} onClick={() => setRun(moveExercise(run, k, -1))} />

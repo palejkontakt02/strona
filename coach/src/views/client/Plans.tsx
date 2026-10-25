@@ -1,4 +1,4 @@
-import { Card, Empty, IconBtn, Tag } from '../../components/ui';
+import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
 import { clonePlan, extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
@@ -139,7 +139,7 @@ export function ClientPlans({ client }: { client: Client }) {
                     Zapisz jako szablon
                   </button>
                   <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
-                    🖨 Drukuj
+                    <Icon name="print" size={16} /> Drukuj
                   </button>
                   <IconBtn
                     icon="trash"

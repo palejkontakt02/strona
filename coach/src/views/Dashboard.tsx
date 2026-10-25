@@ -94,7 +94,7 @@ export function Dashboard() {
                       </button>
                       {(() => {
                         const pr = groupOf(db.appointments, a).filter((x) => x.id !== a.id && x.status !== 'cancel');
-                        return pr.length ? <span className="muted small nowrap" title="Trening w parze — „Prowadź” otwiera obie osoby">👥 + {pr.map((x) => clientById(db, x.clientId)?.name.split(' ')[0] ?? '—').join(', ')}</span> : null;
+                        return pr.length ? <span className="muted small nowrap" title="Trening w parze — „Prowadź” otwiera obie osoby"><Icon name="users" size={13} /> + {pr.map((x) => clientById(db, x.clientId)?.name.split(' ')[0] ?? '—').join(', ')}</span> : null;
                       })()}
                       <LocationTag id={a.locationId} short />
                     </div>
@@ -220,7 +220,7 @@ export function Dashboard() {
                       <div className="grow row-main">
                         <b className="ellipsis">{c?.name ?? '—'}</b>
                         <span className="muted small ellipsis">
-                          {x.workoutName || 'Trening'} · 🎥 {n}
+                          {x.workoutName || 'Trening'} · <Icon name="cam" size={13} /> {n}
                           {x.notes ? ' · ma notatkę' : ''}
                         </span>
                       </div>

@@ -242,7 +242,7 @@ export function CalendarView() {
         />
       )}
       <p className="muted small legend-note">
-        Kolor paska = podopieczny · kropka = miejsce · „sam” = trening samodzielny (kropkowany pasek) · przerywana ramka = zadany do zrobienia
+        kropka = miejsce · „sam” = trening samodzielny (kropkowany pasek) · przerywana ramka = zadany do zrobienia
       </p>
     </div>
   );
@@ -289,12 +289,18 @@ function ApptTile({ a, onDragEnd }: { a: Appointment; onDragEnd?: () => void }) 
       onClick={() => openModal({ kind: 'appt', appt: a })}
     >
       <span className="tile-time">
-        {clash && <span className="clash-mark" aria-label="Kolizja">⚠ </span>}
+        {clash && <span className="clash-mark" aria-label="Kolizja"><Icon name="alert" size={13} /> </span>}
         {a.time}
         {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
       </span>
       <span className="tile-name">
-        {partners.length ? `👥 ${[c, ...partners.map((x) => clientById(db, x.clientId))].map((x) => x?.name.split(' ')[0] ?? '—').join(' + ')}` : c?.name ?? '—'}
+        {partners.length ? (
+          <>
+            <Icon name="users" size={13} /> {[c, ...partners.map((x) => clientById(db, x.clientId))].map((x) => x?.name.split(' ')[0] ?? '—').join(' + ')}
+          </>
+        ) : (
+          c?.name ?? '—'
+        )}
       </span>
       <span className="tile-meta">
         <LocationTag id={a.locationId} short />
