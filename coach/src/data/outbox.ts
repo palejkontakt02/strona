@@ -8,6 +8,20 @@ import { applyChanges, type Change, type Db, type Repository } from './db';
 
 const PREFIX = 'fitowa-outbox:';
 
+/** Zapis, który nie odpowie w tym czasie, traktujemy jak brak sieci (słaby zasięg na sali) — trafia do kolejki. */
+export const APPLY_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  if (!(ms > 0)) return p;
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('Request timed out')), ms);
+    p.then(
+      (v) => (clearTimeout(t), resolve(v)),
+      (e) => (clearTimeout(t), reject(e)),
+    );
+  });
+}
+
 /** Klucz rekordu: kolekcja + id. */
 export const changeKey = (c: Change) => `${c.col}:${c.op === 'del' ? c.id : (c.item as { id: string }).id}`;
 
@@ -80,6 +94,7 @@ export class Outbox {
     private onChange: (n: number) => void = () => undefined,
     private st: Storage | undefined = storage(),
     private isNet: (e: unknown) => boolean = isNetworkError,
+    private timeoutMs: number = APPLY_TIMEOUT_MS,
   ) {
     this.items = readOutbox(scope, st);
   }
@@ -102,7 +117,7 @@ export class Outbox {
   async submit(changes: Change[]): Promise<'sent' | 'queued'> {
     if (!this.items.length && !this.running) {
       try {
-        await this.repo.apply(changes);
+        await withTimeout(this.repo.apply(changes), this.timeoutMs);
         return 'sent';
       } catch (e) {
         if (!this.isNet(e)) throw e;
@@ -110,10 +125,13 @@ export class Outbox {
         return 'queued';
       }
     }
+    // kolejka czeka na sieć — nowa zmiana staje za starszymi; na wysyłkę czekamy najwyżej chwilę,
+    // potem wracamy (ekran nie „wisi” na słabym zasięgu), a wysyłka idzie dalej w tle
     this.set(enqueue(this.items, changes));
     const queued = this.items.filter((x) => changes.includes(x));
-    const r = await this.flush();
-    if (r.failed.some((x) => queued.includes(x))) throw new Error('Zapis odrzucony przez bazę');
+    const flushing = this.flush();
+    const r = await Promise.race([flushing, new Promise<null>((ok) => setTimeout(() => ok(null), Math.min(this.timeoutMs, 3000)))]);
+    if (r && r.failed.some((x) => queued.includes(x))) throw new Error('Zapis odrzucony przez bazę');
     return this.items.some((x) => queued.includes(x)) ? 'queued' : 'sent';
   }
 
@@ -125,7 +143,7 @@ export class Outbox {
       while (this.items.length) {
         const ch = this.items[0];
         try {
-          await this.repo.apply([ch]);
+          await withTimeout(this.repo.apply([ch]), this.timeoutMs);
           res.sent++;
         } catch (e) {
           if (this.isNet(e)) {

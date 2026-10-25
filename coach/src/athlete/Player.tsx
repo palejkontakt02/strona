@@ -277,7 +277,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
 
   const editing = run.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
 
+  // jeden zapis naraz: przy słabym zasięgu zapis trwa, a kolejne naciśnięcia nie mogą tworzyć kolejnych treningów
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  // id nowego treningu ustalone przy otwarciu podsumowania — ponowiony zapis nadpisuje ten sam trening, nie dubluje
+  const newIdRef = useRef<string | null>(null);
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await doSave();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+  const doSave = async () => {
     if (!finish) return;
     if (finish.srpe === '') {
       document.querySelector('.sheet .scale-11')?.scrollIntoView({ behavior: smoothScroll(), block: 'center' });
@@ -316,7 +332,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const today = run.date;
     const check = client.checkins.find((c) => c.date === today);
     const session: TrainingSession = {
-      id: uid(),
+      id: (newIdRef.current ??= uid()),
       clientId: client.id,
       date: today,
       workoutName: run.name,
@@ -390,6 +406,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     showFinish();
   };
   const showFinish = () => {
+    newIdRef.current = null; // nowe podsumowanie = nowy trening
     const charge = defaultCharge(client, sessionsOf(db, client.id));
     if (editing) {
       setFinish({
@@ -1058,8 +1075,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 )}
               </>
             )}
-            <button className="btn btn-primary btn-lg btn-block" onClick={save}>
-              {editing ? 'Zapisz zmiany' : 'Zapisz trening'}
+            <button className="btn btn-primary btn-lg btn-block" onClick={save} disabled={saving} aria-busy={saving}>
+              {saving ? 'Zapisywanie…' : editing ? 'Zapisz zmiany' : 'Zapisz trening'}
             </button>
             <button className="btn btn-ghost btn-block" onClick={() => setFinish(null)}>
               Wróć do ćwiczeń

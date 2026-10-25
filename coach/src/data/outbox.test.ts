@@ -125,3 +125,19 @@ describe('kolejka offline', () => {
     expect(box.items).toHaveLength(0);
   });
 });
+
+describe('słaby zasięg: zapis, który „wisi”', () => {
+  it('po czasie trafia do kolejki zamiast blokować ekran; ponowiony zapis tego samego treningu to jeden wpis', async () => {
+    let hang = true;
+    const sent: Change[] = [];
+    const repo = { apply: (ch: Change[]) => (hang ? new Promise<void>(() => undefined) : (sent.push(...ch), Promise.resolve())) };
+    const box = new Outbox(repo, 't', () => undefined, memStorage(), isNetworkError, 30);
+    expect(await box.submit([sess('t1', 'a')])).toBe('queued');
+    expect(await box.submit([sess('t1', 'b')])).toBe('queued');
+    expect(box.items.length).toBe(1);
+    hang = false;
+    await box.flush();
+    expect(box.items.length).toBe(0);
+    expect(sent.filter((c) => c.op === 'put' && (c.item as { id: string }).id === 't1').length).toBe(1);
+  });
+});
