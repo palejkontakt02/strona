@@ -202,7 +202,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [charge, setCharge] = useState<Billing | ''>(existing?.charge ?? '');
   const [locationId, setLocationId] = useState(existing?.locationId ?? m.appt?.locationId ?? clientById(db, existing?.clientId ?? m.clientId ?? m.appt?.clientId)?.locationId ?? '');
   const [amount, setAmount] = useState('');
-  const [paidNow, setPaidNow] = useState(true);
+  // poprawka treningu bez płatności: domyślnie „do zapłaty” (zwykle dopisujemy zaległą)
+  const [paidNow, setPaidNow] = useState(!existing);
   // trener zapisuje zwykle trening, który prowadził; stary zapis — jak w historii
   const [solo, setSolo] = useState(existing ? isSolo(db, existing) : false);
   // trening w parze: osoby z tej samej wizyty (bez zapisanego treningu) albo dopisane ręcznie
@@ -677,7 +678,12 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             {packageHint(client ? packageStatus(client, sessionsOf(db, clientId))?.left ?? null : null, existing?.charge !== 'pakiet')}
           </p>
         )}
-        {effCharge === 'pojedyncza' && !existing && (
+        {effCharge === 'pojedyncza' && existing && sessionPayment(db, existing) && (
+          <p className="muted small field-wide-2 self-end">
+            {(() => { const sp = sessionPayment(db, existing)!; return `Płatność ${sp.payment.amount} zł — ${sp.payment.status === 'paid' ? 'opłacona' : 'do zapłaty'} (zmienisz ją w zakładce Płatności).`; })()}
+          </p>
+        )}
+        {effCharge === 'pojedyncza' && (!existing || !sessionPayment(db, existing)) && (
           <>
             <Field label="Kwota (zł)">
               <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />

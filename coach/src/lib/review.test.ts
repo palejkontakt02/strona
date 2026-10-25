@@ -172,3 +172,18 @@ describe('hantle: ciężar za 1 hantel / suma', () => {
     expect(tonnage(s({ loadPer: 'one', perSide: true }))).toBe(400);
   });
 });
+
+describe('poprawka treningu: dopisanie zapomnianej płatności', () => {
+  it('sesja pojedyncza bez płatności — przy edycji z kwotą dochodzi płatność „do zapłaty”, druga edycja nie dubluje', async () => {
+    const { saveSession } = await import('../data/ops');
+    const client = { id: 'c1', name: 'Dominik', status: 'aktywny', payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] };
+    const s = { id: 's1', clientId: 'c1', date: '2026-10-13', charge: 'pojedyncza', exercises: [] };
+    const db = { clients: [client], sessions: [s], plans: [], appointments: [], library: [], locations: [], trainer_notes: [] } as never;
+    const r = saveSession(db, { session: s as never, isNew: false, amount: 100, paidNow: false });
+    const put = r.changes.find((c) => c.op === 'put' && c.col === 'clients') as { item: { payments: { amount: number; status: string; date: string }[] } } | undefined;
+    expect(put?.item.payments).toMatchObject([{ amount: 100, status: 'due', date: '2026-10-13' }]);
+    const saved = (r.changes.find((c) => c.op === 'put' && c.col === 'sessions') as { item: { paymentId?: string } }).item;
+    const db2 = { ...(db as object), clients: [put!.item], sessions: [saved] } as never;
+    expect(saveSession(db2, { session: saved as never, isNew: false, amount: 100, paidNow: false }).changes.length).toBe(1);
+  });
+});

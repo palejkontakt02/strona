@@ -117,7 +117,16 @@ export interface SessionSave {
 export function saveSession(db: Db, s: SessionSave): { changes: Change[]; message: string } {
   let message = 'Trening zapisany.';
   let session = withClubRate(db, s.session);
-  if (!s.isNew) return { changes: [put('sessions', session)], message };
+  if (!s.isNew) {
+    // poprawka zapisanego treningu: „sesja pojedyncza” bez płatności — dopisujemy ją teraz (np. zapomniana przy zapisie)
+    const client = clientById(db, session.clientId);
+    if (client && session.charge === 'pojedyncza' && s.amount && !sessionPayment(db, session)) {
+      const pay = singleSessionPayment(uid(), session.date, s.amount, !!s.paidNow, `Sesja ${fmtDay(session.date)}`);
+      session = { ...session, paymentId: pay.id };
+      return { changes: [put('sessions', session), put('clients', { ...client, payments: [...client.payments, pay] })], message: s.paidNow ? 'Zapisano — płatność dodana jako opłacona.' : 'Zapisano — płatność czeka w „Do zapłaty”.' };
+    }
+    return { changes: [put('sessions', session)], message };
+  }
   session = { ...session, createdAt: session.createdAt ?? new Date().toISOString() };
   const changes: Change[] = [];
 
