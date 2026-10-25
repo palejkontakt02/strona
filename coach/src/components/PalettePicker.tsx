@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getPalette, PALETTES, setPalette, type PaletteId } from '../theme';
 
-/** Wybór motywu kolorystycznego (zapisywany na tym urządzeniu) — u trenera w ustawieniach, u podopiecznego w „Wygląd”. */
+/** Wybór motywu kolorystycznego (zapisywany na tym urządzeniu) — u trenera w ustawieniach, u podopiecznego w „Ustawienia”. */
 export function PalettePicker() {
   const [palette, setPal] = useState<PaletteId>(getPalette());
   return (

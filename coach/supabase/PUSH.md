@@ -67,7 +67,7 @@ dostaje od bazy listę telefonów i treść powiadomienia.
 ## 5. Włącz powiadomienia na telefonie
 
 - **Trener**: aplikacja → ⚙ **Ustawienia** → „Powiadomienia na tym telefonie” → włącz → zezwól.
-- **Podopieczny**: aplikacja → **🎨 Wygląd** → „Powiadomienia na tym telefonie” → włącz → zezwól.
+- **Podopieczny**: aplikacja → **⚙ Ustawienia** → „Powiadomienia na tym telefonie” → włącz → zezwól.
 - **iPhone (iOS 16.4+)**: najpierw w Safari **Udostępnij → Do ekranu początkowego**, otwórz aplikację z tej ikony
   i dopiero tam włącz powiadomienia. W zwykłej karcie Safari iOS nie pozwala na powiadomienia.
 - Android: Chrome (karta albo aplikacja dodana do ekranu) — działa od razu.

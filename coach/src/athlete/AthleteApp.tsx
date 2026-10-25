@@ -170,8 +170,8 @@ export function AthleteApp({
           </span>
           <span className="row-inline">
             <OfflineBadge />
-            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Wygląd — kolory aplikacji">
-              🎨 Wygląd
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
+              <Icon name="settings" size={16} /> Ustawienia
             </button>
             <button className="btn btn-ghost btn-sm" onClick={onExit}>
               Wyloguj
@@ -182,8 +182,8 @@ export function AthleteApp({
         <div className="ath-preview">
           <span>Podgląd trybu zawodnika · {client.name}</span>
           <span className="row-inline">
-            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Wygląd — kolory aplikacji">
-              🎨
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
+              <Icon name="settings" size={16} />
             </button>
             <button className="btn btn-ghost btn-sm" onClick={onExit}>
               Wróć do panelu
@@ -192,16 +192,17 @@ export function AthleteApp({
         </div>
       )}
       {look && (
-        <Sheet label="Wygląd" onClose={() => setLook(false)}>
+        <Sheet label="Ustawienia" onClose={() => setLook(false)}>
           <div className="between">
-            <h2>Wygląd</h2>
+            <h2>Ustawienia</h2>
             <button className="btn btn-ghost btn-sm" onClick={() => setLook(false)}>
               Gotowe
             </button>
           </div>
+          {mode === 'client' && <PushSettings role="client" />}
+          <h3 className="form-section">Kolory</h3>
           <p className="muted small">Wybierz kolory aplikacji — zapisują się na tym telefonie.</p>
           <PalettePicker />
-          {mode === 'client' && <PushSettings role="client" />}
         </Sheet>
       )}
       {screen === 'intake' ? (
