@@ -10,6 +10,8 @@
 --  5. Miejsca i biblioteka ćwiczeń — tylko trener i powiązani klienci, nie każdy zalogowany.
 --  6. Trener może być tylko jeden (nikt inny nie przejmie roli).
 --  7. Walidacja check-inu samopoczucia.
+--  …
+--  21. Przypomnienie o samopoczuciu o 8:00 (powiadomienia push).
 
 -- 1. Pola rozliczeniowe treningu chronione przed klientem ---------------------------------------
 create or replace function public.guard_client_session() returns trigger
@@ -929,6 +931,47 @@ begin
     perform cron.schedule('fitowa-push-daily', '0 5,6 * * *', 'select public.push_daily_tick()');
   else
     raise notice 'pg_cron nie jest włączone — poranne przypomnienia wyłączone (Database → Extensions → pg_cron, potem uruchom sekcję 20 ponownie).';
+  end if;
+end $$;
+notify pgrst, 'reload schema';
+
+-- 21. Przypomnienie o samopoczuciu codziennie o 8:00 (czas polski) — tylko podopiecznym, którzy mają włączone
+--     powiadomienia i jeszcze nie wypełnili dzisiejszego „Jak się dziś czujesz?”. Wymaga sekcji 20 (pg_net, pg_cron).
+create or replace function public.push_checkin_reminders() returns int
+language plpgsql security definer set search_path = public as $$
+declare r record; n int := 0; today date := (now() at time zone 'Europe/Warsaw')::date;
+begin
+  for r in
+    select c.id from clients c
+    where coalesce(c.data ->> 'status', 'aktywny') = 'aktywny'
+      and exists (select 1 from push_subscriptions s where s.role = 'client' and s.client_id = c.id)
+      and not exists (
+        select 1 from jsonb_array_elements(case when jsonb_typeof(c.data -> 'checkins') = 'array' then c.data -> 'checkins' else '[]'::jsonb end) ci
+        where ci ->> 'date' = today::text)
+  loop
+    perform push_send('client', r.id, 'Jak się dziś czujesz?', 'Zaznacz sen, energię, mięśnie, stres i nastrój — 10 sekund.', '/app/', 'checkin', 'checkin-' || today);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.push_checkin_reminders from public, anon, authenticated;
+
+-- Harmonogram (pg_cron, w UTC): 5, 6 i 7 UTC pokrywa 7:00 i 8:00 w Polsce latem i zimą;
+-- funkcja sprawdza godzinę polską: 7:00 → „Masz dziś trening”, 8:00 → samopoczucie.
+create or replace function public.push_daily_tick() returns void
+language plpgsql security definer set search_path = public as $$
+declare h int := extract(hour from now() at time zone 'Europe/Warsaw');
+begin
+  if h = 7 then perform push_daily_reminders(); end if;
+  if h = 8 then perform push_checkin_reminders(); end if;
+end $$;
+revoke all on function public.push_daily_tick from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('fitowa-push-daily', '0 5,6,7 * * *', 'select public.push_daily_tick()');
+  else
+    raise notice 'pg_cron nie jest włączone — przypomnienia wyłączone (Database → Extensions → pg_cron, potem uruchom sekcje 20 i 21 ponownie).';
   end if;
 end $$;
 notify pgrst, 'reload schema';
