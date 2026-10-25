@@ -20,6 +20,11 @@ describe('lastExerciseLog', () => {
     expect(lastExerciseLog(hist, 'Przysiad', { before: '2026-10-05' }).length).toBe(2);
     expect(lastExerciseLog(hist, 'Przysiad', { before: '2026-09-01' })).toEqual([]);
   });
+  it('zapis trenera bez setsLog: „3 × 8 × 60”', () => {
+    const h = [S('t', '2026-10-02', [{ name: 'Wiosło', sets: '3', reps: '8', load: '60' }, { name: 'Deska', sets: '2', reps: '30 s' }])];
+    expect(lastExerciseLog(h, 'Wiosło')).toEqual([{ reps: 8, load: 60, unit: undefined }, { reps: 8, load: 60, unit: undefined }, { reps: 8, load: 60, unit: undefined }]);
+    expect(fmtLast(lastExerciseLog(h, 'Deska')[1])).toBe('30 s');
+  });
   it('workIndex liczy tylko serie robocze', () => {
     const sets = [{ warmup: true }, { warmup: false }, { warmup: false }];
     expect(workIndex(sets, 0)).toBeNull();

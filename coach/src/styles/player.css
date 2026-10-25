@@ -66,14 +66,16 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.delta-same {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
 .delta.is-pr {
   color: var(--ath-ok-text, var(--color-ok));
 }
 .hintcol {
   min-width: 0;
-}
-.hintcol .lastline {
-  padding-left: 0;
 }
 
 /* nagłówek ćwiczenia: kamera raz na ćwiczenie, komentarz, rodzaj (podopieczny) */
@@ -301,4 +303,17 @@
   .wdone-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+/* tytuł ćwiczenia + komentarz po prawej */
+.run-ex-head > .between {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.ex-head-side {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
 }

@@ -13,6 +13,7 @@ import './styles/habits.css';
 import './styles/rodo.css';
 import './styles/progress.css';
 import './styles/player.css';
+import './styles/kontakt.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

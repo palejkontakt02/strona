@@ -171,7 +171,7 @@ export async function shareImage(info: DoneInfo): Promise<Blob | null> {
   const rows: [string, string, string][] = [
     ['Tonaż', info.stats.tonnage ? nf.format(info.stats.tonnage) : '—', info.stats.tonnage ? 'kg' : ''],
     ['Serie', String(info.stats.sets), ''],
-    ['Czas', info.duration != null ? String(info.duration) : '—', info.duration != null ? 'min' : ''],
+    ...(info.duration != null ? [['Czas', String(info.duration), 'min'] as [string, string, string]] : []),
     ['Rekordy', String(info.records.length), info.records.length ? plural(info.records.length, 'nowy', 'nowe', 'nowych') : ''],
   ];
   let y = 760;

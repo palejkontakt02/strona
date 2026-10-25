@@ -1,0 +1,449 @@
+/* === kontakt: rozmowa z mediami, zakładka „Trener”, komentarze do treningu, wizyty === */
+
+/* --- pole wpisywania: [spinacz] [tekst] [mikrofon] [Wyślij] --- */
+.chat-compose.chat-compose2 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.chat-compose-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.chat-compose-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  resize: none;
+}
+.chat-compose-row .btn {
+  min-height: 44px;
+  flex: none;
+}
+.chat-tool {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.chat-tool:disabled {
+  opacity: 0.5;
+}
+.chat-recbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  animation: kontakt-pulse 1.2s ease-in-out infinite;
+}
+@keyframes kontakt-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot {
+    animation: none;
+  }
+}
+.chat-replying,
+.chat-draft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  min-width: 0;
+}
+.chat-draft img,
+.chat-draft video {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+.chat-draft .voice {
+  flex: 1;
+}
+
+/* --- dymki: kontekst, media, znaczniki czasu --- */
+.chat-ref {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.8;
+  text-align: left;
+}
+button.chat-ref {
+  min-height: 28px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chat-bubble.has-media {
+  min-width: min(240px, 100%);
+}
+.chat-media {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.chat-media.loading {
+  aspect-ratio: 4 / 3;
+}
+.chat-media-video.loading {
+  aspect-ratio: 9 / 16;
+  max-height: 260px;
+}
+.chat-media-image {
+  cursor: zoom-in;
+}
+.chat-media img,
+.chat-media video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  background: var(--color-neutral-100);
+}
+.chat-media-err {
+  margin: 0;
+  opacity: 0.8;
+}
+.chat-photo-big {
+  display: block;
+  width: 100%;
+  max-height: 75dvh;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+}
+.chat-stamp {
+  display: inline;
+  padding: 0 4px;
+  margin: 0 1px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  font: inherit;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chat-act {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+}
+.chat-act:hover,
+.chat-act:focus-visible {
+  color: var(--color-text);
+}
+.chat-read {
+  margin: 2px 4px 0 0;
+  text-align: right;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ok-fg, var(--color-ok));
+}
+.chat-who {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* --- wiadomość głosowa --- */
+.voice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 200px;
+}
+.voice-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+.voice-btn:disabled {
+  opacity: 0.5;
+}
+.voice-bar {
+  flex: 1;
+  min-width: 60px;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  accent-color: currentColor;
+  color: inherit;
+}
+.voice-time {
+  flex: none;
+  min-width: 2.6em;
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- zakładka „Trener”: rozmowa na całą wysokość --- */
+.trainer-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: calc(100dvh - var(--bottombar-h, 64px) - 120px);
+}
+.trainer-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.trainer-chat-title {
+  font-size: 1.0625rem;
+  margin: 0 0 var(--space-3);
+}
+.chat.chat-full {
+  flex: 1;
+}
+.chat.chat-full .chat-log {
+  max-height: none;
+  overflow: visible;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.chat-compose.sticky {
+  position: sticky;
+  bottom: calc(var(--bottombar-h, 64px) + env(safe-area-inset-bottom));
+  z-index: 5;
+  margin: 0 calc(-1 * var(--ath-gutter, 16px));
+  padding: var(--space-3) var(--ath-gutter, 16px);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-divider);
+}
+.chat-end {
+  height: 0;
+  scroll-margin-bottom: calc(var(--bottombar-h, 64px) + env(safe-area-inset-bottom) + var(--space-4));
+}
+
+/* --- wizyty --- */
+.visits {
+  padding-block: var(--space-2);
+}
+.visits-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.visits-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.visit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.visit-when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.visit-time {
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+}
+.visit-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ok-fg, var(--color-ok));
+}
+.visit-late {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--warn-fg, var(--color-warn));
+}
+.visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.visit-actions .btn {
+  min-height: 44px;
+}
+.visit-cancelled .visit-time {
+  text-decoration: line-through;
+  color: var(--color-neutral-400);
+}
+.visit-warn {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warn) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warn) 45%, transparent);
+  color: var(--warn-fg, var(--color-warn));
+}
+.visit-warn p {
+  margin: 0;
+  color: var(--color-text);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* --- komentarz do treningu / ćwiczenia --- */
+.ref-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ref-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ref-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.ref-form p {
+  margin: 0;
+}
+.ref-attach,
+.ref-reply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ref-attach .btn {
+  min-height: 44px;
+}
+.ref-reply-actions {
+  justify-content: flex-end;
+}
+.ref-reply-actions .btn {
+  min-height: 40px;
+}
+.ref-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ref-reply p {
+  margin: 0;
+}
+.ref-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.chat-mini .chat-log {
+  max-height: 420px;
+}
+.hist-ex-ref {
+  margin-top: var(--space-1);
+}
+.hist-ref {
+  margin-top: var(--space-3);
+}
+.attach-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.attach-menu .btn {
+  min-height: 48px;
+  justify-content: flex-start;
+  gap: var(--space-3);
+}

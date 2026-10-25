@@ -603,7 +603,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </button>
             ))}
           {deltas.map((d) => (
-            <span key={d.text} className={`delta ${s.pr && d.dir === 'up' ? 'is-pr' : ''}`}>
+            <span key={d.text} className={`delta ${d.dir === 'same' ? 'delta-same' : ''} ${s.pr && d.dir === 'up' ? 'is-pr' : ''}`}>
               {d.text}
             </span>
           ))}
@@ -767,9 +767,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     removeWarmup(k, i);
   };
 
-  const header = (k: number) => {
+  const header = (k: number, blockBare?: boolean) => {
     const e = run.ex[k];
-    const bare = noLoad(k);
+    const bare = blockBare ?? noLoad(k);
     // bez ciężaru: jedna kamera na ćwiczenie — nagranie trafia do bieżącej serii
     const camAt = (() => {
       const i = e.sets.findIndex((x) => !x.done && !x.warmup);
@@ -782,11 +782,14 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           <h2>
             {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
           </h2>
-          {e.video && (
-            <a className="small" href={e.video} target="_blank" rel="noreferrer">
-              ▶ Wideo
-            </a>
-          )}
+          <span className="ex-head-side">
+            {e.video && (
+              <a className="small" href={e.video} target="_blank" rel="noreferrer">
+                ▶ Wideo
+              </a>
+            )}
+            <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />
+          </span>
         </div>
         <div className="ex-tools">
           {bare && camAt >= 0 && !e.cardio && (
@@ -800,7 +803,6 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               + ciężar
             </button>
           )}
-          <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />
         </div>
         {!trainer && kind && <div className="ex-kind muted small">{kind}</div>}
         {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone; podopieczny go nie zmienia */}
@@ -936,7 +938,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           <span className="eyebrow">{ks.length === 2 ? 'Superseria' : 'Obwód'} · {ks.length} ćwiczenia na zmianę</span>
           <span className="muted small">przerwa po rundzie {lastRest || '2:00'}</span>
         </div>
-        {ks.map((k) => header(k))}
+        {ks.map((k) => header(k, bare))}
         <div className={`sgrid sgrid-head ${bare ? 'noload' : ''}`}>
           <span />
           <span>powt. / czas</span>

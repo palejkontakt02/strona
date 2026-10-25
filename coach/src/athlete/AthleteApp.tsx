@@ -20,6 +20,7 @@ import { fmtDur, fmtKm, planRunTotals, runVolume } from '../lib/running';
 import { e1Series, exerciseE1, records } from '../lib/strength';
 import { streak } from '../lib/load';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
+import { hasConsent } from '../lib/rodo';
 import { checkinAdvice, firstOpenWeek, planDue, weekStrip } from '../lib/athleteToday';
 import { Player } from './Player';
 import { IntakeWizard } from './Intake';
@@ -826,7 +827,8 @@ function ProgressTab({ client, canImport }: { client: Client; canImport: boolean
       )}
       <h2 className="ath-sec">Ciało</h2>
       <BodyProgress client={client} />
-      <AthletePhotos client={client} />
+      {/* zdjęcia sylwetki tylko za zgodą na wizerunek (RODO) */}
+      {hasConsent(client, 'media') && <AthletePhotos client={client} />}
       {runner && <h2 className="ath-sec">Bieganie</h2>}
       <AthleteRunCards client={client} canImport={canImport} />
       <WeeklyReportCard client={client} />

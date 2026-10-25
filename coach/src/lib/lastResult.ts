@@ -1,5 +1,5 @@
 import type { SetLog, TrainingSession } from '../domain';
-import { num, secOf, sidesOf, sumReps } from './parse';
+import { num, repsN, secOf, sidesOf, sumReps, timeUnit } from './parse';
 import { tonnage } from './load';
 
 /**
@@ -20,8 +20,16 @@ export function lastExerciseLog(history: TrainingSession[], name: string, opts: 
     .filter((s) => s.id !== opts.excludeId && (!opts.before || s.date <= opts.before))
     .sort((a, b) => b.date.localeCompare(a.date));
   for (const s of cand) {
-    const e = s.exercises.find((x) => !x.cardio && norm(x.name) === key && x.setsLog?.some((l) => !l.warmup));
-    if (e) return e.setsLog!.filter((l) => !l.warmup);
+    const e = s.exercises.find((x) => !x.cardio && norm(x.name) === key && (x.setsLog?.some((l) => !l.warmup) || (!x.setsLog?.length && repsN(x.sets))));
+    if (!e) continue;
+    if (e.setsLog?.length) return e.setsLog.filter((l) => !l.warmup);
+    // zapis trenera bez serii pojedynczo („3 × 8 × 60 kg”) — każda seria taka sama
+    const n = Math.min(20, Math.round(repsN(e.sets) ?? 0));
+    const unit = timeUnit(e.reps) ?? undefined;
+    const reps = unit === 's' ? secOf(e.reps) ?? repsN(e.reps) : repsN(e.reps);
+    const load = num(e.load);
+    if (reps == null && load == null) continue;
+    return Array.from({ length: n }, () => ({ reps: reps ?? undefined, load: load ?? undefined, unit }));
   }
   return [];
 }
