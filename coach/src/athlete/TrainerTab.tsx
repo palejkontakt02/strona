@@ -111,11 +111,11 @@ export function Visits({ client, preview }: { client: Client; preview?: boolean 
                       <Icon name="check" size={16} /> Potwierdzam
                     </button>
                   )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => void addToCalendar(a, locName(a))}>
-                    <Icon name="cal" size={16} /> Dodaj do kalendarza
-                  </button>
                   <button className="btn btn-ghost btn-sm visit-cancel" disabled={busy === a.id} onClick={() => setCancelling(a)}>
                     Odwołaj
+                  </button>
+                  <button className="btn btn-ghost btn-sm visit-ics" aria-label="Dodaj do kalendarza" title="Dodaj do kalendarza (.ics)" onClick={() => void addToCalendar(a, locName(a))}>
+                    <Icon name="cal" size={16} /> <span className="visit-ics-txt">Do kalendarza</span>
                   </button>
                 </div>
               </li>
@@ -135,12 +135,12 @@ export function Visits({ client, preview }: { client: Client; preview?: boolean 
           ))}
         </ul>
       )}
-      {cancelling && <CancelSheet a={cancelling} onClose={() => setCancelling(null)} />}
+      {cancelling && <CancelSheet a={cancelling} preview={preview} onClose={() => setCancelling(null)} />}
     </section>
   );
 }
 
-function CancelSheet({ a, onClose }: { a: Appointment; onClose: () => void }) {
+function CancelSheet({ a, preview, onClose }: { a: Appointment; preview?: boolean; onClose: () => void }) {
   const { respondAppointment, toast } = useStore();
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -151,7 +151,7 @@ function CancelSheet({ a, onClose }: { a: Appointment; onClose: () => void }) {
     const ok = await respondAppointment(a.id, 'cancel', reason);
     setBusy(false);
     if (ok) {
-      toast('Wizyta odwołana — trener dostał informację.');
+      toast(preview ? 'Wizyta odwołana (podgląd).' : 'Wizyta odwołana — trener dostał informację.');
       onClose();
     }
   };

@@ -788,7 +788,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 ▶ Wideo
               </a>
             )}
-            <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />
+            {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />}
           </span>
         </div>
         <div className="ex-tools">
@@ -1158,7 +1158,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </span>
               <span className="more-switch-state">{sound ? 'wł.' : 'wył.'}</span>
             </button>
-            <RefComment clientId={client.id} sessionId={run.editSessionId} label="Komentarz do treningu" />
+            {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} label="Komentarz do treningu" />}
           </div>
           <button type="button" className="btn btn-ghost btn-block" onClick={() => setMoreOpen(false)}>
             Zamknij

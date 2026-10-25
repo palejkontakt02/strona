@@ -340,6 +340,25 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
     }
   }, [last, full]);
 
+  // na całej wysokości: zdjęcia i filmy wczytują się po przewinięciu — gdy czytający jest przy końcu, trzymamy koniec
+  useEffect(() => {
+    if (!full) return;
+    const end = endRef.current;
+    const log = logRef.current;
+    if (!end || !log) return;
+    let pinned = true;
+    const onScroll = () => {
+      pinned = end.getBoundingClientRect().top - window.innerHeight < 260;
+    };
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => pinned && end.scrollIntoView?.({ block: 'end' })) : null;
+    ro?.observe(log);
+    return () => {
+      window.removeEventListener('scroll', onScroll, { capture: true });
+      ro?.disconnect();
+    };
+  }, [full]);
+
   // podopieczny: rozmowa na ekranie = odpowiedzi przeczytane
   const lastAt = thread[thread.length - 1]?.at ?? '';
   useEffect(() => {

@@ -310,7 +310,7 @@ button.chat-ref {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4) 0;
+  padding: var(--space-3) 0;
   border-top: 1px solid var(--color-divider);
 }
 .visit-when {
@@ -342,6 +342,9 @@ button.chat-ref {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+.visit-actions .visit-ics {
+  margin-left: auto;
 }
 .visit-actions .btn {
   min-height: 44px;
