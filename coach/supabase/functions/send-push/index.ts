@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
   const data = { title: String(msg.title ?? 'Fitowa').slice(0, 80), body: String(msg.body ?? '').slice(0, 180), url: typeof msg.url === 'string' && msg.url.startsWith('/app/') ? msg.url : '/app/', tag: msg.tag ? String(msg.tag).slice(0, 40) : undefined };
 
   const results = await Promise.all(
-    subs.map((s) => sendWebPush(s, data, vapid, { topic: data.tag }).catch((e) => ({ endpoint: s.endpoint, status: 0, gone: false, error: String(e) }))),
+    // Apple (iPhone) odrzuca część nagłówków Topic (np. „reply” → 400) — tam bez Topic; grupowanie i tak robi `tag` w sw.js
+    subs.map((s) => sendWebPush(s, data, vapid, { topic: s.endpoint.includes('push.apple.com') ? undefined : data.tag }).catch((e) => ({ endpoint: s.endpoint, status: 0, gone: false, error: String(e) }))),
   );
   // wygasłe subskrypcje (telefon wyłączył powiadomienia) — usuwamy z bazy funkcją push_gone (sprawdza sekret)
   const gone = results.filter((r) => r.gone).map((r) => r.endpoint);
