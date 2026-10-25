@@ -520,7 +520,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 </button>
               </span>
             ) : (
-              <input inputMode={s.unit === 's' ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+              <input inputMode={s.unit === 's' || complexEx(run.ex[k]) ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
             )
           )}
           {!run.ex[k].cardio && (
@@ -1107,6 +1107,9 @@ function holdSec(s: RunSet): number {
   if (s.unit === 'min') return Math.round((repsN(s.reps) ?? 0) * 60);
   return secOf(s.reps) ?? 0;
 }
+
+/** Kompleks („2+1”: 2 zarzuty + 1 podrzut) — klawiatura z „+”, bo numeryczna na telefonie go nie ma. */
+const complexEx = (e: RunExercise) => e.sets.some((x) => x.reps.includes('+')) || /clean|jerk|snatch|zarzut|podrzut|rwanie|kompleks/i.test(e.name);
 
 /** Nagłówek kolumny ciężaru: przy hantlach widać, czy wpisuje się 1 hantel, czy sumę. */
 const kgHead = (e: RunExercise) => (loadPerOf(e) === 'one' ? 'kg / 1 hantel' : loadPerOf(e) === 'sum' ? 'kg (suma)' : 'kg');
