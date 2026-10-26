@@ -40,7 +40,9 @@ async function addToCalendar(a: Appointment, location?: string) {
 export function Visits({ client, preview }: { client: Client; preview?: boolean }) {
   const { db, respondAppointment, toast } = useStore();
   const today = todayISO();
-  const next = upcomingVisits(db.appointments, client.id).slice(0, 6);
+  const all = upcomingVisits(db.appointments, client.id).slice(0, 8);
+  const [more, setMore] = useState(false);
+  const next = more ? all : all.slice(0, 2);
   // odwołane przez podopiecznego (do dziś) — żeby widział, że trener dostał informację
   const cancelled = db.appointments
     .filter((a) => a.clientId === client.id && a.status === 'cancel' && a.reply?.kind === 'cancel' && a.date >= today)
@@ -121,6 +123,13 @@ export function Visits({ client, preview }: { client: Client; preview?: boolean 
               </li>
             );
           })}
+          {!more && all.length > next.length && (
+            <li className="visit visit-more">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMore(true)}>
+                Pokaż kolejne wizyty ({all.length - next.length})
+              </button>
+            </li>
+          )}
           {cancelled.map((a) => (
             <li key={a.id} className="visit visit-cancelled">
               <div className="visit-when">

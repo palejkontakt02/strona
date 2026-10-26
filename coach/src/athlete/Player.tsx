@@ -1,3 +1,4 @@
+import { runTotals } from '../lib/running';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet } from '../components/Sheet';
 import { useDialog } from '../components/useDialog';
@@ -416,6 +417,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             name: session.workoutName || 'Trening',
             date: session.date,
             duration: session.duration,
+            km: runTotals(session)?.km || undefined,
             stats,
             records: recordsOf(before).map((p) => ({ name: p.name, text: `${p.hit.reps} × ${fnum(p.hit.load)} kg` })),
             diff: cmp && prev ? { ...cmp, date: prev.date } : null,
@@ -762,7 +764,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   /** Dowolna seria do usunięcia — dotknięcie numeru serii. */
   const removeAt = async (k: number, i: number, num: string) => {
     const s = run.ex[k].sets[i];
-    const what = [s.reps && `${s.reps} powt.`, s.load && `${s.load} kg`].filter(Boolean).join(' × ');
+    const what = [s.reps && `${s.reps} powt.`, s.load && `${String(s.load).replace(".", ",")} kg`].filter(Boolean).join(' × ');
     if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''} — ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}${s.video ? ' Jej nagranie też zniknie.' : ''}`, { confirm: 'Usuń serię' }))) return;
     removeWarmup(k, i);
   };

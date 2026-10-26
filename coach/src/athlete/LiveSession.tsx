@@ -3,7 +3,7 @@ import { Avatar, Icon } from '../components/ui';
 import { clientById, extraPlanOf, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { dropUnsavedVideos } from '../data/videos';
-import { fmtDay, nEx } from '../format';
+import { fmtDay, nEx, nSets } from '../format';
 import { todayISO } from '../lib/dates';
 import { currentPlan, doneInPass, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, buildRunExercise, emptyRun, sessionToRun, type Run } from '../lib/run';
@@ -98,7 +98,7 @@ export function LiveSession({
       // ten sam trening podopieczny już zaczął sam — przejmujemy jego serie
       const own = loadRun(clientId);
       if (own && !own.editSessionId && own.workoutId && own.workoutId === r.workoutId && own.ex.some((e) => e.sets.some((x) => x.done))) {
-        if (await ask(`${client?.name.split(' ')[0] ?? 'Podopieczny'} zaczął już ten trening (${own.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0)} serii). Przejąć i kontynuować od tego miejsca?`, { confirm: 'Przejmij' })) {
+        if (await ask(`${client?.name.split(' ')[0] ?? 'Podopieczny'} zaczął już ten trening (${nSets(own.ex.reduce((a, e) => a + e.sets.filter((x) => x.done).length, 0))}). Przejąć i kontynuować od tego miejsca?`, { confirm: 'Przejmij' })) {
           storeRun(clientId, null);
           setRun(own);
           window.scrollTo(0, 0);

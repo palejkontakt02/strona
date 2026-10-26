@@ -81,3 +81,4 @@ export function fmtRest(r?: string): string {
 
 /** „1 ćwiczenie”, „3 ćwiczenia”, „5 ćwiczeń”. */
 export const nEx = (n: number) => `${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}`;
+export const nSets = (n: number) => `${n} ${plural(n, 'seria', 'serie', 'serii')}`;

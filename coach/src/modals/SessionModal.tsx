@@ -6,7 +6,7 @@ import type { Billing, SessionExercise, TrainingSession, Wellness } from '../dom
 import { chargeProblem, clientById, groupOf, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { deleteSetVideo, sessionVideos } from '../data/videos';
-import { fnum, pln, uid, nEx } from '../format';
+import { fnum, pln, uid, nEx, nSets } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
@@ -184,7 +184,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     if (r.date && !existing) setDate(r.date);
     if (!workoutName.trim() || keep.length) setWorkoutName(r.exercises.slice(0, 2).map((e) => e.name.replace(/\s*\(.*\)$/, '')).join(' + '));
     setPaste(null);
-    toast(`Wczytano ${nEx(r.exercises.length)} (${r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0)} serii)${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
+    toast(`Wczytano ${nEx(r.exercises.length)} (${nSets(r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0))})${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
   };
   const [w, setW] = useState<Record<keyof Wellness, string>>({
     sleep: s(existing?.wellness?.sleep),

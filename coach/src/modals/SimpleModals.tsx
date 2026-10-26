@@ -6,7 +6,7 @@ import { del, normalizeDb, put, type Db } from '../data/db';
 import { clientById } from '../data/ops';
 import { isTemplate } from '../lib/analytics';
 import { useStore } from '../data/store';
-import { fnum, uid } from '../format';
+import { fnum, plural, uid } from '../format';
 import { addDays, todayISO } from '../lib/dates';
 import { num, numIn } from '../lib/parse';
 import { computeLsi } from '../lib/tests';
@@ -477,7 +477,7 @@ export function DataModal() {
         </p>
       )}
       <p className="muted small">
-        {db.clients.length} podopiecznych · {db.sessions.length} treningów · {db.appointments.length} wizyt · {db.plans.filter((p) => !isTemplate(p)).length} planów
+        {[`${db.clients.length} ${plural(db.clients.length, 'podopieczny', 'podopiecznych', 'podopiecznych')}`, `${db.sessions.length} ${plural(db.sessions.length, 'trening', 'treningi', 'treningów')}`, `${db.appointments.length} ${plural(db.appointments.length, 'wizyta', 'wizyty', 'wizyt')}`, `${db.plans.filter((p) => !isTemplate(p)).length} ${plural(db.plans.filter((p) => !isTemplate(p)).length, 'plan', 'plany', 'planów')}`].join(' · ')}
       </p>
       <div className="stack-sm">
         <button type="button" className="btn btn-secondary" onClick={exportAll}>

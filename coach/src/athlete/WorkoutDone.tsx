@@ -14,6 +14,8 @@ export interface DoneInfo {
   date: string;
   /** Minuty. */
   duration?: number;
+  /** Dystans biegu (km) — zamiast tonażu, gdy trening bez ciężarów. */
+  km?: number;
   stats: WorkoutStats;
   records: { name: string; text: string }[];
   /** Różnica do poprzedniego wykonania tego treningu. */
@@ -83,13 +85,23 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
           <dt>Czas</dt>
           <dd>{durText(info.duration)}</dd>
         </div>
-        <div>
-          <dt>Tonaż</dt>
-          <dd>
-            {stats.tonnage ? nf.format(stats.tonnage) : '—'}
-            {stats.tonnage ? <small> kg</small> : null}
-          </dd>
-        </div>
+        {!stats.tonnage && info.km ? (
+          <div>
+            <dt>Dystans</dt>
+            <dd>
+              {nf.format(info.km)}
+              <small> km</small>
+            </dd>
+          </div>
+        ) : (
+          <div>
+            <dt>Tonaż</dt>
+            <dd>
+              {stats.tonnage ? nf.format(stats.tonnage) : '—'}
+              {stats.tonnage ? <small> kg</small> : null}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Serie</dt>
           <dd>{stats.sets}</dd>
@@ -169,10 +181,10 @@ export async function shareImage(info: DoneInfo): Promise<Blob | null> {
   wrap(g, info.name, M, 310, W - 2 * M, 112, 2);
   // liczby
   const rows: [string, string, string][] = [
-    ['Tonaż', info.stats.tonnage ? nf.format(info.stats.tonnage) : '—', info.stats.tonnage ? 'kg' : ''],
+    !info.stats.tonnage && info.km ? ['Dystans', nf.format(info.km), 'km'] : ['Tonaż', info.stats.tonnage ? nf.format(info.stats.tonnage) : '—', info.stats.tonnage ? 'kg' : ''],
     ['Serie', String(info.stats.sets), ''],
     ...(info.duration != null ? [['Czas', String(info.duration), 'min'] as [string, string, string]] : []),
-    ['Rekordy', String(info.records.length), info.records.length ? plural(info.records.length, 'nowy', 'nowe', 'nowych') : ''],
+    ...(info.records.length ? [['Rekordy', String(info.records.length), plural(info.records.length, 'nowy', 'nowe', 'nowych')] as [string, string, string]] : []),
   ];
   let y = 760;
   for (const [label, val, unit] of rows) {
@@ -191,10 +203,11 @@ export async function shareImage(info: DoneInfo): Promise<Blob | null> {
     }
     y += 280;
   }
-  if (info.diff) {
+  // na grafikę do udostępnienia tylko postęp — spadek widać w aplikacji, nie na Instagramie
+  if (info.diff && info.diff.tonnage > 0) {
     g.fillStyle = '#9a9a9a';
     g.font = `500 40px ${BODY}`;
-    g.fillText(`Względem poprzedniego razu: ${info.diff.tonnage ? signed(info.diff.tonnage, 'kg') : 'tonaż bez zmian'}`, M, 1680);
+    g.fillText(`Względem poprzedniego razu: ${signed(info.diff.tonnage, 'kg')}`, M, 1680);
   }
   // podpis
   g.fillStyle = '#fff';

@@ -149,7 +149,7 @@ export function VideoRecorder({ title, onDone, onClose }: { title: string; onDon
       )}
       {state !== 'error' && (
         <p className="muted small center">
-          {state === 'done' && result ? `Nagranie: ${(result.file.size / 1024 / 1024).toFixed(1)} MB — sprawdź i użyj.` : `Wysoka jakość${info ? ` (${info})` : ''} · do ok. ${Math.round((LIMIT * 8) / BITRATE)} s`}
+          {state === 'done' && result ? `Nagranie: ${(result.file.size / 1024 / 1024).toFixed(1).replace(".", ",")} MB — sprawdź i użyj.` : `Wysoka jakość${info ? ` (${info})` : ''} · do ok. ${Math.round((LIMIT * 8) / BITRATE)} s`}
         </p>
       )}
       <div className="rec-actions">

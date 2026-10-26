@@ -25,7 +25,7 @@ export function PlateCalc({ kg, title, onClose }: { kg: number; title?: string; 
             <div className="seg" role="radiogroup" aria-label="Gryf">
               {([20, 15] as const).map((b) => (
                 <button key={b} type="button" role="radio" aria-checked={bar === b} className={bar === b ? 'active' : ''} onClick={() => setBar(b)}>
-                  {b} kg
+                  {fmt(b)} kg
                 </button>
               ))}
             </div>
@@ -35,7 +35,7 @@ export function PlateCalc({ kg, title, onClose }: { kg: number; title?: string; 
           <p className="muted">Wpisz ciężar w kg.</p>
         ) : r.diff < 0 ? (
           <p className="pc-out" role="status">
-            Mniej niż sam gryf ({bar} kg).
+            Mniej niż sam gryf ({fmt(bar)} kg).
           </p>
         ) : (
           <>
@@ -59,7 +59,7 @@ export function PlateCalc({ kg, title, onClose }: { kg: number; title?: string; 
               </p>
             )}
             <p className="muted small">
-              Razem {fmt(r.achieved)} kg = gryf {bar} kg + 2 × {fmt((r.achieved - bar) / 2)} kg.
+              Razem {fmt(r.achieved)} kg = gryf {fmt(bar)} kg + 2 × {fmt((r.achieved - bar) / 2)} kg.
             </p>
           </>
         )}

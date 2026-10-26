@@ -5453,7 +5453,7 @@ button.mini-day {
 }
 .mini-day.visit::before {
   left: calc(50% + 4px);
-  border: 1.5px solid var(--color-ok);
+  border: 1.5px solid var(--color-text);
   background: transparent;
 }
 .mini-day.todo.visit::after {
@@ -5487,7 +5487,7 @@ button.mini-day {
   background: var(--color-accent-100, #cfe);
 }
 .mini-legend .dot.visit {
-  border: 1.5px solid var(--color-ok);
+  border: 1.5px solid var(--color-text);
 }
 .mini-day-list {
   list-style: none;
