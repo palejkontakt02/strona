@@ -831,7 +831,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <Icon name="heart" size={14} /> {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
           </button>
         )}
-        {trainer && !e.cardio && !e.timed && (optsOpen.has(k) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
+        {!e.cardio && !e.timed && ((trainer && optsOpen.has(k)) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
         {trainer && !e.cardio && (optsOpen.has(k) || e.timed) && !e.sets.some((x) => x.done) && (
           <button
             type="button"
