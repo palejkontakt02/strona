@@ -144,13 +144,7 @@ export function RefThread({ clientId, sessionId, side = 'coach' }: { clientId: s
       <span className="eyebrow">Komentarze do treningu</span>
       <MiniThread client={client} msgs={msgs} coachView={coach}>
         {coach && target && (
-          <form
-            className="ref-reply"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void submit();
-            }}
-          >
+          <div className="ref-reply">
             <textarea className="input" rows={2} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={videoOf(target) ? 'Np. 0:07 — kolana do środka' : 'Odpowiedz…'} aria-label="Odpowiedź na komentarz" />
             <div className="ref-reply-actions">
               {videoOf(target) && (
@@ -158,7 +152,7 @@ export function RefThread({ clientId, sessionId, side = 'coach' }: { clientId: s
                   <Icon name="timer" size={14} /> Wstaw czas
                 </button>
               )}
-              <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !text.trim()}>
+              <button type="button" className="btn btn-primary btn-sm" disabled={busy || !text.trim()} onClick={() => void submit()}>
                 {busy ? 'Wysyłam…' : 'Odpowiedz'}
               </button>
             </div>
@@ -167,7 +161,7 @@ export function RefThread({ clientId, sessionId, side = 'coach' }: { clientId: s
                 Do: {refText(target.ref)}
               </p>
             )}
-          </form>
+          </div>
         )}
       </MiniThread>
     </section>

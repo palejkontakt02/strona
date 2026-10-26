@@ -450,3 +450,22 @@ button.chat-ref {
   justify-content: flex-start;
   gap: var(--space-3);
 }
+@media (max-width: 420px) {
+  .visit-ics-txt {
+    display: none;
+  }
+  .visit-actions .visit-ics {
+    min-width: 44px;
+    justify-content: center;
+  }
+}
+.sheet .chat-mini .chat-log {
+  max-height: 34dvh;
+}
+.chat-mini .chat-media img,
+.chat-mini .chat-media video {
+  max-height: 240px;
+}
+/* kalendarz trenera: odpowiedź podopiecznego na wizytę */
+.tile-status.reply-ok { color: var(--color-ok); font-weight: 600; }
+.tile-status.reply-warn { color: var(--color-warn); font-weight: 600; }

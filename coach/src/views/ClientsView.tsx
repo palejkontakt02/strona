@@ -1,3 +1,5 @@
+import { consentWithdrawn, erasureStatus } from '../lib/rodo';
+import type { Client as RodoClient } from '../domain';
 import { AccountBadge } from '../components/accounts';
 import { useAccounts } from '../data/accounts';
 import { useState } from 'react';
@@ -153,6 +155,8 @@ export function ClientsView() {
               </div>
             </header>
 
+            <ConsentAlerts client={selected} />
+
             <div className="tabs-scroll">
               <Seg options={CLIENT_TABS} value={clientTab} onChange={setClientTab} label="Zakładki klienta" />
             </div>
@@ -171,6 +175,25 @@ export function ClientsView() {
           <p className="empty">Wybierz podopiecznego z listy.</p>
         )}
       </section>
+    </div>
+  );
+}
+
+/** RODO: wycofane zgody / prośba o usunięcie konta — bursztynowa informacja dla trenera. */
+function ConsentAlerts({ client }: { client: RodoClient }) {
+  const items: string[] = [];
+  if (consentWithdrawn(client, 'health')) items.push('Wycofał(a) zgodę na dane o zdrowiu — usuń urazy, ankietę i samopoczucie albo zakończ współpracę.');
+  if (consentWithdrawn(client, 'media')) items.push('Wycofał(a) zgodę na zdjęcia i nagrania — usuń zdjęcia sylwetki i nagrania techniki.');
+  const er = erasureStatus(client);
+  if (er.state !== 'none') items.push('Prośba o usunięcie konta — usuń klienta w panelu, konto w Supabase (Authentication → Users) i jego pliki w Storage.');
+  if (!items.length) return null;
+  return (
+    <div className="consent-alert" role="status">
+      {items.map((t) => (
+        <p key={t}>
+          <Icon name="alert" size={14} /> {t}
+        </p>
+      ))}
     </div>
   );
 }

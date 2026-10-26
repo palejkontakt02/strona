@@ -1,3 +1,4 @@
+import { hasConsent } from '../lib/rodo';
 import { useState } from 'react';
 import type { Client, WeeklyReport } from '../domain';
 import { put } from '../data/db';
@@ -192,7 +193,7 @@ function ReportRow({ client, r, prev }: { client: Client; r: WeeklyReport; prev?
         )}
       </div>
       {r.comment && <p className="pre small wr-comment">„{r.comment}”</p>}
-      {photos.length > 0 && (
+      {photos.length > 0 && hasConsent(client, 'media') && (
         <div className="wr-photos">
           {photos.map((p) => (
             <PhotoImg key={p.id} photo={p} alt={`${p.pose}, ${r.week}`} />

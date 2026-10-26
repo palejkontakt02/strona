@@ -181,6 +181,8 @@ export function SessionSheet({
   const ton = tonnage(s);
   const nVid = sessionVideos(s).length;
   const load = sessionLoad(s);
+  // widok podopiecznego (także podgląd trenera w trybie zawodnika) — komentarze piszę jako podopieczny
+  const athleteView = plain || (!onReview && !onAssign);
   return (
     <Sheet label={`Trening ${fmtDay(s.date)}`} onClose={onClose}>
         <div className="between">
@@ -306,7 +308,7 @@ export function SessionSheet({
                   </div>
                 )}
                 {e.notes && <div className="muted small">{e.notes}</div>}
-                {plain && live && (
+                {athleteView && live && (
                   <div className="hist-ex-ref">
                     <RefComment clientId={s.clientId} sessionId={s.id} exIndex={i} label={e.name} />
                   </div>
@@ -321,8 +323,8 @@ export function SessionSheet({
             <p>{s.notes}</p>
           </div>
         )}
-        {live && <RefThread clientId={s.clientId} sessionId={s.id} side={plain ? 'client' : 'coach'} />}
-        {plain && live && (
+        {live && <RefThread clientId={s.clientId} sessionId={s.id} side={athleteView ? 'client' : 'coach'} />}
+        {athleteView && live && (
           <div className="hist-ref">
             <RefComment clientId={s.clientId} sessionId={s.id} label="Komentarz do treningu" />
           </div>

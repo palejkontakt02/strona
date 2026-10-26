@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Field, Icon, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
+import { RefThread } from '../components/RefComment';
 import type { Billing, SessionExercise, TrainingSession, Wellness } from '../domain';
 import { chargeProblem, clientById, groupOf, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
@@ -655,6 +656,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         <Field label="Notatki" wide>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
+        {existing && <RefThread clientId={existing.clientId} sessionId={existing.id} />}
       </div>
 
       <h4 className="form-section">Rozliczenie</h4>

@@ -1,3 +1,4 @@
+import { apptReplyState } from '../lib/appts';
 import { useEffect, useState, type DragEvent } from 'react';
 import { Icon, Seg, Tag } from '../components/ui';
 import type { Appointment, AppointmentStatus, ISODate, Plan, PlanWorkout, TrainingSession } from '../domain';
@@ -307,7 +308,15 @@ function ApptTile({ a, onDragEnd }: { a: Appointment; onDragEnd?: () => void }) 
         {mixed ? (
           <span className="tile-status">{all.filter((x) => x.status !== 'planned').map((x) => `${first(x.clientId)}: ${APPT_STATUS[x.status].label.toLowerCase()}`).join(', ')}</span>
         ) : (
-          a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>
+          <>
+            {a.status !== 'planned' && <span className="tile-status">{APPT_STATUS[a.status].label}</span>}
+            {apptReplyState(a) === 'confirmed' && a.status === 'planned' && <span className="tile-status reply-ok">potwierdzona</span>}
+            {apptReplyState(a)?.startsWith('cancelled') && (
+              <span className="tile-status reply-warn" title={a.reply?.reason}>
+                {apptReplyState(a) === 'cancelled-late' ? 'późne odwołanie' : 'odwołał(a)'}
+              </span>
+            )}
+          </>
         )}
       </span>
     </button>

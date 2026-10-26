@@ -250,7 +250,7 @@ export function StoreProvider({
       } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: prev } : c)) } : cur));
         const m = (e as Error).message;
-        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : kind === 'consents' ? '24' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },
