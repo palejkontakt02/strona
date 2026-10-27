@@ -1,3 +1,4 @@
+import { liveMarkActive } from '../lib/liveMark';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LineChart, WeightTrendChart } from '../components/charts';
 import { weightTrend, weightTrendText } from '../lib/progress';
@@ -186,7 +187,11 @@ export function AthleteApp({
     window.scrollTo(0, 0);
   };
   // check-in przed treningiem: tylko podopieczny (trener w podglądzie nie wpisuje cudzego samopoczucia) i tylko raz dziennie
-  const begin = (r: Run) => {
+  const begin = async (r: Run) => {
+    if (mode === 'client' && !r.editSessionId && liveMarkActive(client.liveBy)) {
+      const ok = await ask(`Trener prowadzi teraz Twój trening „${client.liveBy.name}” i zapisze go u siebie. Jeśli zaczniesz tutaj, powstaną dwa zapisy tego samego treningu.`, { confirm: 'Zacznij mimo to' });
+      if (!ok) return;
+    }
     if (mode === 'client' && !r.editSessionId && !client.checkins.some((c) => c.date === todayISO())) return setPre(r);
     go(r);
   };
@@ -518,6 +523,18 @@ function TodayTab({
         <h1>Cześć, {first}!</h1>
         <p className="muted first-cap">{fmtLong(today)}</p>
       </header>
+
+      {liveMarkActive(client.liveBy) && (
+        <div className="live-by-trainer" role="status">
+          <Icon name="play" size={18} />
+          <div>
+            <b>Trener prowadzi teraz Twój trening</b>
+            <span>
+              „{client.liveBy.name}” od {new Date(client.liveBy.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Trener zapisze go u siebie — nie zaczynaj go tutaj, bo powstaną dwa zapisy.
+            </span>
+          </div>
+        </div>
+      )}
 
       {(() => {
         // treningi zadane przez trenera na konkretny dzień (poza planem), niezrobione: zaległe do 7 dni wstecz i do 7 dni naprzód

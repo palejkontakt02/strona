@@ -2680,3 +2680,18 @@ button.mini-day,
     font-size: 0.8125rem;
   }
 }
+
+/* trener prowadzi trening na swoim telefonie — informacja dla podopiecznego */
+.live-by-trainer {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 var(--space-3);
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--color-warn);
+  background: color-mix(in srgb, var(--color-warn) 10%, var(--color-surface));
+}
+.live-by-trainer svg { color: var(--color-warn); flex-shrink: 0; margin-top: 2px; }
+.live-by-trainer div { display: grid; gap: 2px; }
+.live-by-trainer span { color: var(--color-neutral-400, var(--color-text)); font-size: 0.92rem; }

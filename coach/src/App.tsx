@@ -10,6 +10,8 @@ import { AthleteApp, loadRun } from './athlete/AthleteApp';
 import { LiveSession, PairLive } from './athlete/LiveSession';
 import { groupOf } from './data/ops';
 import { useStore } from './data/store';
+import { put } from './data/db';
+import { markNeedsUpdate, wantedMark } from './lib/liveMark';
 import { CalendarView } from './views/CalendarView';
 import { ClientsView } from './views/ClientsView';
 import { Dashboard } from './views/Dashboard';
@@ -47,7 +49,34 @@ export function App() {
   const [athlete, setAthlete] = useState<{ id: string; start?: RunStart } | null>(null);
   const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart; pair?: { clientId: string; appointmentId?: string }[] } | null>(null);
   const [bannerOpen, setBannerOpen] = useState(false);
-  const { db } = useStore();
+  const { db, apply } = useStore();
+  // trening prowadzony na żywo jest tylko w pamięci telefonu trenera — znacznik w danych klienta
+  // pokazuje podopiecznemu, że trening trwa (inaczej mógłby zacząć drugi zapis u siebie)
+  const dbRef = useRef(db);
+  dbRef.current = db;
+  const syncing = useRef(false);
+  useEffect(() => {
+    const sync = async () => {
+      if (syncing.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+      const now = Date.now();
+      const todo = dbRef.current.clients.filter((c) => markNeedsUpdate(c, wantedMark(loadRun(c.id, 'live')), now));
+      if (!todo.length) return;
+      syncing.current = true;
+      try {
+        await apply(
+          todo.map((c) => {
+            const want = wantedMark(loadRun(c.id, 'live'));
+            return put('clients', { ...c, liveBy: want ? { ...want, at: new Date(now).toISOString() } : undefined });
+          }),
+        );
+      } finally {
+        syncing.current = false;
+      }
+    };
+    void sync();
+    const t = setInterval(() => void sync(), 10_000);
+    return () => clearInterval(t);
+  }, [apply, live]);
   const unreadAll = db.clients.reduce((a, c) => a + trainerUnread(c), 0);
 
   const go = useCallback((s: Section) => {

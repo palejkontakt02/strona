@@ -161,7 +161,16 @@ export interface PainSpot {
   level: number;
 }
 
+/** Trener prowadzi teraz trening tego podopiecznego na swoim telefonie (żeby podopieczny nie zaczął drugiego zapisu). */
+export interface LiveMark {
+  at: string;
+  name: string;
+  workoutId?: string;
+}
+
 export interface Client {
+  /** Znacznik treningu na żywo prowadzonego przez trenera (pole trenera). */
+  liveBy?: LiveMark;
   id: string;
   /** Bieganie: strefy tętna i tempa liczone z tych danych. */
   run?: RunProfile;
