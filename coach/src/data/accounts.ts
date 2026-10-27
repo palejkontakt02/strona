@@ -71,3 +71,8 @@ export const ACCOUNT_LABEL: Record<AccountStatus, string> = {
   none: 'brak konta',
   'no-email': 'brak e-maila w profilu',
 };
+
+/** Stan konta dla checklisty i zaproszeń (lib/onboarding.ts): 'unknown', gdy lista kont jest niedostępna. */
+export function accountKnown(client: Client, state: AccountsState): import('../lib/onboarding').AccountKnown {
+  return state.status === 'ok' ? accountOf(client, state.list).status : 'unknown';
+}

@@ -70,14 +70,15 @@ export interface ChatMsg {
   media?: MsgMedia[];
   textAuto?: boolean;
   /** Odpowiedź trenera na wiadomość o tym id. */
-  replyTo?: string;
+  replyTo?: string;  /** Wiadomość automatyczna (reguła trenera). */
+  auto?: string;
 }
 
 /** Wiadomości podopiecznego i odpowiedzi trenera w jednym wątku, od najstarszej. */
 export function chatThread(c: Pick<Client, 'inbox' | 'replies'>): ChatMsg[] {
   return [
     ...(c.inbox ?? []).filter((n) => !n.hidden).map((n: ClientNote): ChatMsg => ({ id: n.id, at: n.at, text: n.text, from: 'client', sessionId: n.sessionId, read: !!n.read, ref: n.ref, media: n.media, textAuto: n.textAuto })),
-    ...(c.replies ?? []).map((r): ChatMsg => ({ id: r.id, at: r.at, text: r.text, from: 'coach', read: true, ref: r.ref, media: r.media, textAuto: r.textAuto, replyTo: r.replyTo })),
+    ...(c.replies ?? []).map((r): ChatMsg => ({ id: r.id, at: r.at, text: r.text, from: 'coach', read: true, ref: r.ref, media: r.media, textAuto: r.textAuto, replyTo: r.replyTo, ...(r.auto ? { auto: r.auto } : {}) })),
   ].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
 }
 

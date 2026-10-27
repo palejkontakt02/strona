@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../data/supabase';
 import { Screen } from './AuthGate';
+import { readInviteEmail } from '../lib/onboarding';
 
 const REDIRECT = () => `${location.origin}/app/`;
 
@@ -16,8 +17,10 @@ function plError(message: string): string {
 }
 
 export function LoginScreen() {
-  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
-  const [email, setEmail] = useState('');
+  // link z zaproszenia trenera (?zaproszenie=<e-mail>): wpisany adres i od razu „Nowe konto”
+  const [invited] = useState(() => readInviteEmail(location.search));
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(invited ? 'signup' : 'login');
+  const [email, setEmail] = useState(invited ?? '');
   const [password, setPassword] = useState('');
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,6 +63,11 @@ export function LoginScreen() {
             Nowe konto
           </button>
         </div>
+      )}
+      {invited && mode === 'signup' && (
+        <p className="auth-info auth-invite">
+          Zaproszenie od trenera. Załóż konto na adres <strong>{invited}</strong> — ten jest w Twoim profilu, więc od razu zobaczysz swój plan. Masz już konto? Stuknij „Logowanie”.
+        </p>
       )}
       <form
         className="auth-form"

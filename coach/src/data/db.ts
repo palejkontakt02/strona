@@ -131,14 +131,14 @@ export interface Repository {
    * Wpis podopiecznego w jego profilu: raport tygodniowy (po `id`), zdjęcie sylwetki (po `id`)
    * albo dzienny zapis makro / kroków (po `date`). Zastępuje wpis o tym samym kluczu.
    */
-  saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry): Promise<void>;
+  saveClientEntry(clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry | import('../domain').Absence | import('../domain').ExNote): Promise<void>;
   /** Czyja kolejka zapisów offline na tym urządzeniu (konto); brak = „local”. */
   outboxScope?(): Promise<string>;
   /** Podopieczny potwierdza albo odwołuje wizytę (funkcja client_respond_appointment, sekcja 23). Zwraca zapisaną wizytę. */
   respondAppointment?(id: string, kind: 'confirm' | 'cancel', reason?: string): Promise<Appointment | null>;
 }
 
-export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog' | 'consents';
+export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog' | 'consents' | 'absences' | 'exNotes';
 
 /** Wstawia albo podmienia wpis (raport / zdjęcie po id, dzień po dacie); najwyżej `max` ostatnich. */
 export function withEntry<T extends { id?: string; date?: string }>(list: T[] | undefined, entry: T, max = 400): T[] {

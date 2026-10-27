@@ -211,6 +211,8 @@ export interface Client {
   noShowCharges?: string[];
   /** Odpowiedzi trenera (wątek z wiadomościami podopiecznego). */
   replies?: CoachReply[];
+  /** Znacznik ostatniej automatycznej wiadomości (ustawia baza, sekcja 25) — chroni ją przed zapisem z nieaktualnej kopii. */
+  autoMsgRev?: string;
   /** Raporty tygodniowe (zapisuje podopieczny przez funkcję w bazie). */
   weeklyReports?: WeeklyReport[];
   /** Zdjęcia sylwetki w czasie (zapisuje podopieczny przez funkcję w bazie). */
@@ -223,6 +225,47 @@ export interface Client {
   weeklyReport?: boolean;
   /** RODO: zgody podopiecznego (dane o zdrowiu, zdjęcia/nagrania) i prośba o usunięcie konta — zapisuje tylko on sam (lib/rodo.ts). */
   consents?: ConsentEntry[];
+  /** Trener: kiedy wysłał zaproszenie do aplikacji (ISO; lib/onboarding.ts). */
+  invitedAt?: string;
+  /** Trener ukrył checklistę „Pierwsze kroki” w Przeglądzie. */
+  onboardingHidden?: boolean;
+  /** Trener: klucze elementów kolejki „Do przejrzenia” oznaczonych jako przejrzane (lib/reviewQueue.ts; zwykły zapis trenera). */
+  reviewed?: string[];
+  /** Zgłoszone nieobecności (urlop, choroba…) — zapisuje podopieczny (save_client_entry, sekcja 26; lib/absence.ts). */
+  absences?: Absence[];
+  /** Prywatne notatki podopiecznego do ćwiczeń („siedzisko na 4”) — klucz `id` = znormalizowana nazwa ćwiczenia (sekcja 26). */
+  exNotes?: ExNote[];
+  /** Powrót po przerwie (ustawia trener): od ilu dni bez treningu i o ile % lżej pierwszy trening (lib/comeback.ts). */
+  comeback?: ComebackRule;
+}
+
+export type AbsenceReason = 'urlop' | 'choroba' | 'kontuzja' | 'inne';
+/** Nieobecność podopiecznego: od–do (włącznie). `to` < `from` = odwołana („Wracam wcześniej” w dniu startu). */
+export interface Absence {
+  id: string;
+  from: ISODate;
+  to: ISODate;
+  reason: AbsenceReason;
+  note?: string;
+  /** Kiedy zgłoszona (ISO). */
+  at: string;
+}
+
+/** Notatka podopiecznego do ćwiczenia (wraca przy każdym treningu z tym ćwiczeniem). */
+export interface ExNote {
+  /** Znormalizowana nazwa ćwiczenia (`exNoteKey` w lib/exNotes.ts, najwyżej 64 znaki). */
+  id: string;
+  /** Nazwa ćwiczenia, jak ją widział podopieczny. */
+  name: string;
+  text: string;
+  at: string;
+}
+
+/** Powrót po przerwie: `days` — od ilu dni bez treningu, `pct` — o ile % lżejsze podpowiedzi ciężaru; `off` — wyłączone. */
+export interface ComebackRule {
+  days: number;
+  pct: number;
+  off?: boolean;
 }
 
 /** Zgoda RODO: `health` — dane o zdrowiu (art. 9), `media` — zdjęcia sylwetki i nagrania techniki; `erasure` — prośba o usunięcie konta. */
@@ -290,7 +333,8 @@ export interface CoachReply {
   media?: MsgMedia[];
   textAuto?: boolean;
   /** Odpowiedź na konkretną wiadomość (np. z nagraniem techniki — znaczniki czasu przewijają to wideo). */
-  replyTo?: string;
+  replyTo?: string;  /** Wiadomość automatyczna (reguła z „Automatyczne wiadomości”, lib/autoMessages.ts) — oznaczenie widzi tylko trener. */
+  auto?: import('./lib/autoMessages').AutoKind;
 }
 
 /** Kontekst wiadomości: trening (sesja) i ewentualnie ćwiczenie. */
@@ -469,6 +513,8 @@ export interface TrainingSession {
   coachNote?: string;
   /** Trening w parze / grupie: z kim (id podopiecznych). */
   withIds?: string[];
+  /** Trening przerwany z powodu bólu w odtwarzaczu („Przerwij, bo boli”) — zapis częściowy, trener dostał wiadomość. */
+  stoppedForPain?: { level: number; spots?: PainSpot[]; exName?: string; exIndex?: number };
 }
 
 /* ---------- Kalendarz ---------- */

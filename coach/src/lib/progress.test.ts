@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Checkin, SessionExercise, TrainingSession } from '../domain';
-import { milestoneLabel, milestones, monthSummary, monthsRange, shiftMonth } from './progress';
+import { milestoneLabel, milestones, monthSummary, monthsRange, shiftMonth, weightTrend, weightTrendText } from './progress';
 import { musclesOf, muscleTier, normName, setsByMuscle, weeklyMuscleSets, workingSets } from './progressMuscles';
 import { changeText, dailyWellness, wellnessChange, wellnessWeeks } from './progressWellness';
 
@@ -183,5 +183,38 @@ describe('kamienie milowe', () => {
     expect(m.next.find((n) => n.kind === 'streak')).toMatchObject({ value: 2, target: 4 });
     expect(m.next.some((n) => n.kind === 'km')).toBe(false);
     expect(milestones([], '2026-10-06').next).toEqual([{ kind: 'sessions', target: 10, label: '10 treningów', value: 0 }]);
+  });
+});
+
+describe('weightTrend — średnia 7 dni', () => {
+  const W = (date: string, weight?: number) => ({ date, weight });
+  it('średnia krocząca, kilka pomiarów dnia, pomija puste', () => {
+    const t = weightTrend([W('2026-10-01', 73), W('2026-10-02', 72), W('2026-10-02', 74), W('2026-10-03'), W('2026-10-08', 71)]);
+    expect(t.daily).toEqual([{ x: '2026-10-01', y: 73 }, { x: '2026-10-02', y: 73 }, { x: '2026-10-08', y: 71 }]);
+    // 08.10: okno 02–08.10 → (73 + 71) / 2
+    expect(t.avg.map((p) => p.y)).toEqual([73, 73, 72]);
+    expect(t.last).toBe(72);
+    expect(t.change14).toBeNull();
+  });
+  it('zmiana w 2 tygodnie i tekst', () => {
+    const pts = [];
+    for (let d = 1; d <= 28; d++) pts.push(W(`2026-10-${String(d).padStart(2, '0')}`, 74 - d * 0.05 + (d % 2 ? 0.8 : -0.8)));
+    const t = weightTrend(pts);
+    expect(t.change14).toBe(-0.7);
+    expect(weightTrendText(t)).toMatch(/^Średnia 7 dni: \d+,\d kg \(−0,7 kg w 2 tyg\.\)$/);
+    expect(weightTrendText(weightTrend([]))).toBeNull();
+    expect(weightTrendText({ daily: [], avg: [], last: 72.4, change14: 0.6 })).toBe('Średnia 7 dni: 72,4 kg (+0,6 kg w 2 tyg.)');
+  });
+});
+
+describe('milestones — seria tygodni a nieobecność', () => {
+  it('tydzień urlopu nie przerywa serii', () => {
+    // 4 tygodnie z treningiem, w środku tydzień urlopu (pn 12.10)
+    const ses = ['2026-09-29', '2026-10-06', '2026-10-20', '2026-10-27'].map((d) => S(d, []));
+    const abs = (w: string) => w === '2026-10-12';
+    expect(milestones(ses, '2026-10-28').next.find((n) => n.kind === 'streak')?.value).toBe(2);
+    const m = milestones(ses, '2026-10-28', abs);
+    expect(m.next.find((n) => n.kind === 'streak')?.value).toBe(4);
+    expect(m.achieved.some((a) => a.kind === 'streak' && a.target === 4)).toBe(true);
   });
 });

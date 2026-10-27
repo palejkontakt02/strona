@@ -292,7 +292,6 @@ function ApptTile({ a, onDragEnd }: { a: Appointment; onDragEnd?: () => void }) 
       <span className="tile-time">
         {clash && <span className="clash-mark" aria-label="Kolizja"><Icon name="alert" size={13} /> </span>}
         {a.time}
-        {a.seriesId && <span title="Wizyta cykliczna"> ↻</span>}
       </span>
       <span className="tile-name">
         {partners.length ? (

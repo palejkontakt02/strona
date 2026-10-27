@@ -15,6 +15,8 @@ import { ClientsView } from './views/ClientsView';
 import { Dashboard } from './views/Dashboard';
 import { LibraryView } from './views/LibraryView';
 import { PaymentsView } from './views/PaymentsView';
+import { Inbox } from './views/Inbox';
+import { trainerUnread } from './lib/comms';
 
 const ICON: Record<Section, string> = {
   Pulpit: 'dash',
@@ -22,7 +24,20 @@ const ICON: Record<Section, string> = {
   Klienci: 'users',
   Płatności: 'money',
   Ćwiczenia: 'lib',
+  Wiadomości: 'chat',
 };
+/** Kolejność w menu na komputerze (Wiadomości zaraz po Pulpicie). */
+const DESKTOP_NAV: Section[] = ['Pulpit', 'Wiadomości', 'Kalendarz', 'Klienci', 'Płatności', 'Ćwiczenia'];
+
+/** Odznaka z liczbą nieprzeczytanych wiadomości. */
+function UnreadBadge({ n }: { n: number }) {
+  if (!n) return null;
+  return (
+    <span className="nav-badge" aria-label={`${n} nieprzeczytanych`}>
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
 
 export function App() {
   const [section, setSection] = useState<Section>('Pulpit');
@@ -33,6 +48,7 @@ export function App() {
   const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart; pair?: { clientId: string; appointmentId?: string }[] } | null>(null);
   const [bannerOpen, setBannerOpen] = useState(false);
   const { db } = useStore();
+  const unreadAll = db.clients.reduce((a, c) => a + trainerUnread(c), 0);
 
   const go = useCallback((s: Section) => {
     setSection(s);
@@ -137,9 +153,10 @@ export function App() {
           Fitowa <span>/ coach</span>
         </button>
         <div className="nav-links">
-          {SECTIONS.map((s) => (
+          {DESKTOP_NAV.filter((s) => SECTIONS.includes(s)).map((s) => (
             <button key={s} className={section === s ? 'active' : ''} aria-current={section === s ? 'page' : undefined} onClick={() => go(s)}>
               {s}
+              {s === 'Wiadomości' && <UnreadBadge n={unreadAll} />}
             </button>
           ))}
         </div>
@@ -147,6 +164,10 @@ export function App() {
         <OfflineBadge />
         <button className="btn btn-primary btn-sm hide-mobile" onClick={() => setModal({ kind: 'appt', clientId: section === 'Klienci' ? (clientId ?? undefined) : undefined })}>
           <Icon name="plus" size={16} /> Dodaj wizytę
+        </button>
+        <button className={`icon-btn show-mobile nav-msg-btn${section === 'Wiadomości' ? ' active' : ''}`} aria-label="Wiadomości" title="Wiadomości" aria-current={section === 'Wiadomości' ? 'page' : undefined} onClick={() => go('Wiadomości')}>
+          <Icon name="chat" />
+          <UnreadBadge n={unreadAll} />
         </button>
         <button className="icon-btn show-mobile" aria-label="Ćwiczenia" title="Ćwiczenia" onClick={() => go('Ćwiczenia')}>
           <Icon name="lib" />
@@ -198,6 +219,7 @@ export function App() {
           {section === 'Klienci' && <ClientsView />}
           {section === 'Płatności' && <PaymentsView />}
           {section === 'Ćwiczenia' && <LibraryView />}
+          {section === 'Wiadomości' && <Inbox />}
         </ErrorBoundary>
       </main>
 

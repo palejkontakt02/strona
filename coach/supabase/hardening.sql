@@ -1255,3 +1255,555 @@ drop trigger if exists guard_session_archived on public.sessions;
 create trigger guard_session_archived before insert or update on public.sessions
   for each row execute function public.guard_session_archived();
 notify pgrst, 'reload schema';
+
+-- 26. Panel podopiecznego: nieobecności („Wypadam z planu”) i prywatne notatki do ćwiczeń. Można uruchomić ponownie.
+--     a) save_client_entry (wersja z sekcji 22) przyjmuje też rodzaje 'absences' (klucz id: od, do, powód, notatka)
+--        i 'exNotes' (klucz id = znormalizowana nazwa ćwiczenia, tekst do 300 znaków). Zapisuje podopieczny
+--        (albo trener). Zapis profilu przez trenera tych list nie nadpisze (strażnik guard_client_entries26).
+--     b) Poranne przypomnienia push — „Masz dziś trening” (7:00, sekcja 20) i samopoczucie (8:00, sekcja 21) —
+--        nie idą w dni objęte zgłoszoną nieobecnością. Trener dostaje wiadomość „Nieobecność: urlop 01.11–07.11”
+--        (add_client_note) — push do trenera działa bez zmian (sekcja 20).
+--     c) Ustawienie trenera „Powrót po przerwie” (clients.data.comeback = {days, pct}) i przerwanie treningu z bólem
+--        (sessions.data.stoppedForPain) nie wymagają zmian w bazie.
+create or replace function public.save_client_entry(p_client_id text, p_kind text, p_entry jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  trainer boolean := is_trainer();
+  e jsonb;
+  old_e jsonb;
+  key text;
+  keyval text;
+  k text;
+  v numeric;
+  lo numeric;
+  hi numeric;
+begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
+  if not (trainer or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if jsonb_typeof(p_entry) is distinct from 'object' then raise exception 'Nieprawidłowy wpis'; end if;
+  key := case p_kind when 'dayLog' then 'date' when 'weeklyReports' then 'id' when 'progressPhotos' then 'id'
+                      when 'absences' then 'id' when 'exNotes' then 'id' end;
+  if key is null then raise exception 'Nieznany rodzaj wpisu: %', p_kind; end if;
+  keyval := p_entry ->> key;
+  if key = 'id' and (coalesce(keyval, '') = '' or length(keyval) > 64) then raise exception 'Brak id wpisu'; end if;
+  -- dotychczasowy wpis o tym samym kluczu (poprawka) — zostają z niego pola trenera
+  select x into old_e from clients c,
+    jsonb_array_elements(case when jsonb_typeof(c.data -> p_kind) = 'array' then c.data -> p_kind else '[]'::jsonb end) x
+  where c.id = p_client_id and x ->> key = keyval limit 1;
+
+  if p_kind = 'weeklyReports' then
+    if coalesce(p_entry ->> 'week', '') !~ '^\d{4}-\d{2}-\d{2}$' or (p_entry ->> 'week')::date > current_date + 7
+       or (p_entry ->> 'week')::date < date '2000-01-01' then raise exception 'Zły tydzień'; end if;
+    e := jsonb_build_object('id', keyval, 'week', p_entry ->> 'week', 'at', coalesce(old_e -> 'at', to_jsonb(now())));
+    foreach k in array array['sleep', 'stress', 'energy', 'adherence', 'weight', 'steps'] loop
+      if p_entry ? k and jsonb_typeof(p_entry -> k) <> 'null' then
+        if jsonb_typeof(p_entry -> k) <> 'number' then raise exception 'Zła wartość: %', k; end if;
+        v := (p_entry ->> k)::numeric;
+        lo := case k when 'weight' then 20 when 'steps' then 0 else 1 end;
+        hi := case k when 'weight' then 400 when 'steps' then 100000 else 5 end;
+        if v < lo or v > hi then raise exception 'Zła wartość: %', k; end if;
+        e := e || jsonb_build_object(k, v);
+      end if;
+    end loop;
+    if length(coalesce(p_entry ->> 'comment', '')) > 2000 then raise exception 'Komentarz za długi (najwyżej 2000 znaków)'; end if;
+    if length(trim(coalesce(p_entry ->> 'comment', ''))) > 0 then e := e || jsonb_build_object('comment', p_entry ->> 'comment'); end if;
+    if jsonb_typeof(p_entry -> 'photoIds') = 'array' then
+      if jsonb_array_length(p_entry -> 'photoIds') > 3 then raise exception 'Najwyżej 3 zdjęcia w raporcie'; end if;
+      e := e || jsonb_build_object('photoIds', coalesce((select jsonb_agg(left(x #>> '{}', 64)) from jsonb_array_elements(p_entry -> 'photoIds') x
+                                                         where jsonb_typeof(x) = 'string'), '[]'::jsonb));
+    end if;
+    -- pola trenera: trener ustawia je sam, podopieczny ich nie zmienia (zostają z poprzedniej wersji raportu)
+    e := e || jsonb_strip_nulls(jsonb_build_object(
+      'seenAt', case when trainer then left(p_entry ->> 'seenAt', 40) else old_e ->> 'seenAt' end,
+      'coachNote', case when trainer then left(p_entry ->> 'coachNote', 2000) else old_e ->> 'coachNote' end));
+
+  elsif p_kind = 'progressPhotos' then
+    if coalesce(p_entry ->> 'date', '') !~ '^\d{4}-\d{2}-\d{2}$' or (p_entry ->> 'date')::date > current_date + 1 then raise exception 'Zła data'; end if;
+    -- tylko plik z folderu tego podopiecznego w magazynie albo z pamięci przeglądarki
+    if length(coalesce(p_entry ->> 'ref', '')) > 300
+       or not ((p_entry ->> 'ref') like 'sb:' || p_client_id || '/%' or (p_entry ->> 'ref') like 'idb:%')
+       or (p_entry ->> 'ref') like '%..%' then raise exception 'Zły plik zdjęcia'; end if;
+    if coalesce(p_entry ->> 'pose', '') not in ('przód', 'bok', 'tył', 'inne') then raise exception 'Zła poza'; end if;
+    e := jsonb_build_object('id', keyval, 'date', p_entry ->> 'date', 'ref', p_entry ->> 'ref', 'pose', p_entry ->> 'pose',
+                            'at', coalesce(old_e -> 'at', to_jsonb(now())));
+    if (case when trainer then (p_entry ->> 'hidden') else (old_e ->> 'hidden') end) = 'true' then
+      e := e || '{"hidden": true}'::jsonb;
+    end if;
+
+  elsif p_kind = 'absences' then
+    -- nieobecność: od–do (włącznie), powód, notatka; to < from = odwołana („Wracam wcześniej” w dniu startu)
+    if coalesce(p_entry ->> 'from', '') !~ '^\d{4}-\d{2}-\d{2}$' or coalesce(p_entry ->> 'to', '') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Zła data'; end if;
+    if (p_entry ->> 'from')::date < current_date - 400 or (p_entry ->> 'from')::date > current_date + 400 then raise exception 'Zła data'; end if;
+    if (p_entry ->> 'to')::date < (p_entry ->> 'from')::date - 1 or (p_entry ->> 'to')::date > (p_entry ->> 'from')::date + 366 then raise exception 'Zły zakres dat'; end if;
+    if coalesce(p_entry ->> 'reason', '') not in ('urlop', 'choroba', 'kontuzja', 'inne') then raise exception 'Zły powód'; end if;
+    e := jsonb_build_object('id', keyval, 'from', p_entry ->> 'from', 'to', p_entry ->> 'to', 'reason', p_entry ->> 'reason',
+                            'at', coalesce(old_e -> 'at', to_jsonb(now())));
+    if length(trim(coalesce(p_entry ->> 'note', ''))) > 0 then e := e || jsonb_build_object('note', left(trim(p_entry ->> 'note'), 500)); end if;
+
+  elsif p_kind = 'exNotes' then
+    -- prywatna notatka do ćwiczenia: klucz = znormalizowana nazwa (id), pusty tekst = usunięta
+    if keyval !~ '^[a-z0-9 ]+$' then raise exception 'Zły klucz notatki'; end if;
+    e := jsonb_build_object('id', keyval, 'name', left(coalesce(p_entry ->> 'name', keyval), 120),
+                            'text', left(trim(coalesce(p_entry ->> 'text', '')), 300), 'at', to_jsonb(now()));
+
+  else -- dayLog: jeden wpis na dzień
+    if coalesce(keyval, '') !~ '^\d{4}-\d{2}-\d{2}$' or keyval::date > current_date + 1 then raise exception 'Zła data'; end if;
+    e := jsonb_build_object('date', keyval);
+    foreach k in array array['protein', 'kcal', 'steps', 'water', 'fat', 'carbs'] loop
+      if p_entry ? k and jsonb_typeof(p_entry -> k) <> 'null' then
+        if jsonb_typeof(p_entry -> k) <> 'number' then raise exception 'Zła wartość: %', k; end if;
+        v := (p_entry ->> k)::numeric;
+        hi := case k when 'protein' then 600 when 'kcal' then 10000 when 'steps' then 100000 when 'fat' then 600 when 'carbs' then 1500 else 15 end;
+        if v < 0 or v > hi then raise exception 'Zła wartość: %', k; end if;
+        e := e || jsonb_build_object(k, v);
+      end if;
+    end loop;
+    -- zrzut ekranu z aplikacji do liczenia kalorii (np. Fitatu): tylko plik z folderu tego podopiecznego albo z pamięci przeglądarki
+    if coalesce(p_entry ->> 'shot', '') <> '' then
+      if length(p_entry ->> 'shot') > 300
+         or not ((p_entry ->> 'shot') like 'sb:' || p_client_id || '/%' or (p_entry ->> 'shot') like 'idb:%')
+         or (p_entry ->> 'shot') like '%..%' then raise exception 'Zły plik zrzutu'; end if;
+      e := e || jsonb_build_object('shot', p_entry ->> 'shot');
+    end if;
+  end if;
+
+  update clients
+  set data = jsonb_set(data, array[p_kind],
+        coalesce((select jsonb_agg(x order by ord) from (
+          select x, ord from jsonb_array_elements(case when jsonb_typeof(data -> p_kind) = 'array' then data -> p_kind else '[]'::jsonb end)
+            with ordinality t(x, ord)
+          where x ->> key is distinct from keyval
+          order by ord desc limit 399) s), '[]'::jsonb)
+        || jsonb_build_array(e)),
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+
+revoke all on function public.save_client_entry from public, anon;
+grant execute on function public.save_client_entry to authenticated;
+
+-- Strażnik: nieobecności i notatki do ćwiczeń zmienia tylko save_client_entry — zapis profilu (trener, import) ich nie zmienia.
+create or replace function public.guard_client_entries26() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := (new.data - 'absences' - 'exNotes')
+    || case when old.data ? 'absences' then jsonb_build_object('absences', old.data -> 'absences') else '{}'::jsonb end
+    || case when old.data ? 'exNotes' then jsonb_build_object('exNotes', old.data -> 'exNotes') else '{}'::jsonb end;
+  return new;
+end $$;
+drop trigger if exists guard_client_entries26 on public.clients;
+create trigger guard_client_entries26 before update on public.clients
+  for each row execute function public.guard_client_entries26();
+
+-- Czy podopieczny zgłosił nieobecność obejmującą dzień d (lista clients.data.absences; to < from = odwołana).
+create or replace function public.client_absent(p_data jsonb, d date) returns boolean
+language sql immutable as $$
+  select exists (
+    select 1 from jsonb_array_elements(case when jsonb_typeof(p_data -> 'absences') = 'array' then p_data -> 'absences' else '[]'::jsonb end) a
+    where (a ->> 'from') ~ '^\d{4}-\d{2}-\d{2}$' and (a ->> 'to') ~ '^\d{4}-\d{2}-\d{2}$'
+      and (a ->> 'from')::date <= d and d <= (a ->> 'to')::date);
+$$;
+
+-- Poranne przypomnienia (sekcje 20 i 21) — bez dni objętych nieobecnością.
+create or replace function public.push_daily_reminders() returns int
+language plpgsql security definer set search_path = public as $$
+declare r record; n int := 0; today date := (now() at time zone 'Europe/Warsaw')::date;
+begin
+  for r in
+    select c.id,
+      (select min(a.data ->> 'time') from appointments a where a.client_id = c.id and a.data ->> 'date' = today::text and a.data ->> 'status' = 'planned') appt_time,
+      (select k ->> 'name' from plans p,
+              jsonb_array_elements(case when jsonb_typeof(p.data -> 'weeks') = 'array' then p.data -> 'weeks' else '[]'::jsonb end) with ordinality wk(w, wi),
+              jsonb_array_elements(case when jsonb_typeof(w -> 'workouts') = 'array' then w -> 'workouts' else '[]'::jsonb end) k
+        where p.client_id = c.id
+          and (k ->> 'date' = today::text
+               or ((p.data ->> 'active') = 'true' and coalesce(p.data ->> 'extra', '') <> 'true' and (p.data ->> 'startDate') ~ '^\d{4}-\d{2}-\d{2}$'
+                   and (k ->> 'day') ~ '^[1-7]$'
+                   and date_trunc('week', (p.data ->> 'startDate')::date)::date + ((wi - 1) * 7 + (k ->> 'day')::int - 1)::int = today))
+        limit 1) wo_name
+    from clients c
+    where coalesce(c.data ->> 'status', 'aktywny') = 'aktywny'
+      and exists (select 1 from push_subscriptions s where s.role = 'client' and s.client_id = c.id)
+      and not exists (select 1 from sessions s where s.client_id = c.id and s.data ->> 'date' = today::text)
+      and not client_absent(c.data, today)
+  loop
+    continue when r.appt_time is null and r.wo_name is null;
+    perform push_send('client', r.id, 'Masz dziś trening',
+      case when r.appt_time is not null then 'Wizyta o ' || r.appt_time else r.wo_name end, '/app/', 'daily', 'daily-' || today);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.push_daily_reminders from public, anon, authenticated;
+
+create or replace function public.push_checkin_reminders() returns int
+language plpgsql security definer set search_path = public as $$
+declare r record; n int := 0; today date := (now() at time zone 'Europe/Warsaw')::date;
+begin
+  for r in
+    select c.id from clients c
+    where coalesce(c.data ->> 'status', 'aktywny') = 'aktywny'
+      and exists (select 1 from push_subscriptions s where s.role = 'client' and s.client_id = c.id)
+      and not client_absent(c.data, today)
+      and not exists (
+        select 1 from jsonb_array_elements(case when jsonb_typeof(c.data -> 'checkins') = 'array' then c.data -> 'checkins' else '[]'::jsonb end) ci
+        where ci ->> 'date' = today::text)
+  loop
+    perform push_send('client', r.id, 'Jak się dziś czujesz?', 'Zaznacz sen, energię, mięśnie, stres i nastrój — 10 sekund.', '/app/', 'checkin', 'checkin-' || today);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.push_checkin_reminders from public, anon, authenticated;
+notify pgrst, 'reload schema';
+
+-- 25. Automatyczne wiadomości od trenera (Ustawienia → „Automatyczne wiadomości”). Można uruchomić ponownie.
+--     Trener raz zatwierdza treść reguły (włącza ją), potem baza sama wysyła wiadomość jako zwykłą odpowiedź
+--     trenera (clients.data.replies, z polem auto) + powiadomienie push do podopiecznego.
+--     Reguły: pierwszy trening, X dni bez treningu, nowy rekord, ≤ N treningów w pakiecie, urodziny, N-ty trening.
+--     Sprawdzanie raz dziennie o 9:00 czasu polskiego (pg_cron, zadanie „fitowa-auto-messages”) — także dla
+--     zdarzeń z treningu (pierwszy trening, rekord, N-ty trening): wiadomość idzie rano po treningu, nie w trakcie.
+--     Każde zdarzenie (podopieczny + reguła + klucz) najwyżej raz; najwyżej jedna automatyczna wiadomość dziennie
+--     na podopiecznego. Tylko podopieczni z e-mailem (kontem); „zakończony” — nic, „pauza” — tylko urodziny.
+--     Logika jak w aplikacji: src/lib/autoMessages.ts. Bez pg_cron reguły się zapisują, ale nic nie wychodzi
+--     (Database → Extensions → pg_cron, potem uruchom tę sekcję ponownie); bez pg_net — wiadomości tak, push nie.
+create table if not exists public.auto_message_rules (
+  id text primary key default 'rules' check (id = 'rules'),
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.auto_message_rules enable row level security;
+drop policy if exists trainer_all on public.auto_message_rules;
+create policy trainer_all on public.auto_message_rules for all to authenticated using (public.is_trainer()) with check (public.is_trainer());
+revoke all on public.auto_message_rules from anon, authenticated;
+grant select, insert, update on public.auto_message_rules to authenticated;
+
+-- dziennik wysłanych (deduplikacja + „Ostatnio wysłane” w aplikacji trenera)
+create table if not exists public.auto_message_log (
+  id bigint generated always as identity primary key,
+  client_id text not null,
+  kind text not null,
+  key text not null,
+  text text,
+  reply_id text,
+  at timestamptz not null default now(),
+  unique (client_id, kind, key)
+);
+create index if not exists auto_message_log_at_idx on public.auto_message_log (at desc);
+alter table public.auto_message_log enable row level security;
+drop policy if exists trainer_read on public.auto_message_log;
+create policy trainer_read on public.auto_message_log for select to authenticated using (public.is_trainer());
+revoke all on public.auto_message_log from anon, authenticated;
+grant select on public.auto_message_log to authenticated;
+
+-- Liczba z pola (jak num() w aplikacji): 100, „102,5”, „100 kg”, „1 500”.
+create or replace function public.auto_num(v jsonb) returns numeric
+language plpgsql immutable as $$
+declare t text; m text;
+begin
+  if v is null then return null; end if;
+  if jsonb_typeof(v) = 'number' then return (v #>> '{}')::numeric; end if;
+  if jsonb_typeof(v) <> 'string' then return null; end if;
+  t := regexp_replace(v #>> '{}', '[\s  ]', '', 'g');
+  if t ~ '^-?\d{1,3}(\.\d{3})+(,\d+)?$' then t := replace(t, '.', ''); end if;
+  t := replace(t, ',', '.');
+  m := substring(t from '^([-+]?(?:\d+\.?\d*|\.\d+))');
+  return m::numeric;
+exception when others then return null;
+end $$;
+
+-- Pierwsza liczba z zapisu powtórzeń („8–10” → 8).
+create or replace function public.auto_reps(v jsonb) returns numeric
+language sql immutable as $$
+  select public.auto_num(to_jsonb(substring(coalesce(v #>> '{}', '') from '(\d+(?:[.,]\d+)?)')));
+$$;
+
+-- e1RM wg Epleya z RIR = 10 − RPE (jak e1rmRPE w lib/strength.ts).
+create or replace function public.auto_e1(p_load jsonb, p_reps jsonb, p_rpe jsonb) returns numeric
+language plpgsql immutable as $$
+declare l numeric := auto_num(p_load); r numeric := auto_reps(p_reps); rpe numeric := auto_num(p_rpe); rir numeric;
+begin
+  if l is null or l = 0 or r is null or r = 0 then return null; end if;
+  rir := case when rpe is null then 0 else greatest(0, 10 - rpe) end;
+  if r + rir > 15 then return null; end if;
+  return case when r + rir = 1 then l else l * (1 + (r + rir) / 30) end;
+end $$;
+
+-- Najlepszy e1RM ćwiczenia w treningu + seria do pokazania (jak exerciseE1 / bestSet).
+create or replace function public.auto_ex(e jsonb) returns jsonb
+language plpgsql immutable as $$
+declare sets jsonb := case when jsonb_typeof(e -> 'setsLog') = 'array' then e -> 'setsLog' else '[]'::jsonb end; v numeric; b record;
+begin
+  if jsonb_array_length(sets) = 0 then
+    if coalesce(e ->> 'reps', '') like '%+%' then return null; end if;
+    v := auto_e1(e -> 'load', e -> 'reps', e -> 'rpe');
+    return case when v is null then null else jsonb_build_object('e1', v, 'load', auto_num(e -> 'load'), 'reps', auto_reps(e -> 'reps')) end;
+  end if;
+  select max(auto_e1(s -> 'load', s -> 'reps', s -> 'rpe')) into v
+  from jsonb_array_elements(sets) s
+  where jsonb_typeof(s) = 'object' and coalesce(s ->> 'warmup', '') <> 'true' and coalesce(s ->> 'done', '') <> 'false'
+    and coalesce(s ->> 'complex', '') = '' and coalesce(s ->> 'unit', '') = '';
+  if v is null then return null; end if;
+  select auto_num(s -> 'load') l, auto_reps(s -> 'reps') r into b
+  from jsonb_array_elements(sets) with ordinality t(s, ord)
+  where jsonb_typeof(s) = 'object' and coalesce(s ->> 'warmup', '') <> 'true'
+  order by coalesce(auto_e1(s -> 'load', s -> 'reps', s -> 'rpe'), 0) desc, ord limit 1;
+  return jsonb_build_object('e1', v, 'load', b.l, 'reps', b.r);
+end $$;
+
+create or replace function public.auto_fmt(n numeric) returns text
+language plpgsql immutable as $$
+declare t text := round(n, 2)::text;
+begin
+  if position('.' in t) > 0 then t := rtrim(rtrim(t, '0'), '.'); end if;
+  return replace(t, '.', ',');
+end $$;
+
+create or replace function public.auto_treningi(n int) returns text
+language sql immutable as $$
+  select n || ' ' || case when n = 1 then 'trening'
+                          when n % 10 between 2 and 4 and (n % 100 < 12 or n % 100 > 14) then 'treningi'
+                          else 'treningów' end;
+$$;
+
+-- Wstawia pola {imię}, {dni}, {ćwiczenie}, {wynik}, {zostało}, {liczba} (także bez polskich znaków).
+create or replace function public.auto_fill(tpl text, vars jsonb) returns text
+language plpgsql immutable as $$
+declare t text := coalesce(tpl, ''); f record;
+begin
+  for f in select * from (values ('imię', 'imi[eę]'), ('dni', 'dni'), ('ćwiczenie', '[cć]wiczenie'), ('wynik', 'wynik'),
+                                 ('zostało', 'zosta[lł]o'), ('liczba', 'liczba')) x(k, re) loop
+    if vars ? f.k then
+      t := regexp_replace(t, '\{\s*' || f.re || '\s*\}', replace(vars ->> f.k, '\', '\\'), 'gi');
+    end if;
+  end loop;
+  return trim(t);
+end $$;
+
+-- Wysyłka jednej wiadomości (raz na podopiecznego + regułę + klucz): odpowiedź trenera + push.
+create or replace function public.auto_message_deliver(p_client_id text, p_kind text, p_key text, p_text text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare lid bigint; rid text := 'auto-' || p_kind || '-' || substr(md5(p_client_id || '|' || p_kind || '|' || p_key), 1, 12);
+begin
+  if length(trim(coalesce(p_text, ''))) = 0 then return false; end if;
+  insert into auto_message_log (client_id, kind, key, text, reply_id) values (p_client_id, p_kind, p_key, left(p_text, 2000), rid)
+  on conflict (client_id, kind, key) do nothing returning id into lid;
+  if lid is null then return false; end if;
+  perform set_config('fitowa.rpc', '1', true); -- zapis z bazy: strażnicy profilu przepuszczają
+  update clients
+  set data = jsonb_set(data, '{replies}',
+        coalesce((select jsonb_agg(x order by ord) from (
+          select x, ord from jsonb_array_elements(case when jsonb_typeof(data -> 'replies') = 'array' then data -> 'replies' else '[]'::jsonb end)
+            with ordinality t(x, ord) order by ord desc limit 199) s), '[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object('id', rid, 'at', to_jsonb(now()), 'text', left(p_text, 2000), 'auto', p_kind)))
+        -- znacznik wersji: zapis profilu z nieaktualnej kopii (aplikacja otwarta przed wysyłką) nie skasuje wiadomości
+        || jsonb_build_object('autoMsgRev', rid),
+      updated_at = now()
+  where id = p_client_id;
+  -- trener uruchamia ręcznie → push wysyła wyzwalacz push_clients (sekcja 20); z harmonogramu — tutaj
+  if not is_trainer() then
+    perform push_send('client', p_client_id, 'Wiadomość od trenera', p_text, '/app/', 'reply');
+  end if;
+  return true;
+end $$;
+revoke all on function public.auto_message_deliver from public, anon, authenticated;
+
+-- Sprawdzenie wszystkich reguł; zwraca liczbę wysłanych wiadomości.
+create or replace function public.auto_messages_run() returns int
+language plpgsql security definer set search_path = public as $$
+declare
+  today date := (now() at time zone 'Europe/Warsaw')::date;
+  win date := today - 2;
+  rules jsonb;
+  c record; s record; e jsonb; ex jsonb;
+  cand jsonb; x jsonb;
+  nm text; paused boolean; n int; first_date date; last_date date; d int; xd int; m int; mdate date;
+  best jsonb; v numeric; b numeric; rec_day date; rec_sid text; rec_name text; rec_gain numeric; rec_load numeric; rec_reps numeric; rec_e1 numeric;
+  pk_total numeric; pk_used int; pk_left int; pk_id text;
+  sent int := 0;
+  on_ text[];
+begin
+  select r.data -> 'rules' into rules from auto_message_rules r where r.id = 'rules';
+  if rules is null then return 0; end if;
+  select coalesce(array_agg(k), '{}') into on_ from jsonb_object_keys(rules) k
+  where (rules -> k ->> 'on') = 'true' and length(trim(coalesce(rules -> k ->> 'text', ''))) > 0;
+  if cardinality(on_) = 0 then return 0; end if;
+
+  for c in
+    select cl.id, cl.data from clients cl
+    where coalesce(cl.data ->> 'status', 'aktywny') <> 'zakończony'
+      and length(trim(coalesce(cl.email, cl.data ->> 'email', ''))) > 0
+      -- najwyżej jedna automatyczna wiadomość dziennie
+      and not exists (select 1 from auto_message_log l where l.client_id = cl.id and (l.at at time zone 'Europe/Warsaw')::date = today)
+  loop
+   begin -- błąd u jednego podopiecznego nie zatrzymuje pozostałych
+    nm := coalesce(nullif(split_part(trim(c.data ->> 'name'), ' ', 1), ''), 'Cześć');
+    paused := (c.data ->> 'status') = 'pauza';
+    cand := '[]'::jsonb; -- w kolejności: urodziny, pierwszy, N-ty, rekord, pakiet, przerwa
+
+    -- (e) urodziny
+    if 'birthday' = any (on_) and (c.data ->> 'dob') ~ '^\d{4}-\d{2}-\d{2}'
+       and (substr(c.data ->> 'dob', 6, 5) = to_char(today, 'MM-DD')
+            or (substr(c.data ->> 'dob', 6, 5) = '02-29' and to_char(today, 'MM-DD') = '02-28'
+                and extract(day from (date_trunc('year', today) + interval '1 month 28 days')::date) <> 29)) then
+      cand := cand || jsonb_build_array(jsonb_build_object('kind', 'birthday', 'key', extract(year from today)::text, 'vars', '{}'::jsonb));
+    end if;
+
+    if not paused then
+      select count(*), min((data ->> 'date')::date), max((data ->> 'date')::date) into n, first_date, last_date
+      from sessions where client_id = c.id and (data ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (data ->> 'date')::date <= today;
+
+      -- (a) pierwszy trening
+      if 'first' = any (on_) and n >= 1 and first_date >= win then
+        cand := cand || jsonb_build_array(jsonb_build_object('kind', 'first', 'key', 'first', 'vars', '{}'::jsonb));
+      end if;
+
+      -- (f) N-ty trening (największy próg, którego trening wypadł w ostatnich 2 dniach)
+      if 'milestone' = any (on_) and n >= 2 then
+        for m in select y::int from jsonb_array_elements_text(case when jsonb_typeof(rules #> '{milestone,counts}') = 'array' then rules #> '{milestone,counts}' else '[10,25,50,100]'::jsonb end) y
+                 where y ~ '^\d{1,4}$' and y::int between 2 and 1000 order by y::int desc loop
+          continue when n < m;
+          select (data ->> 'date')::date into mdate from sessions
+          where client_id = c.id and (data ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (data ->> 'date')::date <= today
+          order by data ->> 'date', coalesce(data ->> 'createdAt', ''), id offset m - 1 limit 1;
+          if mdate >= win then
+            cand := cand || jsonb_build_array(jsonb_build_object('kind', 'milestone', 'key', m::text, 'vars', jsonb_build_object('liczba', m)));
+            exit;
+          end if;
+        end loop;
+      end if;
+
+      -- (c) rekord: e1RM wyższy o > 0,05 kg niż najlepszy wcześniejszy; najnowszy trening z ostatnich 2 dni
+      if 'record' = any (on_) and n >= 2
+         and not exists (select 1 from auto_message_log l where l.client_id = c.id and l.kind = 'record' and l.at > now() - interval '2 days') then
+        best := '{}'::jsonb; rec_day := null; rec_gain := null;
+        for s in select id, data from sessions
+                 where client_id = c.id and (data ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' and (data ->> 'date')::date <= today
+                 order by data ->> 'date', coalesce(data ->> 'createdAt', ''), id loop
+          for e in select y from jsonb_array_elements(case when jsonb_typeof(s.data -> 'exercises') = 'array' then s.data -> 'exercises' else '[]'::jsonb end) y loop
+            continue when jsonb_typeof(e -> 'name') is distinct from 'string';
+            ex := auto_ex(e);
+            continue when ex is null;
+            v := (ex ->> 'e1')::numeric;
+            b := (best ->> (e ->> 'name'))::numeric;
+            if b is not null and v > b + 0.05 and (s.data ->> 'date')::date >= win
+               and (rec_day is null or (s.data ->> 'date')::date > rec_day or ((s.data ->> 'date')::date = rec_day and v - b > rec_gain)) then
+              rec_day := (s.data ->> 'date')::date; rec_sid := s.id; rec_name := e ->> 'name'; rec_gain := v - b;
+              rec_load := (ex ->> 'load')::numeric; rec_reps := (ex ->> 'reps')::numeric; rec_e1 := v;
+            end if;
+            if b is null or v > b then best := best || jsonb_build_object(e ->> 'name', v); end if;
+          end loop;
+        end loop;
+        if rec_day is not null then
+          cand := cand || jsonb_build_array(jsonb_build_object('kind', 'record', 'key', rec_sid, 'vars', jsonb_build_object(
+            'ćwiczenie', rec_name,
+            'wynik', case when coalesce(rec_load, 0) > 0
+                          then auto_fmt(rec_load) || ' kg' || case when coalesce(rec_reps, 0) > 0 then ' × ' || floor(rec_reps)::int else '' end
+                          else 'szac. 1RM ' || auto_fmt(round(rec_e1, 1)) || ' kg' end)));
+        end if;
+      end if;
+
+      -- (d) pakiet: zostało od 1 do N treningów (raz na pakiet = ostatnią płatność „pakiet”)
+      if 'package' = any (on_) and jsonb_typeof(c.data -> 'payments') = 'array' then
+        select sum(coalesce(auto_num(p -> 'sessions'), 0)) into pk_total from jsonb_array_elements(c.data -> 'payments') p where p ->> 'type' = 'pakiet';
+        if pk_total is not null then
+          select coalesce(nullif(p ->> 'id', ''), p ->> 'date') into pk_id from jsonb_array_elements(c.data -> 'payments') with ordinality t(p, ord)
+          where p ->> 'type' = 'pakiet' order by coalesce(p ->> 'date', '') desc, ord limit 1;
+          select count(*) into pk_used from sessions where client_id = c.id and data ->> 'charge' = 'pakiet';
+          pk_used := pk_used + case when jsonb_typeof(c.data -> 'noShowCharges') = 'array' then jsonb_array_length(c.data -> 'noShowCharges') else 0 end;
+          pk_left := (pk_total - pk_used)::int;
+          xd := coalesce(case when (rules #>> '{package,left}') ~ '^\d{1,2}$' then (rules #>> '{package,left}')::int end, 2);
+          if pk_left between 1 and least(greatest(xd, 1), 10) and pk_id is not null then
+            cand := cand || jsonb_build_array(jsonb_build_object('kind', 'package', 'key', pk_id, 'vars', jsonb_build_object('zostało', auto_treningi(pk_left))));
+          end if;
+        end if;
+      end if;
+
+      -- (b) X dni bez treningu (od X do X + 30 dni), bez zgłoszonej nieobecności w ostatnich X dniach
+      --     (clients.data.absences z sekcji 26: od–do włącznie; to < from = odwołana)
+      xd := coalesce(case when (rules #>> '{inactive,days}') ~ '^\d{1,3}$' then (rules #>> '{inactive,days}')::int end, 7);
+      xd := least(greatest(xd, 3), 90);
+      if 'inactive' = any (on_) and n >= 1
+         and not exists (
+           select 1 from jsonb_array_elements(case when jsonb_typeof(c.data -> 'absences') = 'array' then c.data -> 'absences' else '[]'::jsonb end) a
+           where (a ->> 'from') ~ '^\d{4}-\d{2}-\d{2}$' and (a ->> 'to') ~ '^\d{4}-\d{2}-\d{2}$'
+             and (a ->> 'to') >= (a ->> 'from') and (a ->> 'from')::date <= today and (a ->> 'to')::date >= today - xd + 1) then
+        d := today - last_date;
+        if d >= xd and d <= xd + 30 then
+          cand := cand || jsonb_build_array(jsonb_build_object('kind', 'inactive', 'key', last_date::text, 'vars', jsonb_build_object('dni', d)));
+        end if;
+      end if;
+    end if;
+
+    -- pierwsza niewysłana (wg kolejności) — jedna na podopiecznego
+    for x in select y from jsonb_array_elements(cand) y loop
+      if not exists (select 1 from auto_message_log l where l.client_id = c.id and l.kind = x ->> 'kind' and l.key = x ->> 'key') then
+        if auto_message_deliver(c.id, x ->> 'kind', x ->> 'key',
+             auto_fill(rules -> (x ->> 'kind') ->> 'text', jsonb_build_object('imię', nm) || (x -> 'vars'))) then
+          sent := sent + 1;
+        end if;
+        exit;
+      end if;
+    end loop;
+   exception when others then
+    raise warning 'auto_messages_run (%): %', c.id, sqlerrm;
+   end;
+  end loop;
+  return sent;
+end $$;
+revoke all on function public.auto_messages_run from public, anon, authenticated;
+
+-- Trener: „Sprawdź teraz” (bez czekania do 9:00).
+create or replace function public.auto_messages_run_now() returns int
+language plpgsql security definer set search_path = public as $$
+begin
+  if not is_trainer() then raise exception 'Brak dostępu'; end if;
+  return auto_messages_run();
+end $$;
+revoke all on function public.auto_messages_run_now from public, anon;
+grant execute on function public.auto_messages_run_now to authenticated;
+
+-- Zapis profilu z nieaktualnej kopii (np. aplikacja trenera otwarta od wczoraj) nie kasuje automatycznych wiadomości:
+-- gdy znacznik autoMsgRev się nie zgadza, brakujące odpowiedzi z polem auto wracają. Usunięcie wiadomości przez
+-- trenera z aktualnej kopii (znacznik zgodny) działa normalnie.
+create or replace function public.guard_client_auto_replies() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  if old.data ? 'autoMsgRev' and (new.data ->> 'autoMsgRev') is distinct from (old.data ->> 'autoMsgRev') then
+    new.data := jsonb_set(new.data, '{replies}', coalesce((
+        select jsonb_agg(x order by x ->> 'at') from (
+          select x from jsonb_array_elements(case when jsonb_typeof(new.data -> 'replies') = 'array' then new.data -> 'replies' else '[]'::jsonb end) x
+          union all
+          select o from jsonb_array_elements(case when jsonb_typeof(old.data -> 'replies') = 'array' then old.data -> 'replies' else '[]'::jsonb end) o
+          where o ? 'auto' and not exists (
+            select 1 from jsonb_array_elements(case when jsonb_typeof(new.data -> 'replies') = 'array' then new.data -> 'replies' else '[]'::jsonb end) n
+            where n ->> 'id' = o ->> 'id')) t), '[]'::jsonb))
+      || jsonb_build_object('autoMsgRev', old.data -> 'autoMsgRev');
+  end if;
+  return new;
+end $$;
+drop trigger if exists guard_client_auto_replies on public.clients;
+create trigger guard_client_auto_replies before update on public.clients
+  for each row execute function public.guard_client_auto_replies();
+
+-- Harmonogram (pg_cron, w UTC): 7:00 i 8:00 UTC = 9:00 w Polsce latem / zimą; funkcja działa tylko o 9:00 czasu polskiego.
+-- Wyłączenie: select cron.unschedule('fitowa-auto-messages');
+create or replace function public.auto_messages_tick() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if extract(hour from now() at time zone 'Europe/Warsaw') = 9 then perform auto_messages_run(); end if;
+exception when others then
+  raise warning 'auto_messages_tick: %', sqlerrm;
+end $$;
+revoke all on function public.auto_messages_tick from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('fitowa-auto-messages', '0 7,8 * * *', 'select public.auto_messages_tick()');
+  else
+    raise notice 'pg_cron nie jest włączone — automatyczne wiadomości nie wychodzą (Database → Extensions → pg_cron, potem uruchom sekcję 25 ponownie).';
+  end if;
+end $$;
+notify pgrst, 'reload schema';

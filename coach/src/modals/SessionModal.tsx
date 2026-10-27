@@ -6,7 +6,7 @@ import type { Billing, SessionExercise, TrainingSession, Wellness } from '../dom
 import { chargeProblem, clientById, groupOf, isSolo, deleteSession, extraPlanOf, extraState, plansOf, saveSession, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { deleteSetVideo, sessionVideos } from '../data/videos';
-import { fnum, pln, uid, nEx, nSets } from '../format';
+import { fnum, plural, pln, uid, nEx, nSets } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { parseWorkoutNote } from '../lib/note';
@@ -62,6 +62,8 @@ function withBlockLabels(rows: ExRow[]): (ExRow & { label: string })[] {
 }
 
 const s = (v: number | undefined | null) => (v == null ? '' : String(v));
+/** Liczba zapisana z kropką („132.5”) → z przecinkiem („132,5”) do pola; inny tekst („70%”, „8–10”) bez zmian. */
+const dec = (v: string | undefined) => (v ?? '').replace(/^(-?\d+)\.(\d+)$/, '$1,$2');
 /** Seria w formularzu — tekst z pól (przecinek dziesiętny itp.), zamieniany na liczby przy zapisie. */
 interface SetDraft {
   key: string;
@@ -139,14 +141,14 @@ const blankSet = (prev?: SetDraft): SetDraft => ({ key: uid(), load: prev?.load 
 /** Starszy zapis „4 serie × 5 × 100” → cztery osobne serie. */
 const splitSummary = (e: SessionExercise): SetDraft[] => {
   const reps = String(e.reps ?? '').includes('+') ? String(String(e.reps).split('+').reduce((a, x) => a + (parseInt(x, 10) || 0), 0)) : (e.reps ?? '');
-  return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: e.load ?? '', reps, rpe: e.rpe ?? '' }));
+  return Array.from({ length: Math.min(20, Math.max(1, repsN(e.sets) ?? 1)) }, () => ({ key: uid(), load: dec(e.load), reps, rpe: dec(e.rpe) }));
 };
-const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '', rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, loadPer: e.loadPer, cardio: e.cardio, timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined });
+const toRow = (e: SessionExercise): ExRow => ({ key: uid(), name: e.name, sets: e.sets ?? '', reps: e.reps ?? '', load: dec(e.load), rpe: dec(e.rpe), rest: e.rest ?? '', notes: e.notes ?? '', series: e.setsLog?.length ? fromLog(e.setsLog, e.cardio) : splitSummary(e), linked: linkedFromLabel(e.label), perSide: e.perSide, loadPer: e.loadPer, cardio: e.cardio, timed: e.timed || e.setsLog?.some((x) => x.unit === 's') || undefined });
 const emptyRow = (): ExRow => ({ key: uid(), name: '', sets: '3', reps: '', load: '', rpe: '', rest: '', notes: '', series: [blankSet(), blankSet(), blankSet()] });
 
 function Scale({ value, onChange, max, min = 0, label }: { value: string; onChange: (v: string) => void; max: number; min?: number; label: string }) {
   return (
-    <div className="scale" role="radiogroup" aria-label={label}>
+    <div className={`scale${max - min === 10 ? ' scale-11 scale-form' : ''}`} role="radiogroup" aria-label={label}>
       {Array.from({ length: max - min + 1 }, (_, i) => String(i + min)).map((v) => (
         <button key={v} type="button" role="radio" aria-checked={value === v} className={value === v ? 'active' : ''} onClick={() => onChange(value === v ? '' : v)}>
           {v}
@@ -233,8 +235,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           name: e.name,
           sets: sum.sets,
           reps: sum.reps,
-          load: sum.load || (sug.load != null ? String(sug.load) : ''),
-          rpe: sum.rpe,
+          load: dec(sum.load) || (sug.load != null ? fnum(sug.load, 2) : ''),
+          rpe: dec(sum.rpe),
           rest: e.rest ?? '',
           notes: e.notes ?? '',
           hint: sug.why || undefined,
@@ -246,7 +248,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           // każda seria z planu osobno — ciężary jak w treningu na żywo (%, ±% od poprzedniej, z RPE), cel RPE w podpowiedzi
           series: buildRunExercise(e, history, undefined, client?.tests ?? []).sets.map((x) => ({
             key: uid(),
-            load: x.load,
+            load: dec(x.load),
             reps: x.reps,
             rpe: '',
             tRpe: x.tRpe || undefined,
@@ -505,12 +507,22 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               // Przy seriach rozpisanych podsumowanie liczy się samo — edytujesz serie poniżej.
               const sum = r.series ? seriesSummary(r.series, r.reps) : null;
               return (
+                sum ? (
+                  // podsumowanie z serii poniżej — tekst z jednostkami zamiast pól tylko do odczytu (4 elementy: układ siatki bez zmian)
+                  <>
+                    <span className="ex-derived" title="Serie robocze (liczone z serii poniżej)">{sum.sets} {plural(Number(sum.sets) || 0, 'seria', 'serie', 'serii')}</span>
+                    <span className="ex-derived" title="Powtórzenia pierwszej serii roboczej">{sum.reps ? `${sum.reps} ${r.timed || r.cardio ? '' : 'powt.'}` : '—'}</span>
+                    <span className="ex-derived" title="Ciężar pierwszej serii roboczej">{sum.load ? `${dec(sum.load)} ${r.cardio ? 'km' : 'kg'}` : '—'}</span>
+                    <span className="ex-derived" aria-hidden="true" />
+                  </>
+                ) : (
                 <>
-                  <input className={`input ${sum ? 'derived' : ''}`} value={sum ? sum.sets : r.sets} readOnly={!!sum} onChange={(e) => setRow(i, { sets: e.target.value })} aria-label="Serie" placeholder="serie" />
-                  <input className={`input ${sum ? 'derived' : ''}`} value={sum ? sum.reps : r.reps} readOnly={!!sum} onChange={(e) => setRow(i, { reps: e.target.value })} aria-label="Powtórzenia" placeholder="powt." />
-                  <input className={`input ${sum ? 'derived' : ''}`} inputMode="decimal" value={sum ? sum.load : r.load} readOnly={!!sum} onChange={(e) => setRow(i, { load: e.target.value })} aria-label="Ciężar" placeholder="kg" />
-                  <input className={`input ${sum ? 'derived' : ''}`} inputMode="decimal" value={sum ? '' : r.rpe} readOnly={!!sum} onChange={(e) => setRow(i, { rpe: e.target.value })} aria-label="RPE" placeholder={sum ? '—' : 'RPE'} />
+                  <input className="input" value={r.sets} onChange={(e) => setRow(i, { sets: e.target.value })} aria-label="Serie" placeholder="serie" />
+                  <input className="input" value={r.reps} onChange={(e) => setRow(i, { reps: e.target.value })} aria-label="Powtórzenia" placeholder="powt." />
+                  <input className="input" inputMode="decimal" value={r.load} onChange={(e) => setRow(i, { load: e.target.value })} aria-label="Ciężar" placeholder="kg" />
+                  <input className="input" inputMode="decimal" value={r.rpe} onChange={(e) => setRow(i, { rpe: e.target.value })} aria-label="RPE" placeholder="RPE" />
                 </>
+                )
               );
             })()}
             <input className="input" value={r.rest} onChange={(e) => setRow(i, { rest: e.target.value })} aria-label="Przerwa" placeholder="przerwa" />
@@ -590,10 +602,10 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   );
                 })}
                 <div className="between">
-                  <button type="button" className="link small" onClick={() => setSeries(i, (d) => [...d, blankSet(d[d.length - 1])])}>
+                  <button type="button" className="link small set-add" onClick={() => setSeries(i, (d) => [...d, blankSet(d[d.length - 1])])}>
                     + seria
                   </button>
-                  <span className="muted small">dotknij numeru serii, by oznaczyć rozgrzewkę</span>
+                  <span className="muted small set-add-hint">dotknij numeru serii, by oznaczyć rozgrzewkę</span>
                 </div>
               </div>
             ) : (

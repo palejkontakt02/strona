@@ -510,6 +510,8 @@ export function createSeed(today = todayISO()): Db {
     });
   });
 
+  demoComms(clients, sessions, today);
+
   // Klub wypłacił już za miesiąc sprzed dwóch miesięcy.
   const energy = locations.find((l) => l.id === locIds.energy)!;
   const d = new Date(today + 'T12:00:00');
@@ -533,4 +535,33 @@ export function createEmpty(): Db {
     locations: [{ id: uid(), name: 'Studio (własne)', kind: 'własne', hue: 165, payouts: [] }],
     trainer_notes: [],
   };
+}
+
+/** Demo: kilka wiadomości, raport tygodniowy i cele żywienia — żeby skrzynka i kolejka „Do przejrzenia” nie były puste. */
+function demoComms(clients: Client[], sessions: TrainingSession[], today: string) {
+  const at = (daysAgo: number, hm: string) => new Date(`${addDays(today, -daysAgo)}T${hm}:00`).toISOString();
+  const byName = (n: string) => clients.find((c) => c.name.startsWith(n));
+  const lastOf = (c: Client) => sessions.filter((s) => s.clientId === c.id && s.date <= today).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const julia = byName('Julia');
+  if (julia) {
+    const s = lastOf(julia);
+    julia.inbox = [
+      { id: uid(), at: at(5, '08:10'), text: 'Dzień dobry, kolano trochę lepiej po weekendzie.', read: true },
+      ...(s ? [{ id: uid(), at: at(1, '19:02'), text: 'Przy wykrokach czułam lekkie kłucie w kolanie, zrobiłam mniej powtórzeń.', sessionId: s.id, ref: { sessionId: s.id, workout: s.workoutName, date: s.date } }] : []),
+      { id: uid(), at: at(0, '07:40'), text: 'Czy mogę dziś pobiegać 20 minut?' },
+    ];
+    julia.replies = [{ id: uid(), at: at(5, '09:00'), text: 'Super, tak trzymaj!' }];
+  }
+  const kacper = byName('Kacper');
+  if (kacper) {
+    kacper.inbox = [{ id: uid(), at: at(0, '08:01'), text: 'Czy mogę jutro przyjść o 18 zamiast 17?' }];
+  }
+  const natalia = byName('Natalia');
+  if (natalia) {
+    const week = addDays(weekStart(today), -7);
+    natalia.weeklyReport = true;
+    natalia.weeklyReports = [{ id: uid(), week, at: new Date(`${addDays(week, 6)}T20:00:00`).toISOString(), weight: 68.4, sleep: 2, stress: 3, energy: 3, adherence: 4, steps: 7800, comment: 'Słabo spałam, dużo pracy. Jedzenie raczej trzymane.' }];
+    natalia.targets = { kcal: 1900, protein: 120, steps: 9000, water: 2 };
+    natalia.dayLog = [1, 2, 3, 4, 5].map((d) => ({ date: addDays(today, -d), kcal: d === 2 ? 2700 : 1850 + d * 20, protein: d === 3 ? 70 : 110 + d, steps: 8000 + d * 300 }));
+  }
 }

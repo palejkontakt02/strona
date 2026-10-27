@@ -1,5 +1,7 @@
 import type { Client } from '../domain';
-import { ACCOUNT_LABEL, accountOf, refreshAccounts, useAccounts, type AccountsState } from '../data/accounts';
+import { ACCOUNT_LABEL, accountKnown, accountOf, refreshAccounts, useAccounts, type AccountsState } from '../data/accounts';
+import { inviteState } from '../lib/onboarding';
+import { InviteButton, InviteStatusTag } from './Onboarding';
 import { useStore } from '../data/store';
 import { fmtDate } from '../format';
 import { Tag } from './ui';
@@ -7,22 +9,24 @@ import { Tag } from './ui';
 const TONE = { active: 'ok', unconfirmed: 'warn', none: 'neutral', 'no-email': 'neutral' } as const;
 const day = (iso?: string | null) => (iso ? fmtDate(iso.slice(0, 10)) : '—');
 
-/** Mały znacznik konta na karcie podopiecznego (tylko w chmurze, gdy znamy konta). */
+/** Znacznik konta na karcie podopiecznego: połączył konto / niepotwierdzone / zaproszony (data) / nie zaproszony.
+ *  W chmurze z listy kont; w podglądzie lokalnym — po wpisach podopiecznego. Podczas wczytywania nic. */
 export function AccountBadge({ client, state }: { client: Client; state: AccountsState }) {
-  if (state.status !== 'ok') return null;
-  const { status } = accountOf(client, state.list);
-  if (status === 'active') return <Tag tone="ok">konto ✓</Tag>;
-  if (status === 'unconfirmed') return <Tag tone="warn">niepotwierdzone</Tag>;
-  return null;
+  if (state.status === 'loading') return null;
+  const st = inviteState(client, accountKnown(client, state));
+  if (st === 'connected' && state.status === 'ok') return <Tag tone="ok">konto ✓</Tag>;
+  if (st === 'unconfirmed') return <Tag tone="warn">niepotwierdzone</Tag>;
+  if (client.status === 'zakończony' && st !== 'connected') return null;
+  return <InviteStatusTag client={client} state={st} />;
 }
 
 /** Stan konta w profilu podopiecznego: czy założył konto, czy potwierdził e-mail, kiedy się logował. */
 export function AccountStatusCard({ client }: { client: Client }) {
   const { cloud } = useStore();
   const state = useAccounts(cloud);
-  if (state.status === 'off') return null;
   let body: React.ReactNode;
-  if (state.status === 'loading') body = <span className="muted small">Sprawdzam…</span>;
+  if (state.status === 'off') body = <InviteStatusTag client={client} state={inviteState(client, 'unknown')} />;
+  else if (state.status === 'loading') body = <span className="muted small">Sprawdzam…</span>;
   else if (state.status !== 'ok') body = <span className="muted small">Lista kont niedostępna — zobacz Ustawienia → Konta w aplikacji.</span>;
   else {
     const { status, account } = accountOf(client, state.list);
@@ -32,7 +36,7 @@ export function AccountStatusCard({ client }: { client: Client }) {
         <span className="muted small">
           {status === 'active' && `założone ${day(account!.created_at)} · ostatnie logowanie ${day(account!.last_sign_in_at)}`}
           {status === 'unconfirmed' && `założone ${day(account!.created_at)} — podopieczny musi kliknąć link w mailu, inaczej nie zobaczy swoich danych.`}
-          {status === 'none' && `Nikt nie założył konta na ${client.email}. Wyślij podopiecznemu link sebastianpalej.pl/app → „Nowe konto”.`}
+          {status === 'none' && (client.invitedAt ? `Zaproszenie wysłane ${day(client.invitedAt)} — nikt jeszcze nie założył konta na ${client.email}.` : `Nikt nie założył konta na ${client.email}. Wyślij zaproszenie — link sam wpisze ten e-mail na ekranie „Nowe konto”.`)}
           {status === 'no-email' && 'Wpisz e-mail podopiecznego poniżej — tym adresem założy konto i zobaczy swoje treningi.'}
         </span>
       </>
@@ -40,7 +44,10 @@ export function AccountStatusCard({ client }: { client: Client }) {
   }
   return (
     <div className="card account-card">
-      <span className="eyebrow">Konto w aplikacji</span>
+      <div className="account-card-head">
+        <span className="eyebrow">Konto w aplikacji</span>
+        <InviteButton client={client} />
+      </div>
       <div className="row-inline wrap">{body}</div>
     </div>
   );

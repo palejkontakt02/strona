@@ -16,6 +16,8 @@ import { PalettePicker } from '../components/PalettePicker';
 import { PushSettings } from '../components/PushSettings';
 import { ClientFields, fromDraft, toDraft } from '../views/client/Profile';
 import { ClientSelect } from './ModalHost';
+import { requestInvite } from '../components/Onboarding';
+import { isEmail, normalizePhone } from '../lib/onboarding';
 
 function useClient(id: string): Client | undefined {
   const { db } = useStore();
@@ -24,7 +26,7 @@ function useClient(id: string): Client | undefined {
 
 /* ---------- nowy podopieczny ---------- */
 export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> }) {
-  const { apply } = useStore();
+  const { apply, toast, db } = useStore();
   const { closeModal, openClient } = useNav();
   const [d, setD] = useState(() => toDraft(m.client ?? { status: 'aktywny' }));
   const set = (k: string, v: string) => setD((x) => ({ ...x, [k]: v }));
@@ -34,12 +36,18 @@ export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> 
       onClose={closeModal}
       onSubmit={async () => {
         if (!d.name.trim()) return;
+        if (d.email.trim() && !isEmail(d.email)) return toast('Sprawdź adres e-mail — tym adresem podopieczny założy konto w aplikacji.');
+        if (d.phone.trim() && !normalizePhone(d.phone)) return toast('Sprawdź numer telefonu — np. 600 100 200 albo +48 600 100 200.');
+        const em = d.email.trim().toLowerCase();
+        if (em && db.clients.some((x) => x.id !== m.client?.id && x.email?.trim().toLowerCase() === em)) return toast('Ten e-mail ma już inny podopieczny — jedno konto łączy się z jednym profilem.');
         const base: Client = m.client ?? { id: uid(), name: '', status: 'aktywny', startDate: todayISO(), createdAt: new Date().toISOString(), payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] };
         const c = fromDraft(base, d);
         if (!m.client && !c.startDate) c.startDate = todayISO();
         await apply([put('clients', c)], m.client ? 'Zapisano.' : 'Dodano podopiecznego.');
         closeModal();
-        openClient(c.id, m.client ? undefined : 'Profil');
+        // nowy podopieczny: Przegląd z „Pierwszymi krokami” i od razu okno zaproszenia
+        if (!m.client) requestInvite(c.id);
+        openClient(c.id, m.client ? undefined : 'Przegląd');
       }}
     >
       <ClientFields d={d} set={set} compact />

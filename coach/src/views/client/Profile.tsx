@@ -11,6 +11,7 @@ import { parseDur } from '../../lib/running';
 import { useNav } from '../../nav';
 import { LocationSelect } from '../../components/location';
 import { AccountStatusCard } from '../../components/accounts';
+import { isEmail, normalizePhone } from '../../lib/onboarding';
 
 type Draft = Record<string, string>;
 
@@ -32,6 +33,9 @@ export function fromDraft(base: Client, d: Draft): Client {
   const c: Client = { ...base, status: d.status as ClientStatus, billing: (d.billing || undefined) as Billing | undefined, dominant: d.dominant as Client['dominant'], locationId: d.locationId || undefined };
   for (const k of TEXT_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k].trim() || undefined;
   c.name = d.name.trim();
+  // telefon: polski numer zapisany jednolicie (+48 600 100 200); nierozpoznany zostaje jak wpisany
+  if (c.phone) c.phone = normalizePhone(c.phone) ?? c.phone;
+  if (c.email) c.email = c.email.toLowerCase();
   for (const k of DATE_FIELDS) (c as unknown as Record<string, unknown>)[k] = d[k] || undefined;
   for (const k of NUM_FIELDS) (c as unknown as Record<string, unknown>)[k] = num(d[k]) ?? undefined;
   // bieganie: strefy tętna / tempa (pola z formularza; brak — bez zmian w zapisie)
@@ -55,8 +59,23 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
       <Field label="Imię i nazwisko" wide={compact}>
         {inp('name', 'text', { required: true, autoFocus: compact })}
       </Field>
-      <Field label="Telefon">{inp('phone', 'tel')}</Field>
-      <Field label="E-mail">{inp('email', 'email')}</Field>
+      <Field label="Telefon" hint={d.phone?.trim() && !normalizePhone(d.phone) ? <span className="warn-text">Sprawdź numer — np. 600 100 200 albo +48 600 100 200.</span> : undefined}>
+        {inp('phone', 'tel', {
+          inputMode: 'tel',
+          autoComplete: 'off',
+          placeholder: '+48 600 100 200',
+          onBlur: () => {
+            const n = normalizePhone(d.phone);
+            if (n && n !== d.phone) set('phone', n);
+          },
+        })}
+      </Field>
+      <Field
+        label="E-mail"
+        hint={d.email?.trim() && !isEmail(d.email) ? <span className="warn-text">Sprawdź adres e-mail — tym adresem podopieczny założy konto.</span> : compact ? 'Potrzebny do konta w aplikacji.' : undefined}
+      >
+        {inp('email', 'email', { inputMode: 'email', autoComplete: 'off', autoCapitalize: 'none', spellCheck: false, placeholder: 'np. anna@gmail.com' })}
+      </Field>
       <Field label="Cel" wide>
         {inp('goal')}
       </Field>

@@ -1,27 +1,95 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from '../components/ui';
+import { Icon, Modal } from '../components/ui';
+import { RefThread } from '../components/RefComment';
 import { clientById } from '../data/ops';
 import { put } from '../data/db';
 import { useStore } from '../data/store';
 import { sessionVideos, videoUrl } from '../data/videos';
-import { fmtDay } from '../format';
+import { fmtDay, fmtLong, fnum } from '../format';
+import { setText } from '../athlete/History';
+import { num, repsN } from '../lib/parse';
 import { useNav } from '../nav';
+import type { SessionExercise, SetLog } from '../domain';
+
+/** Powtórzenia serii do tabeli: „5”, „8/7” (lewa/prawa), „30 s”. */
+const repsCell = (x: SetLog) => (x.reps == null ? '—' : `${fnum(x.reps)}${x.repsR != null ? `/${fnum(x.repsR)}` : ''}${x.unit ? ` ${x.unit}` : ''}`);
+
+/** Serie ćwiczenia: pojedynczo (zapis seria po serii) albo z podsumowania („4 × 5 × 100”). */
+function ExSets({ e }: { e: SessionExercise }) {
+  const log = e.setsLog ?? [];
+  if (!log.length) {
+    const n = repsN(e.sets);
+    const load = num(e.load);
+    if (!n && !e.reps && load == null) return <p className="muted small">Bez zapisanych serii.</p>;
+    return (
+      <p className="rv-sum">
+        {n ? `${n} × ` : ''}
+        {e.reps || '?'} powt.{load != null ? ` · ${fnum(load)} kg` : ''}
+        {e.rpe ? ` · RPE ${e.rpe.replace('.', ',')}` : ''}
+      </p>
+    );
+  }
+  if (e.cardio)
+    return (
+      <ol className="rv-cardio">
+        {log.map((x, i) => (
+          <li key={i} className={x.warmup ? 'muted' : undefined}>
+            {setText(x, e.perSide, true)}
+            {x.rpe != null && ` · RPE ${fnum(x.rpe)}`}
+          </li>
+        ))}
+      </ol>
+    );
+  let n = 0;
+  return (
+    <table className="rv-sets">
+      <thead>
+        <tr>
+          <th scope="col">Seria</th>
+          <th scope="col">{e.timed || log.some((x) => x.unit) ? 'Czas / powt.' : 'Powt.'}</th>
+          <th scope="col">kg</th>
+          <th scope="col">RPE</th>
+        </tr>
+      </thead>
+      <tbody>
+        {log.map((x, i) => {
+          if (!x.warmup) n++;
+          return (
+            <tr key={i} className={x.warmup ? 'rv-warm' : undefined}>
+              <td>{x.warmup ? 'rozgrz.' : x.label && x.label !== 'Robocze' ? `${n} · ${x.label.toLowerCase()}` : n}</td>
+              <td className="num">{repsCell(x)}</td>
+              <td className="num">{x.load != null ? fnum(x.load) : '—'}</td>
+              <td className="num">
+                {x.rpe != null ? fnum(x.rpe) : '—'}
+                {x.video && <Icon name="cam" size={13} />}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
 
 /**
- * Przegląd treningu przez trenera: nagrania serii po kolei (poprzednie/następne, zwolnione tempo),
- * notatka podopiecznego i komentarz trenera widoczny w aplikacji podopiecznego; zapis = „obejrzane”.
+ * Trening oczami trenera: ćwiczenia z seriami (wyróżnione to, którego dotyczy komentarz), komentarze podopiecznego
+ * z odpowiedzią, nagrania serii (poprzednie/następne, zwolnione tempo) i komentarz trenera widoczny w aplikacji
+ * podopiecznego. Przy nagraniach zapis = „obejrzane”.
  */
-export function ReviewModal({ m }: { m: { sessionId: string } }) {
+export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } }) {
   const { db, apply } = useStore();
   const { closeModal, openModal } = useNav();
   const s = db.sessions.find((x) => x.id === m.sessionId);
   const vids = s ? sessionVideos(s) : [];
-  const [idx, setIdx] = useState(0);
+  // nagrania ćwiczenia z komentarza na początek
+  const hlName = s && m.exIndex != null ? s.exercises[m.exIndex]?.name : undefined;
+  const [idx, setIdx] = useState(() => Math.max(0, hlName ? vids.findIndex((v) => v.exercise === hlName) : 0));
   const [src, setSrc] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const [rate, setRate] = useState(1);
   const [note, setNote] = useState(s?.coachNote ?? '');
   const player = useRef<HTMLVideoElement>(null);
+  const hlRef = useRef<HTMLDivElement>(null);
   const cur = vids[idx];
 
   useEffect(() => {
@@ -44,11 +112,22 @@ export function ReviewModal({ m }: { m: { sessionId: string } }) {
   useEffect(() => {
     if (player.current) player.current.playbackRate = rate;
   }, [rate, src]);
+  // ćwiczenie z komentarza widoczne od razu
+  useEffect(() => {
+    hlRef.current?.scrollIntoView?.({ block: 'center' });
+  }, []);
 
   if (!s) return null;
   const client = clientById(db, s.clientId);
+  const hasVids = vids.length > 0;
   const save = async () => {
     const coachNote = note.trim() || undefined;
+    // bez nagrań nie ma czego „obejrzeć” — zapisujemy tylko komentarz (o ile się zmienił)
+    if (!hasVids) {
+      if (coachNote === s.coachNote) return closeModal();
+      if (await apply([put('sessions', { ...s, coachNote })], coachNote ? 'Komentarz zapisany — podopieczny zobaczy go przy treningu.' : 'Komentarz usunięty.')) closeModal();
+      return;
+    }
     if (await apply([put('sessions', { ...s, reviewedAt: new Date().toISOString(), coachNote })], coachNote ? 'Obejrzane — komentarz widzi podopieczny.' : 'Oznaczono jako obejrzane.')) closeModal();
   };
 
@@ -57,15 +136,57 @@ export function ReviewModal({ m }: { m: { sessionId: string } }) {
       title={`${client?.name ?? ''} · ${s.workoutName || 'Trening'} · ${fmtDay(s.date)}`}
       onClose={closeModal}
       onSubmit={() => void save()}
-      submitLabel={s.reviewedAt ? 'Zapisz komentarz' : 'Obejrzane ✓'}
+      submitLabel={hasVids && !s.reviewedAt ? 'Obejrzane ✓' : 'Zapisz komentarz'}
       wide
       extraActions={
         <button type="button" className="btn btn-ghost" onClick={() => openModal({ kind: 'session', session: s })}>
-          Edytuj trening
+          <Icon name="edit" size={16} /> Edytuj trening
         </button>
       }
     >
-      {vids.length > 0 ? (
+      <div className="rv-head">
+        <span className="eyebrow first-cap">{fmtLong(s.date)}</span>
+        <h2>{s.workoutName || 'Trening'}</h2>
+        <p className="rv-stats muted small">
+          {[
+            s.duration != null && `${s.duration} min`,
+            s.srpe != null && `sRPE ${fnum(s.srpe)}`,
+            s.pain != null && s.pain > 0 && `ból ${s.pain}/10`,
+            s.solo ? 'samodzielnie' : 'z trenerem',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      </div>
+      {s.notes && (
+        <div className="review-note">
+          <span className="eyebrow">Notatka podopiecznego</span>
+          <p>{s.notes}</p>
+        </div>
+      )}
+      <RefThread clientId={s.clientId} sessionId={s.id} />
+      {s.exercises.length > 0 ? (
+        <div className="rv-exs">
+          {s.exercises.map((e, i) => {
+            const hl = i === m.exIndex;
+            return (
+              <div key={i} ref={hl ? hlRef : undefined} className={`rv-ex${hl ? ' rv-hl' : ''}`}>
+                <div className="rv-ex-name">
+                  <b>
+                    {e.label && <span className="ex-label">{e.label}</span>} {e.name}
+                  </b>
+                  {hl && <span className="rv-hl-tag">Komentarz dotyczy tego ćwiczenia</span>}
+                </div>
+                <ExSets e={e} />
+                {e.notes && <p className="muted small">{e.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="muted">Trening bez zapisanych ćwiczeń.</p>
+      )}
+      {hasVids && (
         <div className="review-player">
           <div className="between">
             <b>
@@ -98,20 +219,12 @@ export function ReviewModal({ m }: { m: { sessionId: string } }) {
             </button>
           </div>
         </div>
-      ) : (
-        <p className="muted">Ten trening nie ma nagrań.</p>
-      )}
-      {s.notes && (
-        <div className="review-note">
-          <span className="eyebrow">Notatka podopiecznego</span>
-          <p>{s.notes}</p>
-        </div>
       )}
       <label className="field">
         <span>Komentarz dla podopiecznego (zobaczy go przy tym treningu)</span>
         <textarea className="input" rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Np. seria 2: kolana uciekają do środka — w następnym tygodniu 5 kg mniej i pauza na dole." />
       </label>
-      {s.reviewedAt && <p className="muted small">Obejrzane {fmtDay(s.reviewedAt.slice(0, 10))}.</p>}
+      {hasVids && s.reviewedAt && <p className="muted small">Obejrzane {fmtDay(s.reviewedAt.slice(0, 10))}.</p>}
     </Modal>
   );
 }

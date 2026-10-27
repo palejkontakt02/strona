@@ -43,7 +43,10 @@ import { LoadPerToggle } from '../components/LoadPerToggle';
 import { RefComment } from '../components/RefComment';
 import { compareWorkouts, fillFromLast, fmtLast, isNoLoad, lastExerciseLog, previousWorkout, resultDelta, srpeFromSets, workIndex, workoutStats } from '../lib/lastResult';
 import type { SetLog } from '../domain';
-import { primeRestAudio, restAudioPlaying, restSoundOn, setRestSound, startRestAudio, stopRestAudio, useWakeLock } from './playerDevice';
+import { canSpeak, primeRestAudio, restAudioPlaying, restFlashOn, restSoundOn, setRestFlash, setRestSound, setVoice, speak, startRestAudio, stopRestAudio, useWakeLock, voiceOn } from './playerDevice';
+import { applyComeback, comebackFor, comebackText, restoreFull, type Comeback, type ComebackOrig } from '../lib/comeback';
+import { flashText, nextSetInfo, speechText } from '../lib/announce';
+import { exNoteEntry, exNoteFor } from '../lib/exNotes';
 import { WorkoutDone, type DoneInfo } from './WorkoutDone';
 
 let audio: AudioContext | null = null;
@@ -133,7 +136,7 @@ function elapsedMinutes(startedAt: number): string {
 }
 
 export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Wróć', appointmentId, onRest }: Props) {
-  const { db, apply, toast, ask, sendClientNote, saveHabitDay } = useStore();
+  const { db, apply, toast, ask, sendClientNote, sendClientMessage, saveHabitDay, saveClientEntry } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number; note?: string } | null>(null);
   useEffect(() => {
     onRest?.(rest?.end ?? null);
@@ -165,6 +168,61 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const [sound, setSound] = useState(restSoundOn);
   // ćwiczenia bez ciężaru, przy których ktoś jednak chce wpisać kg
   const [kgOn, setKgOn] = useState<Set<number>>(new Set());
+  // koniec przerwy: pełnoekranowy napis (domyślnie wł.) i zapowiedź głosowa (domyślnie wył.)
+  const [flashOn, setFlashOn] = useState(restFlashOn);
+  const [voice, setVoiceOn] = useState(voiceOn);
+  const [flash, setFlash] = useState<string | null>(null);
+  // „Przerwij, bo boli”: arkusz (indeks ćwiczenia), zgłoszony ból (do podsumowania i zapisu)
+  const [painFor, setPainFor] = useState<number | null>(null);
+  const [painStop, setPainStop] = useState<{ level: number; spots: PainSpot[]; exName: string; exIndex: number; stop: boolean } | null>(null);
+  // notatka podopiecznego do ćwiczenia (indeks ćwiczenia w edycji)
+  const [noteFor, setNoteFor] = useState<number | null>(null);
+
+  // powrót po przerwie: pierwszy trening po ≥ N dniach — podpowiedzi ciężaru niższe o X% (raz na trening, zapamiętane)
+  const cbKey = `fitowa-comeback-${client.id}-${run.startedAt}`;
+  const [cb, setCb] = useState<{ c: Comeback; orig: ComebackOrig; full?: boolean } | null>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(cbKey) || 'null');
+      return v?.c ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const storeCb = (v: typeof cb) => {
+    setCb(v);
+    try {
+      localStorage.setItem(cbKey, JSON.stringify(v ?? { none: true }));
+    } catch {
+      // bez zapamiętania — po odświeżeniu komunikat zniknie, ciężary zostają
+    }
+  };
+  useEffect(() => {
+    if (run.editSessionId || run.ex.some((e) => e.sets.some((x) => x.done))) return;
+    try {
+      if (localStorage.getItem(cbKey)) return; // już sprawdzone dla tego treningu
+    } catch {
+      // brak localStorage — sprawdzamy w pamięci
+    }
+    if (cb) return;
+    const c = comebackFor(sessionsOf(db, client.id), run.date, client.comeback, client.absences);
+    if (!c) {
+      storeCb(null);
+      return;
+    }
+    const r = applyComeback(run, c.pct);
+    if (!Object.keys(r.orig).length) return storeCb(null);
+    setRun(r.run);
+    storeCb({ c, orig: r.orig });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Po końcu przerwy (przy otwartej aplikacji): duży napis z następną serią i zapowiedź głosowa. */
+  const announceNext = () => {
+    const x = nextSetInfo(run, nextSet);
+    if (!x) return;
+    if (flashOn && document.visibilityState === 'visible') setFlash(flashText(x));
+    speak(speechText(x));
+  };
 
   // ekran nie gaśnie w trakcie treningu (zwolnienie po zakończeniu / wyjściu)
   useWakeLock(!doneInfo);
@@ -205,8 +263,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const go = (b: number) => {
     setHintNext(null);
     setNextSet(null);
-    update((r) => void (r.idx = blocks[b][0]));
+    const next = update((r) => void (r.idx = blocks[b][0]));
     window.scrollTo(0, 0);
+    // przejście do ćwiczenia: zapowiedź głosowa pierwszej niezaliczonej serii (gdy włączona)
+    if (voice) {
+      const x = nextSetInfo(next);
+      if (x && blocks[b].includes(x.k)) speak(speechText(x));
+    }
   };
 
   const lastTick = useRef<{ at: number; key: string }>({ at: 0, key: '' });
@@ -325,6 +388,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const [saving, setSaving] = useState(false);
   // id nowego treningu ustalone przy otwarciu podsumowania — ponowiony zapis nadpisuje ten sam trening, nie dubluje
   const newIdRef = useRef<string | null>(null);
+  // id treningu zarezerwowane przy „Przerwij, bo boli” — wiadomość do trenera wskazuje na ten zapis
+  const painSidRef = useRef<string | null>(null);
   const save = async () => {
     if (savingRef.current) return;
     savingRef.current = true;
@@ -393,8 +458,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       exercises: runToExercises(run),
       solo: finish.solo,
       withIds: run.pairWith?.filter((id) => id !== client.id).length ? run.pairWith.filter((id) => id !== client.id) : undefined,
+      // „Przerwij, bo boli” → „Zakończ trening”: zapis częściowy z miejscem i natężeniem bólu
+      stoppedForPain: !trainer && painStop?.stop ? { level: painStop.level, spots: cleanPainMap(painStop.spots).length ? cleanPainMap(painStop.spots) : undefined, exName: painStop.exName, exIndex: painStop.exIndex } : undefined,
     };
-    if (session.exercises.length === 0) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
+    // przerwany z bólu: zapis także bez zaliczonej serii (trener widzi, że trening się zaczął i dlaczego się skończył)
+    if (session.exercises.length === 0 && !session.stoppedForPain) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
     let apptId = finish.solo ? undefined : appointmentId;
     const appt = apptId ? db.appointments.find((a) => a.id === apptId) : undefined;
@@ -422,6 +490,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             records: recordsOf(before).map((p) => ({ name: p.name, text: `${p.hit.reps} × ${fnum(p.hit.load)} kg` })),
             diff: cmp && prev ? { ...cmp, date: prev.date } : null,
             brand: 'Fitowa',
+            stoppedForPain: !!session.stoppedForPain,
           };
         })();
     if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota!'))) return; // trening zostaje — można ponowić zapis
@@ -435,7 +504,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if (match.length) void saveHabitDay(client.id, session.date, [...done, ...match.map((h) => h.id)]);
     }
     // ból ≥5/10 po treningu samodzielnym: trener dostaje informację od razu (z notatką, jeśli jest)
-    const hurt = !trainer && session.pain != null && session.pain >= 5;
+    // ból zgłoszony już w trakcie („Przerwij, bo boli”) — trener dostał wiadomość, bez drugiej
+    const hurt = !trainer && !painStop && session.pain != null && session.pain >= 5;
     if (hurt || (!trainer && session.notes))
       void sendClientNote(
         client.id,
@@ -484,8 +554,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii roboczych. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane.`, { confirm: 'Zakończ' }))) return;
     showFinish();
   };
-  const showFinish = () => {
-    newIdRef.current = null; // nowe podsumowanie = nowy trening
+  const showFinish = (ps = painStop) => {
+    newIdRef.current = painSidRef.current; // nowe podsumowanie = nowy trening (albo zarezerwowany przy zgłoszeniu bólu)
     const charge = defaultCharge(client, sessionsOf(db, client.id));
     if (editing) {
       setFinish({
@@ -508,7 +578,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     setSrpeHint(fromRpe != null ? String(fromRpe) : null);
     setFinish({
       srpe: !trainer && fromRpe != null ? String(fromRpe) : '',
-      pain: '',
+      // ból zgłoszony w trakcie („Przerwij, bo boli”) — od razu w podsumowaniu
+      pain: ps ? String(ps.level) : '',
       // bieg wpisany po fakcie: czas z odcinków (suma wpisanych minut)
       duration: elapsedMinutes(run.startedAt) || (() => {
         const m = run.ex.filter((e) => e.cardio).reduce((a, e) => a + e.sets.filter((x) => x.done).reduce((b, x) => b + (parseDur(x.reps) ?? 0), 0), 0);
@@ -522,7 +593,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
       // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem
       solo,
-      painMap: [],
+      painMap: ps ? ps.spots : [],
     });
   };
 
@@ -778,6 +849,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       return i >= 0 ? i : e.sets.length - 1;
     })();
     const kind = [e.cardio && 'cardio', e.timed && 'na czas', e.perSide && 'na każdą stronę'].filter(Boolean).join(' · ');
+    const note = exNoteFor(client.exNotes, e.name);
     return (
       <div key={`h${k}`} className="run-ex-head">
         <div className="between">
@@ -785,6 +857,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
           </h2>
           <span className="ex-head-side">
+            {!trainer && (
+              <button type="button" className={`icon-btn exnote-btn ${note ? 'has-note' : ''}`} aria-label={`${note ? 'Twoja notatka' : 'Dodaj notatkę'}: ${e.name}`} title="Twoja notatka do ćwiczenia (np. ustawienie maszyny)" onClick={() => setNoteFor(k)}>
+                <Icon name="edit" size={16} />
+              </button>
+            )}
             {e.video && (
               <a className="small" href={e.video} target="_blank" rel="noreferrer">
                 ▶ Wideo
@@ -793,6 +870,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />}
           </span>
         </div>
+        {note && (
+          <p className="exnote-text">
+            {trainer && <span className="exnote-who">Notatka podopiecznego: </span>}
+            {note.text}
+          </p>
+        )}
         <div className="ex-tools">
           {bare && camAt >= 0 && !e.cardio && (
             <span className="ex-cam">
@@ -969,6 +1052,41 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     );
   };
 
+  /** „Przerwij, bo boli”: wiadomość do trenera od razu; potem zakończenie (zapis częściowy) albo pominięcie ćwiczenia. */
+  const reportPain = (k: number, level: number, spots: PainSpot[], stop: boolean) => {
+    const e = run.ex[k];
+    if (!e) return;
+    const clean = cleanPainMap(spots);
+    const ps = { level, spots: clean, exName: e.name, exIndex: k, stop };
+    setPainStop(ps);
+    setPainFor(null);
+    if (!run.editSessionId) painSidRef.current ??= uid();
+    const sid = run.editSessionId ?? painSidRef.current ?? undefined;
+    const where = painSummary(clean);
+    void sendClientMessage(client.id, `Ból ${level}/10${where ? ` (${where})` : ''} przy „${e.name}” — ${stop ? 'przerywam trening' : 'pomijam to ćwiczenie i ćwiczę dalej'}.`, {
+      sessionId: sid,
+      ref: { sessionId: sid, exIndex: k, exName: e.name, workout: run.name, date: run.date },
+    });
+    if (stop) {
+      setRest(null);
+      setHold(null);
+      showFinish(ps);
+      return;
+    }
+    // pomiń: dalej od następnego bloku z niezaliczonymi seriami
+    const kb = blocks.findIndex((b) => b.includes(k));
+    const nb = blocks.findIndex((b, j) => j > kb && b.some((x) => run.ex[x].sets.some((st) => !st.done)));
+    if (nb >= 0) go(nb);
+    else toast('To było ostatnie ćwiczenie — zakończ trening, kiedy chcesz.');
+  };
+  /** Powrót z podsumowania do ćwiczeń: przerwanie z bólu staje się zwykłym zgłoszeniem (trening trwa dalej). */
+  const closeFinish = () => {
+    setFinish(null);
+    if (painStop?.stop) setPainStop({ ...painStop, stop: false });
+  };
+  /** Ćwiczenie, którego dotyczy zgłoszenie bólu: pierwsze z niezaliczoną serią w bieżącym bloku. */
+  const painDefault = () => block.find((k) => run.ex[k].sets.some((x) => !x.done)) ?? block[0] ?? 0;
+
   if (doneInfo)
     return (
       <div className="player">
@@ -1025,6 +1143,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         <p className="muted small">
           {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
+        {cb && !cb.full && !editing && (
+          <div className="comeback-bar" role="status">
+            <Icon name="alert" size={18} />
+            <span className="comeback-text">{comebackText(cb.c)}</span>
+            <button
+              type="button"
+              className="link small comeback-full"
+              onClick={() => {
+                setRun(restoreFull(run, cb.orig));
+                storeCb({ ...cb, full: true });
+                toast('Pełne ciężary z planu.');
+              }}
+            >
+              Użyj pełnych ciężarów
+            </button>
+          </div>
+        )}
         {!trainer && doneSets === 0 && <p className="muted small rpe-legend">{run.ex.every((x) => x.cardio) ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.' : run.ex.some((x) => x.cardio) ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.' : 'Wpisz wynik, potem ✓. „ostatnio” pod serią wpisuje wynik z poprzedniego razu. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'}</p>}
       </header>
       <div className="segs">
@@ -1059,6 +1194,11 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </button>
             )}
           </div>
+          {!trainer && (
+            <button type="button" className="link small pain-stop-link" onClick={() => setPainFor(painDefault())}>
+              Przerwij, bo boli
+            </button>
+          )}
         </section>
       )}
 
@@ -1160,6 +1300,52 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </span>
               <span className="more-switch-state">{sound ? 'wł.' : 'wył.'}</span>
             </button>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={flashOn}
+              className={`more-switch ${flashOn ? 'on' : ''}`}
+              onClick={() => {
+                setRestFlash(!flashOn);
+                setFlashOn(!flashOn);
+              }}
+            >
+              <span>
+                <b>Koniec przerwy na cały ekran</b>
+                <span className="muted small">Błysk i duży napis z następną serią, gdy aplikacja jest otwarta.</span>
+              </span>
+              <span className="more-switch-state">{flashOn ? 'wł.' : 'wył.'}</span>
+            </button>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={voice}
+              className={`more-switch ${voice ? 'on' : ''}`}
+              onClick={() => {
+                const on = !voice;
+                setVoice(on);
+                setVoiceOn(on);
+                if (on && !speak('Zapowiedzi głosowe włączone', true)) toast('Ta przeglądarka nie ma syntezy mowy — zapowiedzi nie zabrzmią.');
+              }}
+            >
+              <span>
+                <b>Zapowiedzi głosowe</b>
+                <span className="muted small">{canSpeak() ? '„Następna seria: przysiad, 60 kilogramów, 8 powtórzeń” — po przerwie i przy zmianie ćwiczenia.' : 'Ta przeglądarka nie ma syntezy mowy.'}</span>
+              </span>
+              <span className="more-switch-state">{voice ? 'wł.' : 'wył.'}</span>
+            </button>
+            {!trainer && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-block pain-stop-btn"
+                onClick={() => {
+                  setMoreOpen(false);
+                  setPainFor(painDefault());
+                }}
+              >
+                Przerwij, bo boli
+              </button>
+            )}
             {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} label="Komentarz do treningu" />}
           </div>
           <button type="button" className="btn btn-ghost btn-block" onClick={() => setMoreOpen(false)}>
@@ -1167,7 +1353,27 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </button>
         </Sheet>
       )}
-      {rest && !hold && <RestBar rest={rest} setRest={setRest} note={rest.note} />}
+      {rest && !hold && <RestBar rest={rest} setRest={setRest} note={rest.note} onFinished={announceNext} />}
+      {flash && <RestFlash text={flash} onClose={() => setFlash(null)} />}
+      {painFor != null && run.ex[painFor] && (
+        <PainStopSheet
+          run={run}
+          initial={painFor}
+          onClose={() => setPainFor(null)}
+          onStop={(k, level, spots) => reportPain(k, level, spots, true)}
+          onSkip={(k, level, spots) => reportPain(k, level, spots, false)}
+        />
+      )}
+      {noteFor != null && run.ex[noteFor] && (
+        <ExNoteSheet
+          name={run.ex[noteFor].name}
+          text={exNoteFor(client.exNotes, run.ex[noteFor].name)?.text ?? ''}
+          onClose={() => setNoteFor(null)}
+          onSave={async (text) => {
+            if (await saveClientEntry(client.id, 'exNotes', exNoteEntry(run.ex[noteFor].name, text), text.trim() ? 'Notatka zapisana.' : 'Notatka usunięta.')) setNoteFor(null);
+          }}
+        />
+      )}
       {hold && (
         <RestBar
           rest={hold}
@@ -1198,8 +1404,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       {tempoOpen && tempoEx?.tempo && <Tempo name={tempoEx.name} phases={tempoEx.tempo} reps={repsN(tempoEx.sets.find((s) => !s.done)?.reps) || 5} onClose={() => setTempoOpen(false)} />}
 
       {finish && (
-        <Sheet label="Podsumowanie treningu" onClose={() => setFinish(null)}>
+        <Sheet label="Podsumowanie treningu" onClose={closeFinish}>
             <h2>Podsumowanie</h2>
+            {painStop?.stop && !editing && (
+              <p className="pain-stop-note small" role="note">
+                Trening przerwany z powodu bólu — trener dostał informację. Zrobione serie zostaną zapisane.
+              </p>
+            )}
             {(() => {
               const prs = sessionRecords(
                 history(),
@@ -1301,7 +1512,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <button className="btn btn-primary btn-lg btn-block" onClick={save} disabled={saving} aria-busy={saving}>
               {saving ? 'Zapisywanie…' : editing ? 'Zapisz zmiany' : 'Zapisz trening'}
             </button>
-            <button className="btn btn-ghost btn-block" onClick={() => setFinish(null)}>
+            <button className="btn btn-ghost btn-block" onClick={closeFinish}>
               Wróć do ćwiczeń
             </button>
           </Sheet>
@@ -1353,6 +1564,7 @@ function RestBar({
   endText = 'Koniec przerwy – następna seria!',
   note,
   onEnd,
+  onFinished,
 }: {
   rest: { end: number; total: number };
   setRest: (r: { end: number; total: number; note?: string } | null) => void;
@@ -1362,6 +1574,8 @@ function RestBar({
   note?: string;
   /** Zamiast domyślnego końca (sygnał + komunikat + zamknięcie) — np. zmiana strony. */
   onEnd?: () => void;
+  /** Po domyślnym końcu przerwy (np. pełnoekranowy napis i zapowiedź głosowa następnej serii). */
+  onFinished?: () => void;
 }) {
   const fired = useRef(0);
   const { toast } = useStore();
@@ -1380,6 +1594,8 @@ function RestBar({
     if (!restAudioPlaying()) beep(880, 0.25);
     toast(endText);
     setRest(null);
+    onFinished?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, rest.end, setRest, toast, endText, onEnd]);
   return (
     <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
@@ -1774,5 +1990,144 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
           </button>
         )}
       </Sheet>
+  );
+}
+
+/**
+ * Koniec przerwy na cały ekran: 2–3 mignięcia odwróconych kolorów i duży napis z następną serią
+ * przez 2 s albo do stuknięcia. Przy „ogranicz ruch” — statyczny baner bez migania (CSS).
+ */
+function RestFlash({ text, onClose }: { text: string; onClose: () => void }) {
+  useEffect(() => {
+    const t = window.setTimeout(onClose, 2000);
+    return () => clearTimeout(t);
+  }, [text, onClose]);
+  return (
+    <div className="rest-flash" role="alert" onPointerDown={onClose} onKeyDown={onClose}>
+      <span className="rest-flash-eyebrow">Koniec przerwy</span>
+      <strong className="rest-flash-text">{text}</strong>
+      <span className="rest-flash-hint">stuknij, żeby zamknąć</span>
+    </div>
+  );
+}
+
+/** „Przerwij, bo boli”: które ćwiczenie, natężenie 0–10, mapa bólu; zakończ trening albo pomiń ćwiczenie. */
+function PainStopSheet({
+  run,
+  initial,
+  onClose,
+  onStop,
+  onSkip,
+}: {
+  run: Run;
+  initial: number;
+  onClose: () => void;
+  onStop: (k: number, level: number, spots: PainSpot[]) => void;
+  onSkip: (k: number, level: number, spots: PainSpot[]) => void;
+}) {
+  const [k, setK] = useState(initial);
+  const [level, setLevel] = useState<number | null>(null);
+  const [spots, setSpots] = useState<PainSpot[]>([]);
+  const ready = level != null && level > 0;
+  return (
+    <Sheet label="Przerwij, bo boli" onClose={onClose}>
+      <div className="between sheet-top">
+        <h2>Co boli?</h2>
+        <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      </div>
+      <p className="muted small">Trener dostanie wiadomość od razu. Zrobione serie zostają — to nie porażka, tylko rozsądek.</p>
+      {run.ex.length > 1 && (
+        <label className="field">
+          <span>Przy którym ćwiczeniu?</span>
+          <select className="input" value={k} onChange={(ev) => setK(Number(ev.target.value))}>
+            {run.ex.map((e, i) => (
+              <option key={i} value={i}>
+                {e.label ? `${e.label} · ` : ''}
+                {e.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="scale-h">
+        <span>Jak mocno boli?</span>
+        <span className="muted small">0 = brak · 10 = bardzo silny</span>
+      </div>
+      <div className="scale scale-11 scale-fit" role="radiogroup" aria-label="Natężenie bólu">
+        {Array.from({ length: 11 }, (_, v) => (
+          <button key={v} type="button" role="radio" aria-checked={level === v} className={level === v ? 'active' : ''} onClick={() => setLevel(v)}>
+            {v}
+          </button>
+        ))}
+      </div>
+      <div className="field pain-where">
+        <span>Gdzie boli?</span>
+        <PainMap spots={spots} onChange={setSpots} />
+      </div>
+      {!ready && <p className="muted small">Zaznacz, jak mocno boli (1–10).</p>}
+      <div className="pain-stop-actions">
+        <button type="button" className="btn btn-primary btn-lg btn-block pain-stop-end" disabled={!ready} onClick={() => ready && onStop(k, level!, spots)}>
+          Zakończ trening
+          <small>zrobione serie zostaną zapisane</small>
+        </button>
+        <button type="button" className="btn btn-secondary btn-block pain-stop-skip" disabled={!ready} onClick={() => ready && onSkip(k, level!, spots)}>
+          Pomiń to ćwiczenie i kontynuuj
+        </button>
+        <button type="button" className="btn btn-ghost btn-block" onClick={onClose}>
+          Wróć do treningu
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Prywatna notatka do ćwiczenia (wraca przy każdym treningu z tym ćwiczeniem; trener też ją widzi). */
+function ExNoteSheet({ name, text: initial, onClose, onSave }: { name: string; text: string; onClose: () => void; onSave: (text: string) => Promise<void> }) {
+  const [text, setText] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Sheet label="Notatka do ćwiczenia" onClose={onClose}>
+      <div className="between sheet-top">
+        <h2>Twoja notatka</h2>
+        <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      </div>
+      <p className="muted small">
+        {name} — np. „siedzisko na 4”, „lewy kabel”. Pokaże się przy każdym treningu z tym ćwiczeniem. Trener też ją widzi.
+      </p>
+      <label className="field">
+        <span>Notatka</span>
+        <textarea className="input" rows={3} maxLength={300} value={text} placeholder="Ustawienie maszyny, chwyt, na co uważać…" onChange={(ev) => setText(ev.target.value)} autoFocus />
+      </label>
+      <button
+        type="button"
+        className="btn btn-primary btn-block"
+        disabled={busy || text.trim() === initial.trim()}
+        onClick={async () => {
+          setBusy(true);
+          await onSave(text);
+          setBusy(false);
+        }}
+      >
+        {busy ? 'Zapisuję…' : 'Zapisz notatkę'}
+      </button>
+      {initial.trim() && (
+        <button
+          type="button"
+          className="btn btn-ghost btn-block"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onSave('');
+            setBusy(false);
+          }}
+        >
+          Usuń notatkę
+        </button>
+      )}
+    </Sheet>
   );
 }

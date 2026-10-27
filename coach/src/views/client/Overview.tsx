@@ -16,6 +16,7 @@ import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { APPT_STATUS } from '../CalendarView';
 import { BILLING_LABEL } from '../../components/location';
+import { OnboardingChecklist } from '../../components/Onboarding';
 
 
 export function ClientOverview({ client }: { client: Client }) {
@@ -37,6 +38,7 @@ export function ClientOverview({ client }: { client: Client }) {
 
   return (
     <>
+      <OnboardingChecklist client={client} />
       {(() => {
         const h = trainerNotesOf(db.trainer_notes, client.id).health;
         const txt = [h?.contraindications, h?.restrictions].filter(Boolean).join(' · ');

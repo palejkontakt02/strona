@@ -1,0 +1,253 @@
+/* Nowy podopieczny krok po kroku: checklista „Pierwsze kroki”, zaproszenie do aplikacji, znacznik konta. */
+
+/* ---------- checklista ---------- */
+.onb {
+  margin-bottom: var(--space-6);
+}
+.onb-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.onb-head h4 {
+  margin: 0;
+}
+.onb-head p {
+  margin: 2px 0 0;
+}
+.onb-bar {
+  height: 4px;
+  margin: var(--space-4) 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+.onb-bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-ok);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+.onb-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.onb-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.onb-step:first-child {
+  border-top: 0;
+}
+.onb-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-divider);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-neutral-400);
+}
+.onb-step.is-next .onb-mark {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+.onb-step.is-done .onb-mark {
+  border-color: var(--color-ok);
+  background: var(--color-ok);
+  color: var(--on-ok);
+}
+.onb-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.onb-text strong {
+  font-weight: 600;
+}
+.onb-text .small {
+  overflow-wrap: anywhere;
+}
+.onb-step.is-done .onb-text strong {
+  color: var(--color-neutral-400);
+  font-weight: 500;
+}
+.onb-step .btn {
+  white-space: nowrap;
+}
+.onb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (min-width: 900px) {
+  .onb-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-8);
+  }
+  .onb-step:nth-child(2) {
+    border-top: 0;
+  }
+}
+@media (max-width: 600px) {
+  .onb-step .btn {
+    min-height: 44px;
+  }
+}
+
+/* ---------- karta konta w Profilu ---------- */
+.account-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.invite-tag {
+  display: inline-flex;
+}
+.invite-tag .tag {
+  white-space: nowrap;
+}
+
+/* ---------- okno zaproszenia ---------- */
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.invite-who {
+  margin: 0;
+}
+.invite-warn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-warn) 55%, transparent);
+  background: color-mix(in srgb, var(--color-warn) 10%, transparent);
+}
+.invite-warn p {
+  margin: 0;
+}
+.invite-warn svg {
+  color: var(--color-warn);
+}
+.invite-email-row {
+  display: flex;
+  gap: var(--space-3);
+}
+.invite-email-row .input {
+  flex: 1;
+  min-width: 0;
+}
+.invite-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.invite-link p {
+  margin: 0;
+}
+.invite-url {
+  display: block;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.invite-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.invite-actions .btn {
+  justify-content: center;
+  min-height: 44px;
+  text-decoration: none;
+}
+@media (min-width: 700px) {
+  .invite-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.invite-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+.invite-qr p {
+  margin: 0;
+}
+/* QR zawsze ciemne moduły na jasnym tle (skanery nie czytają odwróconych kodów) */
+.qr-svg {
+  width: min(240px, 70vw);
+  height: auto;
+  border-radius: var(--radius-md);
+}
+.qr-bg {
+  fill: var(--color-surface);
+}
+.qr-fg {
+  fill: var(--color-text);
+}
+:root[data-palette='mono'] .qr-bg,
+:root[data-palette='morski'] .qr-bg,
+:root[data-palette='kobalt'] .qr-bg,
+:root[data-palette='fiolet'] .qr-bg,
+:root[data-palette='grafit'] .qr-bg {
+  fill: var(--color-text);
+}
+:root[data-palette='mono'] .qr-fg,
+:root[data-palette='morski'] .qr-fg,
+:root[data-palette='kobalt'] .qr-fg,
+:root[data-palette='fiolet'] .qr-fg,
+:root[data-palette='grafit'] .qr-fg {
+  fill: var(--color-bg);
+}
+.invite-preview summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+.invite-preview pre {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ekran logowania z linku zaproszenia */
+.auth-invite strong {
+  overflow-wrap: anywhere;
+}

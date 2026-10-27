@@ -233,7 +233,7 @@ export function ClientInbox({ client }: { client: Client }) {
         </>
       }
     >
-      <Chat client={client} side="coach" onOpenSession={(sessionId) => openModal({ kind: 'review', sessionId })} />
+      <Chat client={client} side="coach" onOpenSession={(sessionId, exIndex) => openModal({ kind: 'review', sessionId, exIndex })} />
     </Card>
   );
 }

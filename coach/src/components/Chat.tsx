@@ -285,7 +285,7 @@ export function useSendMessage(client: Client, asCoach: boolean) {
  * - `side="coach"` — panel trenera: odpowiedź zapisuje się w `replies`, wiadomości podopiecznego oznacza jako przeczytane.
  * - `full` — rozmowa na całą wysokość (zakładka „Trener”): przewija się strona, pole wpisywania przyklejone na dole.
  */
-export function Chat({ client, side, asTrainer, onOpenSession, full }: { client: Client; side: 'client' | 'coach'; asTrainer?: boolean; onOpenSession?: (sessionId: string) => void; full?: boolean }) {
+export function Chat({ client, side, asTrainer, onOpenSession, full }: { client: Client; side: 'client' | 'coach'; asTrainer?: boolean; onOpenSession?: (sessionId: string, exIndex?: number) => void; full?: boolean }) {
   const { db, apply, ask, toast } = useStore();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -370,13 +370,13 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
     return () => io.disconnect();
   }, [client.id, lastAt, coachView, asTrainer]);
 
-  // pole rośnie z tekstem (do ok. 6 linii)
+  // pole rośnie z tekstem (do ok. 5 linii, dalej przewija się w środku)
   useLayoutEffect(() => {
     const el = areaRef.current;
-    if (!el || !full) return;
+    if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(160, el.scrollHeight + 2)}px`;
-  }, [text, full]);
+    el.style.height = `${Math.min(140, el.scrollHeight + 2)}px`;
+  }, [text, full, voice.state]);
 
   const readAll = () => (client.inbox ?? []).map((n) => ({ ...n, read: true }));
   const submit = async () => {
@@ -406,8 +406,8 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
     );
     if (ok && fromCoach) m.media?.forEach((x) => void deleteChatMedia(x));
   };
-  const openSession = (id: string) => {
-    if (onOpenSession) return onOpenSession(id);
+  const openSession = (id: string, exIndex?: number) => {
+    if (onOpenSession) return onOpenSession(id, exIndex);
     const s = db.sessions.find((x) => x.id === id);
     if (s) setShown(s);
   };
@@ -468,7 +468,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
                     <div className={`chat-row ${mine(m.from) ? 'me' : 'them'} ${m.from === 'client' && !m.read && coachView ? 'unread' : ''}`}>
                       <div className={`chat-bubble${m.media?.length ? ' has-media' : ''}`}>
                         <span className="sr-only">{who(m.from)}: </span>
-                        {m.ref && <RefTag r={m.ref} onOpen={refSession ? () => openSession(refSession.id) : undefined} />}
+                        {m.ref && <RefTag r={m.ref} onOpen={refSession ? () => openSession(refSession.id, m.ref?.exIndex) : undefined} />}
                         {target && !m.ref && <span className="chat-ref">Odpowiedź na: {target.textAuto ? mediaLabel(target.media?.[0]?.kind ?? 'image').toLowerCase() : `„${target.text.slice(0, 40)}${target.text.length > 40 ? '…' : ''}”`}</span>}
                         {m.media?.map((x, i) => (
                           <MediaItem key={i} m={x} videoRef={x.kind === 'video' ? (el) => (el ? videos.current.set(m.id, el) : videos.current.delete(m.id)) : undefined} />
@@ -480,6 +480,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
                           </button>
                         )}
                         <time className="chat-time" dateTime={m.at}>
+                          {coachView && m.auto && <span className="chat-auto" title="Wysłana automatycznie — reguła z Ustawień">automatyczna · </span>}
                           {time(m.at)}
                         </time>
                       </div>
@@ -537,13 +538,13 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
             </button>
           </div>
         ) : (
-          <div className="chat-compose-row">
-            <button type="button" className="chat-tool" aria-label="Dodaj zdjęcie lub film" title="Zdjęcie lub film" onClick={attach.open} disabled={busy}>
+          <div className={`chat-compose-row${coachView ? ' chat-compose-stack' : ''}`}>
+            <button type="button" className="chat-tool chat-clip" aria-label="Dodaj zdjęcie lub film" title="Zdjęcie lub film" onClick={attach.open} disabled={busy}>
               <Icon name="clip" size={20} />
             </button>
             <textarea
               ref={areaRef}
-              className="input"
+              className="input chat-input"
               rows={full ? 1 : 2}
               maxLength={2000}
               value={text}
@@ -562,7 +563,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
                 <Icon name="mic" size={20} />
               </button>
             )}
-            <button type="submit" className="btn btn-primary" disabled={(!text.trim() && !draft) || busy}>
+            <button type="submit" className="btn btn-primary chat-send" disabled={(!text.trim() && !draft) || busy}>
               {busy ? 'Wysyłam…' : coachView ? 'Wyślij odpowiedź' : 'Wyślij'}
             </button>
           </div>

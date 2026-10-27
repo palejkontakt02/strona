@@ -182,3 +182,75 @@ function clearMedia() {
     // nic
   }
 }
+
+/* ---------- koniec przerwy na cały ekran i zapowiedzi głosowe ---------- */
+
+const FLASH_KEY = 'fitowa-rest-flash';
+const VOICE_KEY = 'fitowa-voice';
+
+function readFlag(key: string, def: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v == null ? def : v === '1';
+  } catch {
+    return def;
+  }
+}
+function writeFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0');
+  } catch {
+    // bez zapamiętania
+  }
+}
+
+/** Pełnoekranowy sygnał końca przerwy — domyślnie włączony. */
+export const restFlashOn = () => readFlag(FLASH_KEY, true);
+export const setRestFlash = (on: boolean) => writeFlag(FLASH_KEY, on);
+
+/** Zapowiedzi głosowe („Następna seria: …”) — domyślnie wyłączone. */
+export const voiceOn = () => readFlag(VOICE_KEY, false);
+export function setVoice(on: boolean) {
+  writeFlag(VOICE_KEY, on);
+  if (!on) {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      // nic
+    }
+  }
+}
+
+/** Czy przeglądarka w ogóle ma syntezę mowy. */
+export const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+
+/** Polski głos, jeśli jest (lista głosów bywa pusta przy pierwszym wywołaniu). */
+function plVoice(): SpeechSynthesisVoice | undefined {
+  try {
+    return window.speechSynthesis.getVoices().find((v) => /^pl(-|_|$)/i.test(v.lang));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Mówi tekst po polsku (pl-PL), gdy zapowiedzi są włączone. Bez polskiego głosu — język pl-PL i domyślny głos
+ * systemu; brak API albo błąd — po cichu nic. Poprzednia zapowiedź jest przerywana.
+ */
+export function speak(text: string, force = false): boolean {
+  if ((!force && !voiceOn()) || !canSpeak() || !text.trim()) return false;
+  try {
+    const s = window.speechSynthesis;
+    s.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'pl-PL';
+    const v = plVoice();
+    if (v) u.voice = v;
+    u.rate = 1;
+    u.onerror = () => undefined;
+    s.speak(u);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -20,6 +20,18 @@ import { ClientMonitoring } from './client/Monitoring';
 import { ClientMeasurements } from './client/Measurements';
 import { ClientPayments } from './client/Payments';
 import { ClientProfile } from './client/Profile';
+import { OverviewTable } from './OverviewTable';
+
+const MODES = ['Lista', 'Tabela'] as const;
+type Mode = (typeof MODES)[number];
+const MODE_KEY = 'fitowa-clients-mode';
+function readMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'Tabela' ? 'Tabela' : 'Lista';
+  } catch {
+    return 'Lista';
+  }
+}
 
 export const STATUS_TONE: Record<ClientStatus, Tone> = { aktywny: 'accent', pauza: 'neutral', zakończony: 'muted' };
 const STATUS_LABEL: Record<ClientStatus, string> = { aktywny: 'Aktywny', pauza: 'Pauza', zakończony: 'Zakończony' };
@@ -36,6 +48,16 @@ export function ClientsView() {
   const { clientId, openClient, closeClient, clientTab, setClientTab, openModal, startAthlete, startLive } = useNav();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Aktywni');
+  // telefon: lista kart albo tabela wszystkich (na komputerze tabela jest w prawym panelu)
+  const [mode, setModeState] = useState<Mode>(readMode);
+  const setMode = (m: Mode) => {
+    setModeState(m);
+    try {
+      localStorage.setItem(MODE_KEY, m);
+    } catch {
+      /* bez localStorage — tylko w tej karcie */
+    }
+  };
   const today = todayISO();
 
   const q = normalize(query.trim());
@@ -48,7 +70,10 @@ export function ClientsView() {
 
   return (
     <div className={`master-detail ${selected ? 'show-detail' : ''}`}>
-      <aside className="sidebar">
+      <aside className={`sidebar${mode === 'Tabela' ? ' sidebar-table' : ''}`}>
+        <div className="cl-mode">
+          <Seg options={MODES} value={mode} onChange={setMode} label="Widok podopiecznych" />
+        </div>
         <input className="input" type="search" placeholder="Szukaj: imię, cel, uraz, miejsce…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="sidebar-row">
           <Seg options={FILTERS} value={filter} onChange={setFilter} label="Filtr" />
@@ -111,6 +136,11 @@ export function ClientsView() {
           })}
           {list.length === 0 && <li className="empty">Brak wyników.</li>}
         </ul>
+        {mode === 'Tabela' && !selected && (
+          <div className="cl-table-mobile">
+            <OverviewTable compact />
+          </div>
+        )}
       </aside>
 
       <section className="detail-pane">
@@ -172,7 +202,9 @@ export function ClientsView() {
             </div>
           </div>
         ) : (
-          <p className="empty">Wybierz podopiecznego z listy.</p>
+          <div className="cl-overview">
+            <OverviewTable />
+          </div>
         )}
       </section>
     </div>

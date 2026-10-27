@@ -30,7 +30,7 @@ interface StoreValue {
   addMeasurement: (clientId: string, m: Measurement) => Promise<boolean>;
   saveIntake: (clientId: string, intake: Intake) => Promise<boolean>;
   /** Wpis podopiecznego: raport tygodniowy, zdjęcie sylwetki albo dzień makro / kroków. */
-  saveClientEntry: (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry, okMessage?: string) => Promise<boolean>;
+  saveClientEntry: (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry | import('../domain').Absence | import('../domain').ExNote, okMessage?: string) => Promise<boolean>;
   saveHabitDay: (clientId: string, date: string, done: string[]) => Promise<void>;
   sendClientNote: (clientId: string, text: string, sessionId?: string) => Promise<boolean>;
   /** Wiadomość z kontekstem treningu / ćwiczenia i załącznikami (zdjęcie, wideo, głos). */
@@ -239,7 +239,7 @@ export function StoreProvider({
   );
 
   const saveClientEntry = useCallback(
-    async (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry, okMessage?: string) => {
+    async (clientId: string, kind: ClientEntryKind, entry: WeeklyReport | ProgressPhoto | DayLog | import('../domain').ConsentEntry | import('../domain').Absence | import('../domain').ExNote, okMessage?: string) => {
       const prev = db?.clients.find((c) => c.id === clientId)?.[kind];
       const upd = (list: unknown) => withEntry((list ?? []) as { id?: string; date?: string }[], entry as { id?: string; date?: string });
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: upd(c[kind]) } : c)) } : cur));
@@ -250,7 +250,7 @@ export function StoreProvider({
       } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: prev } : c)) } : cur));
         const m = (e as Error).message;
-        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : kind === 'consents' ? '24' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : kind === 'consents' ? '24' : kind === 'absences' || kind === 'exNotes' ? '26' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },

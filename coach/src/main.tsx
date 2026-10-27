@@ -14,6 +14,8 @@ import './styles/rodo.css';
 import './styles/progress.css';
 import './styles/player.css';
 import './styles/kontakt.css';
+import './styles/inbox.css';
+import './styles/onboarding.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

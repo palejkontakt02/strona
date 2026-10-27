@@ -469,3 +469,192 @@ button.chat-ref {
 /* kalendarz trenera: odpowiedź podopiecznego na wizytę */
 .tile-status.reply-ok { color: var(--color-ok); font-weight: 600; }
 .tile-status.reply-warn { color: var(--color-warn); font-weight: 600; }
+
+/* =========================================================
+   Runda 4 — poprawki panelu trenera
+   ========================================================= */
+
+/* --- rozmowa u trenera: pole na całą szerokość, narzędzia i „Wyślij” pod nim --- */
+.chat-compose-row.chat-compose-stack {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'txt txt txt txt'
+    'clip mic . send';
+  align-items: center;
+}
+.chat-compose-stack .chat-input {
+  grid-area: txt;
+  width: 100%;
+}
+.chat-compose-stack .chat-clip {
+  grid-area: clip;
+}
+.chat-compose-stack .chat-mic {
+  grid-area: mic;
+}
+.chat-compose-stack .chat-send {
+  grid-area: send;
+}
+/* pole rośnie z tekstem do ok. 5 linii, dalej przewija się w środku */
+.chat-compose-row .chat-input {
+  max-height: 140px;
+  overflow-y: auto;
+  line-height: 1.45;
+}
+
+/* --- podgląd treningu z komentarza (ReviewModal) --- */
+.rv-head h2 {
+  margin: 2px 0 4px;
+}
+.rv-head {
+  margin-bottom: var(--space-4);
+}
+.rv-exs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+.rv-ex {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid transparent;
+}
+.rv-ex.rv-hl {
+  background: var(--color-surface);
+  border: 2px solid var(--color-text);
+}
+.rv-ex-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.rv-hl-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.rv-sets {
+  width: 100%;
+  max-width: 420px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.rv-sets th {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-neutral-400);
+  text-align: left;
+  padding: 2px var(--space-2) 4px 0;
+}
+.rv-sets td {
+  padding: 3px var(--space-2) 3px 0;
+  border-top: 1px solid var(--color-divider);
+  font-size: 15px;
+}
+.rv-sets td.num {
+  font-family: var(--font-display);
+  font-size: 17px;
+  white-space: nowrap;
+}
+.rv-sets td.num svg {
+  margin-left: 6px;
+  vertical-align: -1px;
+  color: var(--color-neutral-400);
+}
+.rv-sets tr.rv-warm td {
+  color: var(--color-neutral-400);
+}
+.rv-sum {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rv-cardio {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.modal .ref-thread {
+  margin-top: var(--space-2);
+}
+
+/* --- zapis treningu: skala 0–10 (sRPE, ból), „+ seria”, podsumowanie ćwiczenia --- */
+.scale.scale-form {
+  flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+  .scale.scale-form {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .scale.scale-form button {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+  }
+}
+@media (min-width: 901px) {
+  .scale.scale-form button {
+    flex: 1 0 36px;
+    height: 36px;
+  }
+}
+.set-edit .set-add {
+  white-space: nowrap;
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--space-2) 0 0;
+}
+.set-edit .set-add-hint {
+  text-align: right;
+  min-width: 0;
+}
+.ex-row > .ex-derived {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 600px) {
+  .ex-row > .ex-derived {
+    display: none;
+  }
+}
+
+/* --- pasek „Trening na żywo” i „W toku”: neutralny (zieleń tylko jako potwierdzenie) --- */
+.ath-preview.live-bar {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-divider);
+}
+.live-banner button,
+.live-banner button.live-sub {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text);
+}
+.live-banner button.live-sub {
+  background: var(--color-surface-2);
+}
+.live-banner .live-label {
+  color: var(--color-neutral-400);
+}
+.live-banner .live-go {
+  background: var(--color-accent);
+  color: var(--on-accent);
+}
+.live-dot {
+  background: var(--color-text);
+}

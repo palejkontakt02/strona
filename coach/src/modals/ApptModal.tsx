@@ -9,6 +9,7 @@ import { useStore } from '../data/store';
 import { fmtShort, fmtWeekday, plural, uid } from '../format';
 import { clashes, weeklyDates } from '../lib/calendar';
 import { addDays, todayISO } from '../lib/dates';
+import { suggestSlot } from '../lib/apptSuggest';
 import { num, numIn } from '../lib/parse';
 import { useNav, type ModalState } from '../nav';
 import { APPT_STATUS } from '../views/CalendarView';
@@ -21,8 +22,22 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const editing = m.appt;
   const [clientId, setClientId] = useState(editing?.clientId ?? m.clientId ?? '');
   const [date, setDate] = useState(editing?.date ?? m.date ?? todayISO());
-  const [time, setTime] = useState(editing?.time ?? m.time ?? '17:00');
-  const [duration, setDuration] = useState(String(editing?.duration ?? 60));
+  // nowa wizyta bez wskazanej godziny: zwyczaj klienta albo pierwsza wolna pełna godzina (7–20) — dopóki trener jej nie zmieni
+  const autoSlot = !editing && !m.time;
+  const slotTouched = useRef(false);
+  const slotFor = (cid: string, d: string) => {
+    const now = new Date();
+    return suggestSlot(db.appointments, cid, d, d === todayISO() ? now.getHours() * 60 + now.getMinutes() : undefined);
+  };
+  const [initialSlot] = useState(() => (autoSlot ? slotFor(m.clientId ?? '', m.date ?? todayISO()) : null));
+  const [time, setTime] = useState(editing?.time ?? m.time ?? initialSlot?.time ?? '17:00');
+  const [duration, setDuration] = useState(String(editing?.duration ?? initialSlot?.duration ?? 60));
+  const resuggest = (cid: string, d: string) => {
+    if (!autoSlot || slotTouched.current) return;
+    const sl = slotFor(cid, d);
+    setTime(sl.time);
+    setDuration(String(sl.duration));
+  };
   const [locationId, setLocationId] = useState(editing?.locationId ?? clientById(db, editing?.clientId ?? m.clientId)?.locationId ?? db.locations[0]?.id ?? '');
   const [location, setLocation] = useState(editing?.location ?? '');
   const [note, setNote] = useState(editing?.note ?? '');
@@ -170,6 +185,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
             value={clientId}
             onChange={(id) => {
               setClientId(id);
+              resuggest(id, date);
               const loc = clientById(db, id)?.locationId;
               if (loc && !editing) setLocationId(loc);
             }}
@@ -210,13 +226,13 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           {partners.length > 0 && <span className="muted small">Każda osoba ma swoją wizytę, status, trening i rozliczenie. Godzina, czas i miejsce są wspólne.</span>}
         </div>
         <Field label="Data">
-          <input ref={dateRef} className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input ref={dateRef} className="input" type="date" value={date} onChange={(e) => (setDate(e.target.value), resuggest(clientId, e.target.value))} required />
         </Field>
         <Field label="Godzina">
-          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+          <input className="input" type="time" value={time} onChange={(e) => ((slotTouched.current = true), setTime(e.target.value))} required />
         </Field>
         <Field label="Czas (min)">
-          <input className="input" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
+          <input className="input" inputMode="numeric" value={duration} onChange={(e) => ((slotTouched.current = true), setDuration(e.target.value))} />
         </Field>
         <Field label="Miejsce">
           <LocationSelect value={locationId} onChange={(v) => { setLocationId(v); setLocation(''); }} />

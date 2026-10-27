@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
-import { clientById, extraPlanOf, plansOf, sessionsOf } from '../data/ops';
+import { clientById, extraPlanOf, extraState, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { dropUnsavedVideos } from '../data/videos';
 import { fmtDay, nEx, nSets } from '../format';
@@ -110,6 +110,27 @@ export function LiveSession({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // „Prowadź”: gdy jedyną sensowną opcją jest następna jednostka planu — start od razu (inny trening: „‹ Zmień trening”).
+  // Ekran wyboru zostaje przy treningu w parze, bez planu, z treningiem podopiecznego do przejęcia i z treningiem zadanym na dziś.
+  const autoRun = useRef<Run | null>(null);
+  useEffect(() => {
+    if (pair || editing || initial || run || !client) return;
+    const own = loadRun(clientId);
+    if (own && !own.editSessionId) return;
+    const pl = currentPlan(plansOf(db, clientId));
+    if (!pl) return;
+    const ss = sessionsOf(db, clientId);
+    const n = nextWorkout(pl, ss);
+    if (!n || !n.workout.exercises.some((e) => e.name)) return;
+    const today = todayISO();
+    const ex = extraPlanOf(db, clientId);
+    if (ex?.weeks.some((w) => w.workouts.some((k) => k.date === today && k.exercises.some((e) => e.name) && extraState(k, ex.id, ss, today).state !== 'done'))) return;
+    const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
+    const r = { ...buildRun(pl, n.week.name, n.workout, ss, videos, today, Date.now(), client.tests), appointmentId };
+    autoRun.current = r;
+    setRun(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     document.body.classList.add('athlete-mode');
     return () => document.body.classList.remove('athlete-mode');
@@ -154,6 +175,8 @@ export function LiveSession({
           className="btn btn-ghost btn-sm"
           onClick={async () => {
             if (editing && run && !(await ask('Wyjść bez zapisywania poprawek? Zapisany trening zostanie bez zmian.', { confirm: 'Wyjdź' }))) return;
+            // trening uruchomiony sam i nieruszony — nie zostawiamy go na pasku „W toku”
+            if (run && autoRun.current && run.ex === autoRun.current.ex && !run.ex.some((e) => e.sets.some((x) => x.done))) storeRun(clientId, null, 'live');
             onExit();
           }}
         >

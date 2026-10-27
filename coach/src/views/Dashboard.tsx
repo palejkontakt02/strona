@@ -15,6 +15,10 @@ import { ApptStatusTag } from './CalendarView';
 import { LocationTag, locStyle } from '../components/location';
 import { clubAmount, clubOutstanding, clubSessions } from '../lib/club';
 import { reportStats, weekLabel } from '../lib/comms';
+import { useSendMessage } from '../components/Chat';
+import type { Client } from '../domain';
+import { openInbox } from './Inbox';
+import { REVIEW_LABEL, reviewQueue } from '../lib/reviewQueue';
 
 export function Dashboard() {
   const { db, apply, toast } = useStore();
@@ -127,29 +131,53 @@ export function Dashboard() {
         </Card>
 
         {(() => {
-          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
+          const notes = db.clients.flatMap((c) => (c.inbox ?? []).filter((n) => !n.read && !n.hidden).map((n) => ({ c, n }))).sort((a, b) => (b.n.at || '').localeCompare(a.n.at || ''));
           if (!notes.length) return null;
+          // jedna pozycja na podopiecznego (najnowsza wiadomość na górze), szybka odpowiedź w wierszu
+          const groups = [...new Map(notes.map((x) => [x.c.id, x.c])).values()].map((c) => ({ c, ns: notes.filter((x) => x.c.id === c.id).map((x) => x.n) }));
           return (
-            <Card title={`Wiadomości od podopiecznych (${notes.length})`} className="span-2 dash-msgs">
-              <ul className="rows">
-                {notes.slice(0, 6).map(({ c, n }) => (
-                  <li key={n.id} className="row row-top">
+            <Card
+              title={`Wiadomości od podopiecznych (${notes.length})`}
+              className="span-2 dash-msgs"
+              action={
+                <button className="btn btn-ghost btn-sm" onClick={() => openInbox(go)}>
+                  Wszystkie ›
+                </button>
+              }
+            >
+              <ul className="rows dash-msg-groups">
+                {groups.slice(0, 5).map(({ c, ns }) => (
+                  <li key={c.id} className="row row-top dash-msg-group">
                     <div className="grow">
-                      <button className="link" onClick={() => openClient(c.id, 'Przegląd')}>
-                        {c.name}
-                      </button>
-                      <span className="muted small"> · {new Date(n.at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                      <div className="small ellipsis-2">{n.text}</div>
-                      <div className="row-links">
-                        <button className="link small" onClick={() => openClient(c.id, 'Przegląd')}>
-                          Odpowiedz ›
+                      <div className="dash-msg-who">
+                        <button className="link" onClick={() => openInbox(go, { clientId: c.id })}>
+                          {c.name}
                         </button>
-                        {n.sessionId && db.sessions.some((x) => x.id === n.sessionId) && (
-                          <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: n.sessionId! })}>
-                            Zobacz trening ›
-                          </button>
-                        )}
-                        <button className="link small muted" onClick={() => apply([put('clients', { ...c, inbox: (c.inbox ?? []).map((x) => (x.id === n.id ? { ...x, read: true } : x)) })])}>
+                        {ns.length > 1 && <span className="nav-badge">{ns.length}</span>}
+                        <span className="muted small"> · {new Date(ns[0].at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      {ns.slice(0, 2).map((n) => (
+                        <div key={n.id} className="dash-msg-line">
+                          {(n.ref?.sessionId || n.sessionId) && <Icon name="dumbbell" size={13} />}
+                          {n.media?.length ? <Icon name={n.media[0].kind === 'video' ? 'cam' : n.media[0].kind === 'audio' ? 'mic' : 'image'} size={13} /> : null}
+                          <span className="small ellipsis-2">{n.text}</span>
+                        </div>
+                      ))}
+                      {ns.length > 2 && <div className="muted small">+ {ns.length - 2} wcześniejsze</div>}
+                      <QuickReply client={c} />
+                      <div className="row-links">
+                        <button className="link small" onClick={() => openInbox(go, { clientId: c.id })}>
+                          Rozmowa ›
+                        </button>
+                        {(() => {
+                          const sid = ns.map((n) => n.ref?.sessionId ?? n.sessionId).find((id) => id && db.sessions.some((x) => x.id === id));
+                          return sid ? (
+                            <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: sid })}>
+                              Zobacz trening ›
+                            </button>
+                          ) : null;
+                        })()}
+                        <button className="link small muted" onClick={() => apply([put('clients', { ...c, inbox: (c.inbox ?? []).map((x) => ({ ...x, read: true })) })])}>
                           ✓ Przeczytane
                         </button>
                       </div>
@@ -157,7 +185,11 @@ export function Dashboard() {
                   </li>
                 ))}
               </ul>
-              {notes.length > 6 && <p className="muted small">I jeszcze {notes.length - 6} — otwórz podopiecznego, by zobaczyć wszystkie.</p>}
+              {groups.length > 5 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => openInbox(go)}>
+                  I jeszcze {groups.length - 5} — wszystkie rozmowy ›
+                </button>
+              )}
             </Card>
           );
         })()}
@@ -293,6 +325,16 @@ export function Dashboard() {
 
         <div className="dash-col dash-col-side">
         {(() => {
+          const q = reviewQueue(db.clients, db.sessions, today);
+          if (!q.length) return null;
+          const kinds = [...new Set(q.map((x) => x.kind))];
+          return (
+            <Card title={`Do przejrzenia (${q.length})`} className="dash-review" action={<button className="btn btn-primary btn-sm" onClick={() => openInbox(go, { tab: 'Do przejrzenia' })}>Przejrzyj ›</button>}>
+              <p className="small muted">Z ostatnich 7 dni: {kinds.map((k) => REVIEW_LABEL[k].toLowerCase()).join(', ')}.</p>
+            </Card>
+          );
+        })()}
+        {(() => {
           // jedna pozycja na osobę (kilka sygnałów w jednej linii), czerwone najpierw
           const groups = [...new Map(alerts.map((a) => [a.client.id, a.client])).values()]
             .map((client) => ({ client, items: alerts.filter((a) => a.client.id === client.id) }))
@@ -411,5 +453,34 @@ export function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Szybka odpowiedź z Pulpitu (bez wchodzenia w kartę podopiecznego) — oznacza jego wiadomości jako przeczytane. */
+function QuickReply({ client }: { client: Client }) {
+  const send = useSendMessage(client, true);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const first = client.name.split(' ')[0];
+  const submit = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    const ok = await send(text, { okMessage: `Wysłano — ${first} zobaczy odpowiedź w aplikacji.` });
+    setBusy(false);
+    if (ok) setText('');
+  };
+  return (
+    <form
+      className="quick-reply"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+    >
+      <input className="input" value={text} maxLength={2000} placeholder={`Odpowiedz ${first}…`} aria-label={`Szybka odpowiedź dla ${client.name}`} onChange={(e) => setText(e.target.value)} />
+      <button className="btn btn-primary btn-sm" type="submit" disabled={!text.trim() || busy} aria-label="Wyślij odpowiedź">
+        <Icon name="up" size={16} /> <span className="hide-xs">Wyślij</span>
+      </button>
+    </form>
   );
 }

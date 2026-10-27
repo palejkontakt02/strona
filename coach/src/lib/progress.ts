@@ -130,7 +130,7 @@ function crossings(kind: MilestoneKind, events: { date: ISODate; add: number }[]
  * Kamienie milowe: osiągnięte (z datą, od najnowszego) i następny próg każdego rodzaju z postępem.
  * Km — tylko gdy podopieczny cokolwiek przebiegł; tonaż — gdy cokolwiek podniósł.
  */
-export function milestones(sessions: TrainingSession[], today: ISODate): Milestones {
+export function milestones(sessions: TrainingSession[], today: ISODate, absentWeek?: (monday: ISODate) => boolean): Milestones {
   const asc = sessions.filter((s) => s.date && s.date <= today).sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
   const ses = crossings('sessions', asc.map((s) => ({ date: s.date, add: 1 })));
   const ton = crossings('tonnage', asc.map((s) => ({ date: s.date, add: tonnage(s) / 1000 })));
@@ -145,7 +145,12 @@ export function milestones(sessions: TrainingSession[], today: ISODate): Milesto
   for (const s of asc) {
     const w = weekStart(s.date);
     if (w === prevWeek) continue;
-    run = prevWeek && addDays(prevWeek, 7) === w ? run + 1 : 1;
+    // tydzień w całości objęty zgłoszoną nieobecnością (lib/absence.ts) nie przerywa serii
+    const gapOk = (from: ISODate) => {
+      for (let x = addDays(from, 7); x < w; x = addDays(x, 7)) if (!absentWeek?.(x)) return false;
+      return true;
+    };
+    run = prevWeek && gapOk(prevWeek) ? run + 1 : 1;
     prevWeek = w;
     while (si < steps.length && run >= steps[si]) {
       st.push({ kind: 'streak', target: steps[si], label: milestoneLabel('streak', steps[si]), date: s.date });
@@ -161,9 +166,65 @@ export function milestones(sessions: TrainingSession[], today: ISODate): Milesto
     nextOf('sessions', ses.total, ses.achieved.length),
     ton.total > 0 ? nextOf('tonnage', ton.total, ton.achieved.length) : null,
     km.total > 0 ? nextOf('km', km.total, km.achieved.length) : null,
-    asc.length ? nextOf('streak', streak(asc, today).weeks, st.length) : null,
+    asc.length ? nextOf('streak', absentWeek ? streakSkipping(asc, today, absentWeek) : streak(asc, today).weeks, st.length) : null,
   ].filter((x): x is NextMilestone => x != null);
 
   const achieved = [...ses.achieved, ...ton.achieved, ...km.achieved, ...st].sort((a, b) => b.date.localeCompare(a.date) || b.target - a.target);
   return { achieved, next };
+}
+
+/** Bieżąca seria tygodni, w której tygodnie `absentWeek` (nieobecność) nie przerywają serii. */
+function streakSkipping(asc: TrainingSession[], today: ISODate, absentWeek: (monday: ISODate) => boolean): number {
+  const weeks = new Set(asc.map((s) => weekStart(s.date)));
+  const first = weekStart(asc[0].date);
+  let w = weekStart(today);
+  if (!weeks.has(w)) w = addDays(w, -7);
+  let n = 0;
+  for (; w >= first; w = addDays(w, -7)) {
+    if (weeks.has(w)) n++;
+    else if (!absentWeek(w)) break;
+  }
+  return n;
+}
+
+/* ---------- waga: średnia 7-dniowa ---------- */
+
+export interface WeightTrend {
+  /** Waga dzień po dniu (kilka pomiarów jednego dnia — średnia). */
+  daily: { x: ISODate; y: number }[];
+  /** Średnia krocząca z 7 dni kalendarzowych (dzień pomiaru i 6 poprzednich) w każdym dniu z pomiarem. */
+  avg: { x: ISODate; y: number }[];
+  /** Ostatnia średnia 7 dni. */
+  last: number | null;
+  /** Zmiana średniej w 2 tygodnie (ostatnia średnia − średnia sprzed 14 dni); null, gdy brak danych sprzed 2 tyg. */
+  change14: number | null;
+}
+
+/** Średnia z pomiarów w oknie 7 dni kończącym się w `d`. */
+function avgAt(daily: { x: ISODate; y: number }[], d: ISODate): number | null {
+  const from = addDays(d, -6);
+  const w = daily.filter((p) => p.x >= from && p.x <= d);
+  return w.length ? w.reduce((a, p) => a + p.y, 0) / w.length : null;
+}
+
+/** Trend wagi: punkty dzienne i średnia 7-dniowa (wahania 1–2 kg dziennie to woda i jedzenie). */
+export function weightTrend(ms: { date: ISODate; weight?: number }[]): WeightTrend {
+  const by = new Map<ISODate, number[]>();
+  for (const m of ms) if (m.weight != null && Number.isFinite(m.weight) && /^\d{4}-\d{2}-\d{2}$/.test(m.date)) by.set(m.date, [...(by.get(m.date) ?? []), m.weight]);
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  const daily = [...by.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([x, v]) => ({ x, y: v.reduce((a, b) => a + b, 0) / v.length }));
+  const avg = daily.map((p) => ({ x: p.x, y: r1(avgAt(daily, p.x)!) }));
+  if (!daily.length) return { daily, avg, last: null, change14: null };
+  const lastDay = daily[daily.length - 1].x;
+  const last = avgAt(daily, lastDay)!;
+  const before = avgAt(daily, addDays(lastDay, -14));
+  return { daily: daily.map((p) => ({ x: p.x, y: r1(p.y) })), avg, last: r1(last), change14: before == null ? null : r1(last - before) };
+}
+
+/** „Średnia 7 dni: 72,4 kg (−0,6 kg w 2 tyg.)”. */
+export function weightTrendText(t: WeightTrend): string | null {
+  if (t.last == null) return null;
+  const f = (v: number) => v.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const ch = t.change14 == null ? '' : t.change14 === 0 ? ' (bez zmian w 2 tyg.)' : ` (${t.change14 > 0 ? '+' : '−'}${f(Math.abs(t.change14))} kg w 2 tyg.)`;
+  return `Średnia 7 dni: ${f(t.last)} kg${ch}`;
 }
