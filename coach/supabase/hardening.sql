@@ -1807,3 +1807,37 @@ begin
   end if;
 end $$;
 notify pgrst, 'reload schema';
+
+-- 27. Trening w toku u podopiecznego: znacznik „trenuje teraz u siebie” (athleteLive), żeby trener nie poprowadził
+--     tego samego treningu drugi raz na swoim telefonie. Zapisuje tylko podopieczny przez funkcję; zapis profilu
+--     przez trenera znacznika nie nadpisze. Można uruchomić ponownie.
+create or replace function public.set_athlete_live(p_client_id text, p_mark jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  perform set_config('fitowa.rpc', '1', true);
+  update clients
+  set data = case
+        when p_mark is null or jsonb_typeof(p_mark) <> 'object' then data - 'athleteLive'
+        else jsonb_set(data, '{athleteLive}', jsonb_strip_nulls(jsonb_build_object(
+               'at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+               'name', left(coalesce(p_mark ->> 'name', 'Trening'), 120),
+               'workoutId', left(p_mark ->> 'workoutId', 80))))
+      end,
+      updated_at = now()
+  where id = p_client_id;
+end $$;
+revoke all on function public.set_athlete_live from public, anon;
+grant execute on function public.set_athlete_live to authenticated;
+
+create or replace function public.guard_client_athlete_live() returns trigger
+language plpgsql as $$
+begin
+  if coalesce(current_setting('fitowa.rpc', true), '') = '1' then return new; end if;
+  new.data := (new.data - 'athleteLive') || case when old.data ? 'athleteLive' then jsonb_build_object('athleteLive', old.data -> 'athleteLive') else '{}'::jsonb end;
+  return new;
+end $$;
+drop trigger if exists guard_client_athlete_live on public.clients;
+create trigger guard_client_athlete_live before update on public.clients
+  for each row execute function public.guard_client_athlete_live();
+notify pgrst, 'reload schema';

@@ -1,4 +1,4 @@
-import { liveMarkActive } from '../lib/liveMark';
+import { liveMarkActive, markNeedsUpdate, wantedMark } from '../lib/liveMark';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LineChart, WeightTrendChart } from '../components/charts';
 import { weightTrend, weightTrendText } from '../lib/progress';
@@ -155,6 +155,16 @@ export function AthleteApp({
   useEffect(() => {
     storeRun(clientId, run);
   }, [clientId, run]);
+  // trening w toku na telefonie podopiecznego — znacznik w bazie, żeby trener nie poprowadził go drugi raz u siebie
+  const { setAthleteLive } = useStore();
+  const runKey = run && !run.editSessionId ? `${run.workoutId}|${run.name}` : '';
+  const athleteLive = client?.athleteLive;
+  useEffect(() => {
+    if (mode !== 'client') return;
+    const want = wantedMark(run);
+    if (markNeedsUpdate({ liveBy: athleteLive }, want)) void setAthleteLive(clientId, want);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, clientId, runKey, athleteLive?.at]);
   const started = useRef(false);
   useEffect(() => {
     if (!initial || !client || started.current) return;

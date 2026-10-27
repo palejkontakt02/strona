@@ -1,3 +1,5 @@
+import { liveMarkActive } from '../lib/liveMark';
+import type { Client as LiveClient } from '../domain';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
 import { clientById, extraPlanOf, extraState, plansOf, sessionsOf } from '../data/ops';
@@ -95,6 +97,7 @@ export function LiveSession({
     if (typeof r === 'string') return void toast(r);
     void (async () => {
       if (run && run.ex.some((e) => e.sets.some((x) => x.done)) && !(await ask('Masz rozpoczęty trening z tym podopiecznym. Porzucić go i zacząć wybrany?', { confirm: 'Tak' }))) return;
+      if (!run && liveMarkActive(client?.athleteLive) && !(await ask(athleteLiveAsk(client!), { confirm: 'Prowadź mimo to' }))) return;
       // ten sam trening podopieczny już zaczął sam — przejmujemy jego serie
       const own = loadRun(clientId);
       if (own && !own.editSessionId && own.workoutId && own.workoutId === r.workoutId && own.ex.some((e) => e.sets.some((x) => x.done))) {
@@ -117,6 +120,7 @@ export function LiveSession({
     if (pair || editing || initial || run || !client) return;
     const own = loadRun(clientId);
     if (own && !own.editSessionId) return;
+    if (liveMarkActive(client.athleteLive)) return; // podopieczny trenuje u siebie — ekran wyboru z ostrzeżeniem
     const pl = currentPlan(plansOf(db, clientId));
     if (!pl) return;
     const ss = sessionsOf(db, clientId);
@@ -257,6 +261,15 @@ export function LiveSession({
               </section>
             );
           })()}
+          {!pair && liveMarkActive(client.athleteLive) && (
+            <section className="acard acard-warn athlete-live-warn" role="status">
+              <span className="eyebrow">{client.name.split(' ')[0]} trenuje teraz u siebie</span>
+              <h2>{client.athleteLive.name}</h2>
+              <p className="muted small">
+                Rozpoczęty na telefonie podopiecznego o {new Date(client.athleteLive.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Jeśli poprowadzisz trening tutaj, powstaną dwa zapisy — poproś, żeby zakończył albo anulował go u siebie.
+              </p>
+            </section>
+          )}
           {pair &&
             pairWith!.map((pid) => {
               // ten sam trening co partner: ćwiczenia partnera, ciężary z historii tej osoby
@@ -473,4 +486,9 @@ export function PairLive({ people: initial, onExit }: { people: { clientId: stri
       )}
     </div>
   );
+}
+
+function athleteLiveAsk(c: LiveClient): string {
+  const at = c.athleteLive ? new Date(c.athleteLive.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '';
+  return `${c.name.split(' ')[0]} zaczął(a) trening „${c.athleteLive?.name ?? ''}” u siebie o ${at}. Jeśli poprowadzisz go tutaj, powstaną dwa zapisy. Najlepiej poproś, żeby zakończył(a) albo anulował(a) go na swoim telefonie.`;
 }

@@ -90,6 +90,14 @@ export function createLocalRepository(): Repository {
       db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
       persist();
     },
+    async setAthleteLive(clientId, mark) {
+      db = {
+        ...db,
+        clients: db.clients.map((c) => (c.id === clientId ? { ...c, athleteLive: mark ? { ...mark, at: new Date().toISOString() } : undefined } : c)),
+      };
+      persist();
+    },
+
     async respondAppointment(id, kind, reason) {
       const a = db.appointments.find((x) => x.id === id);
       if (!a || a.status !== 'planned') throw new Error('Wizyta nie jest już zaplanowana');

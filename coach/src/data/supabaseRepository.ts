@@ -98,6 +98,12 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
       if (error) throw error;
     },
 
+    async setAthleteLive(clientId, mark) {
+      const { error } = await supabase.rpc('set_athlete_live', { p_client_id: clientId, p_mark: mark });
+      if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');
+      if (error) throw error;
+    },
+
     async respondAppointment(id, kind, reason) {
       // funkcja w bazie: sekcja 23 w hardening.sql (podopieczny nie zapisuje wizyt bezpośrednio)
       const { data, error } = await supabase.rpc('client_respond_appointment', { p_id: id, p_kind: kind, p_reason: reason ?? null });

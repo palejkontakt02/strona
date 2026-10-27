@@ -37,6 +37,8 @@ interface StoreValue {
   sendClientMessage: (clientId: string, text: string, extra: Pick<ClientNote, 'ref' | 'media' | 'textAuto' | 'sessionId'>) => Promise<boolean>;
   /** Podopieczny potwierdza / odwołuje wizytę (funkcja w bazie, sekcja 23). */
   respondAppointment: (id: string, kind: 'confirm' | 'cancel', reason?: string) => Promise<boolean>;
+  /** Podopieczny: znacznik treningu w toku (cicho — przy starej bazie nic się nie dzieje). */
+  setAthleteLive: (clientId: string, mark: { name: string; workoutId?: string } | null) => Promise<void>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
   /** Zapisy zrobione bez internetu, które czekają na wysłanie (kolejka offline). */
@@ -319,6 +321,20 @@ export function StoreProvider({
     [repo, toast],
   );
 
+  const setAthleteLive = useCallback(
+    async (clientId: string, mark: { name: string; workoutId?: string } | null) => {
+      if (!repo.setAthleteLive) return;
+      const athleteLive = mark ? { ...mark, at: new Date().toISOString() } : undefined;
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, athleteLive } : c)) } : cur));
+      try {
+        await repo.setAthleteLive(clientId, mark);
+      } catch {
+        // znacznik pomocniczy — bez komunikatu (np. baza bez sekcji 27 albo brak internetu)
+      }
+    },
+    [repo],
+  );
+
   const ask = useCallback(
     (message: string, opts: { confirm?: string; danger?: boolean; cancel?: string } = {}) =>
       new Promise<boolean>((resolve) =>
@@ -351,9 +367,9 @@ export function StoreProvider({
   const value = useMemo(
     () =>
       db
-        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, cloud, signOut, pending, sendPending: () => void sendPending() }
+        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, cloud, signOut, pending, sendPending: () => void sendPending() }
         : null,
-    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, cloud, signOut, pending, sendPending],
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, cloud, signOut, pending, sendPending],
   );
   if (loadError)
     return (

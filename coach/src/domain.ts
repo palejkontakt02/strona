@@ -171,6 +171,8 @@ export interface LiveMark {
 export interface Client {
   /** Znacznik treningu na żywo prowadzonego przez trenera (pole trenera). */
   liveBy?: LiveMark;
+  /** Podopieczny trenuje teraz u siebie (pole podopiecznego, zapis przez funkcję set_athlete_live). */
+  athleteLive?: LiveMark;
   id: string;
   /** Bieganie: strefy tętna i tempa liczone z tych danych. */
   run?: RunProfile;
