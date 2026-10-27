@@ -37,7 +37,7 @@ export function AbsenceNotice({ client, plan, onShift }: { client: Client; plan:
 
 /** Panel „Przesuń plan”: od wybranego tygodnia / dnia o N dni, z podglądem dat i cofnięciem. */
 export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { from: string; days: number }; onClose: () => void }) {
-  const { apply, toast } = useStore();
+  const { db, apply, toast } = useStore();
   const today = todayISO();
   const weeks = useMemo(() => {
     const ds = planDates(plan);
@@ -56,7 +56,7 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
   const run = async () => {
     if (!rows.length) return;
     const before = plan;
-    if (!(await apply(savePlan({ plans: [] } as never, shiftPlanFrom(plan, from, days))))) return;
+    if (!(await apply(savePlan(db, shiftPlanFrom(plan, from, days))))) return;
     toast(`Przesunięto ${total} ${plural(total, 'jednostkę', 'jednostki', 'jednostek')} o ${nDays(days)} (od ${fmtShort(from)}).`, {
       label: 'Cofnij',
       run: () => void apply([put('plans', before)], 'Cofnięto przesunięcie planu.'),
@@ -103,13 +103,13 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
       </div>
       <div className="pt-chips">
         {[1, 2, 3].map((n) => (
-          <button key={n} type="button" className={`chip ${days === n ? 'is-on' : ''}`} aria-pressed={days === n} onClick={() => setDays(n)}>
+          <button key={n} type="button" className={`chip ${days === n ? 'active' : ''}`} aria-pressed={days === n} onClick={() => setDays(n)}>
             +{nDays(n)}
           </button>
         ))}
         <button
           type="button"
-          className={`chip ${days === 7 && from === weekStart(from) ? 'is-on' : ''}`}
+          className={`chip ${days === 7 && from === weekStart(from) ? 'active' : ''}`}
           onClick={() => {
             setDays(7);
             setFrom(weekStart(from));
@@ -123,7 +123,7 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
           {rows.slice(0, 8).map((r) => (
             <li key={r.week}>
               <span>{r.week}:</span> <span className="pt-num">{fmtShort(r.from)}</span> <span aria-hidden="true">→</span>
-              <span className="sr-only">na</span> <span className="pt-num">{fmtShort(r.to)}</span>
+              <span className="pt-num">{fmtShort(r.to)}</span>
               {r.count > 1 && <span className="muted small"> · {r.count} jedn.</span>}
             </li>
           ))}
@@ -152,7 +152,7 @@ const TAG: Record<LoadSuggestion['kind'], { tone: 'ok' | 'warn' | 'muted'; text:
 
 /** Panel „Sugestie na tydzień X”: ciężary na kolejny tydzień z ostatnich wykonań, z wyborem i zastosowaniem w planie. */
 export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: TrainingSession[] }) {
-  const { apply, toast } = useStore();
+  const { db, apply, toast } = useStore();
   const res = useMemo(() => suggestLoads(plan, sessions, todayISO()), [plan, sessions]);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string> | null>(null);
@@ -167,7 +167,7 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
     const items = res.items.filter((s) => chosen.has(s.exercise) && s.applicable);
     if (!items.length) return;
     const before = plan;
-    if (!(await apply(savePlan({ plans: [] } as never, applySuggestions(plan, res.weekIndex, items))))) return;
+    if (!(await apply(savePlan(db, applySuggestions(plan, res.weekIndex, items))))) return;
     toast(`Zmieniono ciężary w ${week.name}: ${items.map((s) => `${s.exercise} ${kg(s.next)}`).join(', ')}.`, {
       label: 'Cofnij',
       run: () => void apply([put('plans', before)], 'Cofnięto zmianę ciężarów.'),
