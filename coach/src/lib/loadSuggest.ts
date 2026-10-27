@@ -46,6 +46,8 @@ interface DoneSet {
   load: number;
   reps: number;
   rpe: number | null;
+  /** Z podsumowania (serie × powt. × kg), nie seria po serii — porównujemy z pierwszą serią roboczą planu. */
+  summary?: boolean;
 }
 
 /** Serie robocze z zapisu (bez rozgrzewek, niezaliczonych, kompleksów i serii na czas). */
@@ -59,7 +61,7 @@ function doneSets(e: SessionExercise): DoneSet[] {
   const load = num(e.load);
   const reps = num(e.reps);
   if (!load || reps == null || String(e.reps ?? '').includes('+')) return [];
-  return Array.from({ length: Math.max(1, Math.min(10, n)) }, () => ({ load, reps, rpe: num(e.rpe) }));
+  return Array.from({ length: Math.max(1, Math.min(10, n)) }, () => ({ load, reps, rpe: num(e.rpe), summary: true }));
 }
 
 interface Verdict {
@@ -73,7 +75,10 @@ interface Verdict {
 
 /** Porównanie serii z celem planu: seria n ↔ n-ta seria robocza planu (ostatnia, gdy zrobiono więcej). */
 function judge(sets: DoneSet[], groups: SetGroup[]): Verdict {
-  const plan = expandSets(groups.filter((g) => g.type !== 'Rozgrzewka'));
+  const work = expandSets(groups.filter((g) => g.type !== 'Rozgrzewka'));
+  // podsumowanie (np. „3 × 5 · 150 kg”) opisuje serie główne — cel z pierwszej serii roboczej planu
+  const main = work.find((g) => MAIN.has(g.type)) ?? work[0];
+  const plan = sets.some((s) => s.summary) && main ? [main] : work;
   const rpeAll = num(plan.find((g) => num(g.rpe) != null)?.rpe);
   const v: Verdict = { missed: null, top: true, rpeOver: null, rpeHigh: null, maxRpe: null, topRange: null };
   let compared = 0;
@@ -97,7 +102,10 @@ function judge(sets: DoneSet[], groups: SetGroup[]): Verdict {
   return v;
 }
 
-/** Tydzień do sugestii: następny po tygodniu ostatnio wykonanej jednostki planu. Brak historii albo koniec planu → null. */
+/**
+ * Tydzień do sugestii: następny po tygodniu ostatnio wykonanej jednostki planu; po ostatnim tygodniu — pierwszy
+ * (plan idzie w kółko, jak „następny trening”). Brak historii → null.
+ */
 export function targetWeekIndex(plan: Plan, sessions: TrainingSession[]): number | null {
   let last: { date: string; wi: number } | null = null;
   for (const s of sessions) {
@@ -106,8 +114,8 @@ export function targetWeekIndex(plan: Plan, sessions: TrainingSession[]): number
     if (wi < 0) continue;
     if (!last || s.date > last.date || (s.date === last.date && wi > last.wi)) last = { date: s.date, wi };
   }
-  if (!last || last.wi + 1 >= plan.weeks.length) return null;
-  return last.wi + 1;
+  if (!last) return null;
+  return (last.wi + 1) % plan.weeks.length;
 }
 
 const strengthEx = (e: PlanExercise) => !!e.name.trim() && !(e.cardio ?? cardioByName(e.name)) && !isTimed(e);

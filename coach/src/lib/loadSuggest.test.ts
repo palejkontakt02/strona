@@ -35,7 +35,7 @@ describe('loadSuggest', () => {
   it('tydzień docelowy = następny po ostatnio wykonanym', () => {
     expect(targetWeekIndex(plan(), [])).toBeNull();
     expect(targetWeekIndex(plan(), [ses('2026-10-12', 'k2', [[100, 8, 7]])])).toBe(2);
-    expect(targetWeekIndex(plan(), [ses('2026-10-19', 'k3', [[100, 8, 7]])])).toBeNull();
+    expect(targetWeekIndex(plan(), [ses('2026-10-19', 'k3', [[100, 8, 7]])])).toBe(0); // po ostatnim — od początku
   });
 
   it('dodaj +2,5 kg: wszystkie serie z górnym zakresem przy RPE ≤ cel', () => {
@@ -63,6 +63,15 @@ describe('loadSuggest', () => {
   it('RPE > cel + 1 dwa razy z rzędu — zmniejsz', () => {
     const r = suggestLoads(plan(), [ses('2026-10-19', 'k2', [[100, 8, 9.5]]), ses('2026-10-12', 'k1', [[100, 8, 9.5]])], TODAY)!;
     expect(r.items[0].kind).toBe('cut');
+  });
+
+  it('zapis podsumowaniem (3 × 5 · kg) — cel z pierwszej serii roboczej (top set), nie z back-offów', () => {
+    const p = plan();
+    for (const w of p.weeks) w.workouts[0].exercises[0].groups = [g('5', '', '8', 'Top set'), g('5', '-10%', '7', 'Back-off'), g('5', '-10%', '7', 'Back-off')];
+    const s: TrainingSession = { ...ses('2026-10-19', 'k1', []), exercises: [{ name: 'Przysiad ze sztangą', sets: '3', reps: '5', load: '150', rpe: '8' }] };
+    const r = suggestLoads(p, [s], TODAY)!;
+    expect(r.items[0]).toMatchObject({ kind: 'add', last: 150, next: 152.5 });
+    expect(r.items[0].applicable).toBe(true);
   });
 
   it('stare treningi (> 6 tyg.) nie liczą się', () => {

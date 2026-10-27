@@ -121,8 +121,8 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
       {rows.length ? (
         <ul className="pt-preview" aria-label="Podgląd przesunięcia">
           {rows.slice(0, 8).map((r) => (
-            <li key={r.week}>
-              <span>{r.week}:</span> <span className="pt-num">{fmtShort(r.from)}</span> <span aria-hidden="true">→</span>
+            <li key={r.week} aria-label={`${r.week}: ${fmtShort(r.from)} na ${fmtShort(r.to)}`}>
+              <span>{r.week}:</span> <span className="pt-num">{fmtShort(r.from)}</span> <span aria-hidden="true">→</span>{' '}
               <span className="pt-num">{fmtShort(r.to)}</span>
               {r.count > 1 && <span className="muted small"> · {r.count} jedn.</span>}
             </li>
@@ -222,7 +222,7 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
                   </span>
                   <p className="ls-why small">
                     {s.why}
-                    {s.already && s.planned != null && <span className="muted"> W planie na ten tydzień już {kg(s.planned)}.</span>}
+                    {s.already && s.kind !== 'hold' && s.planned != null && <span className="muted"> W planie na ten tydzień już {kg(s.planned)}.</span>}
                     {!s.applicable && <span className="muted"> Ciężar w planie liczony z % — zmień w edytorze.</span>}
                   </p>
                 </li>
