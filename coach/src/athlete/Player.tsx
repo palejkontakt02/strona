@@ -788,9 +788,21 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </button>
         )}
         {trainer && s.warmup && !s.done && (
-          <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
-            ✕ usuń tę serię wstępną
-          </button>
+          <div className="warm-tools">
+            {run.ex[k].sets[i - 1]?.warmup && !run.ex[k].sets[i - 1].done && (
+              <button className="link small muted" aria-label="Przesuń serię wstępną wyżej" onClick={() => moveWarmup(k, i, -1)}>
+                ↑ wyżej
+              </button>
+            )}
+            {run.ex[k].sets[i + 1]?.warmup && (
+              <button className="link small muted" aria-label="Przesuń serię wstępną niżej" onClick={() => moveWarmup(k, i, 1)}>
+                ↓ niżej
+              </button>
+            )}
+            <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
+              ✕ usuń tę serię wstępną
+            </button>
+          </div>
         )}
         {trainer && !s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
           <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, num) : removeWarmup(k, i))}>
@@ -801,11 +813,26 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     );
   };
 
+  /** Zamiana kolejności dwóch serii wstępnych (zrobione zostają na swoim miejscu). */
+  const moveWarmup = (k: number, i: number, dir: -1 | 1) =>
+    update((r) => {
+      const sets = r.ex[k].sets;
+      const j = i + dir;
+      if (!sets[i]?.warmup || !sets[j]?.warmup || sets[j].done) return;
+      [sets[i], sets[j]] = [sets[j], sets[i]];
+    });
   const addWarmup = (k: number) =>
     update((r) => {
       const sets = r.ex[k].sets;
       const firstWork = sets.find((s) => !s.warmup);
-      sets.unshift({ load: '', reps: firstWork?.reps || '5', rpe: '', done: false, warmup: true, sug: '', edited: false, tRpe: '', spec: '', rest: '', label: 'Rozgrzewka' });
+      // nowa seria wstępna trafia pod ostatnią wstępną (tuż nad roboczymi), z ciężarem w połowie drogi do roboczego
+      let at = 0;
+      sets.forEach((s, i) => s.warmup && (at = i + 1));
+      const prevW = at > 0 ? Number(String(sets[at - 1].load).replace(',', '.')) : NaN;
+      const work = Number(String(firstWork?.load ?? '').replace(',', '.'));
+      const mid = prevW > 0 && work > prevW ? Math.round((prevW + work) / 2 / 2.5) * 2.5 : NaN;
+      const load = mid > prevW && mid < work ? String(mid).replace('.', ',') : '';
+      sets.splice(at, 0, { load, reps: (at > 0 ? sets[at - 1].reps : firstWork?.reps) || '5', rpe: '', done: false, warmup: true, sug: '', edited: false, tRpe: '', spec: '', rest: '', label: 'Rozgrzewka' });
     });
   const addSet = (ks: number[]) =>
     update((r) => {

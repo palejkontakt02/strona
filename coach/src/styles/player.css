@@ -317,3 +317,7 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* serie wstępne: przesuwanie i usuwanie w jednym rzędzie */
+.warm-tools { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.warm-tools .link { min-height: 36px; }
