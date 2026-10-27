@@ -115,6 +115,35 @@ export function StoreProvider({
     return () => window.removeEventListener('storage', onStorage);
   }, [cloud, load]);
 
+  // Trening w toku na drugim telefonie (trener ↔ podopieczny): co 15 s lekki odczyt samych znaczników,
+  // bo pełne odświeżenie jest tylko przy powrocie do aplikacji.
+  useEffect(() => {
+    if (!cloud || !repo.pollLive) return;
+    const poll = async () => {
+      if (document.visibilityState !== 'visible' || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+      try {
+        const rows = await repo.pollLive!();
+        const byId = new Map(rows.map((r) => [r.id, r]));
+        const same = (a?: { at: string } | null, b?: { at: string } | null) => (a?.at ?? '') === (b?.at ?? '');
+        setDb((cur) => {
+          if (!cur) return cur;
+          let changed = false;
+          const clients = cur.clients.map((c) => {
+            const r = byId.get(c.id);
+            if (!r || (same(c.liveBy, r.liveBy) && same(c.athleteLive, r.athleteLive))) return c;
+            changed = true;
+            return { ...c, liveBy: r.liveBy, athleteLive: r.athleteLive };
+          });
+          return changed ? { ...cur, clients } : cur;
+        });
+      } catch {
+        // pomocnicze — przy błędzie sieci spróbujemy za chwilę
+      }
+    };
+    const t = setInterval(() => void poll(), 15_000);
+    return () => clearInterval(t);
+  }, [cloud, repo]);
+
   // Po powrocie do aplikacji (inne urządzenie mogło coś zmienić) — odśwież dane z chmury.
   useEffect(() => {
     if (!cloud) return;

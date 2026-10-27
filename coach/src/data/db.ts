@@ -138,6 +138,8 @@ export interface Repository {
   respondAppointment?(id: string, kind: 'confirm' | 'cancel', reason?: string): Promise<Appointment | null>;
   /** Podopieczny: znacznik „trenuje teraz u siebie” (null = koniec). Sekcja 27 w hardening.sql. */
   setAthleteLive?(clientId: string, mark: { name: string; workoutId?: string } | null): Promise<void>;
+  /** Lekki odczyt znaczników treningu w toku (trener / podopieczny) — bez pobierania całej bazy. */
+  pollLive?(): Promise<{ id: string; liveBy?: import('../domain').LiveMark; athleteLive?: import('../domain').LiveMark }[]>;
 }
 
 export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog' | 'consents' | 'absences' | 'exNotes';

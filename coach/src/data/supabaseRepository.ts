@@ -1,3 +1,4 @@
+import type { LiveMark } from '../domain';
 import type { Appointment, Checkin, ClientNote, Measurement } from '../domain';
 import type { Intake } from '../lib/intake';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
@@ -96,6 +97,16 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
     async addClientNote(clientId: string, note: ClientNote) {
       const { error } = await supabase.rpc('add_client_note', { p_client_id: clientId, p_note: note });
       if (error) throw error;
+    },
+
+    async pollLive() {
+      const { data, error } = await supabase.from('clients').select('id, liveBy:data->liveBy, athleteLive:data->athleteLive');
+      if (error) throw error;
+      return ((data ?? []) as { id: string; liveBy?: LiveMark | null; athleteLive?: LiveMark | null }[]).map((r) => ({
+        id: r.id,
+        liveBy: r.liveBy ?? undefined,
+        athleteLive: r.athleteLive ?? undefined,
+      }));
     },
 
     async setAthleteLive(clientId, mark) {
