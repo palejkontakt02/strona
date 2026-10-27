@@ -299,7 +299,7 @@ function RuleCard({
         <div className="am-edit">
           <label className="field">
             <span className="small">Treść</span>
-            <textarea ref={area} className="input" rows={3} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} />
+            <textarea ref={area} className="input" rows={4} maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} />
           </label>
           <div className="am-fields" aria-label="Wstaw pole">
             {meta.fields.map((f) => (

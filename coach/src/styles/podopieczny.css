@@ -1,0 +1,215 @@
+/* ================= Panel podopiecznego — runda 4 (agent „podopieczny”) ================= */
+
+/* --- powrót po przerwie (odtwarzacz) --- */
+.comeback-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warn);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.comeback-bar > svg {
+  color: var(--color-warn);
+  flex-shrink: 0;
+}
+.comeback-text {
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+.comeback-full {
+  min-height: 44px;
+}
+
+/* --- notatka podopiecznego do ćwiczenia --- */
+.exnote-btn {
+  width: 44px;
+  height: 44px;
+  color: var(--color-neutral-400);
+}
+.exnote-btn.has-note {
+  color: var(--color-text);
+}
+.exnote-text {
+  margin: 2px 0 var(--space-2);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-neutral-400);
+  overflow-wrap: anywhere;
+}
+.exnote-who {
+  font-weight: 600;
+}
+
+/* --- „Przerwij, bo boli” --- */
+.pain-stop-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: var(--space-1);
+  color: var(--color-neutral-400);
+}
+.pain-stop-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.pain-stop-end {
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.2;
+}
+.pain-stop-end small {
+  font-weight: 400;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.pain-stop-note,
+.wdone-pain {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.wdone-pain {
+  display: inline-block;
+  font-size: 15px;
+}
+
+/* --- koniec przerwy na cały ekran --- */
+.rest-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 16px;
+  text-align: center;
+  background: var(--color-text);
+  color: var(--color-bg);
+  animation: rest-flash-blink 0.9s steps(1, end) 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+@keyframes rest-flash-blink {
+  0%,
+  33.3%,
+  66.6% {
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+  16.6%,
+  50%,
+  83.3% {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+.rest-flash-eyebrow {
+  font-size: 17px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.rest-flash-text {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  max-width: 18ch;
+  overflow-wrap: anywhere;
+}
+.rest-flash-hint {
+  font-size: 13px;
+  opacity: 0.7;
+}
+/* ogranicz ruch: bez migania — statyczny baner u góry */
+@media (prefers-reduced-motion: reduce) {
+  .rest-flash {
+    animation: none;
+    inset: auto 0 auto 0;
+    top: 0;
+    padding: calc(var(--space-4) + env(safe-area-inset-top, 0px)) 16px var(--space-4);
+    gap: var(--space-1);
+    box-shadow: var(--shadow-lg);
+  }
+  .rest-flash-text {
+    font-size: 28px;
+  }
+}
+
+/* --- nieobecność (Dziś, ustawienia) --- */
+.absence-card h2 {
+  margin-bottom: var(--space-1);
+}
+.absence-card .actions {
+  flex-wrap: wrap;
+}
+.absence-link {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+  text-align: right;
+}
+.absence-link .link {
+  min-height: 44px;
+}
+.absence-dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.absence-dates .input {
+  min-width: 0;
+}
+.absence-reasons {
+  flex-wrap: wrap;
+}
+.absence-reasons button {
+  min-height: 44px;
+}
+
+/* --- waga: średnia 7 dni --- */
+.wt-summary {
+  margin: var(--space-2) 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.wt-chart .wt-daily circle {
+  fill: color-mix(in srgb, var(--color-text) 25%, transparent);
+}
+.wt-chart .wt-avg {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wt-swatch-daily {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-text) 25%, transparent);
+}
+.wt-swatch-avg {
+  height: 4px !important;
+  width: 16px !important;
+  vertical-align: 2px !important;
+  background: var(--color-text);
+}
+.wt-help {
+  margin-top: var(--space-1);
+}
+
+/* --- ustawienie trenera „Powrót po przerwie” --- */
+.comeback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-2) 0;
+}
