@@ -1,3 +1,4 @@
+import { ComebackSettings } from './ComebackSettings';
 import { ClientHealth, ClientIntakeCard } from './Health';
 import { useEffect, useRef, useState } from 'react';
 import { Card, Empty, Field, IconBtn, Tag } from '../../components/ui';
@@ -272,6 +273,8 @@ export function ClientProfile({ client }: { client: Client }) {
           </ul>
         )}
       </Card>
+
+      <ComebackSettings client={client} />
 
       <Card className="section-gap" title="Dane osobowe (RODO)">
         <p className="muted small">Eksport wszystkich danych podopiecznego do pliku albo trwałe usunięcie.</p>

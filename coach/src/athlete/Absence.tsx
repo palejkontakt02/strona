@@ -85,7 +85,7 @@ export function AbsenceToday({ client, absence, onOwn, notify = true }: { client
     <section className="acard acard-hero absence-card" aria-label="Nieobecność">
       <span className="eyebrow">Przerwa w planie</span>
       <h2>{card.title}</h2>
-      <p className="muted">{card.text.slice(card.title.length + 3)}</p>
+      <p className="muted first-cap">{card.text.slice(card.title.length + 3)}</p>
       {absence.note && <p className="muted small">{absence.note}</p>}
       <div className="actions">
         <button className="btn btn-secondary" onClick={() => void back()}>

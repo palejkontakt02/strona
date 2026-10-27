@@ -170,9 +170,10 @@ export function Dashboard() {
                           Rozmowa ›
                         </button>
                         {(() => {
-                          const sid = ns.map((n) => n.ref?.sessionId ?? n.sessionId).find((id) => id && db.sessions.some((x) => x.id === id));
+                          const hit = ns.find((n) => { const id = n.ref?.sessionId ?? n.sessionId; return id && db.sessions.some((x) => x.id === id); });
+                          const sid = hit ? (hit.ref?.sessionId ?? hit.sessionId) : undefined;
                           return sid ? (
-                            <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: sid })}>
+                            <button className="link small" onClick={() => openModal({ kind: 'review', sessionId: sid, exIndex: hit?.ref?.exIndex })}>
                               Zobacz trening ›
                             </button>
                           ) : null;

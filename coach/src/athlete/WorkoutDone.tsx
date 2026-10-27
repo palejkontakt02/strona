@@ -118,7 +118,7 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
           <dd className={info.records.length ? 'is-pr' : undefined}>{info.records.length}</dd>
         </div>
       </dl>
-      {diff ? (
+      {info.stoppedForPain ? null : diff ? (
         <div className="wdone-cmp">
           <span className="eyebrow">W porównaniu z poprzednim razem ({new Date(`${diff.date}T12:00:00`).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })})</span>
           <p>
