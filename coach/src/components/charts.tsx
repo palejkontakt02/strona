@@ -150,3 +150,72 @@ export function LineChart({
     </figure>
   );
 }
+
+/**
+ * Waga: punkty dzienne (jasnoszare) i średnia krocząca 7 dni (gruba linia w kolorze tekstu) — lib/progress `weightTrend`.
+ */
+export function WeightTrendChart({ daily, avg, height = 190, label = 'Waga — średnia 7 dni' }: { daily: Pt[]; avg: Pt[]; height?: number; label?: string }) {
+  const ok = (p: Pt) => /^\d{4}-\d{2}-\d{2}/.test(p.x) && Number.isFinite(p.y);
+  const d = daily.filter(ok);
+  const a = avg.filter(ok);
+  if (d.length < 2) return <p className="empty">Za mało danych do wykresu.</p>;
+  const format = (v: number) => v.toLocaleString('pl-PL', { maximumFractionDigits: 1 });
+  const R = 12;
+  const T = 12;
+  const B = 24;
+  const xs = d.map((p) => new Date(p.x).getTime());
+  const t0 = Math.min(...xs);
+  const t1 = Math.max(...xs);
+  const ys = [...d, ...a].map((p) => p.y);
+  let y0 = Math.min(...ys);
+  let y1 = Math.max(...ys);
+  if (y1 - y0 < 1) {
+    y0 -= 0.5;
+    y1 += 0.5;
+  }
+  const pad = (y1 - y0) * 0.1;
+  y0 -= pad;
+  y1 += pad;
+  const ticks = [y0 + (y1 - y0) * 0.1, (y0 + y1) / 2, y1 - (y1 - y0) * 0.1];
+  const L = Math.max(44, 14 + Math.max(...ticks.map((t) => format(t).length)) * 12);
+  const X = (x: string) => L + (t1 === t0 ? (W - L - R) / 2 : ((new Date(x).getTime() - t0) / (t1 - t0)) * (W - L - R));
+  const Y = (y: number) => T + (1 - (y - y0) / (y1 - y0)) * (height - T - B);
+  const first = d[0].x;
+  const last = d[d.length - 1].x;
+  return (
+    <figure className="chart-fig wt-chart">
+      <svg className="chart" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={label}>
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={L} x2={W - R} y1={Y(t)} y2={Y(t)} className="grid" />
+            <text x={L - 6} y={Y(t) + 4} className="chart-axis" textAnchor="end">
+              {format(t)}
+            </text>
+          </g>
+        ))}
+        <text x={X(first)} y={height - 6} className="chart-axis" textAnchor="start">
+          {fmtShort(first)}
+        </text>
+        <text x={X(last)} y={height - 6} className="chart-axis" textAnchor="end">
+          {fmtShort(last)}
+        </text>
+        <g className="wt-daily">
+          {d.map((p) => (
+            <circle key={p.x} cx={X(p.x)} cy={Y(p.y)} r={4}>
+              <title>{`${fmtShort(p.x)}: ${format(p.y)} kg`}</title>
+            </circle>
+          ))}
+        </g>
+        {a.length > 1 && <polyline className="wt-avg" points={[...a].sort((p, q) => p.x.localeCompare(q.x)).map((p) => `${X(p.x)},${Y(p.y)}`).join(' ')} />}
+      </svg>
+      <figcaption className="legend">
+        <span>
+          <i className="legend-swatch wt-swatch-daily" /> dzienny pomiar
+        </span>
+        <span>
+          <i className="legend-swatch wt-swatch-avg" /> średnia 7 dni
+        </span>
+      </figcaption>
+    </figure>
+  );
+}

@@ -511,7 +511,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   // podsumowanie z serii poniżej — tekst z jednostkami zamiast pól tylko do odczytu (4 elementy: układ siatki bez zmian)
                   <>
                     <span className="ex-derived" title="Serie robocze (liczone z serii poniżej)">{sum.sets} {plural(Number(sum.sets) || 0, 'seria', 'serie', 'serii')}</span>
-                    <span className="ex-derived" title="Powtórzenia pierwszej serii roboczej">{sum.reps ? `${sum.reps} ${r.timed || r.cardio ? '' : 'powt.'}` : '—'}</span>
+                    <span className="ex-derived" title="Powtórzenia pierwszej serii roboczej">{sum.reps ? (r.timed || r.cardio || /[a-ząćęłńóśźż:]/i.test(sum.reps) ? sum.reps : `${sum.reps} powt.`) : '—'}</span>
                     <span className="ex-derived" title="Ciężar pierwszej serii roboczej">{sum.load ? `${dec(sum.load)} ${r.cardio ? 'km' : 'kg'}` : '—'}</span>
                     <span className="ex-derived" aria-hidden="true" />
                   </>

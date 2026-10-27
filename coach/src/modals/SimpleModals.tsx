@@ -474,6 +474,11 @@ export function DataModal() {
       <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'locations' })}>
         Miejsca i kluby…
       </button>
+      <h4 className="form-section">Automatyczne wiadomości</h4>
+      <p className="muted small">Gratulacje po pierwszym treningu i rekordzie, przypomnienie po przerwie, koniec pakietu, urodziny — wysyłane same, raz.</p>
+      <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'autoMessages' })}>
+        Automatyczne wiadomości…
+      </button>
       <h4 className="form-section">Dane</h4>
       {cloud ? (
         <p className="small">

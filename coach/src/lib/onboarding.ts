@@ -4,6 +4,7 @@
  */
 import type { Client } from '../domain';
 import { INTAKE_PARQ } from './intake';
+import { fmtDay } from '../format';
 
 /** Adres aplikacji podopiecznego (tak jak w mailach i na stronie). */
 export const APP_URL = 'https://sebastianpalej.pl/app/';
@@ -144,7 +145,7 @@ export function onboardingSteps(i: OnboardingInput): Step[] {
       id: 'invite',
       label: 'Zaproszenie wysłane',
       done: !!c.invitedAt || inv === 'connected' || inv === 'unconfirmed',
-      note: c.invitedAt ? `wysłane ${c.invitedAt.slice(0, 10)}` : inv === 'connected' || inv === 'unconfirmed' ? 'konto już założone' : 'link, kod QR, SMS, WhatsApp lub e-mail',
+      note: c.invitedAt ? `wysłane ${fmtDay(c.invitedAt.slice(0, 10))}` : inv === 'connected' || inv === 'unconfirmed' ? 'konto już założone' : 'link, kod QR, SMS, WhatsApp lub e-mail',
     },
     {
       id: 'account',

@@ -13,6 +13,8 @@ import { todayISO } from '../../lib/dates';
 import { num } from '../../lib/parse';
 import { records } from '../../lib/strength';
 import { WELLNESS_ITEMS } from '../../lib/wellness';
+import { absentWeek } from '../../lib/absence';
+import type { Absence } from '../../domain';
 import { milestones, monthsRange, monthSummary, shiftMonth, type MilestoneKind, type NextMilestone } from '../../lib/progress';
 import { MUSCLE_LABEL, muscleTier, weeklyMuscleSets, type Muscle, type MuscleWeekRow } from '../../lib/progressMuscles';
 import { dailyWellness, wellnessChange, wellnessWeeks, type WellnessWeek, type WellKey } from '../../lib/progressWellness';
@@ -29,7 +31,7 @@ export function ProgressExtra({ client }: { client: Client }) {
       <MonthCard sessions={sessions} today={today} />
       <MuscleCard sessions={sessions} today={today} />
       <WellnessCard client={client} sessions={sessions} today={today} />
-      <MilestonesCard sessions={sessions} today={today} />
+      <MilestonesCard sessions={sessions} today={today} absences={client.absences} />
     </div>
   );
 }
@@ -361,8 +363,9 @@ function progressText(n: NextMilestone): string {
   return `${f(n.value)}/${NF0.format(n.target)}${unit[n.kind]}`;
 }
 
-function MilestonesCard({ sessions, today }: { sessions: TrainingSession[]; today: string }) {
-  const m = useMemo(() => milestones(sessions, today), [sessions, today]);
+function MilestonesCard({ sessions, today, absences }: { sessions: TrainingSession[]; today: string; absences?: Absence[] }) {
+  // tygodnie w całości na zgłoszonej nieobecności nie przerywają serii tygodni
+  const m = useMemo(() => milestones(sessions, today, absences?.length ? absentWeek(absences) : undefined), [sessions, today, absences]);
   const [all, setAll] = useState(false);
   const shown = all ? m.achieved : m.achieved.slice(0, 5);
   return (
@@ -382,7 +385,7 @@ function MilestonesCard({ sessions, today }: { sessions: TrainingSession[]; toda
           </li>
         ))}
       </ul>
-      {m.next.find((n) => n.kind === 'streak') && <p className="muted small">Seria tygodni: liczy się tydzień z co najmniej jednym treningiem.</p>}
+      {m.next.find((n) => n.kind === 'streak') && <p className="muted small">Seria tygodni: liczy się tydzień z co najmniej jednym treningiem; tydzień zgłoszonej nieobecności jej nie przerywa.</p>}
       {m.achieved.length > 0 && (
         <>
           <h4 className="pg-sub">Osiągnięte</h4>

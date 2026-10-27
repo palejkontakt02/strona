@@ -310,6 +310,7 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
       </div>
 
       <article className="card review-card" key={item.key}>
+        <div className="review-main">
         <header className="review-head">
           <Tag tone={KIND_TONE[item.kind]}>
             <Icon name={KIND_ICON[item.kind]} size={13} /> {REVIEW_LABEL[item.kind]}
@@ -352,29 +353,6 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
           </p>
         )}
 
-        <div className="review-charts">
-          <figure>
-            <figcaption className="muted small">Waga — 8 tygodni</figcaption>
-            <LineChart series={[{ label: 'Waga', pts: ctx.weight }]} height={120} label={`Waga ${c.name} — 8 tygodni`} />
-          </figure>
-          <figure>
-            <figcaption className="muted small">Sen i energia (1–5)</figcaption>
-            <LineChart
-              series={[
-                { label: 'Sen', pts: ctx.sleep },
-                { label: 'Energia', pts: ctx.energy, tone: 'muted' },
-              ]}
-              height={120}
-              minY={1}
-              label={`Sen i energia ${c.name} — 8 tygodni`}
-            />
-          </figure>
-          <figure>
-            <figcaption className="muted small">Objętość — serie robocze / tydzień</figcaption>
-            <BarChart pts={ctx.volume} height={120} label={`Serie robocze ${c.name} — 8 tygodni`} />
-          </figure>
-        </div>
-
         {replyOpen && (
           <div className="review-reply">
             <textarea
@@ -411,6 +389,30 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
             Następny ›
           </button>
         </div>
+        </div>
+        <div className="review-charts">
+          <figure>
+            <figcaption className="muted small">Waga — 8 tygodni</figcaption>
+            <LineChart series={[{ label: 'Waga', pts: ctx.weight }]} height={150} label={`Waga ${c.name} — 8 tygodni`} />
+          </figure>
+          <figure>
+            <figcaption className="muted small">Sen i energia (1–5)</figcaption>
+            <LineChart
+              series={[
+                { label: 'Sen', pts: ctx.sleep },
+                { label: 'Energia', pts: ctx.energy, tone: 'muted' },
+              ]}
+              height={150}
+              minY={1}
+              label={`Sen i energia ${c.name} — 8 tygodni`}
+            />
+          </figure>
+          <figure>
+            <figcaption className="muted small">Objętość — serie robocze / tydzień</figcaption>
+            <BarChart pts={ctx.volume} height={150} label={`Serie robocze ${c.name} — 8 tygodni`} />
+          </figure>
+        </div>
+
       </article>
     </div>
   );

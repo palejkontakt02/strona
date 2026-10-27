@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { LineChart } from '../components/charts';
+import { LineChart, WeightTrendChart } from '../components/charts';
+import { weightTrend, weightTrendText } from '../lib/progress';
 import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { PalettePicker } from '../components/PalettePicker';
@@ -18,7 +19,8 @@ import { fmtWeekdayDate } from '../lib/planGrid';
 import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { fmtDur, fmtKm, planRunTotals, runVolume } from '../lib/running';
 import { e1Series, exerciseE1, records } from '../lib/strength';
-import { streak } from '../lib/load';
+import { activeAbsence, streakWithAbsences } from '../lib/absence';
+import { AbsenceLink, AbsenceSheet, AbsenceToday } from './Absence';
 import { readiness, readinessNorm, WELLNESS_ITEMS } from '../lib/wellness';
 import { hasConsent } from '../lib/rodo';
 import { checkinAdvice, firstOpenWeek, planDue, weekStrip } from '../lib/athleteToday';
@@ -145,6 +147,7 @@ export function AthleteApp({
   const [tab, setTabState] = useState<Tab>(() => loadTab(clientId));
   const [planId, setPlanId] = useState<string | null>(null);
   const [look, setLook] = useState(false);
+  const [absOpen, setAbsOpen] = useState(false);
   /** Trening czekający na krótki check-in samopoczucia (krok przed Start). */
   const [pre, setPre] = useState<Run | null>(null);
 
@@ -278,6 +281,16 @@ export function AthleteApp({
         <Sheet label="Ustawienia" onClose={() => setLook(false)}>
           <SheetTop title="Ustawienia" onClose={() => setLook(false)} />
           {mode === 'client' && <PushSettings role="client" />}
+          <h3 className="form-section">Plan</h3>
+          <button
+            className="btn btn-secondary btn-block ath-set-row"
+            onClick={() => {
+              setLook(false);
+              setAbsOpen(true);
+            }}
+          >
+            <Icon name="cal" size={18} /> Wypadam z planu
+          </button>
           <h3 className="form-section">Kolory</h3>
           <PalettePicker />
           <h3 className="form-section">Ankieta</h3>
@@ -292,6 +305,7 @@ export function AthleteApp({
           )}
         </Sheet>
       )}
+      {absOpen && <AbsenceSheet client={client} notify={mode === 'client'} onClose={() => setAbsOpen(false)} />}
       {pre && (
         <PreCheckin
           client={client}
@@ -358,6 +372,8 @@ export function AthleteApp({
               onStartFrom={startFrom}
               onResume={() => setScreen('run')}
               onIntake={openIntake}
+              onAbsence={() => setAbsOpen(true)}
+              notify={mode === 'client'}
               onDiscard={() => {
                 if (run) dropUnsavedVideos(run.ex.flatMap((e) => e.sets.map((x) => x.video)), db.sessions);
                 setRun(null);
@@ -446,7 +462,11 @@ function TodayTab({
   onResume,
   onDiscard,
   onIntake,
+  onAbsence,
+  notify,
 }: {
+  onAbsence: () => void;
+  notify: boolean;
   clientId: string;
   plan: ReturnType<typeof currentPlan>;
   run: Run | null;
@@ -485,7 +505,9 @@ function TodayTab({
   );
   const thisWeek = sessions.filter((s) => s.date >= weekStart(today)).length;
   const goal = client.daysPerWeek || 2;
-  const st = streak(sessions, today);
+  // seria tygodni: tydzień w całości na zgłoszonej nieobecności jej nie przerywa
+  const st = streakWithAbsences(sessions, today, client.absences);
+  const away = activeAbsence(client.absences, today);
   const lastWeight = allMeasurements(client)
     .filter((m) => m.weight != null)
     .sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -503,7 +525,7 @@ function TodayTab({
           .filter((k) => k.date && k.date >= addDays(today, -7) && k.date <= addDays(today, 7) && k.exercises.some((e) => e.name))
           .filter((k) => extraState(k, extra!.id, sessions, today).state !== 'done')
           .sort((a, b) => a.date!.localeCompare(b.date!));
-        if (!due.length || run) return null;
+        if (!due.length || run || away) return null;
         const when = (d: string) => (d === today ? 'na dziś' : d === addDays(today, 1) ? 'na jutro' : d < today ? `zaległy z ${fmtDay(d)}` : `na ${fmtDay(d)}`);
         return due.map((k) => (
           <section key={k.id} className={`acard ${k.date! <= today ? 'acard-hero' : 'acard-extra'}`}>
@@ -562,6 +584,8 @@ function TodayTab({
             </button>
           </div>
         </section>
+      ) : away && !run ? (
+        <AbsenceToday client={client} absence={away} onOwn={onOwn} notify={notify} />
       ) : nx ? (
         <section className="acard acard-hero">
           <span className="eyebrow">Następny trening</span>
@@ -609,7 +633,7 @@ function TodayTab({
           </button>
         </section>
       )}
-      {!run && (nx || sessions[0]) && (
+      {!run && !away && (nx || sessions[0]) && (
         <div className={`ath-quick ${nx && sessions[0] ? 'two' : ''}`}>
           {nx && (
             <button className="btn btn-secondary own-btn" onClick={onOwn} title="Trening poza planem — dodajesz ćwiczenia w trakcie">
@@ -623,6 +647,8 @@ function TodayTab({
           )}
         </div>
       )}
+
+      {!away && !run && <AbsenceLink client={client} onOpen={onAbsence} />}
 
       {!client.intake?.completedAt && (
         <section className="acard acard-warn ath-intake">
@@ -978,7 +1004,20 @@ function BodyProgress({ client }: { client: Client }) {
               </div>
             )}
           </div>
-          {vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />}
+          {field === 'weight' && vals.length >= 2 ? (
+            (() => {
+              const t = weightTrend(ms);
+              return (
+                <>
+                  <p className="wt-summary">{weightTrendText(t)}</p>
+                  <WeightTrendChart daily={t.daily} avg={t.avg} />
+                  <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie — patrz na średnią z 7 dni.</p>
+                </>
+              );
+            })()
+          ) : (
+            vals.length >= 2 && <LineChart label={field === 'weight' ? 'Waga' : 'Talia'} series={[{ label: field === 'weight' ? 'Waga (kg)' : 'Talia (cm)', pts: vals.map((m) => ({ x: m.date, y: m[field]! })) }]} />
+          )}
         </>
       )}
       <button className="btn btn-secondary btn-block" onClick={() => setAdding(true)}>

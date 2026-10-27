@@ -23,6 +23,8 @@ export type ModalState =
   | { kind: 'assign'; clientId?: string; date?: string; /** Powtórka / kopia wykonanego treningu (także innego podopiecznego). */ sessionId?: string }
   | { kind: 'data' }
   | { kind: 'locations' }
+  /** Ustawienia → automatyczne wiadomości do podopiecznych (views/AutoMessages.tsx). */
+  | { kind: 'autoMessages' }
   | { kind: 'location'; location?: Location };
 
 export interface NavValue {

@@ -22,6 +22,8 @@ export interface DoneInfo {
   diff: { tonnage: number; sets: number; date: string } | null;
   /** Kto podpisany na grafice (trener albo „Fitowa”). */
   brand: string;
+  /** Przerwany przez „Przerwij, bo boli” — zapis częściowy (bez czerwieni: to nie porażka). */
+  stoppedForPain?: boolean;
 }
 
 const dayText = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -79,6 +81,11 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
         <p className="muted">
           {info.name} · {dayText(info.date)}
         </p>
+        {info.stoppedForPain && (
+          <p className="wdone-pain" role="note">
+            Przerwany z powodu bólu — trener dostał informację.
+          </p>
+        )}
       </div>
       <dl className="wdone-stats">
         <div>

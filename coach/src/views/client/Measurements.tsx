@@ -1,6 +1,7 @@
 import { allMeasurements } from '../../data/ops';
 import { useState } from 'react';
-import { LineChart } from '../../components/charts';
+import { LineChart, WeightTrendChart } from '../../components/charts';
+import { weightTrend, weightTrendText } from '../../lib/progress';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client, TestResult } from '../../domain';
 import { put } from '../../data/db';
@@ -79,7 +80,20 @@ export function ClientMeasurements({ client }: { client: Client }) {
                 </button>
               ))}
             </div>
-            <LineChart label="Pomiary" series={[{ label: field, pts }]} />
+            {field === 'weight' && pts.length >= 2 ? (
+              (() => {
+                const t = weightTrend(ms);
+                return (
+                  <>
+                    <p className="wt-summary">{weightTrendText(t)}</p>
+                    <WeightTrendChart daily={t.daily} avg={t.avg} label="Masa — średnia 7 dni" />
+                    <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie — oceniaj trend średniej z 7 dni.</p>
+                  </>
+                );
+              })()
+            ) : (
+              <LineChart label="Pomiary" series={[{ label: field, pts }]} />
+            )}
           </Card>
           <div className="card table-wrap">
             <table className="table">

@@ -1,7 +1,7 @@
 import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
-import { clonePlan, extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
+import { extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
 import { useState } from 'react';
 import { del, put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -11,6 +11,22 @@ import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf
 import { doneInPass, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
+import { AbsenceNotice, LoadSuggestPanel, ShiftPanel } from '../../components/PlanTools';
+import { PlanImport } from '../../components/PlanImport';
+import { nextBlock } from '../../lib/planShift';
+import { csvFileName, planToCsv } from '../../lib/sheetImport';
+
+/** Plik CSV do pobrania (eksport planu). */
+function downloadCsv(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function newPlan(clientId: string): Plan {
   return {
@@ -35,6 +51,9 @@ export function ClientPlans({ client }: { client: Client }) {
   // zadane na dzień i już wykonane chowamy pod „Wykonane”, żeby lista nie rosła bez końca
   const states = new Map(extraWorkouts.map((k) => [k.id, extraState(k, extra?.id, sessions, today)]));
   const [showDone, setShowDone] = useState(false);
+  // „Przesuń plan” (id planu + ewentualnie gotowe ustawienia z nieobecności) i import z arkusza
+  const [shift, setShift] = useState<{ planId: string; preset?: { from: string; days: number } } | null>(null);
+  const [importing, setImporting] = useState(false);
   const doneDated = extraWorkouts.filter((k) => states.get(k.id)!.state === 'done');
   const visibleExtra = extraWorkouts
     .filter((k) => showDone || states.get(k.id)!.state !== 'done')
@@ -100,6 +119,9 @@ export function ClientPlans({ client }: { client: Client }) {
               </select>
             );
           })()}
+          <button className="btn btn-secondary pl-import-btn" onClick={() => setImporting(true)} title="Wklej zakres z Excela / Arkuszy Google albo wybierz plik CSV / XLSX">
+            <Icon name="download" size={16} /> Import z arkusza
+          </button>
           <button className="btn btn-primary" onClick={() => openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true })}>
             + Nowy plan
           </button>
@@ -127,7 +149,20 @@ export function ClientPlans({ client }: { client: Client }) {
                     </button>
                   )}
                   <IconBtn icon="edit" label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })} />
-                  <IconBtn icon="copy" label="Duplikuj plan" onClick={() => apply(savePlan(db, clonePlan(p, `${p.name} (kopia)`)), 'Plan zduplikowany.')} />
+                  <IconBtn
+                    icon="copy"
+                    label="Duplikuj plan"
+                    onClick={() => {
+                      // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
+                      const b = nextBlock(p);
+                      void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Plan jest nieaktywny — „Ustaw aktywny”, gdy zacznie się blok.`);
+                    }}
+                  />
+                  {p.active && (
+                    <button className="btn btn-ghost btn-sm" aria-expanded={shift?.planId === p.id} onClick={() => setShift(shift?.planId === p.id ? null : { planId: p.id })} title="Przesuń daty jednostek od wybranego dnia (np. choroba, urlop)">
+                      <Icon name="cal" size={16} /> Przesuń plan
+                    </button>
+                  )}
                   <button
                     className="btn btn-ghost btn-sm"
                     title="Kopia planu do biblioteki szablonów — przypiszesz ją innym podopiecznym"
@@ -140,6 +175,9 @@ export function ClientPlans({ client }: { client: Client }) {
                   </button>
                   <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
                     <Icon name="print" size={16} /> Drukuj
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
+                    <Icon name="download" size={16} /> CSV
                   </button>
                   <IconBtn
                     icon="trash"
@@ -158,6 +196,9 @@ export function ClientPlans({ client }: { client: Client }) {
                 {nx && p.active && ` · następny: ${nx.workout.name} (${nx.week.name})`}
               </p>
               {p.notes && <p className="small pre">{p.notes}</p>}
+              {p.active && <AbsenceNotice client={client} plan={p} onShift={(from, days) => setShift({ planId: p.id, preset: { from, days } })} />}
+              {p.active && shift?.planId === p.id && <ShiftPanel key={JSON.stringify(shift.preset ?? null)} plan={p} preset={shift.preset} onClose={() => setShift(null)} />}
+              {p.active && <LoadSuggestPanel plan={p} sessions={sessions} />}
               {p.active && (
                 <PlanTable
                   plan={p}
@@ -171,6 +212,17 @@ export function ClientPlans({ client }: { client: Client }) {
           );
         })}
       </div>
+      {importing && (
+        <PlanImport
+          clientId={client.id}
+          active={!plans.some((x) => x.active)}
+          onClose={() => setImporting(false)}
+          onDone={(plan) => {
+            setImporting(false);
+            openModal({ kind: 'plan', plan, isNew: true });
+          }}
+        />
+      )}
       <Card
         className="extra-card"
         title="Treningi poza planem"

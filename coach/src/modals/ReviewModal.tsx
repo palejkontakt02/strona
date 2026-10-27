@@ -24,7 +24,7 @@ function ExSets({ e }: { e: SessionExercise }) {
     return (
       <p className="rv-sum">
         {n ? `${n} × ` : ''}
-        {e.reps || '?'} powt.{load != null ? ` · ${fnum(load)} kg` : ''}
+        {e.reps || '?'}{/[a-ząćęłńóśźż]/i.test(e.reps ?? '') ? '' : ' powt.'}{load != null ? ` · ${fnum(load)} kg` : ''}
         {e.rpe ? ` · RPE ${e.rpe.replace('.', ',')}` : ''}
       </p>
     );

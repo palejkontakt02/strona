@@ -16,6 +16,8 @@ import './styles/player.css';
 import './styles/kontakt.css';
 import './styles/inbox.css';
 import './styles/onboarding.css';
+import './styles/automaty.css';
+import './styles/plan.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

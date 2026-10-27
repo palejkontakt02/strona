@@ -7,7 +7,7 @@ const XLSX = 'UEsDBBQAAAAIAFFIWl0O+t6SBQEAAKQCAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbK
 
 describe('readXlsx', () => {
   it('czyta pierwszy arkusz i daje się zaimportować jako plan', async () => {
-    const rows = await readXlsx(Uint8Array.from(Buffer.from(XLSX, 'base64')));
+    const rows = await readXlsx(Uint8Array.from(atob(XLSX), (c) => c.charCodeAt(0)));
     expect(rows[0]).toEqual(['Tydzień', 'Ćwiczenie', 'Serie', 'Powt.', 'Ciężar']);
     expect(rows[1]).toEqual(['1', 'Przysiad ze sztangą', '3', '5', '102.5']);
     expect(rows[2]).toEqual(['', '', '', '', '']);
