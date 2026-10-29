@@ -300,6 +300,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       if (v != null) wellness[k] = v;
     }
     const session: TrainingSession = {
+      // pola spoza formularza (komentarz trenera, obejrzane nagrania, przerwany z bólu, powiązana płatność…) zostają
+      ...(existing ?? {}),
       id: existing?.id ?? uid(),
       clientId: client.id,
       date,
