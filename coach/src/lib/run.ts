@@ -68,7 +68,13 @@ export interface RunExercise {
 
 /** Nazwy aktywności cardio (domyślnie tryb cardio, da się przełączyć). */
 export function cardioByName(name: string): boolean {
-  return isRunning(name) || /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|marsz|spacer|nordic|pływani|skakank|schody|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name);
+  if (isRunning(name) || /bieżni|\bbieg\b|bieganie|przebieżk|\brower|ergometr|wioślarz|concept ?2|orbitrek|crosstrainer|pływani|skakank|stepper|air ?bike|assault|ski ?erg|cardio|kardio|\bhiit\b/i.test(name)) return true;
+  // Ćwiczenia siłowe o „cardiowych” słowach: spacer/marsz farmera, nordic hamstring/curl, wykroki w marszu, wejścia na schody / step-up.
+  const strength = /farmer|walizk|suitcase|z (ciężarem|obciążeniem|hantl|kettl|sztang)|hantl|kettl|sztang|wykrok|lunge|step[- ]?up|wejści|wchodzeni|hamstring|curl|uginani|nordyck/i;
+  if (/nordic\s*walking|nordic(?!\s*(ham|curl|leg))|marsz\s*nordic/i.test(name)) return !/hamstring|curl|uginani/i.test(name);
+  if (/\b(marsz|spacer)/i.test(name)) return !strength.test(name);
+  if (/schod/i.test(name)) return /(bieg|biegani|marsz|chód|chodzeni|podbieg)\S*\s+(po|na)\s+schod|schod\S*\s*[-–(]?\s*(bieg|marsz)|^schody$/i.test(name.trim()) && !strength.test(name);
+  return false;
 }
 
 /** Nazwy ćwiczeń zwykle robionych na czas (domyślnie „na czas”, da się wyłączyć). */
