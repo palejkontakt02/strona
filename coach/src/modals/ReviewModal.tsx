@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, Modal } from '../components/ui';
 import { RefThread } from '../components/RefComment';
-import { clientById } from '../data/ops';
+import { clientById, isSolo } from '../data/ops';
+import { PainMap } from '../components/PainMap';
+import { isAsym, painTextClass, repsLabel, spotsText } from '../lib/sessionBadges';
 import { put } from '../data/db';
 import { useStore } from '../data/store';
 import { sessionVideos, videoUrl } from '../data/videos';
@@ -11,11 +13,11 @@ import { num, repsN } from '../lib/parse';
 import { useNav } from '../nav';
 import type { SessionExercise, SetLog } from '../domain';
 
-/** Powtórzenia serii do tabeli: „5”, „8/7” (lewa/prawa), „30 s”. */
-const repsCell = (x: SetLog) => (x.reps == null ? '—' : `${fnum(x.reps)}${x.repsR != null ? `/${fnum(x.repsR)}` : ''}${x.unit ? ` ${x.unit}` : ''}`);
+/** Powtórzenia serii do tabeli jednolicie z listą i nagraniami: „5”, „5/5 L/P”, „8/str.”, „1:30/str.”, „15/10 s L/P”. */
+const repsCell = (x: SetLog, perSide?: boolean) => (x.reps == null ? '—' : repsLabel(x, perSide));
 
 /** Serie ćwiczenia: pojedynczo (zapis seria po serii) albo z podsumowania („4 × 5 × 100”). */
-function ExSets({ e }: { e: SessionExercise }) {
+function ExSets({ e, onVideo }: { e: SessionExercise; /** Kamera przy serii: pokaż to nagranie w odtwarzaczu. */ onVideo?: (video: string) => void }) {
   const log = e.setsLog ?? [];
   if (!log.length) {
     const n = repsN(e.sets);
@@ -41,13 +43,15 @@ function ExSets({ e }: { e: SessionExercise }) {
       </ol>
     );
   let n = 0;
+  // ćwiczenie bez ciężaru (wszędzie „—”) — bez kolumny kg
+  const hasKg = log.some((x) => x.load != null);
   return (
     <table className="rv-sets">
       <thead>
         <tr>
           <th scope="col">Seria</th>
           <th scope="col">{e.timed || log.some((x) => x.unit) ? 'Czas / powt.' : 'Powt.'}</th>
-          <th scope="col">kg</th>
+          {hasKg && <th scope="col">kg</th>}
           <th scope="col">RPE</th>
         </tr>
       </thead>
@@ -57,11 +61,20 @@ function ExSets({ e }: { e: SessionExercise }) {
           return (
             <tr key={i} className={x.warmup ? 'rv-warm' : undefined}>
               <td>{x.warmup ? 'rozgrz.' : x.label && x.label !== 'Robocze' ? `${n} · ${x.label.toLowerCase()}` : n}</td>
-              <td className="num">{repsCell(x)}</td>
-              <td className="num">{x.load != null ? fnum(x.load) : '—'}</td>
+              <td className={`num${isAsym(x) ? ' rv-asym' : ''}`} title={isAsym(x) ? 'Różnica między stronami' : undefined}>
+                {repsCell(x, e.perSide)}
+              </td>
+              {hasKg && <td className="num">{x.load != null ? fnum(x.load) : '—'}</td>}
               <td className="num">
                 {x.rpe != null ? fnum(x.rpe) : '—'}
-                {x.video && <Icon name="cam" size={13} />}
+                {x.video &&
+                  (onVideo ? (
+                    <button type="button" className="rv-cam" onClick={() => onVideo(x.video!)} aria-label={`Odtwórz nagranie: seria ${x.warmup ? 'rozgrzewkowa' : n}`}>
+                      <Icon name="cam" size={15} />
+                    </button>
+                  ) : (
+                    <Icon name="cam" size={13} />
+                  ))}
               </td>
             </tr>
           );
@@ -89,6 +102,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
   const [rate, setRate] = useState(1);
   const [note, setNote] = useState(s?.coachNote ?? '');
   const player = useRef<HTMLVideoElement>(null);
+  const playerBox = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
   const cur = vids[idx];
 
@@ -120,6 +134,16 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
   if (!s) return null;
   const client = clientById(db, s.clientId);
   const hasVids = vids.length > 0;
+  const solo = isSolo(db, s);
+  const stop = s.stoppedForPain;
+  const stopSpots = stop?.spots?.length ? stop.spots : s.painMap;
+  // kamera przy serii: to nagranie w odtwarzaczu na górze
+  const showVideo = (video: string) => {
+    const i = vids.findIndex((v) => v.video === video);
+    if (i >= 0) setIdx(i);
+    playerBox.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    if (i === idx) void player.current?.play?.().catch(() => {});
+  };
   const save = async () => {
     const coachNote = note.trim() || undefined;
     // bez nagrań nie ma czego „obejrzeć” — zapisujemy tylko komentarz (o ile się zmienił)
@@ -133,7 +157,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
 
   return (
     <Modal
-      title={`${client?.name ?? ''} · ${s.workoutName || 'Trening'} · ${fmtDay(s.date)}`}
+      title={client?.name ?? 'Trening'}
       onClose={closeModal}
       onSubmit={() => void save()}
       submitLabel={hasVids && !s.reviewedAt ? 'Obejrzane ✓' : 'Zapisz komentarz'}
@@ -151,43 +175,37 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
           {[
             s.duration != null && `${s.duration} min`,
             s.srpe != null && `sRPE ${fnum(s.srpe)}`,
-            s.pain != null && s.pain > 0 && `ból ${s.pain}/10`,
-            s.solo ? 'samodzielnie' : 'z trenerem',
+            solo ? 'samodzielnie' : 'z trenerem',
           ]
             .filter(Boolean)
             .join(' · ')}
+          {s.pain != null && s.pain > 0 && !stop && (
+            <>
+              {' · '}
+              <span className={painTextClass(s.pain) || undefined}>ból {s.pain}/10{s.painMap?.length ? ` (${spotsText(s.painMap)})` : ''}</span>
+            </>
+          )}
         </p>
       </div>
-      {s.notes && (
-        <div className="review-note">
-          <span className="eyebrow">Notatka podopiecznego</span>
-          <p>{s.notes}</p>
+      {stop && (
+        <div className="sb-stop-box rv-stop" role="note">
+          <b>Trening przerwany z powodu bólu</b>
+          <span>
+            ból <b>{stop.level}/10</b>
+            {stop.exName ? ` · przy ćwiczeniu: ${stop.exName}` : ''}
+          </span>
+          {stopSpots?.length ? (
+            <>
+              <span>gdzie: {spotsText(stopSpots)}</span>
+              <PainMap spots={stopSpots} readOnly />
+            </>
+          ) : (
+            <span className="muted small">Bez zaznaczonych miejsc.</span>
+          )}
         </div>
-      )}
-      <RefThread clientId={s.clientId} sessionId={s.id} />
-      {s.exercises.length > 0 ? (
-        <div className="rv-exs">
-          {s.exercises.map((e, i) => {
-            const hl = i === m.exIndex;
-            return (
-              <div key={i} ref={hl ? hlRef : undefined} className={`rv-ex${hl ? ' rv-hl' : ''}`}>
-                <div className="rv-ex-name">
-                  <b>
-                    {e.label && <span className="ex-label">{e.label}</span>} {e.name}
-                  </b>
-                  {hl && <span className="rv-hl-tag">Komentarz dotyczy tego ćwiczenia</span>}
-                </div>
-                <ExSets e={e} />
-                {e.notes && <p className="muted small">{e.notes}</p>}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="muted">Trening bez zapisanych ćwiczeń.</p>
       )}
       {hasVids && (
-        <div className="review-player">
+        <div className="review-player" ref={playerBox}>
           <div className="between">
             <b>
               {cur.exercise} <span className="muted">· {cur.label}</span>
@@ -219,6 +237,35 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
             </button>
           </div>
         </div>
+      )}
+      {s.notes && (
+        <div className="review-note">
+          <span className="eyebrow">Notatka podopiecznego</span>
+          <p>{s.notes}</p>
+        </div>
+      )}
+      <RefThread clientId={s.clientId} sessionId={s.id} />
+      {s.exercises.length > 0 ? (
+        <div className="rv-exs">
+          {s.exercises.map((e, i) => {
+            const hl = i === m.exIndex;
+            return (
+              <div key={i} ref={hl ? hlRef : undefined} className={`rv-ex${hl ? ' rv-hl' : ''}`}>
+                <div className="rv-ex-name">
+                  <b>
+                    {e.label && <span className="ex-label">{e.label}</span>} {e.name}
+                  </b>
+                  {hl && <span className="rv-hl-tag">Komentarz dotyczy tego ćwiczenia</span>}
+                  {stop && stop.exIndex === i && <span className="sb-stop small">tu przerwano — ból {stop.level}/10</span>}
+                </div>
+                <ExSets e={e} onVideo={hasVids ? showVideo : undefined} />
+                {e.notes && <p className="muted small">{e.notes}</p>}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="muted">Trening bez zapisanych ćwiczeń.</p>
       )}
       <label className="field">
         <span>Komentarz dla podopiecznego (zobaczy go przy tym treningu)</span>

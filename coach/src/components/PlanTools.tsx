@@ -7,7 +7,8 @@ import { fmtShort, plural } from '../format';
 import { todayISO, weekStart } from '../lib/dates';
 import { applySuggestions, suggestLoads, type LoadSuggestion } from '../lib/loadSuggest';
 import { fmtWeekdayDate } from '../lib/planGrid';
-import { absenceShift, planDates, shiftPlanFrom, shiftPreview, type Absence } from '../lib/planShift';
+import { absenceShift, doneWorkoutIds, planDates, shiftPlanFrom, shiftPreview, type Absence } from '../lib/planShift';
+import { nextWorkout } from '../lib/plan';
 import { Field, Icon, Tag } from './ui';
 
 const kg = (v: number) => `${String(Math.round(v * 100) / 100).replace('.', ',')} kg`;
@@ -17,8 +18,8 @@ const nDays = (n: number) => `${n} ${plural(Math.abs(n), 'dzień', 'dni', 'dni')
 export const absencesOf = (c: Client) => (c as Client & { absences?: Absence[] }).absences;
 
 /** Bursztynowa informacja: na nieobecność klienta wypadają treningi planu → propozycja przesunięcia. */
-export function AbsenceNotice({ client, plan, onShift }: { client: Client; plan: Plan; onShift: (from: string, days: number) => void }) {
-  const hit = absenceShift(plan, absencesOf(client), todayISO());
+export function AbsenceNotice({ client, plan, sessions, onShift }: { client: Client; plan: Plan; sessions?: TrainingSession[]; onShift: (from: string, days: number) => void }) {
+  const hit = absenceShift(plan, absencesOf(client), todayISO(), sessions);
   if (!hit) return null;
   const { absence: a, from, days } = hit;
   return (
@@ -35,8 +36,27 @@ export function AbsenceNotice({ client, plan, onShift }: { client: Client; plan:
   );
 }
 
+const DAY_CHIPS = [-3, -2, -1, 1, 2, 3, 7];
+const MIN_DAYS = -28;
+const MAX_DAYS = 56;
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+/** „-3”, „−3”, „+2”, „7” → liczba; inaczej null. */
+const parseDays = (t: string) => {
+  const m = t.trim().replace(/[−–]/, '-').match(/^([+-]?)\s*(\d{1,3})$/);
+  return m ? (m[1] === '-' ? -1 : 1) * Number(m[2]) : null;
+};
+
+/** Data następnej niewykonanej jednostki planu (≥ dziś): najpierw „następna” z kolejności, potem najwcześniejsza niewykonana. */
+export function nextUndoneDate(plan: Plan, sessions: TrainingSession[] | undefined, today: string): string | undefined {
+  const done = doneWorkoutIds(plan, sessions);
+  const ds = planDates(plan).filter((x) => !done.has(plan.weeks[x.wi].workouts[x.ki].id) && x.date >= today);
+  const nx = nextWorkout(plan, sessions ?? []);
+  const nxd = nx && ds.find((x) => plan.weeks[x.wi].workouts[x.ki].id === nx.workout.id)?.date;
+  return nxd ?? ds.map((x) => x.date).sort()[0];
+}
+
 /** Panel „Przesuń plan”: od wybranego tygodnia / dnia o N dni, z podglądem dat i cofnięciem. */
-export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { from: string; days: number }; onClose: () => void }) {
+export function ShiftPanel({ plan, sessions, preset, onClose }: { plan: Plan; sessions?: TrainingSession[]; preset?: { from: string; days: number }; onClose: () => void }) {
   const { db, apply, toast } = useStore();
   const today = todayISO();
   const weeks = useMemo(() => {
@@ -46,17 +66,23 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
       return first ? [{ name: w.name, first }] : [];
     });
   }, [plan]);
-  const def = preset?.from ?? weeks.find((w) => w.first >= today)?.first ?? planDates(plan).map((x) => x.date).filter((d) => d >= today).sort()[0] ?? weeks[0]?.first ?? today;
+  const nextFrom = useMemo(() => nextUndoneDate(plan, sessions, today), [plan, sessions, today]);
+  const def = preset?.from ?? nextFrom ?? weeks.find((w) => w.first >= today)?.first ?? weeks[0]?.first ?? today;
   const [from, setFrom] = useState(def);
-  const [days, setDays] = useState(preset?.days ?? 7);
-  const custom = !weeks.some((w) => w.first === from);
-  const rows = shiftPreview(plan, from, days);
+  // „Inna data…” — własne pole daty (też gdy domyślna data nie jest początkiem tygodnia ani następną jednostką)
+  const [custom, setCustom] = useState(() => def !== nextFrom && !weeks.some((w) => w.first === def));
+  const [daysText, setDaysText] = useState(String(preset?.days ?? 7));
+  const parsed = parseDays(daysText);
+  const valid = parsed != null && parsed !== 0 && parsed >= MIN_DAYS && parsed <= MAX_DAYS;
+  const days = valid ? parsed! : 0;
+  const rows = shiftPreview(plan, from, days, sessions);
   const total = rows.reduce((a, r) => a + r.count, 0);
+  const selValue = custom ? '__custom' : from === nextFrom ? '__next' : from;
 
   const run = async () => {
     if (!rows.length) return;
     const before = plan;
-    if (!(await apply(savePlan(db, shiftPlanFrom(plan, from, days))))) return;
+    if (!(await apply(savePlan(db, shiftPlanFrom(plan, from, days, sessions))))) return;
     toast(`Przesunięto ${total} ${plural(total, 'jednostkę', 'jednostki', 'jednostek')} o ${nDays(days)} (od ${fmtShort(from)}).`, {
       label: 'Cofnij',
       run: () => void apply([put('plans', before)], 'Cofnięto przesunięcie planu.'),
@@ -79,40 +105,51 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
     <div className="pt-panel" role="group" aria-label="Przesuń plan">
       <div className="pt-panel-head">
         <strong>Przesuń resztę planu</strong>
-        <span className="muted small">Jednostki od wybranego dnia przesuną się o tyle samo; wcześniejsze zostają.</span>
+        <span className="muted small">Jednostki od wybranego dnia przesuną się o tyle samo; wcześniejsze i już zrobione zostają.</span>
       </div>
       <div className="pt-form">
         <Field label="Od">
-          <select className="input" value={custom ? '' : from} onChange={(e) => e.target.value && setFrom(e.target.value)}>
+          <select
+            className="input"
+            value={selValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '__custom') return setCustom(true);
+              setCustom(false);
+              setFrom(v === '__next' ? nextFrom! : v);
+            }}
+          >
+            {nextFrom && <option value="__next">Następna jednostka · {fmtWeekdayDate(nextFrom)}</option>}
             {weeks.map((w) => (
               <option key={w.name + w.first} value={w.first}>
                 {w.name} · od {fmtWeekdayDate(w.first)}
               </option>
             ))}
-            <option value="">Inna data…</option>
+            <option value="__custom">Inna data…</option>
           </select>
         </Field>
         {custom && (
           <Field label="Od dnia">
-            <input className="input" type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} />
+            <input className="input" type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} autoFocus />
           </Field>
         )}
-        <Field label="O ile dni">
-          <input className="input pt-days" type="number" inputMode="numeric" min={-28} max={84} value={days} onChange={(e) => setDays(Math.max(-28, Math.min(84, Math.round(Number(e.target.value) || 0))))} />
+        <Field label="O ile dni" hint={!valid && daysText.trim() ? `Liczba od ${signed(MIN_DAYS)} do ${signed(MAX_DAYS)}, bez zera` : 'Minus = wcześniej'}>
+          <input className={`input pt-days ${!valid && daysText.trim() ? 'is-invalid' : ''}`} type="text" inputMode="numeric" enterKeyHint="done" aria-invalid={!valid && !!daysText.trim()} value={daysText} placeholder="np. 7 albo -2" onChange={(e) => setDaysText(e.target.value.replace(/[^\d+\-−–]/g, '').slice(0, 4))} />
         </Field>
       </div>
-      <div className="pt-chips">
-        {[1, 2, 3].map((n) => (
-          <button key={n} type="button" className={`chip ${days === n ? 'active' : ''}`} aria-pressed={days === n} onClick={() => setDays(n)}>
-            +{nDays(n)}
+      <div className="pt-chips" role="group" aria-label="Szybki wybór dni">
+        {DAY_CHIPS.map((n) => (
+          <button key={n} type="button" className={`chip pt-daychip ${days === n ? 'active' : ''}`} aria-pressed={days === n} aria-label={`${n > 0 ? 'Później' : 'Wcześniej'} o ${nDays(n)}`} onClick={() => setDaysText(String(n))}>
+            {signed(n)}
           </button>
         ))}
         <button
           type="button"
           className={`chip ${days === 7 && from === weekStart(from) ? 'active' : ''}`}
           onClick={() => {
-            setDays(7);
+            setDaysText('7');
             setFrom(weekStart(from));
+            setCustom(!weeks.some((w) => w.first === weekStart(from)) && weekStart(from) !== nextFrom);
           }}
         >
           Wstaw tydzień przerwy
@@ -130,7 +167,7 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
           {rows.length > 8 && <li className="muted small">i {rows.length - 8} kolejne tygodnie</li>}
         </ul>
       ) : (
-        <p className="muted small">{days ? 'Od tego dnia nie ma już jednostek planu.' : 'Wpisz liczbę dni.'}</p>
+        <p className="muted small">{valid ? 'Od tego dnia nie ma już niewykonanych jednostek planu.' : 'Wpisz liczbę dni albo wybierz z listy.'}</p>
       )}
       <div className="pt-actions">
         <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
@@ -144,8 +181,49 @@ export function ShiftPanel({ plan, preset, onClose }: { plan: Plan; preset?: { f
   );
 }
 
-const TAG: Record<LoadSuggestion['kind'], { tone: 'ok' | 'warn' | 'muted'; text: (s: LoadSuggestion) => string }> = {
-  add: { tone: 'ok', text: (s) => `dodaj +${kg(s.next - s.last)}` },
+/** Szybkie „Przesuń od dziś” przy „następny”: drugie stuknięcie wybiera +1 dzień / +2 dni / tydzień i od razu zapisuje (z cofnięciem). */
+export function QuickShift({ plan, sessions }: { plan: Plan; sessions?: TrainingSession[] }) {
+  const { db, apply, toast } = useStore();
+  const [open, setOpen] = useState(false);
+  const today = todayISO();
+  if (!shiftPreview(plan, today, 1, sessions).length) return null;
+  const go = async (days: number) => {
+    const rows = shiftPreview(plan, today, days, sessions);
+    const total = rows.reduce((a, r) => a + r.count, 0);
+    const before = plan;
+    setOpen(false);
+    if (!(await apply(savePlan(db, shiftPlanFrom(plan, today, days, sessions))))) return;
+    toast(`Przesunięto ${total} ${plural(total, 'jednostkę', 'jednostki', 'jednostek')} o ${nDays(days)} (od dziś).`, {
+      label: 'Cofnij',
+      run: () => void apply([put('plans', before)], 'Cofnięto przesunięcie planu.'),
+    });
+  };
+  if (!open)
+    return (
+      <button type="button" className="btn btn-ghost btn-sm pt-quick" aria-expanded={false} onClick={() => setOpen(true)} title="Przesuń niewykonane jednostki od dziś (np. podopieczny dziś nie może)">
+        <Icon name="cal" size={16} /> Przesuń od dziś
+      </button>
+    );
+  return (
+    <span className="pt-quick-row" role="group" aria-label="Przesuń od dziś o">
+      {[
+        [1, '+1 dzień'],
+        [2, '+2 dni'],
+        [7, '+tydzień'],
+      ].map(([n, t]) => (
+        <button key={n} type="button" className="chip pt-daychip" onClick={() => void go(n as number)}>
+          {t}
+        </button>
+      ))}
+      <button type="button" className="icon-btn" aria-label="Anuluj przesunięcie" onClick={() => setOpen(false)}>
+        <Icon name="x" size={16} />
+      </button>
+    </span>
+  );
+}
+
+const TAG: Record<LoadSuggestion['kind'], { tone: 'neutral' | 'warn' | 'muted'; text: (s: LoadSuggestion) => string }> = {
+  add: { tone: 'neutral', text: (s) => `dodaj +${kg(s.next - s.last)}` },
   cut: { tone: 'warn', text: () => 'zmniejsz −5%' },
   hold: { tone: 'muted', text: () => 'utrzymaj' },
 };
@@ -210,7 +288,7 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
                     />
                     <span className="ls-name">{s.exercise}</span>
                   </label>
-                  <Tag tone={TAG[s.kind].tone}>{TAG[s.kind].text(s)}</Tag>
+                  <Tag tone={TAG[s.kind].tone} outline={s.kind === 'add'}>{TAG[s.kind].text(s)}</Tag>
                   <span className="ls-load">
                     <span className="pt-num">{kg(s.last)}</span>
                     {s.next !== s.last && (

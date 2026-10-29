@@ -1,4 +1,4 @@
-import { addDays, weekStart } from './dates';
+import { addDays, daysBetween, weekStart } from './dates';
 import type { Plan, PlanWeek, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { repsN } from './parse';
 
@@ -54,9 +54,13 @@ export function currentPlan(plans: Plan[]): Plan | null {
   );
 }
 
+/** Trening przerwany z powodu bólu nie zalicza jednostki planu (trener decyduje, co dalej). */
+const counts = (s: TrainingSession) => !s.stoppedForPain;
+
 /**
  * Następny trening: jednostka po ostatnio wykonanej z tego planu (wg daty, w kolejności
  * tydzień → jednostka), cyklicznie — po ostatniej wraca do pierwszej. Bez historii — pierwsza.
+ * Treningi przerwane z bólu (`stoppedForPain`) się nie liczą — następna zostaje ta sama jednostka.
  */
 export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (PlanStep & { total: number }) | null {
   if (!plan) return null;
@@ -65,7 +69,7 @@ export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (Pl
   const pos = new Map(seq.map((x, i) => [x.workout.id, i]));
   let last: { date: string; i: number } | null = null;
   for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId)) continue;
+    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId) || !counts(s)) continue;
     const i = pos.get(s.workoutId)!;
     if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
   }
@@ -81,11 +85,53 @@ export function doneInPass(plan: Plan | null, sessions: TrainingSession[]): Set<
   const seq = planSequence(plan).map((x) => x.workout.id);
   const ni = nx ? seq.indexOf(nx.workout.id) : -1;
   for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId) continue;
+    if (s.planId !== plan.id || !s.workoutId || !counts(s)) continue;
     const i = seq.indexOf(s.workoutId);
     if (i >= 0 && (ni < 0 || i < ni)) out.add(s.workoutId);
   }
   return out;
+}
+
+/**
+ * Stan planu w czasie: koniec = ostatnia data jednostki (wpisana albo z dnia tygodnia), a gdy
+ * jednostki nie mają dat — niedziela ostatniego tygodnia od startu. `ended` — dziś po końcu planu
+ * (UI pokazuje baner „plan zakończony”). `cycle` — które przejście planu wg kalendarza (1 = pierwsze).
+ */
+export function planStatus(plan: Plan | null, today: string): { ended: boolean; endDate?: string; cycle: number } {
+  if (!plan || plan.extra) return { ended: false, cycle: 1 };
+  let end: string | undefined;
+  plan.weeks.forEach((w, wi) => w.workouts.forEach((k) => {
+    const d = workoutDate(plan, wi, k);
+    if (d && (!end || d > end)) end = d;
+  }));
+  if (plan.startDate && plan.weeks.length) {
+    const lastSun = addDays(weekStart(plan.startDate), plan.weeks.length * 7 - 1);
+    if (!end) end = lastSun;
+  }
+  if (!end) return { ended: false, cycle: 1 };
+  const ended = today > end;
+  let cycle = 1;
+  if (plan.startDate && plan.weeks.length) {
+    const days = daysBetween(weekStart(plan.startDate), today);
+    if (days > 0) cycle = Math.floor(days / (plan.weeks.length * 7)) + 1;
+  }
+  return { ended, endDate: end, cycle };
+}
+
+/**
+ * Realna najbliższa data jednostki `nx` (z nextWorkout): data z planu, jeśli jeszcze nie minęła;
+ * w kolejnym przejściu planu (albo gdy data minęła) — najbliższy dzień tygodnia tej jednostki ≥ dziś.
+ * Bez dnia i daty — undefined.
+ */
+export function nextDate(plan: Plan | null, nx: Pick<PlanStep, 'week' | 'workout'> | null | undefined, today: string): string | undefined {
+  if (!plan || !nx) return undefined;
+  const wi = plan.weeks.findIndex((w) => w.id === nx.week.id);
+  const d = workoutDate(plan, Math.max(0, wi), nx.workout);
+  if (!d) return undefined;
+  if (d >= today) return d;
+  const dow = nx.workout.day || (daysBetween(weekStart(d), d) + 1);
+  const cand = addDays(weekStart(today), dow - 1);
+  return cand >= today ? cand : addDays(cand, 7);
 }
 
 /** Podsumowanie ćwiczenia z serii (zgodność z widokami listy): liczba serii roboczych i parametry pierwszej. */

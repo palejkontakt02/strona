@@ -19,15 +19,8 @@ async function readActivity(file: File): Promise<{ act: Activity; lib: Parser }>
   return { act: lib.parseActivity(file.name, await file.arrayBuffer()), lib };
 }
 
-/**
- * Formularz treningu (trener): import wypełnia pierwsze ćwiczenie cardio bez wpisanych km / tętna (np. bieg z planu,
- * zachowując nazwę z planu); gdy takiego nie ma — dopisuje nowe. Puste wiersze bez nazwy znikają.
- */
-export function fillCardioRows<T extends { name: string; cardio?: boolean; series?: { dist?: string; hr?: string }[] }>(rows: T[], imported: T): T[] {
-  const kept = rows.filter((r) => r.name.trim());
-  const i = kept.findIndex((r) => r.cardio && !(r.series ?? []).some((x) => (x.dist ?? '').trim() || (x.hr ?? '').trim()));
-  return i < 0 ? [...kept, imported] : kept.map((r, j) => (j === i ? { ...r, series: imported.series } : r));
-}
+/** Formularz treningu (trener): import zastępuje odcinki z planu albo wypełnia puste cardio — patrz lib/importTarget. */
+export { fillCardioRows } from '../lib/importTarget';
 
 const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '');
 
@@ -36,7 +29,13 @@ const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('
  * - z `clientId` (aplikacja podopiecznego): zapisuje trening samodzielny (tylko kolekcja sessions),
  * - z `onImport` (okno treningu u trenera): oddaje ćwiczenie cardio do wstawienia w formularz.
  */
-export function ImportActivity({ clientId, onImport, small }: { clientId?: string; onImport?: (ex: SessionExercise, a: Activity) => void; small?: boolean }) {
+export function ImportActivity({ clientId, onImport, small, target }: {
+  clientId?: string;
+  onImport?: (ex: SessionExercise, a: Activity) => void;
+  small?: boolean;
+  /** Okno treningu: co zrobi wstawienie (np. „Zastąpi odcinki z planu …”) — dla nazwy ćwiczenia i liczby odcinków. */
+  target?: (name: string, segs: number) => string;
+}) {
   const { db, apply, toast, ask } = useStore();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -150,7 +149,7 @@ export function ImportActivity({ clientId, onImport, small }: { clientId?: strin
             </div>
           </dl>
           {a.elapsedMin - a.movingMin >= 1 && <p className="muted small">Całkowity czas {fmtClock(a.elapsedMin)} (z postojami).</p>}
-          {a.laps.length > 1 && (
+          {a.laps.length > 1 && a.splits.length > 0 && (
             <div className="chips imp-mode" role="group" aria-label="Odcinki">
               <button type="button" className={`chip ${useLaps ? 'active' : ''}`} aria-pressed={useLaps} onClick={() => setUseLaps(true)}>
                 Okrążenia z zegarka ({a.laps.length})
@@ -184,6 +183,7 @@ export function ImportActivity({ clientId, onImport, small }: { clientId?: strin
               </tbody>
             </table>
           </div>
+          {onImport && target && exercise && <p className="small imp-target">{target(exercise.name, rows.length)}</p>}
           {!onImport && (
             <div className="imp-fields">
               <label className="field">

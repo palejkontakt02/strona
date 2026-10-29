@@ -194,7 +194,7 @@ describe('import TCX', () => {
     expect(a.movingMin).toBeCloseTo(10.17, 2);
     expect(a.laps).toEqual([
       { km: 1, min: 5, hr: 150 },
-      { km: 1, min: 5.17, hr: 160 },
+      { km: 1, min: 5.1667, hr: 160 },
     ]);
     expect(a.avgHr).toBe(155);
     expect(a.maxHr).toBe(171);
@@ -203,13 +203,27 @@ describe('import TCX', () => {
   it('okrążenia zamiast kilometrów, gdy jest ich kilka', () => {
     expect(activityRows(a).map((r) => [r.reps, r.dist, r.hr])).toEqual([
       [5, 1, 150],
-      [5.17, 1, 160],
+      [5.1667, 1, 160],
     ]);
     expect(activityRows(a, false)).toHaveLength(2); // z punktów: też 2 × 1 km
   });
   it('rozpoznanie formatu po treści', () => {
     const buf = new TextEncoder().encode(tcx()).buffer as ArrayBuffer;
     expect(parseActivity('export.xml', buf).source).toBe('tcx');
+  });
+});
+
+describe('import — sumy co do sekundy', () => {
+  // 12 okrążeń po 4:45,083 s (r2 minut gubiło sekundę: 57:01 → 57:00)
+  const laps = Array.from({ length: 12 }, (_, i) => `<Lap StartTime="${iso(T0 + i * 285083)}"><TotalTimeSeconds>285.083</TotalTimeSeconds><DistanceMeters>1000</DistanceMeters></Lap>`).join('');
+  const xml = `<TrainingCenterDatabase><Activities><Activity Sport="Running"><Id>${iso(T0)}</Id>${laps}</Activity></Activities></TrainingCenterDatabase>`;
+  it('czas w ruchu z sekund okrążeń, wiersze sumują się do tego samego czasu', () => {
+    const a = parseTcx(xml);
+    expect(Math.round(a.movingMin * 60)).toBe(3421); // 57:01
+    expect(a.splits).toEqual([]); // bez GPS — brak odcinków co 1 km
+    expect(a.laps).toHaveLength(12);
+    const rows = activityRows(a);
+    expect(Math.round(rows.reduce((s, r) => s + r.reps!, 0) * 60)).toBe(3421);
   });
 });
 
@@ -228,11 +242,11 @@ describe('import FIT', () => {
   });
   it('podsumowanie z session, okrążenia z lap', () => {
     const a = parseFit(f);
-    expect(a).toMatchObject({ source: 'fit', sport: 'running', km: 2, movingMin: 10.03, elapsedMin: 10.08, avgHr: 150, maxHr: 170, start: iso(T0), date: '2026-10-20' });
+    expect(a).toMatchObject({ source: 'fit', sport: 'running', km: 2, movingMin: 10.0333, elapsedMin: 10.0833, avgHr: 150, maxHr: 170, start: iso(T0), date: '2026-10-20' });
     expect(a.pace).toBe('5:01/km');
     expect(a.laps).toEqual([
       { km: 1, min: 5, hr: 148 },
-      { km: 1, min: 5.03, hr: 152 },
+      { km: 1, min: 5.0333, hr: 152 },
     ]);
     expect(a.splits.map((s) => s.km)).toEqual([1, 1]);
   });

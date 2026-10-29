@@ -22,6 +22,8 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
   const [header, setHeader] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [start, setStart] = useState(nextMonday(todayISO()));
+  // domyślnie aktywny, gdy klient nie ma aktywnego planu albo aktywny już się zakończył
+  const [makeActive, setMakeActive] = useState(active);
 
   const rows = useMemo(() => fileRows ?? (text.trim() ? parseTable(text) : null), [fileRows, text]);
   const guess = useMemo(() => (rows ? detectColumns(rows) : null), [rows]);
@@ -60,7 +62,7 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
       submitLabel="Otwórz w edytorze"
       onSubmit={() => {
         if (!result || !result.stats.exercises) return setErr('Nie rozpoznano żadnego ćwiczenia — sprawdź przypisanie kolumny „Ćwiczenie”.');
-        onDone({ ...result.plan, active });
+        onDone({ ...result.plan, active: makeActive });
       }}
     >
       <p className="muted small">
@@ -158,6 +160,10 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
               <input className="input" type="date" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} />
             </Field>
           </div>
+          <label className="check pi-active">
+            <input type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} /> Ustaw jako aktywny
+            <span className="muted small">{makeActive ? ' — podopieczny zobaczy go jako swój plan po zapisaniu' : ' — zapisze się obok obecnego planu'}</span>
+          </label>
           <p className="pi-stats">
             <span className="pt-num">{result.stats.weeks}</span> {plural(result.stats.weeks, 'tydzień', 'tygodnie', 'tygodni')} · <span className="pt-num">{result.stats.workouts}</span> {plural(result.stats.workouts, 'jednostka', 'jednostki', 'jednostek')} · <span className="pt-num">{result.stats.exercises}</span> {plural(result.stats.exercises, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}
           </p>

@@ -1,0 +1,225 @@
+/* Runda 5 — listy treningów: Treningi u trenera, podgląd treningu (ReviewModal), arkusz historii. */
+
+/* ból: jeden próg (bursztyn 4–5, czerwony ≥ 6) — lib/sessionBadges.ts */
+.pain-warn {
+  color: var(--color-warn);
+  font-weight: 600;
+}
+.pain-danger {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* znaczniki w wierszu */
+.sb-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  vertical-align: middle;
+}
+.sb-badges:empty {
+  display: none;
+}
+.sb-badges .tag {
+  white-space: nowrap;
+}
+.sb-badges .tag svg {
+  vertical-align: -2px;
+}
+.sb-stop-tag {
+  white-space: normal;
+}
+.sb-stop {
+  display: block;
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* przerwany z powodu bólu — ramka w arkuszu i podglądzie */
+.sb-stop-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+  margin: var(--space-2) 0 var(--space-3);
+}
+.sb-stop-box > b:first-child {
+  color: var(--color-danger);
+}
+.sb-stop-box .painmap {
+  margin-top: var(--space-2);
+}
+.sb-stop-box .painmap .pm-figs {
+  max-width: 300px;
+}
+
+/* --- Zapisane treningi --- */
+.sess-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.sess-next-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sess-next-main strong {
+  font-size: 17px;
+}
+.sess-next-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+@media (max-width: 600px) {
+  .sess-next-actions {
+    width: 100%;
+  }
+  .sess-next-actions .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+
+.sess-filters {
+  margin-bottom: var(--space-3);
+}
+.sess-filters .chip {
+  min-height: 36px;
+}
+@media (max-width: 900px) {
+  .sess-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
+    padding: 0 var(--space-4);
+  }
+  .sess-filters .chip {
+    flex: none;
+    min-height: 40px;
+  }
+}
+.sess-filter-n {
+  margin-left: 6px;
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+}
+
+.sess-list .sess-open {
+  gap: 4px;
+  min-width: 0;
+}
+.sess-meta {
+  font-variant-numeric: tabular-nums;
+}
+.sess-more {
+  list-style: none;
+  padding-top: var(--space-2);
+}
+.sess-stopped .sess-open strong,
+.sess-stopped .sess-title {
+  color: var(--color-text);
+}
+
+/* tabela na komputerze: mieści się w kontenerze (bez przewijania w bok) */
+.sess-table-wrap {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+.sess-table th,
+.sess-table td {
+  padding: var(--space-2) var(--space-2);
+}
+.sess-table td.sess-name {
+  min-width: 180px;
+  width: 100%;
+}
+.sess-table .sess-title {
+  display: block;
+  margin-bottom: 2px;
+}
+.sess-table .sess-note {
+  max-width: 320px;
+}
+.sess-table td.actions {
+  width: 1%;
+}
+.sess-table td.actions .icon-btn,
+.sess-table td.actions button {
+  flex: none;
+}
+.sess-table tr.sess-stopped td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-danger);
+}
+
+/* --- Wszystkie treningi --- */
+.wl-past {
+  margin-bottom: var(--space-2);
+}
+
+/* --- Podgląd treningu (ReviewModal) --- */
+.rv-asym,
+.set-chip.set-asym {
+  color: var(--color-warn);
+}
+.set-chip.set-asym {
+  box-shadow: inset 0 0 0 1px var(--color-warn);
+}
+.rv-cam {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  margin: -8px 0 -8px 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  vertical-align: middle;
+  cursor: pointer;
+}
+.rv-sets td.num .rv-cam svg {
+  margin: 0;
+  color: var(--color-text);
+}
+.rv-cam:hover,
+.rv-cam:focus-visible {
+  background: var(--color-surface);
+}
+.rv-stop {
+  margin-top: 0;
+}
+.review-player {
+  margin-bottom: var(--space-4);
+  scroll-margin-top: var(--space-4);
+}
+.sess-table .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* podgląd: mapa bólu mała, bez listy (miejsca są w tekście nad nią) — odtwarzacz zostaje wysoko */
+.rv-stop .painmap .pm-list,
+.rv-stop .painmap .pm-hint {
+  display: none;
+}
+.rv-stop .painmap .pm-figs {
+  max-width: 200px;
+  margin: 0;
+}

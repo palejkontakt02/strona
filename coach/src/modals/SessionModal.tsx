@@ -9,7 +9,7 @@ import { deleteSetVideo, sessionVideos } from '../data/videos';
 import { fnum, plural, pln, uid, nEx, nSets } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
-import { parseWorkoutNote } from '../lib/note';
+import { matchNoteWorkout, parseWorkoutNote } from '../lib/note';
 import { cardioByName, isTimed, loadPerOf, perSideByName, buildRunExercise } from '../lib/run';
 import { LoadPerToggle } from '../components/LoadPerToggle';
 import { fmtClock, paceText, parseDur, parseKm } from '../lib/running';
@@ -24,6 +24,7 @@ import { PainMap } from '../components/PainMap';
 import { cleanPainMap, painSummary } from '../lib/painMap';
 import type { PainSpot } from '../domain';
 import { fillCardioRows, ImportActivity } from '../components/ImportActivity'; // funkcje: bieg
+import { importTargetText } from '../lib/importTarget';
 
 interface ExRow {
   key: string;
@@ -78,19 +79,29 @@ interface SetDraft {
   /** Cardio / bieg: dystans (km) i tętno — tekst z pól. */
   dist?: string;
   hr?: string;
+  /** Wartości wczytane z jednostki planu, jeszcze nieruszone (import z zegarka je zastępuje). */
+  planned?: boolean;
+  /** Bieg: cel intensywności z planu („Z5”, „4:20–4:35”). */
+  tPace?: string;
+  /** Bieg: czas z zapisu / zegarka (min, z ułamkiem sekundy) — dopóki pole nie zmienione, liczymy z niego, nie z „m:ss”. */
+  rawMin?: number;
 }
+const minText = (v: number) => (Number.isInteger(v) ? String(v) : fmtClock(v));
+/** Czas odcinka (min): dokładny z zegarka, gdy pole bez zmian, inaczej z wpisanego tekstu. */
+const segMin = (x: SetDraft) => (x.rawMin != null && x.reps === minText(x.rawMin) ? x.rawMin : parseDur(x.reps));
 const fromLog = (log: NonNullable<SessionExercise['setsLog']>, cardio?: boolean): SetDraft[] =>
   log.map((x) => ({
     key: uid(),
     load: x.load != null ? fnum(x.load) : '',
     // bieg: czas jako m:ss, gdy są sekundy
-    reps: x.reps != null ? cardio && x.unit === 'min' ? (Number.isInteger(x.reps) ? String(x.reps) : fmtClock(x.reps)) : `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '',
+    reps: x.reps != null ? cardio && x.unit === 'min' ? minText(x.reps) : `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : '',
     rpe: x.rpe != null ? fnum(x.rpe) : '',
     warmup: x.warmup || undefined,
     label: x.label,
     video: x.video,
     dist: x.dist != null ? fnum(x.dist) : undefined,
     hr: x.hr != null ? String(x.hr) : undefined,
+    rawMin: cardio && x.unit === 'min' && x.reps != null ? x.reps : undefined,
   }));
 const toLog = (d: SetDraft[], cardio?: boolean, timed?: boolean): NonNullable<SessionExercise['setsLog']> =>
   d
@@ -99,8 +110,8 @@ const toLog = (d: SetDraft[], cardio?: boolean, timed?: boolean): NonNullable<Se
       const out: NonNullable<SessionExercise['setsLog']>[number] = {};
       if (cardio) {
         // odcinek: czas (min albo m:ss), dystans, tętno, RPE
-        const d = parseDur(x.reps);
-        if (d != null) out.reps = Math.round(d * 100) / 100;
+        const d = segMin(x);
+        if (d != null) out.reps = Math.round(d * 10000) / 10000; // co do sekundy — suma odcinków = czas z zegarka
         out.unit = 'min';
         const km = parseKm(x.dist);
         if (km != null) out.dist = km;
@@ -131,8 +142,21 @@ const toLog = (d: SetDraft[], cardio?: boolean, timed?: boolean): NonNullable<Se
       if (numIn(x.hr, 30, 240) != null) out.hr = numIn(x.hr, 30, 240)!;
       return out;
     });
+/** Odcinek główny biegu — bez rozgrzewki, schłodzenia i przerw (truchtu). */
+const mainSeg = (x: SetDraft) => !x.warmup && x.label !== 'Schłodzenie' && x.label !== 'Przerwa' && x.label !== 'Rozgrzewka';
+/** Bieg: liczba odcinków głównych, ich km (z dystansu) i czas. */
+function runSummary(d: SetDraft[]) {
+  const main = d.filter((x) => mainSeg(x) && (x.reps.trim() || (x.dist ?? '').trim()));
+  return { n: main.length, km: main.reduce((a, x) => a + (parseKm(x.dist) ?? 0), 0), min: main.reduce((a, x) => a + (segMin(x) ?? 0), 0) };
+}
+/** Czas wszystkich odcinków (z rozgrzewką i przerwami) — domyślny czas trwania biegu. */
+const runMinutes = (d: SetDraft[]) => d.reduce((a, x) => a + (segMin(x) ?? 0), 0);
 /** Podsumowanie ćwiczenia z serii: liczba serii roboczych, powtórzenia i ciężar pierwszej z nich. */
-function seriesSummary(d: SetDraft[], repsText: string) {
+function seriesSummary(d: SetDraft[], repsText: string, cardio?: boolean) {
+  if (cardio) {
+    const main = d.filter((x) => mainSeg(x) && (x.reps.trim() || (x.dist ?? '').trim()));
+    return { sets: String(main.length), reps: main[0]?.reps ?? '', load: '' };
+  }
   const work = d.filter((x) => !x.warmup && (x.load.trim() || x.reps.trim()));
   const first = work[0];
   return { sets: String(work.length), reps: repsText.includes('+') ? repsText : (first?.reps ?? ''), load: first?.load ?? '' };
@@ -175,18 +199,33 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   const [planRef, setPlanRef] = useState<{ planId?: string; workoutId?: string }>({ planId: existing?.planId, workoutId: existing?.workoutId });
   const [rows, setRows] = useState<ExRow[]>(() => (existing ? existing.exercises.map(toRow) : []));
   const [paste, setPaste] = useState<string | null>(m.paste ? '' : null);
+  /** Po wczytaniu notatki: linie nierozpoznane, ostrzeżenia i podpięta jednostka planu — zostają w oknie, aż trener je zamknie. */
+  const [noteInfo, setNoteInfo] = useState<{ skipped: string[]; warnings: string[]; plan?: string } | null>(null);
   /** Wczytuje ćwiczenia (seria po serii) z tekstu notatki trenera. */
   const loadNote = async () => {
     const r = parseWorkoutNote(paste ?? '');
-    if (r.exercises.length === 0) return toast('Nie rozpoznano ćwiczeń. Format: nazwa ćwiczenia, pod nią serie, np. „4x100” albo „8x70kg RPE 8”.');
+    if (r.exercises.length === 0) {
+      setNoteInfo({ skipped: r.skipped, warnings: [] });
+      return toast('Nie rozpoznano ćwiczeń. Format: nazwa ćwiczenia, pod nią serie, np. „4x100” albo „8x70kg RPE 8”.');
+    }
     const keep = rows.filter((x) => x.name.trim());
     if (keep.length && !(await ask(`Zastąpić wpisane ćwiczenia (${keep.length}) tymi z notatki?`, { confirm: 'Zastąp', danger: false }))) return;
     setRows(r.exercises.map(toRow));
-    setPlanRef({}); // trening z notatki — nie jednostka z planu
+    // nazwa treningu albo ćwiczenia z notatki pasują do jednostki planu — podpinamy ją (zaliczy się w planie)
+    const hit = matchNoteWorkout(r, seq.map((x) => x.workout));
+    // ta sama nazwa w kilku tygodniach — bierzemy najbliższą od następnej jednostki planu
+    const hitName = hit ? seq.find((x) => x.workout.id === hit.id)?.workout.name : undefined;
+    const same = seq.filter((x) => x.workout.name === hitName);
+    const nxIdx = seq.findIndex((x) => x.workout.id === nextWorkout(plan, history)?.workout.id);
+    const step = same.find((x) => seq.indexOf(x) >= nxIdx) ?? same[0];
+    const skipped = hit?.line ? r.skipped.filter((x) => x !== hit.line) : r.skipped;
+    setPlanRef(step ? { planId: step.planId, workoutId: step.workout.id } : {}); // bez dopasowania — trening z notatki, nie jednostka z planu
     if (r.date && !existing) setDate(r.date);
-    if (!workoutName.trim() || keep.length) setWorkoutName(r.exercises.slice(0, 2).map((e) => e.name.replace(/\s*\(.*\)$/, '')).join(' + '));
+    if (step) setWorkoutName(step.workout.name);
+    else if (!workoutName.trim() || keep.length) setWorkoutName(r.exercises.slice(0, 2).map((e) => e.name.replace(/\s*\(.*\)$/, '')).join(' + '));
     setPaste(null);
-    toast(`Wczytano ${nEx(r.exercises.length)} (${nSets(r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0))})${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${r.skipped.length ? ` Pominięto: ${r.skipped.join(', ')}.` : ''}`);
+    setNoteInfo(skipped.length || r.warnings.length || step ? { skipped, warnings: r.warnings, plan: step ? `${step.week.name} · ${step.workout.name}` : undefined } : null);
+    toast(`Wczytano ${nEx(r.exercises.length)} (${nSets(r.exercises.reduce((a, e) => a + (e.setsLog?.length ?? 0), 0))})${r.date ? `, data ${r.date.split('-').reverse().join('.')}` : ''}.${skipped.length ? ` Nie rozpoznano: ${skipped.length} ${plural(skipped.length, 'linia', 'linie', 'linii')}.` : ''}`);
   };
   const [w, setW] = useState<Record<keyof Wellness, string>>({
     sleep: s(existing?.wellness?.sleep),
@@ -197,7 +236,13 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   });
   const [sleepH, setSleepH] = useState(s(existing?.sleepH));
   const [rhr, setRhr] = useState(s(existing?.rhr));
-  const [duration, setDuration] = useState(s(existing?.duration ?? m.appt?.duration ?? (existing ? undefined : 60)));
+  const [duration, setDurationRaw] = useState(s(existing?.duration ?? m.appt?.duration ?? (existing ? undefined : 60)));
+  // bieg: czas trwania = suma odcinków, dopóki trener sam go nie wpisze
+  const [durTouched, setDurTouched] = useState(!!existing?.duration);
+  const setDuration = (v: string) => {
+    setDurTouched(true);
+    setDurationRaw(v);
+  };
   const [srpe, setSrpe] = useState(s(existing?.srpe));
   const [pain, setPain] = useState(s(existing?.pain));
   const [painMap, setPainMap] = useState<PainSpot[]>(() => existing?.painMap ?? []);
@@ -255,6 +300,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             warmup: x.warmup || undefined,
             label: x.label && x.label !== 'Robocze' ? x.label : undefined,
             dist: x.dist || undefined,
+            tPace: x.pace || undefined,
+            planned: true,
           })),
         };
       }),
@@ -275,6 +322,13 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   }
 
   const setRow = (i: number, patch: Partial<ExRow>) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  /** Wybór jednostki z listy: wpisane serie (nie z planu) — najpierw pytamy. */
+  const pickWorkout = async (workoutId: string) => {
+    const step = seq.find((x) => x.workout.id === workoutId);
+    const typed = rows.some((r) => r.name.trim() && (r.series ?? []).some((x) => !x.planned && (x.reps.trim() || x.load.trim() || (x.dist ?? '').trim() || (x.hr ?? '').trim())));
+    if (step && typed && !(await ask(`Zastąpić wpisane ćwiczenia i serie ćwiczeniami z jednostki ${step.workout.name}?`, { confirm: 'Zastąp', danger: false }))) return;
+    loadWorkout(workoutId);
+  };
   const setSeries = (i: number, f: (d: SetDraft[]) => SetDraft[]) => setRows((r) => r.map((x, j) => (j === i ? { ...x, series: f(x.series ?? []) } : x)));
   /** Rozpisuje podsumowanie („4 × 5 × 100”) na osobne serie do edycji. */
   const splitRow = (i: number) => {
@@ -284,12 +338,16 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
   };
   const moveUp = (i: number) => i > 0 && setRows((r) => moveInBlocks(r, i, -1));
 
-  const au = num(srpe) != null && num(duration) != null ? num(srpe)! * num(duration)! : null;
+  const named = rows.filter((r) => r.name.trim());
+  const runMin = named.length && named.every((r) => r.cardio) ? named.reduce((a, r) => a + runMinutes(r.series ?? []), 0) : 0;
+  const durAuto = !durTouched && runMin >= 1 ? String(Math.round(runMin)) : null;
+  const durEff = durAuto ?? duration;
+  const au = num(srpe) != null && num(durEff) != null ? num(srpe)! * num(durEff)! : null;
 
   const save = async () => {
     if (!client) return toast('Wybierz podopiecznego.');
     if (!date) return toast('Podaj datę treningu.');
-    if (duration.trim() && numIn(duration, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
+    if (durEff.trim() && numIn(durEff, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
     const problem = chargeProblem(db, effCharge, locationId);
     if (num(srpe) == null && rows.some((r) => r.name.trim()) && !(await ask('Nie zaznaczono, jak ciężki był trening (sRPE) — nie wliczy się do obciążenia (ACWR). Zapisać mimo to?', { confirm: 'Zapisz bez sRPE', danger: false })))
       return;
@@ -307,7 +365,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       date,
       workoutName: workoutName.trim() || undefined,
       charge: effCharge,
-      duration: numIn(duration, 1, 600) ?? undefined,
+      duration: numIn(durEff, 1, 600) ?? undefined,
       srpe: num(srpe) ?? undefined,
       pain: num(pain) ?? (cleanPainMap(painMap).length ? Math.max(...cleanPainMap(painMap).map((x) => x.level)) : undefined),
       painMap: cleanPainMap(painMap).length ? cleanPainMap(painMap) : undefined,
@@ -323,7 +381,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       exercises: withBlockLabels(rows).map((r) => ({
         name: r.name.trim(),
         label: r.label,
-        ...(r.series ? { ...seriesSummary(r.series, r.reps), rpe: '' } : { sets: r.sets, reps: r.reps, load: r.load, rpe: r.rpe }),
+        ...(r.series ? { ...seriesSummary(r.series, r.reps, r.cardio), rpe: '' } : { sets: r.sets, reps: r.reps, load: r.load, rpe: r.rpe }),
         rest: r.rest || undefined,
         notes: r.notes || undefined,
         setsLog: r.series ? toLog(r.series, r.cardio, r.timed) : undefined,
@@ -398,7 +456,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </Field>
         <Field label="Jednostka z planu">
-          <select className="input" value={planRef.workoutId ?? ''} onChange={(e) => (e.target.value ? loadWorkout(e.target.value) : setPlanRef({}))} disabled={!seq.length}>
+          <select className="input" value={planRef.workoutId ?? ''} onChange={(e) => (e.target.value ? void pickWorkout(e.target.value) : setPlanRef({}))} disabled={!seq.length}>
             <option value="">{seq.length ? '— bez planu —' : 'brak planu'}</option>
             {seq.map((x) => (
               <option key={x.workout.id} value={x.workout.id}>
@@ -451,6 +509,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
               setSolo(v === 'Samodzielnie');
               // samodzielny — bez rozliczenia (pakiet / sesja) i bez łączenia z wizytą; zmienisz niżej, jeśli trzeba
               if (!existing) setCharge(v === 'Samodzielnie' ? 'brak' : '');
+              // samodzielnie — nie w miejscu trenera (domyślna sala klienta nie przechodzi); z trenerem — z wizyty / domyślne
+              setLocationId(v === 'Samodzielnie' ? '' : existing?.locationId ?? m.appt?.locationId ?? client?.locationId ?? '');
             }}
             label="Z kim był trening"
           />
@@ -458,6 +518,14 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         <Field label="Nazwa treningu" wide>
           <input className="input" value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} placeholder="np. A – dół ciała" />
         </Field>
+        {/* sRPE i czas wysoko — zapis bez przewijania całego formularza (na telefonie ~4000 px) */}
+        <Field label="Czas trwania (min)" hint={durAuto ? 'suma odcinków — wpisz, jeśli inny' : undefined}>
+          <input className="input" inputMode="numeric" value={durEff} onChange={(e) => setDuration(e.target.value)} />
+        </Field>
+        <div className="field field-wide-2 sm-srpe">
+          <span>sRPE – ciężkość treningu (0–10){au != null && <strong className="text-accent"> · {fnum(au, 0)} AU</strong>}</span>
+          <Scale label="sRPE" value={srpe} onChange={setSrpe} max={10} />
+        </div>
       </div>
 
 
@@ -470,7 +538,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         )}
       </div>
       {/* funkcje: bieg — import z zegarka (GPX/TCX/FIT): wstawia odcinki cardio (czas, km, tętno) */}
-      <ImportActivity small onImport={(ex, act) => { setRows((rs) => fillCardioRows(rs, toRow(ex))); if (!workoutName.trim()) setWorkoutName(ex.name); setDuration(String(Math.round(act.elapsedMin || act.movingMin))); if (!existing && act.date) setDate(act.date); }} />
+      <ImportActivity small target={(name, n) => importTargetText(rows, name, n)} onImport={(ex, act) => { setRows((rs) => fillCardioRows(rs, toRow(ex))); if (!workoutName.trim()) setWorkoutName(ex.name); setDuration(String(Math.round(act.elapsedMin || act.movingMin))); if (!existing && act.date) setDate(act.date); }} />
       {paste !== null && (
         <div className="paste-box">
           <textarea
@@ -492,6 +560,35 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           </div>
         </div>
       )}
+      {noteInfo && (
+        <div className={`sm-note-info ${noteInfo.skipped.length || noteInfo.warnings.length ? 'warn' : ''}`} role="status">
+          <div className="sm-note-body">
+            {noteInfo.plan && (
+              <p className="small">
+                <Icon name="check" size={14} /> Pasuje do jednostki z planu: <strong>{noteInfo.plan}</strong> — podpięta (zmienisz wyżej).
+              </p>
+            )}
+            {noteInfo.skipped.length > 0 && (
+              <>
+                <p className="small"><strong>Nie rozpoznano ({noteInfo.skipped.length}):</strong></p>
+                <ul className="sm-note-list">
+                  {noteInfo.skipped.map((x, k) => <li key={k}>{x}</li>)}
+                </ul>
+              </>
+            )}
+            {noteInfo.warnings.length > 0 && (
+              <>
+                <p className="small"><strong>Sprawdź:</strong></p>
+                <ul className="sm-note-list">
+                  {noteInfo.warnings.map((x, k) => <li key={k}>{x}</li>)}
+                </ul>
+              </>
+            )}
+          </div>
+          <IconBtn icon="x" label="Zamknij informację o notatce" onClick={() => setNoteInfo(null)} />
+        </div>
+      )}
+      {rows.some((r) => r.series && !r.cardio) && <p className="muted small sm-warm-hint">Dotknij numeru serii, by oznaczyć rozgrzewkę (R).</p>}
       <div className="ex-table">
         <div className="ex-head">
           <span>Ćwiczenie</span>
@@ -507,14 +604,27 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             <input className="input" list="lib-exercises" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="Ćwiczenie" aria-label="Ćwiczenie" />
             {(() => {
               // Przy seriach rozpisanych podsumowanie liczy się samo — edytujesz serie poniżej.
-              const sum = r.series ? seriesSummary(r.series, r.reps) : null;
+              const sum = r.series ? seriesSummary(r.series, r.reps, r.cardio) : null;
+              if (sum && r.cardio) {
+                // bieg: „6 odcinków · 4,8 km · 22:30” — tylko odcinki główne (bez rozgrzewki, schłodzenia, przerw), km z dystansu
+                const rs = runSummary(r.series!);
+                const txt = [`${rs.n} ${plural(rs.n, 'odcinek', 'odcinki', 'odcinków')}`, rs.km > 0 && `${fnum(rs.km, 2)} km`, rs.min > 0 && fmtClock(rs.min)].filter(Boolean).join(' · ');
+                return (
+                  <>
+                    <span className="ex-derived ex-derived-run" title="Odcinki główne (bez rozgrzewki, schłodzenia i przerw)">{txt}</span>
+                    <span className="ex-derived sm-gap" aria-hidden="true" />
+                    <span className="ex-derived sm-gap" aria-hidden="true" />
+                    <span className="ex-derived" aria-hidden="true" />
+                  </>
+                );
+              }
               return (
                 sum ? (
                   // podsumowanie z serii poniżej — tekst z jednostkami zamiast pól tylko do odczytu (4 elementy: układ siatki bez zmian)
                   <>
                     <span className="ex-derived" title="Serie robocze (liczone z serii poniżej)">{sum.sets} {plural(Number(sum.sets) || 0, 'seria', 'serie', 'serii')}</span>
                     <span className="ex-derived" title="Powtórzenia pierwszej serii roboczej">{sum.reps ? (r.timed || r.cardio || /[a-ząćęłńóśźż:]/i.test(sum.reps) ? sum.reps : `${sum.reps} powt.`) : '—'}</span>
-                    <span className="ex-derived" title="Ciężar pierwszej serii roboczej">{sum.load ? `${dec(sum.load)} ${r.cardio ? 'km' : 'kg'}` : '—'}</span>
+                    <span className="ex-derived" title="Ciężar pierwszej serii roboczej">{sum.load ? `${dec(sum.load)} kg` : '—'}</span>
                     <span className="ex-derived" aria-hidden="true" />
                   </>
                 ) : (
@@ -575,11 +685,12 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                   <span />
                 </div>
                 {r.series.map((x, k) => {
-                  const upd = (patch: Partial<SetDraft>) => setSeries(i, (d) => d.map((y, m) => (m === k ? { ...y, ...patch } : y)));
+                  const upd = (patch: Partial<SetDraft>) => setSeries(i, (d) => d.map((y, m) => (m === k ? { ...y, ...patch, planned: undefined } : y)));
                   const workNo = r.series!.slice(0, k + 1).filter((y) => !y.warmup).length;
                   return (
                     r.cardio ? (
-                      <div key={x.key} className={`set-edit-row cardio ${x.warmup ? 'warm' : ''}`}>
+                      <div key={x.key} className="sm-seg">
+                      <div className={`set-edit-row cardio ${x.warmup ? 'warm' : ''}`}>
                         <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Odcinek ${k + 1}: rozgrzewka` : `Odcinek ${k + 1}`} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                           {x.warmup ? 'R' : x.label === 'Schłodzenie' ? 'S' : x.label === 'Przerwa' ? 'P' : r.series!.slice(0, k + 1).filter((y) => !y.warmup && y.label !== 'Schłodzenie' && y.label !== 'Przerwa').length}
                         </button>
@@ -587,8 +698,10 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                         <input className="input" inputMode="decimal" value={x.dist ?? ''} onChange={(e) => upd({ dist: e.target.value })} aria-label={`Dystans (km), odcinek ${k + 1}`} placeholder="km" />
                         <input className="input" inputMode="numeric" value={x.hr ?? ''} onChange={(e) => upd({ hr: e.target.value })} aria-label={`Tętno, odcinek ${k + 1}`} placeholder="tętno" />
                         <input className="input" inputMode="decimal" value={x.rpe} onChange={(e) => upd({ rpe: e.target.value })} aria-label={`RPE, odcinek ${k + 1}`} placeholder="RPE" />
-                        <span className="muted small">{paceText(parseDur(x.reps), parseKm(x.dist))}</span>
+                        <span className="muted small">{paceText(segMin(x), parseKm(x.dist))}</span>
                         <IconBtn icon="trash" label={`Usuń odcinek ${k + 1}`} danger onClick={() => setSeries(i, (d) => d.filter((_, m) => m !== k))} />
+                      </div>
+                      {x.tPace && <span className="sm-seg-target">cel {/^\d+:\d{2}(\s*[-–]\s*\d+:\d{2})?$/.test(x.tPace.trim()) ? `${x.tPace.trim()}/km` : x.tPace}</span>}
                       </div>
                     ) :
                     <div key={x.key} className={`set-edit-row ${x.warmup ? 'warm' : ''}`}>
@@ -605,9 +718,8 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                 })}
                 <div className="between">
                   <button type="button" className="link small set-add" onClick={() => setSeries(i, (d) => [...d, blankSet(d[d.length - 1])])}>
-                    + seria
+                    {r.cardio ? '+ odcinek' : '+ seria'}
                   </button>
-                  <span className="muted small set-add-hint">dotknij numeru serii, by oznaczyć rozgrzewkę</span>
                 </div>
               </div>
             ) : (
@@ -642,13 +754,6 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
 
       <h4 className="form-section">Po treningu</h4>
       <div className="form-grid form-grid-3">
-        <Field label="Czas trwania (min)">
-          <input className="input" inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} />
-        </Field>
-        <div className="field field-wide-2">
-          <span>sRPE – ciężkość treningu (0–10){au != null && <strong className="text-accent"> · {fnum(au, 0)} AU</strong>}</span>
-          <Scale label="sRPE" value={srpe} onChange={setSrpe} max={10} />
-        </div>
         <div className="field field-wide">
           <span>Ból (0–10)</span>
           <Scale label="Ból" value={pain} onChange={setPain} max={10} />

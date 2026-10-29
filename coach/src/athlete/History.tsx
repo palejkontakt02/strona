@@ -16,6 +16,7 @@ import { todayISO } from '../lib/dates';
 import { sessionLoad, tonnage } from '../lib/load';
 import { num, repsN } from '../lib/parse';
 import { fmtDur, fmtKm, paceText, runTotals } from '../lib/running';
+import { fmtTon, isAsym, painTextClass, repsLabel, spotsText, stoppedLabel } from '../lib/sessionBadges';
 
 /** Najbliższe zaplanowane wizyty klienta. */
 /** Zaplanowane wizyty, które jeszcze się nie skończyły (dzisiejsze po czasie trwania już nie). */
@@ -73,15 +74,8 @@ export function setText(x: { reps?: number; repsR?: number; unit?: 's' | 'min'; 
     ]
       .filter(Boolean)
       .join(' · ');
-  // na czas od minuty: „1:30” zamiast „90 s”
-  if (x.unit === 's' && x.reps != null && x.reps >= 60 && x.repsR == null) {
-    const t = `${Math.floor(x.reps / 60)}:${String(x.reps % 60).padStart(2, '0')}${perSide ? '/str.' : ''}`;
-    return x.load != null ? `${t} × ${fnum(x.load)} kg` : t;
-  }
-  const u = x.unit ? ` ${x.unit === 'min' ? 'min' : 's'}` : '';
-  const side = perSide && x.repsR == null ? '/str.' : '';
-  const r = x.reps == null ? '?' : x.repsR != null ? `${fnum(x.reps)}/${fnum(x.repsR)}` : fnum(x.reps);
-  const main = `${r}${u}${side}${x.repsR != null ? ' (L/P)' : ''}`;
+  // jednolicie z listą i nagraniami: „5/5 L/P”, „8/str.”, „1:30/str.”, „15/10 s L/P”
+  const main = repsLabel(x, perSide);
   return x.load != null ? `${main} × ${fnum(x.load)} kg` : x.unit ? main : `${main} × —`;
 }
 
@@ -120,9 +114,10 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                   <span className="muted small">
                     {nEx(s.exercises.length)}
                     {s.duration ? ` · ${s.duration} min` : ''}
-                    {s.srpe != null ? (plain ? ` · wysiłek ${s.srpe}/10` : ` · RPE ${s.srpe}`) : ''}
-                    {s.pain ? ` · ból ${s.pain}/10` : ''}
+                    {s.srpe != null ? (plain ? ` · wysiłek ${s.srpe}/10` : ` · sRPE ${s.srpe}`) : ''}
+                    {(s.pain ?? 0) > 0 && !s.stoppedForPain ? <span className={painTextClass(s.pain)}>{` · ból ${s.pain}/10`}</span> : ''}
                   </span>
+                  {s.stoppedForPain && <span className="sb-stop small">{stoppedLabel(s)}</span>}
                 </span>
                 <span className="wo-go">›</span>
               </button>
@@ -194,6 +189,18 @@ export function SessionSheet({
             Zamknij
           </button>
         </div>
+        {s.stoppedForPain && (
+          <div className="sb-stop-box" role="note">
+            <b>{plain ? 'Przerwałeś trening z powodu bólu' : 'Trening przerwany z powodu bólu'}</b>
+            <span>
+              ból <b>{s.stoppedForPain.level}/10</b>
+              {s.stoppedForPain.exName ? ` · przy ćwiczeniu: ${s.stoppedForPain.exName}` : ''}
+            </span>
+            {spotsText(s.stoppedForPain.spots?.length ? s.stoppedForPain.spots : s.painMap) && (
+              <span>gdzie: {spotsText(s.stoppedForPain.spots?.length ? s.stoppedForPain.spots : s.painMap)}</span>
+            )}
+          </div>
+        )}
         {s.coachNote && (
           <div className="coach-note">
             <span className="eyebrow">Komentarz trenera</span>
@@ -251,18 +258,19 @@ export function SessionSheet({
           )}
           {s.srpe != null && (
             <span>
-              {plain ? 'wysiłek' : 'RPE'} <b>{s.srpe}</b>
+              {plain ? 'wysiłek' : 'sRPE'} <b>{s.srpe}</b>
               {plain && '/10'}
             </span>
           )}
           {s.pain != null && s.pain > 0 && (
-            <span className={s.pain >= 5 ? 'warn-text' : undefined}>
+            <span className={painTextClass(s.pain) || undefined}>
               ból <b>{s.pain}</b>/10
+              {!s.stoppedForPain && s.painMap?.length ? ` · ${spotsText(s.painMap)}` : ''}
             </span>
           )}
           {ton > 0 && (
             <span title="Suma: ciężar × powtórzenia ze wszystkich serii">
-              <b>{fnum(ton / 1000, 1)}</b> {plain ? 't podniesione łącznie' : 't tonażu'}
+              <b>{fmtTon(ton)}</b> {plain ? 'podniesione łącznie' : 'tonażu'}
             </span>
           )}
           {load != null && !plain && (
@@ -290,7 +298,7 @@ export function SessionSheet({
                   <div className="hist-sets">
                     {warm.length > 0 && <span className="muted">rozgrzewka: {warm.map((x) => setText(x, e.perSide, e.cardio)).join(', ')}{warm.filter((x) => x.video).map((x, j) => <VideoChip key={j} video={x.video!} title={`${e.name} · rozgrzewka`} />)}</span>}
                     {work.map((x, j) => (
-                      <span key={j} className="set-chip">
+                      <span key={j} className={`set-chip${isAsym(x) ? ' set-asym' : ''}`} title={isAsym(x) ? 'Różnica między stronami' : undefined}>
                         {setText(x, e.perSide, e.cardio)}
                         {x.rpe != null && <i>{plain ? ` · trudność ${fnum(x.rpe)}/10` : ` @${fnum(x.rpe)}`}</i>}
                         {x.video && <VideoChip video={x.video} title={`${e.name} · seria ${j + 1}`} />}

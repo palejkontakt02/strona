@@ -84,6 +84,8 @@ function cumulative(pts: TrackPoint[]): { t: number; d: number; hr?: number }[] 
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
+/** Minuty z dokładnością do ~0,01 s — sumy okrążeń zgadzają się co do sekundy z zegarkiem. */
+const r4 = (v: number) => Math.round(v * 10000) / 10000;
 
 /** Podsumowanie z punktów trasy: dystans, czasy, tętno, odcinki co 1 km. */
 export function summarize(pts: TrackPoint[], over: Partial<Activity> & { source: Activity['source'] }): Activity {
@@ -118,7 +120,7 @@ export function summarize(pts: TrackPoint[], over: Partial<Activity> & { source:
       movedHere += part;
       if (hr && part > 0) (splitHrSum += hr * part), (splitHrW += part);
       const min = (moving + movedHere - splitStartMove) / 60;
-      splits.push({ km: 1, min: r2(min), hr: splitHrW ? Math.round(splitHrSum / splitHrW) : undefined });
+      splits.push({ km: 1, min: r4(min), hr: splitHrW ? Math.round(splitHrSum / splitHrW) : undefined });
       splitStartMove = moving + movedHere;
       splitHrSum = 0;
       splitHrW = 0;
@@ -133,7 +135,7 @@ export function summarize(pts: TrackPoint[], over: Partial<Activity> & { source:
   }
   const total = c.length ? c[c.length - 1].d : 0;
   if (total - lastSplitD >= 50) {
-    splits.push({ km: r3((total - lastSplitD) / 1000), min: r2((moving - splitStartMove) / 60), hr: splitHrW ? Math.round(splitHrSum / splitHrW) : undefined });
+    splits.push({ km: r3((total - lastSplitD) / 1000), min: r4((moving - splitStartMove) / 60), hr: splitHrW ? Math.round(splitHrSum / splitHrW) : undefined });
   }
   const elapsed = c.length > 1 ? (c[c.length - 1].t - c[0].t) / 60000 : 0;
   const start = c.length ? new Date(c[0].t).toISOString() : null;
@@ -144,7 +146,7 @@ export function summarize(pts: TrackPoint[], over: Partial<Activity> & { source:
     date: start ? todayISO(new Date(start)) : null,
     km,
     elapsedMin: r2(elapsed),
-    movingMin: r2(moving / 60),
+    movingMin: r4(moving / 60),
     avgHr: hrW ? Math.round(hrSum / hrW) : undefined,
     maxHr: maxHr || undefined,
     pace: '',
@@ -197,7 +199,7 @@ export function parseTcx(xml: string): Activity {
   const act = blocks(xml, 'Activity')[0];
   if (!act) throw new Error('W pliku TCX nie ma treningu (Activity).');
   const pts: TrackPoint[] = [];
-  const laps: (ActivitySplit & { max?: number })[] = [];
+  const laps: (ActivitySplit & { max?: number; secs: number })[] = [];
   for (const lap of blocks(act.body, 'Lap')) {
     const secs = numOf(tag(lap.body, 'TotalTimeSeconds'));
     // dystans okrążenia: znacznik bezpośrednio w Lap, nie w punktach (te są w <Track>)
@@ -205,7 +207,7 @@ export function parseTcx(xml: string): Activity {
     const m = numOf(tag(head, 'DistanceMeters'));
     const avg = numOf(tag(tag(head, 'AverageHeartRateBpm') ?? '', 'Value'));
     const max = numOf(tag(tag(head, 'MaximumHeartRateBpm') ?? '', 'Value'));
-    if (secs != null && m != null) laps.push({ km: r3(m / 1000), min: r2(secs / 60), hr: avg ? Math.round(avg) : undefined, max });
+    if (secs != null && m != null) laps.push({ km: r3(m / 1000), min: r4(secs / 60), secs, hr: avg ? Math.round(avg) : undefined, max });
     for (const tp of blocks(lap.body, 'Trackpoint')) {
       const pos = tag(tp.body, 'Position') ?? '';
       pts.push({
@@ -217,7 +219,8 @@ export function parseTcx(xml: string): Activity {
       });
     }
   }
-  const sum = laps.reduce((a, l) => ({ km: a.km + l.km, min: a.min + l.min }), { km: 0, min: 0 });
+  // suma z sekund (nie z zaokrąglonych minut okrążeń): 12 okrążeń nie „gubi” sekundy
+  const sum = laps.reduce((a, l) => ({ km: a.km + l.km, min: a.min + l.secs / 60 }), { km: 0, min: 0 });
   const hrLaps = laps.filter((l) => l.hr);
   const avgHr = hrLaps.length && sum.min ? Math.round(hrLaps.reduce((a, l) => a + l.hr! * l.min, 0) / hrLaps.reduce((a, l) => a + l.min, 0)) : undefined;
   const maxHr = laps.reduce((a, l) => Math.max(a, l.max ?? 0), 0) || undefined;
@@ -231,8 +234,8 @@ export function parseTcx(xml: string): Activity {
       return t != null ? new Date(t).toISOString() : undefined;
     })() as string | undefined,
     // okrążenia zegarka: TotalTimeSeconds = czas stopera (bez auto-pauzy) → czas w ruchu
-    ...(laps.length ? { km: r3(sum.km), movingMin: r2(sum.min), avgHr, maxHr } : {}),
-    laps: laps.length > 1 ? laps.map(({ max: _m, ...l }) => l) : [],
+    ...(laps.length ? { km: r3(sum.km), movingMin: r4(sum.min), avgHr, maxHr } : {}),
+    laps: laps.length > 1 ? laps.map(({ max: _m, secs: _s, ...l }) => l) : [],
   });
 }
 
@@ -380,7 +383,7 @@ export function parseFit(buf: ArrayBuffer | Uint8Array): Activity {
     hr: r[3],
   }));
   // pola lap: 2 start, 7 czas całkowity, 8 czas stopera (ms), 9 dystans (cm), 15 / 16 tętno śr. / maks.
-  const laps: ActivitySplit[] = lap.filter((l) => l[9] != null && (l[8] ?? l[7]) != null).map((l) => ({ km: r3(l[9] / 100000), min: r2((l[8] ?? l[7]) / 60000), hr: l[15] }));
+  const laps: ActivitySplit[] = lap.filter((l) => l[9] != null && (l[8] ?? l[7]) != null).map((l) => ({ km: r3(l[9] / 100000), min: r4((l[8] ?? l[7]) / 60000), hr: l[15] }));
   const s = session[0];
   if (!pts.length && !s && !laps.length) throw new Error('W pliku FIT nie ma treningu (session / lap / record).');
   // pola session: 2 start, 5 sport, 7 czas całkowity, 8 czas stopera, 9 dystans, 16 / 17 tętno śr. / maks.
@@ -390,8 +393,8 @@ export function parseFit(buf: ArrayBuffer | Uint8Array): Activity {
     sport: s?.[5] != null ? SPORTS[s[5]] ?? String(s[5]) : undefined,
     start: st != null ? new Date(st).toISOString() : (undefined as unknown as string),
     km: s?.[9] != null ? r3(s[9] / 100000) : undefined,
-    elapsedMin: s?.[7] != null ? r2(s[7] / 60000) : undefined,
-    movingMin: s?.[8] != null ? r2(s[8] / 60000) : undefined,
+    elapsedMin: s?.[7] != null ? r4(s[7] / 60000) : undefined,
+    movingMin: s?.[8] != null ? r4(s[8] / 60000) : undefined,
     avgHr: s?.[16],
     maxHr: s?.[17],
     laps: laps.length > 1 ? laps : [],
@@ -418,7 +421,7 @@ export function parseActivity(name: string, data: ArrayBuffer): Activity {
  */
 export function activityRows(a: Activity, useLaps = a.laps.length > 1): SetLog[] {
   const segs = useLaps && a.laps.length ? a.laps : a.splits.length ? a.splits : [{ km: a.km, min: a.movingMin || a.elapsedMin, hr: a.avgHr }];
-  return segs.filter((x) => x.km > 0 || x.min > 0).map((x) => ({ reps: r2(x.min), unit: 'min' as const, dist: r3(x.km), ...(x.hr ? { hr: Math.round(x.hr) } : {}), done: true }));
+  return segs.filter((x) => x.km > 0 || x.min > 0).map((x) => ({ reps: r4(x.min), unit: 'min' as const, dist: r3(x.km), ...(x.hr ? { hr: Math.round(x.hr) } : {}), done: true }));
 }
 
 /** Ćwiczenie cardio do treningu z zaimportowanej aktywności. */

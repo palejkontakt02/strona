@@ -133,7 +133,7 @@ describe('poprawki z weryfikacji', () => {
     expect(testedMax(tests, 'Przysiad przedni')).toBeNull();
     const { setText } = await import('../athlete/History');
     expect(setText({ reps: 30, unit: 's' }, true)).toBe('30 s/str.');
-    expect(setText({ reps: 30, repsR: 20, unit: 's' }, true)).toBe('30/20 s (L/P)');
+    expect(setText({ reps: 30, repsR: 20, unit: 's' }, true)).toBe('30/20 s L/P');
     expect(setText({ reps: 8, load: 20 }, true)).toBe('8/str. × 20 kg');
   });
 });

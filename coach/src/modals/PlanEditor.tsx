@@ -4,12 +4,20 @@ import { emptyRunExercise, parseDur, parseKm, RUN_TEMPLATES } from '../lib/runni
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
 
 const CARDIO_TYPES: SetType[] = ['Rozgrzewka', 'Robocze', 'Schłodzenie'];
+const PL = new Intl.PluralRules('pl');
+/** „1 odcinek”, „3 odcinki”, „22 odcinki”, „5 odcinków” — liczba powtórzeń części głównej (6 × 800 m = 6), nie wierszy. */
+function segmentsLabel(groups: SetGroup[]): string {
+  const work = groups.filter((g) => g.type !== 'Rozgrzewka' && g.type !== 'Schłodzenie' && g.type !== 'Przerwa');
+  const n = (work.length ? work : groups).reduce((a, g) => a + Math.max(1, parseInt(g.sets || '1', 10) || 1), 0);
+  const f = PL.select(n);
+  return `${n} ${f === 'one' ? 'odcinek' : f === 'few' ? 'odcinki' : 'odcinków'}`;
+}
 import { useState } from 'react';
 import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
 import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, sessionsOf, type Progression } from '../data/ops';
 import { isTemplate, pctOf } from '../lib/analytics';
-import { currentMax, percentToKg, type MaxSource } from '../lib/strength';
+import { currentMax, resolveLoad, rounderFor, type MaxSource } from '../lib/strength';
 import { fnum } from '../format';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
@@ -47,6 +55,16 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     if (!client || !name.trim()) return null;
     if (!maxCache.has(name)) maxCache.set(name, currentMax(clientSessions, client.tests, name.trim()));
     return maxCache.get(name)!;
+  };
+  /** Ciężary serii po kolei (kg z %, z „-10%” od poprzedniej, z RPE przy pustym polu) — do podpowiedzi „≈ X kg”. */
+  const resolved = (e: PlanExercise, mx: MaxSource | null) => {
+    const round = rounderFor(e.name, loadPerOf(e));
+    let prev: number | null = null;
+    return e.groups.map((g) => {
+      const r = resolveLoad(g.load, mx?.value ?? null, g.reps, g.rpe, prev, { round, maxLabel: mx?.label });
+      if (r.load != null) prev = r.load;
+      return r;
+    });
   };
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
@@ -139,11 +157,14 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
           <input className="input" value={p.notes ?? ''} onChange={(e) => upd((d) => void (d.notes = e.target.value || undefined))} />
         </Field>
       </div>
-      <p className="muted small">
-        Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
-        Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
-        Bieg: „+ Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
-      </p>
+      <details className="pe-help">
+        <summary>Jak to działa?</summary>
+        <p className="muted small">
+          Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
+          Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
+          Bieg: „+ Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
+        </p>
+      </details>
       <RunTargetList />
 
       {p.weeks.map((week, wi) => (
@@ -292,18 +313,37 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         placeholder={inBlock && all[ei + 1]?.linked ? 'Przejście' : 'Przerwa'}
                         title={inBlock ? (all[ei + 1]?.linked ? 'Czas przejścia do następnego ćwiczenia bloku (puste = od razu)' : 'Przerwa po całej rundzie bloku') : 'Przerwa między seriami'}
                         onChange={(ev) => setEx((x) => void (x.rest = ev.target.value))} aria-label="Przerwa" /></> : <span className="grow" />}
-                      <span className="muted small nowrap">{(e.cardio ?? cardioByName(e.name)) ? `${e.groups.length} ${e.groups.length === 1 ? 'odcinek' : e.groups.length < 5 ? 'odcinki' : 'odcinków'}` : setCountLabel(e.groups)}</span>
-                      <IconBtn
-                        icon="up"
-                        label="Przesuń ćwiczenie w górę"
+                      <span className="muted small nowrap">{(e.cardio ?? cardioByName(e.name)) ? segmentsLabel(e.groups) : setCountLabel(e.groups)}</span>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label="Przesuń ćwiczenie w górę"
+                        title="Przesuń ćwiczenie w górę"
+                        disabled={ei === 0}
                         onClick={() =>
-                          ei > 0 &&
                           upd((d) => {
                             const k = findWorkout(d, wi, ki);
                             k.exercises = moveInBlocks(k.exercises, ei, -1);
                           })
                         }
-                      />
+                      >
+                        <Icon name="up" size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn pe-down"
+                        aria-label="Przesuń ćwiczenie w dół"
+                        title="Przesuń ćwiczenie w dół"
+                        disabled={ei === all.length - 1}
+                        onClick={() =>
+                          upd((d) => {
+                            const k = findWorkout(d, wi, ki);
+                            k.exercises = moveInBlocks(k.exercises, ei, 1);
+                          })
+                        }
+                      >
+                        <Icon name="up" size={16} />
+                      </button>
                       <IconBtn icon="trash" label="Usuń ćwiczenie" danger onClick={() =>
                           upd((d) => {
                             const k = findWorkout(d, wi, ki);
@@ -372,14 +412,21 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                           <input className="input" value={g.reps} placeholder={cardio ? 'np. 40 / 3:00' : isTimed(e) ? 'np. 45' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'reps', ev.target.value))} aria-label={cardio ? 'Czas' : 'Powtórzenia'} />
                           {(() => {
                             const input = <input className="input" value={g.load} placeholder={cardio ? 'np. 800 m' : undefined} onChange={(ev) => setEx((x) => fillDown(x.groups, gi, 'load', ev.target.value))} aria-label={cardio ? 'Dystans' : 'Ciężar'} />;
-                            const pct = cardio ? null : pctOf(g.load);
-                            const mx = pct != null ? maxOf(e.name) : null;
-                            if (pct == null || !client) return input;
+                            if (cardio || !client) return input;
+                            // ≈ kg: „75%” z maksa, „-10%” od poprzedniej serii, puste — dobór z RPE (gdy znany e1RM)
+                            const pct = pctOf(g.load);
+                            const rel = /^\s*[+-]\s*\d/.test(g.load);
+                            const empty = !g.load.trim() && g.type !== 'Rozgrzewka';
+                            if (pct == null && !rel && !empty) return input;
+                            const mx = maxOf(e.name);
+                            const r = resolved(e, mx)[gi];
+                            if (empty && !r?.load) return input;
+                            if (rel && !r?.load) return input;
                             return (
                               <span className="pe-load">
                                 {input}
-                                <small className={`pe-pct ${mx ? '' : 'none'}`} title={mx ? `${fnum(pct, 1)}% · max ${mx.label}` : 'Brak testu 1RM i historii tego ćwiczenia — % policzy się po pierwszym treningu albo teście.'}>
-                                  {mx ? `≈ ${fnum(percentToKg(pct, mx.value, e.name, loadPerOf(e)), 2)} kg` : 'brak 1RM'}
+                                <small className={`pe-pct ${r?.load ? '' : 'none'} ${empty ? 'pe-auto' : ''}`} title={r?.load ? `${r.why}${mx ? ` · max ${mx.label}` : ''}` : 'Brak testu 1RM i historii tego ćwiczenia — % policzy się po pierwszym treningu albo teście.'}>
+                                  {r?.load ? `≈ ${fnum(r.load, 2)} kg` : 'brak 1RM'}
                                 </small>
                               </span>
                             );

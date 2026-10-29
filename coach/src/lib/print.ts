@@ -1,6 +1,9 @@
 import type { Client, Plan, TrainingSession } from '../domain';
 import { targetText, ZONES } from './running';
-import { fmtWeekdayDate, planGrid } from './planGrid';
+import { fmtWeekdayDate, planGrid, type GridCell } from './planGrid';
+import { cardioByName, loadPerOf } from './run';
+import { currentMax, resolveLoad, rounderFor } from './strength';
+import { nextDate, nextWorkout } from './plan';
 import { addDays, todayISO } from './dates';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -9,20 +12,21 @@ const pl = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
 const lsiOf = (t: { lsi?: number }) => (t.lsi != null ? `${String(t.lsi).replace('.', ',')}%` : '');
 const fmtD = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' });
 
+/* czarno-biało: tylko czerń, biel i odcienie szarości (przezroczystość czerni), bez wpisanych kolorów */
 const CSS = `
   *{box-sizing:border-box} html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{font:11.5px/1.45 Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#141a24;margin:16mm 14mm;background:#fff}
+  body{font:11.5px/1.45 Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:black;margin:16mm 14mm;background:white}
   .num,h1,h2{font-family:'Barlow Condensed','Arial Narrow','Roboto Condensed',sans-serif}
   h1{font-size:30px;line-height:1.05;font-weight:600;margin:0 0 4px;letter-spacing:0}
-  h2{font-size:19px;font-weight:600;margin:20px 0 6px;padding-bottom:3px;border-bottom:1.5px solid #141a24;letter-spacing:0}
-  h3{font-size:13px;margin:12px 0 4px} .muted{color:#5b6475} .note{font-size:10.5px;color:#4a5263}
+  h2{font-size:19px;font-weight:600;margin:20px 0 6px;padding-bottom:3px;border-bottom:1.5px solid black;letter-spacing:0}
+  h3{font-size:13px;margin:12px 0 4px} .muted{color:rgb(0 0 0 / 60%)} .note{font-size:10.5px;color:rgb(0 0 0 / 68%)}
   table{border-collapse:collapse;width:100%;margin:4px 0 8px}
-  th,td{border:1px solid #c9ced8;padding:4px 7px;text-align:left;vertical-align:top}
-  th{background:#e8ecf4;font-weight:600;color:#141a24}
-  .lbl{font-weight:700;width:34px} .box{border:1px solid #c9ced8;border-left:3px solid #141a24;padding:6px 10px;margin:8px 0;border-radius:2px}
-  .done{display:inline-block;width:10px;height:10px;border:1.2px solid #3a4150;border-radius:2px;margin-right:5px;vertical-align:-1px}
-  .doc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:8px;border-bottom:3px solid #141a24;margin-bottom:10px}
-  .doc-brand{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13px;font-weight:600;color:#5b6475;white-space:nowrap}
+  th,td{border:1px solid rgb(0 0 0 / 22%);padding:4px 7px;text-align:left;vertical-align:top}
+  th{background:rgb(0 0 0 / 7%);font-weight:600;color:black}
+  .lbl{font-weight:700;width:34px} .box{border:1px solid rgb(0 0 0 / 22%);border-left:3px solid black;padding:6px 10px;margin:8px 0;border-radius:2px}
+  .done{display:inline-block;width:10px;height:10px;border:1.2px solid rgb(0 0 0 / 75%);border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:8px;border-bottom:3px solid black;margin-bottom:10px}
+  .doc-brand{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13px;font-weight:600;color:rgb(0 0 0 / 60%);white-space:nowrap}
   @page{size:A4;margin:0} @media print{.noprint{display:none}}
 `;
 
@@ -51,11 +55,6 @@ function openPrint(title: string, body: string) {
   }, 300);
 }
 
-/**
- * Plan do druku — jak tabela w aplikacji: dla każdego treningu wiersz na serię, kolumny = tygodnie,
- * w komórce „powt. × ciężar @RPE” (ciężar, gdy wpisany) i kratka do odhaczenia; rozgrzewki szare.
- * Przy więcej niż 3 tygodniach strona pozioma.
- */
 /** Bieg w planie: legenda stref z tętnem / tempem podopiecznego (na wydruku „Z2” samo nic nie mówi). */
 function zoneLegend(slots: ReturnType<typeof planGrid>, client: Client): string {
   if (!slots.some((s) => s.rows.some((r) => r.cardio))) return '';
@@ -63,65 +62,134 @@ function zoneLegend(slots: ReturnType<typeof planGrid>, client: Client): string 
   return `<h2>Strefy</h2><ul class="note">${items}</ul>`;
 }
 
-export function printPlan(plan: Plan, client: Client, _sessions?: TrainingSession[]) {
-  const slots = planGrid(plan, () => true);
-  const wide = Math.max(0, ...slots.map((s) => s.cols.length)) > 3;
-  const tables = slots
+/** „75%” / „-10%” → „75% ≈105 kg” z maksa podopiecznego (test 1RM albo e1RM z treningów); bez maksa — bez zmian. */
+function withKg(plan: Plan, client: Client, sessions: TrainingSession[]): Plan {
+  const out = structuredClone(plan);
+  for (const w of out.weeks)
+    for (const k of w.workouts)
+      for (const e of k.exercises) {
+        if (e.cardio ?? cardioByName(e.name)) continue;
+        if (!e.groups.some((g) => /%/.test(g.load))) continue;
+        const mx = currentMax(sessions, client.tests ?? [], e.name.trim());
+        const round = rounderFor(e.name, loadPerOf(e));
+        let prev: number | null = null;
+        for (const g of e.groups) {
+          const r = resolveLoad(g.load, mx?.value ?? null, g.reps, g.rpe, prev, { round });
+          if (r.load != null) prev = r.load;
+          if (r.load != null && /%/.test(g.load)) g.load = `${g.load.trim()} ≈${pl(r.load)} kg`;
+        }
+      }
+  return out;
+}
+
+const GRID_CSS = (wide: boolean) => `<style>@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:0} body{margin:${wide ? '11mm 10mm' : '16mm 14mm'}}
+      table.grid{font-size:11px;border:1.5px solid black;margin-top:6px}
+      table.grid td,table.grid th{padding:3px 6px;white-space:nowrap;border-color:rgb(0 0 0 / 18%);vertical-align:middle}
+      table.grid thead th{background:white;font-size:10px;font-weight:600;color:rgb(0 0 0 / 75%);vertical-align:bottom}
+      table.grid thead th.band{background:black;color:white;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:14.5px;line-height:1.1;text-align:center;padding:5px 6px 4px;border-bottom:1px solid black}
+      table.grid thead th.sub{background:rgb(0 0 0 / 8%);font-weight:500;color:rgb(0 0 0 / 75%);text-align:center;font-size:9.5px;padding:2px 4px;border-bottom:1.5px solid black}
+      table.grid thead th.ex,table.grid thead th.no{border-bottom:1.5px solid black}
+      .date{display:block;font-family:Inter,system-ui,sans-serif;font-size:9px;font-weight:500;opacity:.8;margin-top:1px}
+      table.grid td.ex{white-space:normal;min-width:120px;max-width:210px;font-weight:600;vertical-align:top;padding-top:5px;background:white;border-right:1px solid rgb(0 0 0 / 40%)}
+      table.grid .lab{display:inline-block;min-width:18px;padding:0 3px;margin-right:5px;border:1px solid rgb(0 0 0 / 75%);border-radius:3px;font-size:9.5px;text-align:center;font-weight:700;line-height:13px}
+      table.grid .note{font-weight:400;margin-top:1px}
+      table.grid .num{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13.5px;font-weight:500;font-variant-numeric:tabular-nums}
+      table.grid .no{text-align:center;color:rgb(0 0 0 / 60%);width:1%} table.grid td.rest{vertical-align:top;padding-top:5px}
+      table.grid .wk{border-left:1.5px solid black} table.grid td.reps{text-align:left} table.grid td.load{text-align:right;min-width:42px} table.grid td.rpe,table.grid th.rpe{text-align:center;width:1%}
+      table.grid tr.z td:not(.ex):not(.rest){background:rgb(0 0 0 / 4%)}
+      table.grid tr.first td{border-top:1.2px solid rgb(0 0 0 / 55%)} table.grid tbody tr:first-child td{border-top:0}
+      table.grid tr:not(.first) td{border-top-color:rgb(0 0 0 / 10%)}
+      table.grid .warm{color:rgb(0 0 0 / 55%);font-style:italic} table.grid .warm .done{border-color:rgb(0 0 0 / 40%)}
+      table.grid td.none{text-align:center;color:rgb(0 0 0 / 40%)}
+      table.grid td.dl{background:rgb(0 0 0 / 6%)} table.grid th.band.dl{background:rgb(0 0 0 / 60%)}
+      table.grid th.didit{min-width:150px} table.grid td.didit{min-width:150px;border-left:1.5px solid black}
+      h2{break-after:avoid} .slot{break-inside:auto} table.grid{break-inside:auto} table.grid tr{break-inside:avoid} thead{display:table-header-group}
+      .legend{font-size:10.5px;color:rgb(0 0 0 / 68%);margin:2px 0 4px} ul.note{margin:4px 0;padding-left:18px;columns:2;column-gap:24px} ul.note li{margin:1px 0}</style>`;
+
+/** Przerwa jako m:ss („90” → „1:30”). */
+const restText = (r: string | undefined) => {
+  const t = String(r ?? '').trim();
+  const m = t.match(/^(\d+(?:[.,]\d+)?)$/);
+  if (!m) return t;
+  const v = parseFloat(m[1].replace(',', '.'));
+  const sec = Math.round(v <= 5 ? v * 60 : v);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+};
+const RUN_NO: Record<string, string> = { R: 'Rozgrz.', S: 'Schł.', trucht: 'trucht' };
+
+/** Tabele planu (slot = trening A, B…; kolumny = tygodnie). `didit` — pusta kolumna „Zrobiono” do wpisania wykonania. */
+function gridTables(slots: ReturnType<typeof planGrid>, opts: { didit?: boolean; dateOf?: (id: string) => string | undefined } = {}): string {
+  return slots
     .map((slot) => {
       if (!slot.rows.length) return `<h2>${esc(slot.name)}</h2><p class="muted">Brak ćwiczeń.</p>`;
       const run = slot.rows.every((r) => r.cardio);
-      const head = `<thead><tr><th class="ex" rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols.map((c) => `<th colspan="3" class="wk band">${esc(c.week.name)}${c.date ? `<span class="date">${esc(fmtWeekdayDate(c.date))}</span>` : ''}</th>`).join('')}</tr><tr>${slot.cols.map(() => (run ? '<th class="wk sub">Odcinek</th><th class="sub">Cel</th><th class="sub rpe">RPE</th>' : '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub rpe">RPE</th>')).join('')}</tr></thead>`;
+      const dl = (name: string) => (/deload/i.test(name) ? ' dl' : '');
+      const head = `<thead><tr><th class="ex" rowspan="2">Ćwiczenie</th><th class="no" rowspan="2">Seria</th><th class="no" rowspan="2">Przerwa</th>${slot.cols
+        .map((c) => {
+          const d = opts.dateOf?.(c.k.id) ?? c.date;
+          return `<th colspan="3" class="wk band${dl(c.week.name)}">${esc(opts.didit ? `${slot.name} · ${c.week.name}` : c.week.name)}${d ? `<span class="date">${esc(fmtWeekdayDate(d))}</span>` : ''}</th>`;
+        })
+        .join('')}${opts.didit ? '<th class="didit band" rowspan="2">Zrobiono</th>' : ''}</tr><tr>${slot.cols.map(() => (run ? '<th class="wk sub">Odcinek</th><th class="sub">Cel</th><th class="sub rpe">RPE</th>' : '<th class="wk sub">Powt.</th><th class="sub">Ciężar</th><th class="sub rpe">RPE</th>')).join('')}</tr></thead>`;
       let zebra = 0;
       const body = slot.rows
         .map((r) =>
           r.lines
             .map((line, i) => {
               const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><span class="lab">${esc(r.label)}</span>${esc(r.name)}${r.loadPer ? `<div class="note">kg: ${esc(r.loadPer)}</div>` : ''}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
-              const rest = i === 0 ? `<td class="no num rest" rowspan="${r.lines.length}">${esc(r.rest || '—')}</td>` : '';
+              const rest = i === 0 ? `<td class="no num rest" rowspan="${r.lines.length}">${esc(restText(r.rest) || '—')}</td>` : '';
+              const first = line.cells.find((c) => c && c !== 'none') as (GridCell & { no?: string }) | undefined;
+              const no = r.cardio && first?.no ? (RUN_NO[first.no] ?? first.no) : line.no;
               const cells = line.cells
-                .map((c) =>
-                  c === 'none'
-                    ? '<td class="wk muted none" colspan="3">—</td>'
-                    : c
-                      ? `<td class="wk num reps ${c.warm ? 'warm' : ''}"><span class="done"></span>${esc(c.reps)}</td><td class="num load ${c.warm ? 'warm' : ''}">${esc(c.load)}</td><td class="num rpe ${c.warm ? 'warm' : ''}">${esc(c.rpe)}</td>`
-                      : '<td class="wk"></td><td></td><td></td>',
-                )
+                .map((c, ci) => {
+                  const d = dl(slot.cols[ci].week.name);
+                  if (c === 'none') return `<td class="wk muted none${d}" colspan="3">—</td>`;
+                  if (!c) return `<td class="wk${d}"></td><td class="${d}"></td><td class="${d}"></td>`;
+                  const cn = (c as GridCell & { no?: string }).no;
+                  const reps = r.cardio && cn && RUN_NO[cn] ? c.reps.replace(new RegExp(`^${cn} `), '') : c.reps;
+                  return `<td class="wk num reps ${c.warm ? 'warm' : ''}${d}"><span class="done"></span>${esc(reps)}</td><td class="num load ${c.warm ? 'warm' : ''}${d}">${esc(c.load)}</td><td class="num rpe ${c.warm ? 'warm' : ''}${d}">${esc(c.rpe)}</td>`;
+                })
                 .join('');
-              const warm = line.no.startsWith('R');
-              return `<tr class="${i === 0 ? 'first' : ''} ${zebra++ % 2 ? 'z' : ''} ${warm ? 'wline' : ''}">${ex}<td class="no num">${esc(line.no)}</td>${rest}${cells}</tr>`;
+              const warm = line.no.startsWith('R') || (r.cardio && !!first?.warm);
+              return `<tr class="${i === 0 ? 'first' : ''} ${zebra++ % 2 ? 'z' : ''} ${warm ? 'wline' : ''}">${ex}<td class="no num">${esc(no)}</td>${rest}${cells}${opts.didit ? '<td class="didit"></td>' : ''}</tr>`;
             })
             .join(''),
         )
         .join('');
-      return `<section class="slot"><h2>${esc(slot.name)}</h2><table class="grid">${head}<tbody>${body}</tbody></table></section>`;
+      return `<section class="slot">${opts.didit ? '' : `<h2>${esc(slot.name)}</h2>`}<table class="grid">${head}<tbody>${body}</tbody></table></section>`;
     })
-    .join('') + zoneLegend(slots, client);
-  openPrint(
-    `${plan.name} — ${client.name}`,
-    `<style>@page{size:A4 ${wide ? 'landscape' : 'portrait'};margin:0} body{margin:${wide ? '11mm 10mm' : '16mm 14mm'}}
-      table.grid{font-size:11px;border:1.5px solid #141a24;margin-top:6px}
-      table.grid td,table.grid th{padding:3px 6px;white-space:nowrap;border-color:#d3d8e1;vertical-align:middle}
-      table.grid thead th{background:#e8ecf4;font-size:10px;font-weight:600;color:#3a4150;vertical-align:bottom}
-      table.grid thead th.band{background:#d6e0f5;color:#0f1d3d;font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:14.5px;line-height:1.1;text-align:center;padding:5px 6px 4px;border-bottom:1px solid #9aa6bd}
-      table.grid thead th.sub{background:#eef2fa;font-weight:500;color:#3a4150;text-align:center;font-size:9.5px;padding:2px 4px;border-bottom:1.5px solid #141a24}
-      table.grid thead th.ex,table.grid thead th.no{border-bottom:1.5px solid #141a24}
-      .date{display:block;font-family:Inter,system-ui,sans-serif;font-size:9px;font-weight:500;color:#3a4a6b;margin-top:1px}
-      table.grid td.ex{white-space:normal;min-width:120px;max-width:210px;font-weight:600;vertical-align:top;padding-top:5px;background:#fff;border-right:1px solid #9aa6bd}
-      table.grid .lab{display:inline-block;min-width:18px;padding:0 3px;margin-right:5px;border:1px solid #3a4150;border-radius:3px;font-size:9.5px;text-align:center;font-weight:700;line-height:13px}
-      table.grid .note{font-weight:400;margin-top:1px}
-      table.grid .num{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13.5px;font-weight:500;font-variant-numeric:tabular-nums}
-      table.grid .no{text-align:center;color:#5b6475;width:1%} table.grid td.rest{vertical-align:top;padding-top:5px}
-      table.grid .wk{border-left:1.5px solid #141a24} table.grid td.reps{text-align:left} table.grid td.load{text-align:right;min-width:42px} table.grid td.rpe,table.grid th.rpe{text-align:center;width:1%}
-      table.grid tr.z td:not(.ex):not(.rest){background:#f4f6fa}
-      table.grid tr.first td{border-top:1.2px solid #6b7486} table.grid tbody tr:first-child td{border-top:0}
-      table.grid tr:not(.first) td{border-top-color:#e3e7ee}
-      table.grid .warm{color:#7b8292;font-style:italic} table.grid .warm .done{border-color:#9aa1ae}
-      table.grid td.none{text-align:center;color:#9aa1ae}
-      h2{break-after:avoid} .slot{break-inside:auto} table.grid{break-inside:auto} table.grid tr{break-inside:avoid} thead{display:table-header-group}
-      .legend{font-size:10.5px;color:#4a5263;margin:2px 0 4px} ul.note{margin:4px 0;padding-left:18px;columns:2;column-gap:24px} ul.note li{margin:1px 0}</style>
-    <div class="doc-head"><div><h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · ${plan.weeks.length} tyg.</div></div><div class="doc-brand">wydruk ${fmtD(todayISO())}</div></div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}
-    <p class="legend">Każdy tydzień: powtórzenia (lub czas) · ciężar · RPE dla każdej serii · R = rozgrzewka · kratka do odhaczenia</p>${tables}`,
-  );
+    .join('');
+}
+
+/**
+ * Plan do druku — jak tabela w aplikacji: dla każdego treningu wiersz na serię, kolumny = tygodnie,
+ * w komórce powtórzenia · ciężar (przy % także ≈ kg) · RPE i kratka do odhaczenia; rozgrzewki szare.
+ * Przy więcej niż 3 tygodniach strona pozioma. `nextWeek` — tylko tydzień następnej jednostki, z pustą kolumną „Zrobiono”.
+ */
+export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[] = [], opts: { nextWeek?: boolean } = {}) {
+  const p = withKg(plan, client, sessions);
+  const head = (sub: string) =>
+    `<div class="doc-head"><div><h1>${esc(plan.name)}</h1><div class="muted">${esc(client.name)}${sub}</div></div><div class="doc-brand">wydruk ${fmtD(todayISO())}</div></div>${plan.notes ? `<div class="box">${esc(plan.notes)}</div>` : ''}`;
+  const legend = '<p class="legend">Każdy tydzień: powtórzenia (lub czas) · ciężar (przy % ≈ kg z maksa) · RPE dla każdej serii · R = rozgrzewka · kratka do odhaczenia</p>';
+  if (opts.nextWeek) {
+    const nx = nextWorkout(plan, sessions);
+    const wi = nx ? plan.weeks.findIndex((w) => w.id === nx.week.id) : 0;
+    const week = p.weeks[Math.max(0, wi)];
+    if (week) {
+      const one: Plan = { ...p, weeks: [week] };
+      const slots = planGrid(one, () => true);
+      const today = todayISO();
+      // realne daty jednostek tego tygodnia (plan cykliczny — daty z planu mogą być przeszłe)
+      const dateOf = (id: string) => {
+        const k = week.workouts.find((x) => x.id === id);
+        return k ? nextDate(plan, { week: plan.weeks[Math.max(0, wi)], workout: k }, today) : undefined;
+      };
+      openPrint(`${plan.name} — ${week.name} — ${client.name}`, `${GRID_CSS(false)}${head(` · ${week.name}`)}${legend}<p class="legend">Kolumna „Zrobiono”: wpisz wykonane ciężary / powtórzenia, uwagi, ból.</p>${gridTables(slots, { didit: true, dateOf })}${zoneLegend(slots, client)}`);
+      return;
+    }
+  }
+  const slots = planGrid(p, () => true);
+  const wide = Math.max(0, ...slots.map((s) => s.cols.length)) > 3;
+  openPrint(`${plan.name} — ${client.name}`, `${GRID_CSS(wide)}${head(`${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · ${plan.weeks.length} tyg.`)}${legend}${gridTables(slots)}${zoneLegend(slots, client)}`);
 }
 
 /**

@@ -1,0 +1,85 @@
+/* Okno zapisu treningu (trener): import z zegarka, „Wklej z notatki”, podsumowanie biegu — runda 5 */
+
+.imp-target {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.sm-note-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: 14px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface-2);
+}
+.sm-note-info.warn {
+  border-color: var(--color-warn);
+}
+.sm-note-body {
+  flex: 1;
+  min-width: 0;
+}
+.sm-note-body p {
+  margin: 0 0 var(--space-1);
+}
+.sm-note-body p .icon,
+.sm-note-body p svg {
+  vertical-align: -2px;
+  color: var(--color-ok);
+}
+.sm-note-list {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.2em;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.sm-note-list li {
+  font-family: var(--font-body);
+}
+
+.sm-warm-hint {
+  margin: 0 0 var(--space-2);
+}
+
+/* bieg: jedno podsumowanie na trzy kolumny (układ siatki: 4 elementy jak przy siłowych) */
+.ex-row > .ex-derived.ex-derived-run {
+  grid-column: span 3;
+  justify-content: flex-start;
+  color: var(--color-text);
+}
+.ex-row > .ex-derived.sm-gap {
+  display: none;
+}
+@media (max-width: 600px) {
+  .ex-row > .ex-derived.ex-derived-run {
+    display: flex;
+    grid-column: 1 / -2;
+    min-height: 32px;
+    padding: 0;
+    font-size: 17px;
+  }
+}
+
+/* odcinek biegu z celem z planu */
+.sm-seg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sm-seg-target {
+  padding-left: 40px;
+  font-size: 13px;
+  color: var(--color-neutral-400);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .sm-seg-target {
+    padding-left: 32px;
+  }
+}

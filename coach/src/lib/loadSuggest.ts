@@ -1,9 +1,9 @@
 import type { ISODate, Plan, PlanExercise, SessionExercise, SetGroup, TrainingSession } from '../domain';
 import { daysBetween } from './dates';
 import { num } from './parse';
-import { expandSets } from './plan';
+import { expandSets, nextWorkout, planSequence } from './plan';
 import { cardioByName, isTimed, loadPerOf } from './run';
-import { recentE1, resolveLoad, rounderFor, roundLoad } from './strength';
+import { recentE1, resolveLoad, roundReal, stepLoad } from './strength';
 
 /** add — dołóż ciężar, hold — utrzymaj, cut — zmniejsz o 5%. */
 export type SuggestKind = 'add' | 'hold' | 'cut';
@@ -25,6 +25,12 @@ export interface LoadSuggestion {
   applicable: boolean;
   /** Plan na ten tydzień już zakłada taki ruch (np. wyższy ciężar) — domyślnie bez zaznaczenia. */
   already: boolean;
+  /** Tydzień planu, w którym to ćwiczenie wystąpi najbliżej od następnego treningu (tam trafia sugestia). */
+  weekIndex: number;
+  /** Powód wstrzymania progresji: tydzień deload albo ból w ostatnich treningach. */
+  reason?: 'deload' | 'pain';
+  /** Krótki opis do etykiety: „dodaj +2 kg”, „utrzymaj (deload)”, „utrzymaj (ból)”, „zmniejsz −5%”. */
+  tag: string;
 }
 
 const MAIN = new Set(['Robocze', 'Top set', 'AMRAP']);
@@ -132,22 +138,61 @@ function targetGroups(plan: Plan, s: TrainingSession, name: string, fallback: Se
   return fallback;
 }
 
+const workSetCount = (groups: SetGroup[]) => groups.filter((g) => g.type !== 'Rozgrzewka').reduce((a, g) => a + (parseInt(g.sets || '1', 10) || 1), 0);
+const maxRpe = (groups: SetGroup[]) => Math.max(-1, ...groups.filter((g) => g.type !== 'Rozgrzewka').map((g) => num(g.rpe) ?? -1));
+
+/** Tydzień deload dla ćwiczenia: nazwa tygodnia z „deload” albo wyraźnie mniej serii (≥ 25%) / RPE niższe o ≥ 1 niż tydzień wcześniej. */
+export function isDeloadFor(plan: Plan, weekIndex: number, name: string): boolean {
+  const w = plan.weeks[weekIndex];
+  if (!w) return false;
+  if (/deload|rozładow/i.test(w.name) || w.workouts.some((k) => /deload/i.test(k.name))) return true;
+  const find = (wi: number) => plan.weeks[wi]?.workouts.flatMap((k) => k.exercises).find((e) => e.name === name);
+  const cur = find(weekIndex);
+  const prev = weekIndex > 0 ? find(weekIndex - 1) : undefined;
+  if (!cur || !prev) return false;
+  const a = workSetCount(prev.groups);
+  const b = workSetCount(cur.groups);
+  if (a > 0 && b < a && (a - b) / a >= 0.25) return true;
+  const ra = maxRpe(prev.groups);
+  const rb = maxRpe(cur.groups);
+  return ra >= 0 && rb >= 0 && rb <= ra - 1;
+}
+
+/** Ból ≥ 5 (albo przerwanie z bólu) w ostatnich 2 treningach klienta lub w 2 ostatnich z tym ćwiczeniem. */
+function painRecent(sorted: TrainingSession[], name: string): number | null {
+  const withEx = sorted.filter((s) => s.exercises.some((e) => e.name === name) || s.stoppedForPain?.exName === name).slice(0, 2);
+  let worst: number | null = null;
+  for (const s of new Set([...sorted.slice(0, 2), ...withEx])) {
+    const p = Math.max(s.pain ?? 0, s.stoppedForPain?.level ?? 0);
+    if (p >= 5 && (worst == null || p > worst)) worst = p;
+  }
+  return worst;
+}
+
 /**
- * Sugestie ciężaru na kolejny tydzień planu dla ćwiczeń siłowych:
- * „dodaj” (+2,5 kg) — wszystkie serie z górnym zakresem powtórzeń przy RPE ≤ cel;
+ * Sugestie ciężaru dla ćwiczeń siłowych — każde ćwiczenie na tydzień, w którym wystąpi najbliżej od następnego
+ * treningu (`weekIndex` w wyniku = tydzień następnego treningu; podany parametr ogranicza do jednego tygodnia):
+ * „dodaj” (o jeden realny krok: sztanga 2,5 kg, hantle 1–2 kg) — wszystkie serie z górnym zakresem powtórzeń przy RPE ≤ cel;
  * „zmniejsz” (−5%) — niedobrane powtórzenia albo RPE > cel + 1 dwa treningi z rzędu; inaczej „utrzymaj”.
- * Bierze pod uwagę treningi z ostatnich 6 tygodni (od `today`).
+ * Tydzień deload albo ból ≥ 5 w ostatnich 2 treningach — nigdy „dodaj”. Historia ćwiczenia po nazwie ze wszystkich
+ * podanych treningów (też z poprzedniego bloku), z ostatnich 6 tygodni (od `today`).
  */
-export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISODate, weekIndex = targetWeekIndex(plan, sessions)): { weekIndex: number; items: LoadSuggestion[] } | null {
-  if (weekIndex == null || !plan.weeks[weekIndex]) return null;
-  const week = plan.weeks[weekIndex];
+export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISODate, weekIndex?: number | null): { weekIndex: number; items: LoadSuggestion[] } | null {
+  const seq = planSequence(plan);
+  const nx = nextWorkout(plan, sessions);
+  if (!nx || !seq.length) return null;
+  const nextWi = plan.weeks.indexOf(nx.week);
+  if (weekIndex != null && !plan.weeks[weekIndex]) return null;
+  // kolejność od następnego treningu, w kółko
+  const order = weekIndex != null ? seq.filter((x) => x.week === plan.weeks[weekIndex]) : [...seq.slice(nx.index), ...seq.slice(0, nx.index)];
   const seen = new Set<string>();
   const items: LoadSuggestion[] = [];
   const sorted = [...sessions].sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || ''));
-  for (const k of week.workouts)
-    for (const pe of k.exercises) {
+  for (const step of order)
+    for (const pe of step.workout.exercises) {
       if (!strengthEx(pe) || seen.has(pe.name)) continue;
       seen.add(pe.name);
+      const wi = plan.weeks.indexOf(step.week);
       const hist = sorted
         .filter((s) => daysBetween(s.date, today) <= 42)
         .flatMap((s) => {
@@ -161,8 +206,11 @@ export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISO
       const vp = prev ? judge(prev.sets, targetGroups(plan, prev.s, pe.name, pe.groups)) : null;
       const last = Math.max(...cur.sets.map((x) => x.load));
       const per = loadPerOf(pe);
-      const round = rounderFor(pe.name, per);
+      const round = (v: number) => roundReal(v, pe.name, per);
+      const deload = isDeloadFor(plan, wi, pe.name);
+      const pain = painRecent(sorted, pe.name);
       let kind: SuggestKind = 'hold';
+      let reason: LoadSuggestion['reason'];
       let next = last;
       let why: string;
       if (vc.missed && vp?.missed) {
@@ -182,38 +230,55 @@ export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISO
       } else {
         why = vc.topRange ? `Powtórzenia w zakresie, jeszcze nie górna granica (${vc.topRange[1]}) — utrzymaj.` : 'Brak celu powtórzeń w planie — utrzymaj.';
       }
-      if (kind === 'add') {
-        next = roundLoad(last + 2.5, pe.name, per);
-        if (next <= last) next = last + 2.5;
-      }
-      if (kind === 'cut') {
-        next = round(last * 0.95);
-        if (next >= last) next = Math.max(0, round(last - 2.5));
+      if (kind === 'add' && pain != null) {
+        kind = 'hold';
+        reason = 'pain';
+        why = `Ból ${fmt(pain)}/10 w ostatnich treningach — utrzymaj ciężar, bez progresji.`;
+      } else if (kind === 'cut' && pain != null) {
+        reason = 'pain';
+        why = `${why} Do tego ból ${fmt(pain)}/10.`;
       }
       const main = pe.groups.find((g) => MAIN.has(g.type)) ?? pe.groups.find((g) => g.type !== 'Rozgrzewka');
       const planned = main ? resolveLoad(main.load, recentE1(sessions, pe.name), main.reps, main.rpe, null, { round }).load : null;
+      if (deload && kind !== 'cut') {
+        kind = 'hold';
+        reason = 'deload';
+        why = `Tydzień deload — bez dokładania${planned != null && planned !== last ? `, w planie ${fmt(planned)} kg` : ''}.`;
+      }
+      if (kind === 'add') {
+        next = stepLoad(last, pe.name, per, 1);
+        why = why.replace(/ — czas na więcej\.$/, ` — czas na więcej (+${fmt(next - last)} kg).`);
+      }
+      if (kind === 'cut') {
+        next = round(last * 0.95);
+        if (next >= last) next = stepLoad(last, pe.name, per, -1);
+      }
+      // deload: zostaje ciężar z planu (zastosowanie nic nie podbija)
+      if (reason === 'deload' && planned != null) next = planned;
       const applicable = pe.groups.some((g) => MAIN.has(g.type) && (ABS.test(g.load) || !g.load.trim()));
-      const already = planned != null && ((kind === 'add' && planned >= next) || (kind === 'cut' && planned <= next) || (kind === 'hold' && planned === next));
-      items.push({ exercise: pe.name, kind, last, planned, next, why, date: cur.s.date, applicable, already });
+      const already = reason === 'deload' || (planned != null && ((kind === 'add' && planned >= next) || (kind === 'cut' && planned <= next) || (kind === 'hold' && planned === next)));
+      const tag = kind === 'add' ? `dodaj +${fmt(next - last)} kg` : kind === 'cut' ? `zmniejsz −5%${reason === 'pain' ? ' (ból)' : ''}` : reason === 'deload' ? 'utrzymaj (deload)' : reason === 'pain' ? 'utrzymaj (ból)' : 'utrzymaj';
+      items.push({ exercise: pe.name, kind, last, planned, next, why, date: cur.s.date, applicable, already, weekIndex: wi, reason, tag });
     }
-  return { weekIndex, items };
+  return { weekIndex: weekIndex ?? nextWi, items };
 }
 
 /**
- * Wpisuje ciężary w tygodniu `weekIndex`: serie robocze / top / AMRAP (z kg albo bez ciężaru) → nowy ciężar;
+ * Wpisuje ciężary w tygodniu `weekIndex` (albo w tygodniu z sugestii — `weekIndex` pozycji): serie robocze / top / AMRAP (z kg albo bez ciężaru) → nowy ciężar;
  * back-off i drop z kg — o tyle samo kg co seria główna. Zapis względny („-10%”, „75%”) zostaje.
  */
-export function applySuggestions(plan: Plan, weekIndex: number, items: Pick<LoadSuggestion, 'exercise' | 'next' | 'planned' | 'last'>[]): Plan {
+export function applySuggestions(plan: Plan, weekIndex: number, items: (Pick<LoadSuggestion, 'exercise' | 'next' | 'planned' | 'last'> & { weekIndex?: number })[]): Plan {
   const out: Plan = structuredClone(plan);
-  const week = out.weeks[weekIndex];
-  if (!week) return out;
-  for (const it of items)
+  for (const it of items) {
+    // sugestia per ćwiczenie ma własny tydzień docelowy
+    const week = out.weeks[it.weekIndex ?? weekIndex];
+    if (!week) continue;
     for (const k of week.workouts)
       for (const e of k.exercises) {
         if (e.name !== it.exercise) continue;
         const base = it.planned ?? it.last;
         const delta = it.next - base;
-        const round = rounderFor(e.name, loadPerOf(e));
+        const round = (v: number) => roundReal(v, e.name, loadPerOf(e));
         e.groups = e.groups.map((g) => {
           if (g.type === 'Rozgrzewka') return g;
           if (MAIN.has(g.type) && (ABS.test(g.load) || !g.load.trim())) return { ...g, load: String(it.next) };
@@ -221,5 +286,6 @@ export function applySuggestions(plan: Plan, weekIndex: number, items: Pick<Load
           return g;
         });
       }
+  }
   return out;
 }

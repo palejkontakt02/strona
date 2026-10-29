@@ -43,20 +43,28 @@ export function setCells(e: PlanExercise, perRep = false): (GridCell & { no: str
   if (e.cardio ?? cardioByName(e.name)) return cardioCells(e, perRep);
   const timed = isTimed(e);
   const side = (e.perSide ?? perSideByName(e.name)) ? '/str.' : '';
+  // „8/str.” wpisane ręcznie — bez drugiego „/str.”
+  const hasSide = (r: string) => /\/\s*str|na\s+str|\bstr\.?\s*$|\/\s*stron/i.test(r);
   let n = 0;
   return expandSets(e.groups).map((g) => {
     const warm = g.type === 'Rozgrzewka';
     if (!warm) n++;
     const reps = timed && secOf(g.reps) != null ? fmtSec(secOf(g.reps)!) : g.reps.trim() || '?';
     const kind = !warm && g.type !== 'Robocze' && PREFIX[g.type] ? ` (${PREFIX[g.type]})` : '';
-    return { no: warm ? 'R' : String(n), warm, reps: `${reps}${side}${kind}`, load: g.load.trim() ? kg(g.load) : '', rpe: g.rpe.trim() };
+    return { no: warm ? 'R' : String(n), warm, reps: `${reps}${hasSide(reps) ? '' : side}${kind}`, load: g.load.trim() ? kg(g.load) : '', rpe: g.rpe.trim() };
   });
 }
 
 export interface GridRow {
   name: string;
+  /** Oznaczenie w tygodniu odniesienia; gdy w innych tygodniach ćwiczenie ma inną literę — wszystkie po kolei („A/B”). */
   label: string;
+  /** Oznaczenie w każdym tygodniu (kolumnie) — undefined, gdy ćwiczenia w tym tygodniu nie ma. */
+  labels: (string | undefined)[];
+  /** Notatka: wspólna albo z tygodniami („T1: … · T3: …”), gdy różne. */
   notes?: string;
+  /** Notatka ćwiczenia w każdym tygodniu (kolumnie). */
+  weekNotes: (string | undefined)[];
   rest?: string;
   linked: boolean;
   /** Bieg / cardio: kolumny to odcinek | cel | RPE. */
@@ -71,27 +79,48 @@ export interface GridSlot {
   cols: { week: PlanWeek; k: PlanWorkout; /** Data z dnia tygodnia / daty jednostki. */ date?: string }[];
   rows: GridRow[];
   hasWarm: boolean;
+  /** Kolejność ćwiczeń różni się między tygodniami (wiersze są w kolejności tygodnia odniesienia). */
+  orderVaries: boolean;
+}
+
+export interface GridOpts {
+  /** Indeks tygodnia, którego kolejność ćwiczeń wyznacza wiersze (np. bieżący / najbliższy). Domyślnie pierwszy tydzień. */
+  refWeek?: number;
 }
 
 /**
  * Plan jako arkusz: treningi łączone po nazwie (Trening A w każdym tygodniu); wiersz na serię, kolumny = tygodnie.
  * Serie wyrównane po numerze (rozgrzewki R, potem 1, 2, 3…); bieg — odcinki po kolei. `warm` — czy pokazać rozgrzewki.
  */
-export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = false): GridSlot[] {
+export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = false, opts: GridOpts = {}): GridSlot[] {
   const names: string[] = [];
   for (const w of plan.weeks) for (const k of w.workouts) if (!names.includes(k.name)) names.push(k.name);
+  const refWeekId = plan.weeks[Math.min(Math.max(0, opts.refWeek ?? 0), Math.max(0, plan.weeks.length - 1))]?.id;
   return names.map((slot) => {
     const cols = plan.weeks.flatMap((w, wi) => {
       const k = w.workouts.find((x) => x.name === slot);
       return k ? [{ week: w, k, date: workoutDate(plan, wi, k) }] : [];
     });
-    const base: { name: string; label: string; first: PlanExercise }[] = [];
-    for (const c of cols) {
-      const labels = exerciseLabels(c.k.exercises);
-      c.k.exercises.forEach((e, i) => {
-        if (e.name.trim() && !base.some((r) => r.name === e.name)) base.push({ name: e.name, label: labels[i], first: e });
+    // Kolejność wierszy: najpierw tydzień odniesienia, potem ćwiczenia, których w nim nie ma (z dalszych tygodni).
+    const ordered = [...cols.filter((c) => c.week.id === refWeekId), ...cols.filter((c) => c.week.id !== refWeekId)];
+    const base: { name: string; first: PlanExercise }[] = [];
+    for (const c of ordered) {
+      c.k.exercises.forEach((e) => {
+        if (e.name.trim() && !base.some((r) => r.name === e.name)) base.push({ name: e.name, first: e });
       });
     }
+    const colLabels = cols.map(({ k }) => {
+      const labels = exerciseLabels(k.exercises);
+      const m = new Map<string, string>();
+      k.exercises.forEach((e, i) => { if (e.name.trim() && !m.has(e.name)) m.set(e.name, labels[i]); });
+      return m;
+    });
+    const seqOf = (c: (typeof cols)[number]) => base.map((r) => r.name).filter((n) => c.k.exercises.some((e) => e.name === n));
+    const orderVaries = cols.some((c) => {
+      const mine = c.k.exercises.map((e) => e.name).filter((n, i, a) => n.trim() && a.indexOf(n) === i);
+      const ref = seqOf(c);
+      return mine.join('\u0000') !== ref.join('\u0000');
+    });
     const hasWarm = cols.some((c) => c.k.exercises.some((e) => !(e.cardio ?? cardioByName(e.name)) && e.groups.some((g) => g.type === 'Rozgrzewka')));
     const showWarm = warm(slot);
     const rows: GridRow[] = base.map((r) => {
@@ -114,9 +143,17 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = f
         no: key ? no(key) : '',
         cells: keyed.map((m) => (m == null ? (i === 0 ? ('none' as const) : null) : (m.get(key) ?? null))),
       }));
-      return { name: r.name, label: r.label, notes: r.first.notes || undefined, rest: r.first.rest || undefined, linked: /\d$/.test(r.label) && !r.label.endsWith('1'), cardio: !!isCardio, loadPer: !isCardio && !isTimed(r.first) && loadPerOf(r.first) ? LOAD_PER_TEXT[loadPerOf(r.first)!] : undefined, lines };
+      const labels = colLabels.map((m) => m.get(r.name));
+      const refIdx = cols.findIndex((c) => c.week.id === refWeekId && labels[cols.indexOf(c)]);
+      const refLabel = labels[refIdx >= 0 ? refIdx : labels.findIndex(Boolean)] ?? '';
+      const uniq = [refLabel, ...labels.filter((l): l is string => !!l && l !== refLabel)].filter((l, i, a) => a.indexOf(l) === i);
+      const label = uniq.join('/');
+      const weekNotes = cols.map(({ k }) => k.exercises.find((x) => x.name === r.name)?.notes?.trim() || undefined);
+      const uNotes = [...new Set(weekNotes.filter(Boolean))];
+      const notes = uNotes.length <= 1 ? uNotes[0] : cols.map((c, i) => (weekNotes[i] ? `${c.week.name}: ${weekNotes[i]}` : '')).filter(Boolean).join(' · ');
+      return { name: r.name, label, labels, notes, weekNotes, linked: /\d$/.test(refLabel) && !refLabel.endsWith('1'), rest: r.first.rest || undefined, cardio: !!isCardio, loadPer: !isCardio && !isTimed(r.first) && loadPerOf(r.first) ? LOAD_PER_TEXT[loadPerOf(r.first)!] : undefined, lines };
     });
-    return { name: slot, cols, rows, hasWarm };
+    return { name: slot, cols, rows, hasWarm, orderVaries };
   });
 }
 

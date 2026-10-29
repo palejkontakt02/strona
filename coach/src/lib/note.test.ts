@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSetLine, parseWorkoutNote } from './note';
+import { matchNoteWorkout, parseSetLine, parseWorkoutNote } from './note';
 
 const NOTE = `13.10.2026
 Clean & Jerk (z podłogi)
@@ -90,5 +90,69 @@ describe('serie na czas i na stronę', () => {
     expect(r.exercises[1].perSide).toBe(true);
     expect(r.exercises[1].setsLog!.length).toBe(3);
     expect(r.exercises[1].setsLog![0].reps).toBe(6);
+  });
+});
+
+describe('typowe zapisy trenera (runda 5)', () => {
+  const one = (t: string) => parseWorkoutNote(t);
+  const sets = (t: string) => one(t).exercises[0].setsLog!;
+  it('„Przysiad 140x5x3” — kg × powtórzenia × serie', () => {
+    const r = one('Przysiad 140x5x3');
+    expect(r.exercises[0].name).toBe('Przysiad');
+    expect(sets('Przysiad 140x5x3')).toEqual([{ load: 140, reps: 5 }, { load: 140, reps: 5 }, { load: 140, reps: 5 }]);
+    // klasyczny zapis serie × powt × kg bez zmian
+    expect(sets('Przysiad 5x3x100')).toHaveLength(5);
+  });
+  it('„Wyciskanie leżąc 102,5 kg 3x5 @8” — kg nie trafia do nazwy', () => {
+    const r = one('Wyciskanie leżąc 102,5 kg 3x5 @8');
+    expect(r.exercises[0].name).toBe('Wyciskanie leżąc');
+    expect(r.exercises[0].setsLog).toEqual(Array(3).fill({ load: 102.5, reps: 5, rpe: 8 }));
+    expect(r.skipped).toEqual([]);
+  });
+  it('„180x3, 190x2” — dwie serie w jednej linii (kg × powt.)', () => {
+    expect(sets('Martwy ciąg\n180x3, 190x2')).toEqual([{ load: 180, reps: 3 }, { load: 190, reps: 2 }]);
+    expect(sets('Martwy ciąg\n100x5,110x3')).toEqual([{ load: 100, reps: 5 }, { load: 110, reps: 3 }]);
+  });
+  it('„Step down / 3x10” i „Step down” + „3x10” — 3 serie po 10, bez kg', () => {
+    for (const t of ['Step down / 3x10', 'Step down\n3x10']) {
+      const r = one(t);
+      expect(r.exercises[0].name).toBe('Step down');
+      expect(r.exercises[0].setsLog).toEqual(Array(3).fill({ reps: 10 }));
+    }
+  });
+  it('niejednoznaczne „3x10” w ćwiczeniu zapisanym w kg zostaje powtórzenia × kg', () => {
+    expect(sets('Wznosy\n8x12kg\n3x10').map((s) => `${s.reps}x${s.load}`)).toEqual(['8x12', '3x10']);
+  });
+  it('„3x10 8kg” i „8kg 3x10”', () => {
+    expect(sets('Wykroki\n3x10 8kg')).toEqual(Array(3).fill({ load: 8, reps: 10 }));
+    expect(sets('Wykroki\n8kg 3x10')).toEqual(Array(3).fill({ load: 8, reps: 10 }));
+    expect(sets('Wykroki 8 kg 3x10')).toHaveLength(3);
+  });
+  it('L/P: „Hop jednonóż 5/3” i „3x5/4”', () => {
+    const r = one('Hop jednonóż 5/3\nPrzysiad bułgarski\n3x5/4');
+    expect(r.exercises.map((e) => e.name)).toEqual(['Hop jednonóż', 'Przysiad bułgarski']);
+    expect(r.exercises[0].setsLog).toEqual([{ reps: 5, repsR: 3 }]);
+    expect(r.exercises[0].perSide).toBe(true);
+    expect(r.exercises[1].setsLog).toEqual(Array(3).fill({ reps: 5, repsR: 4 }));
+    expect(r.exercises[1].reps).toBe('5/4');
+  });
+  it('„Plank 3x45s” — na czas', () => {
+    const r = one('Plank 3x45s');
+    expect(r.exercises[0]).toMatchObject({ name: 'Plank', reps: '45 s' });
+    expect(r.exercises[0].setsLog).toEqual(Array(3).fill({ reps: 45, unit: 's' }));
+  });
+  it('kontrola sensowności i pominięte linie', () => {
+    const r = one('Przysiad\n18x5x100\nTrening A\nbla bla');
+    expect(r.warnings.join(' ')).toMatch(/18 serii/);
+    expect(r.skipped).toEqual(['Trening A', 'bla bla']);
+  });
+  it('dopasowanie jednostki planu: po nazwie albo ćwiczeniach', () => {
+    const ws = [
+      { id: 'a', name: 'A – dół ciała', exercises: [{ name: 'Przysiad' }, { name: 'Martwy ciąg' }, { name: 'Wykroki' }] },
+      { id: 'b', name: 'B – góra', exercises: [{ name: 'Wyciskanie leżąc' }, { name: 'Wiosłowanie' }] },
+    ];
+    expect(matchNoteWorkout(one('A – dół ciała\nPrzysiad 3x5 100kg'), ws)).toMatchObject({ id: 'a', by: 'name' });
+    expect(matchNoteWorkout(one('Wyciskanie leżąc 3x5 80kg\nWiosłowanie 3x8 60kg'), ws)).toMatchObject({ id: 'b', by: 'exercises' });
+    expect(matchNoteWorkout(one('Plank 3x45s'), ws)).toBeNull();
   });
 });

@@ -1,10 +1,14 @@
-import type { Appointment, Client, ISODate, Measurement, Payment, Plan, PlanWorkout, SetGroup, TrainingSession } from '../domain';
-import { fmtDay, plural, uid } from '../format';
+import type { Appointment, Client, ISODate, Measurement, Payment, Plan, PlanExercise, PlanWorkout, SetGroup, SetType, TrainingSession } from '../domain';
+import { SET_TYPES } from '../domain';
+import { fmtDay, fnum, plural, uid } from '../format';
 import { packageMessage, packageStatus, singleSessionPayment } from '../lib/billing';
 import { weeklyDates } from '../lib/calendar';
 import { addDays } from '../lib/dates';
 import { parseDur, parseKm } from '../lib/running';
-import { cardioByName } from '../lib/run';
+import { cardioByName, isTimed, loadPerOf } from '../lib/run';
+import { fmtSec, secOf } from '../lib/parse';
+import { expandSets } from '../lib/plan';
+import { roundReal, scaleLoad } from '../lib/strength';
 import { del, put, type Change, type Db } from './db';
 
 /* ---------- selektory ---------- */
@@ -199,36 +203,69 @@ const clock = (min: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 
-/** Zapis treningu jako jednostka do zrobienia (te same ćwiczenia i serie). */
-export function sessionToWorkout(s: TrainingSession): PlanWorkout {
+const REL_PCTS = [5, 10, 15, 20, 25, 30];
+
+/** Back-off / drop z zapisu: ciężar względem poprzedniej serii głównej jako „-10%”, gdy tak wychodzi po zaokrągleniu. */
+function relSpec(load: number | undefined, ref: number | undefined, name: string, per?: 'one' | 'sum'): string | null {
+  if (!load || !ref || load >= ref) return null;
+  for (const p of REL_PCTS) if (Math.abs(roundReal(ref * (1 - p / 100), name, per) - load) < 0.01) return `-${p}%`;
+  return null;
+}
+
+/**
+ * Zapis treningu jako jednostka do zrobienia (te same ćwiczenia i serie): typ serii (top / back-off / AMRAP…) zostaje,
+ * back-off zapisany względnie („-10%”), gdy tak wychodzi z ciężarów; RPE z przecinkiem. Gdy podano plany, a trening
+ * pochodzi z jednostki planu — zapis względny i docelowe RPE z planu (ciężary bezwzględne z wykonania).
+ */
+export function sessionToWorkout(s: TrainingSession, plans?: Plan[]): PlanWorkout {
+  const src = s.planId && s.workoutId ? plans?.find((p) => p.id === s.planId)?.weeks.flatMap((w) => w.workouts).find((k) => k.id === s.workoutId) : undefined;
   return {
     id: uid(),
     name: s.workoutName?.trim() || `Trening z ${fmtDay(s.date)}`,
     exercises: s.exercises
       .filter((e) => e.name.trim())
-      .map((e) => ({
-        id: uid(),
-        name: e.name,
-        rest: e.rest,
-        notes: e.notes,
-        perSide: e.perSide,
-        loadPer: e.loadPer,
-        cardio: e.cardio,
-        groups: e.setsLog?.length
-          ? e.setsLog.map((x) => ({
-              type: x.warmup ? ('Rozgrzewka' as const) : x.label === 'Schłodzenie' || x.label === 'Przerwa' ? x.label : ('Robocze' as const),
-              sets: '1',
-              // seria na czas zostaje na czas („60 s”), lewa/prawa jako „30/20”; cardio: czas jak w zegarku (3:05)
-              reps: e.cardio
-                ? x.reps != null ? (Number.isInteger(x.reps) ? String(x.reps) : clock(x.reps)) : ''
-                : x.complex ?? (x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : ''),
-              // cardio: „ciężar” w planie = dystans (km)
-              load: e.cardio ? (x.dist != null ? String(x.dist).replace('.', ',') : '') : x.load != null ? String(x.load) : '',
-              // wynik RPE biegu to nie cel na następny raz
-              rpe: !e.cardio && x.rpe != null ? String(x.rpe) : '',
-            }))
-          : [{ type: 'Robocze' as const, sets: e.sets || '1', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '' }],
-      })),
+      .map((e) => {
+        const per = loadPerOf({ name: e.name, loadPer: e.loadPer, cardio: e.cardio });
+        const planGroups = src ? expandSets(src.exercises.find((x) => x.name === e.name)?.groups ?? []) : [];
+        let ref: number | undefined;
+        return {
+          id: uid(),
+          name: e.name,
+          rest: e.rest,
+          notes: e.notes,
+          perSide: e.perSide,
+          loadPer: e.loadPer,
+          cardio: e.cardio,
+          groups: e.setsLog?.length
+            ? e.setsLog.map((x, i) => {
+                const lbl = (SET_TYPES as readonly string[]).includes(x.label ?? '') ? (x.label as SetType) : undefined;
+                const type: SetType = x.warmup || lbl === 'Rozgrzewka' ? 'Rozgrzewka' : e.cardio ? (x.label === 'Schłodzenie' || x.label === 'Przerwa' ? x.label : 'Robocze') : lbl ?? 'Robocze';
+                const pg = planGroups[i] && planGroups[i].type === type ? planGroups[i] : undefined;
+                let load = e.cardio ? (x.dist != null ? String(x.dist).replace('.', ',') : '') : x.load != null ? String(x.load) : '';
+                if (!e.cardio && type !== 'Rozgrzewka') {
+                  if (type === 'Back-off' || type === 'Drop set') {
+                    const rel = pg && /^[+-]\s*\d/.test(pg.load.trim()) ? pg.load.trim() : relSpec(x.load, ref, e.name, per);
+                    if (rel) load = rel;
+                    if (type === 'Drop set' && x.load) ref = x.load;
+                  } else if (x.load) ref = x.load;
+                }
+                // RPE: docelowe z planu (back-off / każda seria), inaczej wynik z zapisu — dla biegu nie (wynik to nie cel)
+                const rpe = e.cardio ? '' : pg?.rpe?.trim() ? pg.rpe.trim() : x.rpe != null ? fnum(x.rpe, 1) : '';
+                return {
+                  type,
+                  sets: '1',
+                  // seria na czas zostaje na czas („60 s”), lewa/prawa jako „30/20”; cardio: czas jak w zegarku (3:05)
+                  reps: e.cardio
+                    ? x.reps != null ? (Number.isInteger(x.reps) ? String(x.reps) : clock(x.reps)) : ''
+                    : x.complex ?? (x.reps != null ? `${x.reps}${x.repsR != null ? `/${x.repsR}` : ''}${x.unit ? ` ${x.unit}` : ''}` : ''),
+                  // cardio: „ciężar” w planie = dystans (km)
+                  load,
+                  rpe,
+                };
+              })
+            : [{ type: 'Robocze' as const, sets: e.sets || '1', reps: e.reps ?? '', load: e.load ?? '', rpe: e.rpe ?? '' }],
+        };
+      }),
   };
 }
 
@@ -368,7 +405,7 @@ export function cloneWeek(w: Plan['weeks'][number], name: string, mode: Progress
       exercises: k.exercises.map((e) => {
         // bieg / cardio: progresja objętości odcinków (czas, dystans, powtórzenia), nie kilogramów
         if (e.cardio ?? cardioByName(e.name)) return { ...e, id: uid(), groups: e.groups.map((g) => progressCardio(g, mode)) };
-        let groups = e.groups.map((g) => progressGroup(g, mode));
+        let groups = e.groups.map((g) => progressGroup(g, mode, e));
         // deload przy seriach rozpisanych pojedynczo: jedna seria robocza mniej
         const work = groups.filter((g) => g.type !== 'Rozgrzewka');
         if (mode === 'deload' && work.length > 1 && work.every((g) => !g.sets || g.sets === '1')) {
@@ -392,19 +429,24 @@ export function nextWeekName(weeks: { name: string }[], name: string): string {
 export type Progression = 'none' | 'load2' | 'load5' | 'rep' | 'rpe' | 'deload';
 export const PROGRESSIONS: [Progression, string][] = [
   ['none', 'bez zmian'],
-  ['load2', '+2,5% ciężaru (bieg: ~+5% czasu / dystansu)'],
-  ['load5', '+5% ciężaru (bieg: ~+10%)'],
-  ['rep', '+1 powtórzenie (bieg: +1 odcinek)'],
+  ['load2', '+2,5% ciężaru (na czas: +5 s; bieg: ~+5% czasu / dystansu)'],
+  ['load5', '+5% ciężaru (na czas: +10 s; bieg: ~+10%)'],
+  ['rep', '+1 powtórzenie (na czas: +5 s; bieg: +1 odcinek)'],
   ['rpe', '+0,5 RPE'],
-  ['deload', 'deload (−1 seria, −10%, RPE −2)'],
+  ['deload', 'deload (−1 seria, −10% ciężaru, RPE −2; na czas: −20%; bieg: −20% lub −1 odcinek, RPE −1)'],
 ];
 
-const r25 = (v: number) => Math.round(v / 2.5) * 2.5;
 const fmtN = (v: number) => String(Math.round(v * 10) / 10).replace('.', ',');
 
+/** Czas odcinka biegu po zmianie: od 5 min — pełne minuty, krótsze odcinki co 15 s. */
+function roundRunMin(min: number): number {
+  return min >= 5 ? Math.max(1, Math.round(min)) : Math.max(0.25, Math.round(min * 4) / 4);
+}
+
 /**
- * Odcinek biegu po progresji: +5% / +10% czasu lub dystansu części głównej (zasada ok. 10% tygodniowo),
- * +1 powtórzenie odcinków, +0,5 RPE, deload: −30% objętości i jedno powtórzenie mniej.
+ * Odcinek biegu po progresji: +5% / +10% czasu lub dystansu części głównej (zasada ok. 10% tygodniowo) — dystans
+ * zaokrąglony do 100 m, czas do pełnych minut (krótkie odcinki co 15 s); +1 powtórzenie = +1 odcinek interwału
+ * (bieg ciągły: +10%); +0,5 RPE; deload: interwał −1 odcinek, bieg ciągły −20% czasu / dystansu, RPE −1.
  * Rozgrzewka, schłodzenie i trucht zostają bez zmian.
  */
 export function progressCardio(g: SetGroup, mode: Progression): SetGroup {
@@ -413,11 +455,20 @@ export function progressCardio(g: SetGroup, mode: Progression): SetGroup {
   const n = parseInt(g.sets || '1', 10) || 1;
   const scale = (f: number) => {
     const d = parseDur(g.reps);
-    if (d != null) out.reps = fmtMin(d * f);
+    if (d != null) {
+      let m = roundRunMin(d * f);
+      // bieg ciągły: przy wzroście co najmniej minuta więcej (zaokrąglenie nie zjada progresji)
+      if (f > 1 && m <= d && n === 1) m = Math.floor(d) + 1;
+      out.reps = fmtMin(m);
+    }
     const km = parseKm(g.load);
-    // w metrach zostaje w metrach (co 50 m), w km — co 0,1 km
+    // w metrach zostaje w metrach, w km — w km; zawsze co 100 m
     const meters = /\d\s*m$/i.test(g.load.trim()) || (km != null && !/km/i.test(g.load) && parseFloat(g.load.replace(',', '.')) >= 100);
-    if (km != null) out.load = meters || km < 1 ? `${Math.round((km * f * 1000) / 50) * 50} m` : fmtN(Math.round(km * f * 10) / 10);
+    if (km != null) {
+      let m100 = Math.max(1, Math.round((km * f * 1000) / 100));
+      if (f > 1 && m100 * 100 <= km * 1000 && n === 1) m100 = Math.floor((km * 1000) / 100) + 1;
+      out.load = meters || m100 < 10 ? `${m100 * 100} m` : fmtN(m100 / 10);
+    }
   };
   const rpe = g.rpe ? parseFloat(g.rpe.replace(',', '.')) : null;
   if (mode === 'load2') scale(1.05);
@@ -428,8 +479,8 @@ export function progressCardio(g: SetGroup, mode: Progression): SetGroup {
   } else if (mode === 'rpe') {
     if (rpe != null) out.rpe = fmtN(Math.min(10, rpe + 0.5));
   } else if (mode === 'deload') {
-    if (n > 2) out.sets = String(n - 1);
-    else scale(0.7);
+    if (n > 1) out.sets = String(n - 1);
+    else scale(0.8);
     if (rpe != null) out.rpe = fmtN(Math.max(2, rpe - 1));
   }
   return out;
@@ -441,26 +492,57 @@ function fmtMin(min: number): string {
   return s % 60 === 0 ? String(s / 60) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** Seria planu po progresji (kg, % 1RM, powtórzenia, RPE); zapis względny („-10%”) zostaje. */
-export function progressGroup(g: SetGroup, mode: Progression): SetGroup {
+/** Czas serii po zmianie: „45 s” → „50 s”, „1:30” → „1:35”, „20 s/str.” → „25 s/str.”; zapis bez jednostki zostaje bez jednostki. */
+function shiftTime(reps: string, fn: (sec: number) => number): string | null {
+  const m = reps.trim().match(/^(.*?)(\s*\/\s*str\.?|\s+na\s+stronę)?$/i);
+  const core = (m?.[1] ?? reps).trim();
+  const suffix = m?.[2] ?? '';
+  const sec = secOf(core);
+  if (sec == null || sec <= 0) return null;
+  const v = Math.max(5, Math.round(fn(sec) / 5) * 5);
+  const plain = /^\d+$/.test(core);
+  return `${plain ? String(v) : fmtSec(v)}${suffix}`;
+}
+
+/**
+ * Seria planu po progresji (kg, % 1RM, powtórzenia, RPE); zapis względny („-10%”) zostaje. Ciężar w realnych krokach
+ * (sztanga 2,5 kg, hantle 1–2 kg, małe ciężary < 20 kg co 0,5–1 kg), przy wzroście co najmniej jeden krok.
+ * Ćwiczenie na czas (`ex`): „+1 powtórzenie” / +2,5% → +5 s, +5% → +10 s, deload −20% czasu (i −1 seria).
+ */
+export function progressGroup(g: SetGroup, mode: Progression, ex?: Pick<PlanExercise, 'name' | 'groups' | 'timed' | 'cardio' | 'loadPer'>): SetGroup {
   if (mode === 'none' || g.type === 'Rozgrzewka') return { ...g };
   const out = { ...g };
+  const name = ex?.name ?? '';
+  const per = ex ? loadPerOf(ex) : undefined;
   const kg = /^\s*\d+(?:[.,]\d+)?\s*(kg)?\s*$/i.test(g.load) ? parseFloat(g.load.replace(',', '.')) : null;
   const pct = g.load.match(/^\s*(\d+(?:[.,]\d+)?)\s*%\s*$/);
   const pctV = pct ? parseFloat(pct[1].replace(',', '.')) : null;
   const rpe = g.rpe ? parseFloat(g.rpe.replace(',', '.')) : null;
+  const timed = ex ? isTimed(ex) && shiftTime(g.reps, (x) => x) != null : false;
+  if (timed && mode !== 'rpe') {
+    if (mode === 'load2' || mode === 'rep') out.reps = shiftTime(g.reps, (x) => x + 5)!;
+    else if (mode === 'load5') out.reps = shiftTime(g.reps, (x) => x + 10)!;
+    else if (mode === 'deload') {
+      out.reps = shiftTime(g.reps, (x) => x * 0.8)!;
+      const n = parseInt(g.sets || '1', 10);
+      if (Number.isFinite(n) && n > 1) out.sets = String(n - 1);
+      if (rpe != null) out.rpe = fmtN(Math.max(5, rpe - 2));
+    }
+    return out;
+  }
   if (mode === 'load2' || mode === 'load5') {
     const f = mode === 'load2' ? 0.025 : 0.05;
-    if (kg != null) out.load = fmtN(Math.max(r25(kg * (1 + f)), kg + 2.5));
+    if (kg != null) out.load = fmtN(scaleLoad(kg, f, name, per));
     else if (pctV != null) out.load = `${fmtN(pctV + f * 100)}%`;
   } else if (mode === 'rep') {
-    if (/^\d+$/.test(g.reps.trim())) out.reps = String(parseInt(g.reps, 10) + 1);
+    const m = g.reps.trim().match(/^(\d+)(\s*\/\s*str\.?)?$/i);
+    if (m) out.reps = `${parseInt(m[1], 10) + 1}${m[2] ?? ''}`;
   } else if (mode === 'rpe') {
     if (rpe != null) out.rpe = fmtN(Math.min(10, rpe + 0.5));
   } else if (mode === 'deload') {
     const n = parseInt(g.sets || '1', 10);
     if (Number.isFinite(n) && n > 1) out.sets = String(n - 1);
-    if (kg != null) out.load = fmtN(r25(kg * 0.9));
+    if (kg != null) out.load = fmtN(scaleLoad(kg, -0.1, name, per));
     else if (pctV != null) out.load = `${fmtN(pctV - 10)}%`;
     if (rpe != null) out.rpe = fmtN(Math.max(5, rpe - 2));
   }

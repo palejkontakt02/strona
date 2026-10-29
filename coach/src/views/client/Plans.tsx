@@ -5,15 +5,17 @@ import { extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState
 import { useState } from 'react';
 import { del, put } from '../../data/db';
 import { useStore } from '../../data/store';
-import { fmtDate, plural, uid } from '../../format';
-import { todayISO } from '../../lib/dates';
+import { fmtDate, fmtShort, plural, uid } from '../../format';
+import { daysBetween, todayISO, weekStart } from '../../lib/dates';
 import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf } from '../../lib/analytics';
-import { doneInPass, nextWorkout } from '../../lib/plan';
+import { doneInPass, nextDate, nextWorkout, planStatus } from '../../lib/plan';
+import { Sheet } from '../../components/Sheet';
+import { fmtWeekdayDate } from '../../lib/planGrid';
 import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
-import { AbsenceNotice, LoadSuggestPanel, ShiftPanel } from '../../components/PlanTools';
+import { AbsenceNotice, LoadSuggestPanel, QuickShift, ShiftPanel } from '../../components/PlanTools';
 import { PlanImport } from '../../components/PlanImport';
-import { nextBlock } from '../../lib/planShift';
+import { nextBlock, nextBlockName, planDates, shiftPlanFrom } from '../../lib/planShift';
 import { csvFileName, planToCsv } from '../../lib/sheetImport';
 
 /** Plik CSV do pobrania (eksport planu). */
@@ -40,7 +42,7 @@ export function newPlan(clientId: string): Plan {
 }
 
 export function ClientPlans({ client }: { client: Client }) {
-  const { db, apply, ask } = useStore();
+  const { db, apply, ask, toast } = useStore();
   const { openModal, startLive, startAthlete } = useNav();
   const plans = plansOf(db, client.id).sort((a, b) => Number(b.active) - Number(a.active) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const sessions = sessionsOf(db, client.id);
@@ -62,6 +64,44 @@ export function ClientPlans({ client }: { client: Client }) {
   const removeExtra = async (id: string, name: string) => {
     if (!extra || !(await ask(`Usunąć „${name}” z dodatkowych treningów? Zapisane wcześniej treningi zostają w historii.`, { confirm: 'Usuń trening' }))) return;
     await apply(savePlan(db, { ...extra, weeks: extra.weeks.map((w) => ({ ...w, workouts: w.workouts.filter((k) => k.id !== id) })) }), `Usunięto „${name}”.`);
+  };
+
+  const activePlan = plans.find((x) => x.active && !x.extra);
+  const [menu, setMenu] = useState<string | null>(null);
+  const menuPlan = plans.find((x) => x.id === menu);
+
+  // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
+  const dupPlan = (p: Plan) => {
+    const b = nextBlock(p);
+    void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Plan jest nieaktywny — „Ustaw aktywny”, gdy zacznie się blok.`);
+  };
+  const saveTemplate = (p: Plan) => {
+    const taken = templatesOf(db.plans).some((t) => t.name === p.name);
+    void apply([put('plans', templateFromPlan(p, taken ? `${p.name} (${fmtDate(todayISO())})` : p.name))], `Zapisano szablon „${p.name}” — znajdziesz go w „Nowy plan z szablonu…” i w Ćwiczeniach.`);
+  };
+  const removePlan = async (p: Plan) => {
+    if (await ask(`Usunąć plan „${p.name}”? Zapisane treningi zostaną.`)) await apply([del('plans', p.id)], 'Plan usunięty.');
+  };
+  // zakończony plan → kolejny blok od najbliższego poniedziałku, od razu aktywny (z cofnięciem)
+  const nextBlockNow = async (p: Plan) => {
+    const b: Plan = { ...nextBlock(p, today), active: true };
+    if (!(await apply(savePlan(db, b)))) return;
+    toast(`Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Teraz to plan aktywny.`, {
+      label: 'Cofnij',
+      run: () => void apply([del('plans', b.id), put('plans', p)], 'Cofnięto nowy blok.'),
+    });
+  };
+  // ten sam plan od nowa: cały plan przesunięty o pełne tygodnie na najbliższy poniedziałek (z cofnięciem)
+  const restartDates = async (p: Plan) => {
+    const first = planDates(p).map((x) => x.date).sort()[0];
+    const days = p.startDate ? daysBetween(weekStart(p.startDate), nextMonday(today)) : 0;
+    if (!first || days <= 0) return openModal({ kind: 'plan', plan: p });
+    const moved = shiftPlanFrom(p, first, days);
+    if (!(await apply(savePlan(db, moved)))) return;
+    toast(`Plan „${p.name}” zaczyna się od nowa ${fmtDate(moved.startDate ?? nextMonday(today))}.`, {
+      label: 'Cofnij',
+      run: () => void apply([put('plans', p)], 'Cofnięto zmianę dat.'),
+    });
   };
 
   return (
@@ -132,6 +172,8 @@ export function ClientPlans({ client }: { client: Client }) {
         {plans.map((p) => {
           const nx = nextWorkout(p, sessions);
           const done = doneInPass(p, sessions);
+          const st = p.active && !p.extra ? planStatus(p, today) : null;
+          const nd = nx && p.active ? nextDate(p, nx, today) : undefined;
           return (
             <Card
               key={p.id}
@@ -142,68 +184,78 @@ export function ClientPlans({ client }: { client: Client }) {
                 </>
               }
               action={
-                <div className="actions">
+                <div className="actions pl-actions">
                   {!p.active && (
                     <button className="btn btn-ghost btn-sm" onClick={() => apply(savePlan(db, { ...p, active: true }), 'Plan ustawiony jako aktywny.')}>
                       Ustaw aktywny
                     </button>
                   )}
                   <IconBtn icon="edit" label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })} />
-                  <IconBtn
-                    icon="copy"
-                    label="Duplikuj plan"
-                    onClick={() => {
-                      // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
-                      const b = nextBlock(p);
-                      void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Plan jest nieaktywny — „Ustaw aktywny”, gdy zacznie się blok.`);
-                    }}
-                  />
                   {p.active && (
                     <button className="btn btn-ghost btn-sm" aria-expanded={shift?.planId === p.id} onClick={() => setShift(shift?.planId === p.id ? null : { planId: p.id })} title="Przesuń daty jednostek od wybranego dnia (np. choroba, urlop)">
                       <Icon name="cal" size={16} /> Przesuń plan
                     </button>
                   )}
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    title="Kopia planu do biblioteki szablonów — przypiszesz ją innym podopiecznym"
-                    onClick={() => {
-                      const taken = templatesOf(db.plans).some((t) => t.name === p.name);
-                      void apply([put('plans', templateFromPlan(p, taken ? `${p.name} (${fmtDate(todayISO())})` : p.name))], `Zapisano szablon „${p.name}” — znajdziesz go w „Nowy plan z szablonu…” i w Ćwiczeniach.`);
-                    }}
-                  >
-                    Zapisz jako szablon
+                  {/* rzadsze akcje: na komputerze w rzędzie, na telefonie w arkuszu „⋯” */}
+                  <span className="pl-rare">
+                    <IconBtn icon="copy" label="Duplikuj plan" onClick={() => dupPlan(p)} />
+                    <button className="btn btn-ghost btn-sm" title="Kopia planu do biblioteki szablonów — przypiszesz ją innym podopiecznym" onClick={() => saveTemplate(p)}>
+                      Zapisz jako szablon
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
+                      <Icon name="print" size={16} /> Drukuj
+                    </button>
+                    {p.active && (
+                      <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions, { nextWeek: true })} title="Tylko tydzień następnej jednostki, z pustą kolumną „Zrobiono” do wpisania wykonania">
+                        <Icon name="print" size={16} /> Następny tydzień
+                      </button>
+                    )}
+                    <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
+                      <Icon name="download" size={16} /> CSV
+                    </button>
+                    <IconBtn icon="trash" label="Usuń plan" danger onClick={() => void removePlan(p)} />
+                  </span>
+                  <button type="button" className="icon-btn pl-more" aria-label="Więcej akcji planu" title="Więcej: duplikuj, szablon, druk, CSV, usuń" aria-haspopup="dialog" onClick={() => setMenu(p.id)}>
+                    <Icon name="more" size={18} />
                   </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
-                    <Icon name="print" size={16} /> Drukuj
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
-                    <Icon name="download" size={16} /> CSV
-                  </button>
-                  <IconBtn
-                    icon="trash"
-                    label="Usuń plan"
-                    danger
-                    onClick={async () => {
-                      if (await ask(`Usunąć plan „${p.name}”? Zapisane treningi zostaną.`)) await apply([del('plans', p.id)], 'Plan usunięty.');
-                    }}
-                  />
                 </div>
               }
             >
               <p className="muted small">
                 {p.startDate && `Start ${fmtDate(p.startDate)} · `}
                 {p.weeks.length} tyg. · {(() => { const n = p.weeks.reduce((a, w) => a + w.workouts.length, 0); return `${n} ${plural(n, 'jednostka', 'jednostki', 'jednostek')}`; })()}
-                {nx && p.active && ` · następny: ${nx.workout.name} (${nx.week.name})`}
+                {nx && p.active && ` · następny: ${nx.workout.name} (${nx.week.name})${nd ? ` · ${fmtWeekdayDate(nd)}` : ''}`}
               </p>
+              {st?.ended && st.endDate && (
+                <div className="warn-box pl-ended" role="status">
+                  <Icon name="alert" size={16} />
+                  <span className="pl-ended-text">
+                    Plan zakończył się {fmtShort(st.endDate)} — zaplanuj kolejny blok.
+                    {st.cycle > 1 && <span className="muted small"> Podopieczny robi go teraz od nowa (przejście {st.cycle}).</span>}
+                  </span>
+                  <span className="pl-ended-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku — od razu aktywna">
+                      Następny blok
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restartDates(p)} title="Ten sam plan od najbliższego poniedziałku (podgląd przed zapisem)">
+                      Ustaw daty od nowa
+                    </button>
+                  </span>
+                </div>
+              )}
               {p.notes && <p className="small pre">{p.notes}</p>}
-              {p.active && <AbsenceNotice client={client} plan={p} onShift={(from, days) => setShift({ planId: p.id, preset: { from, days } })} />}
-              {p.active && shift?.planId === p.id && <ShiftPanel key={JSON.stringify(shift.preset ?? null)} plan={p} preset={shift.preset} onClose={() => setShift(null)} />}
+              {p.active && <AbsenceNotice client={client} plan={p} sessions={sessions} onShift={(from, days) => setShift({ planId: p.id, preset: { from, days } })} />}
+              {p.active && shift?.planId === p.id && <ShiftPanel key={JSON.stringify(shift.preset ?? null)} plan={p} sessions={sessions} preset={shift.preset} onClose={() => setShift(null)} />}
               {p.active && <LoadSuggestPanel plan={p} sessions={sessions} />}
               {p.active && (
                 <PlanTable
                   plan={p}
                   done={done}
                   nextId={nx?.workout.id}
+                  nextDate={nd}
+                  profile={client.run}
+                  dob={client.dob}
+                  nextExtra={<QuickShift plan={p} sessions={sessions} />}
                   onLive={(id) => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: id })}
                   onAthlete={(id) => startAthlete(client.id, { planId: p.id, workoutId: id })}
                 />
@@ -212,10 +264,38 @@ export function ClientPlans({ client }: { client: Client }) {
           );
         })}
       </div>
+      {menuPlan && (
+        <Sheet label={`Plan „${menuPlan.name}” — więcej`} onClose={() => setMenu(null)}>
+          <strong className="pl-sheet-title">{menuPlan.name}</strong>
+          <div className="pl-sheet-list">
+            {[
+              { icon: 'copy', text: `Duplikuj jako „${nextBlockName(menuPlan.name)}”`, run: () => dupPlan(menuPlan) },
+              { icon: 'lib', text: 'Zapisz jako szablon', run: () => saveTemplate(menuPlan) },
+              { icon: 'print', text: 'Drukuj', run: () => printPlan(menuPlan, client, sessions) },
+              ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
+              { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
+              { icon: 'download', text: 'Import z arkusza', run: () => setImporting(true) },
+              { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(menuPlan), danger: true },
+            ].map((a) => (
+              <button
+                key={a.text}
+                type="button"
+                className={`btn btn-ghost pl-sheet-btn ${a.danger ? 'is-danger' : ''}`}
+                onClick={() => {
+                  setMenu(null);
+                  a.run();
+                }}
+              >
+                <Icon name={a.icon} size={18} /> {a.text}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
       {importing && (
         <PlanImport
           clientId={client.id}
-          active={!plans.some((x) => x.active)}
+          active={!activePlan || !!planStatus(activePlan, today).ended}
           onClose={() => setImporting(false)}
           onDone={(plan) => {
             setImporting(false);

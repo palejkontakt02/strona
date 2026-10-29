@@ -447,3 +447,46 @@ export function platesFor(total: number, bar = 20, plates: readonly number[] = P
 
 /** „20 + 15 + 2,5 na stronę”; bez talerzy — „sam gryf”. */
 export const platesText = (perSide: number[]) => (perSide.length ? `${perSide.map(fmtKg).join(' + ')} na stronę` : 'sam gryf');
+
+/**
+ * Najmniejszy realny krok ciężaru: hantle / kettle 1 kg (do 10 kg na rękę) albo 2 kg (przy `sum` — razy dwa);
+ * małe ciężary < 20 kg poza sztangą (linka, talerz, maszyna z małym krokiem) 1 kg; sztanga / maszyna 2,5 kg.
+ */
+export function loadStep(v: number, exerciseName: string, loadPer?: 'one' | 'sum'): number {
+  if (dumbbellByName(exerciseName)) {
+    const per = loadPer === 'sum' ? v / 2 : v;
+    const s = per < 10 ? 1 : 2;
+    return loadPer === 'sum' ? s * 2 : s;
+  }
+  if (!barbellByName(exerciseName) && v < 20) return 1;
+  return 2.5;
+}
+
+/** Zaokrąglenie do ciężaru do założenia: jak `roundLoad`, a małe ciężary (< 20 kg, nie hantle i nie sztanga) co 0,5 kg. */
+export function roundReal(v: number, exerciseName: string, loadPer?: 'one' | 'sum'): number {
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  if (!dumbbellByName(exerciseName) && !barbellByName(exerciseName) && v < 20) return Math.round(v * 2) / 2;
+  return roundLoad(v, exerciseName, loadPer);
+}
+
+/** Ciężar o `n` realnych kroków wyżej (n < 0 — niżej): sztanga 100 → 102,5; hantel 8 → 9, 12 → 14. */
+export function stepLoad(v: number, exerciseName: string, loadPer?: 'one' | 'sum', n = 1): number {
+  let x = v;
+  const sign = Math.sign(n);
+  for (let i = 0; i < Math.abs(n); i++) {
+    const s = loadStep(sign > 0 ? x : x - 0.001, exerciseName, loadPer);
+    const cand = x + sign * s;
+    const r = roundReal(cand, exerciseName, loadPer);
+    x = (sign > 0 ? r > x : r < x) ? r : cand;
+  }
+  return Math.max(0, Math.round(x * 100) / 100);
+}
+
+/** Ciężar po zmianie o ułamek (`+0.025`, `-0.1`) w realnych krokach; przy wzroście co najmniej jeden krok, bez wymuszania +2,5 kg. */
+export function scaleLoad(v: number, f: number, exerciseName: string, loadPer?: 'one' | 'sum'): number {
+  if (!Number.isFinite(v) || v <= 0) return v;
+  const r = roundReal(v * (1 + f), exerciseName, loadPer);
+  if (f > 0 && r <= v) return stepLoad(v, exerciseName, loadPer, 1);
+  if (f < 0 && r >= v) return stepLoad(v, exerciseName, loadPer, -1);
+  return r;
+}

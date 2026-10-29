@@ -1,6 +1,6 @@
-import type { ISODate, Plan } from '../domain';
-import { uid } from '../format';
-import { addDays, daysBetween, weekStart } from './dates';
+import type { ISODate, Plan, TrainingSession } from '../domain';
+import { fmtShort, uid } from '../format';
+import { addDays, daysBetween, todayISO, weekStart } from './dates';
 import { workoutDate } from './plan';
 
 /** Dzień tygodnia 1 (pon.) … 7 (niedz.). */
@@ -18,17 +18,36 @@ export function planDates(plan: Plan): { wi: number; ki: number; date: ISODate }
   return out;
 }
 
+/** Id jednostek tego planu, które już mają zapisany trening (nie przesuwamy ich i nie liczymy). Przerwane z bólu się nie liczą. */
+export function doneWorkoutIds(plan: Plan, sessions?: Pick<TrainingSession, 'planId' | 'workoutId' | 'stoppedForPain'>[]): Set<string> {
+  const out = new Set<string>();
+  for (const s of sessions ?? []) if (s.planId === plan.id && s.workoutId && !s.stoppedForPain) out.add(s.workoutId);
+  return out;
+}
+
+/** Daty planu do przesunięcia: bez jednostek już wykonanych. */
+function movable(plan: Plan, sessions?: Pick<TrainingSession, 'planId' | 'workoutId' | 'stoppedForPain'>[]) {
+  const done = doneWorkoutIds(plan, sessions);
+  return planDates(plan).filter((x) => !done.has(plan.weeks[x.wi].workouts[x.ki].id));
+}
+
+/** „29.10” dla jednego dnia, „29.10–02.11” dla zakresu. */
+export function fmtRange(from: ISODate, to: ISODate): string {
+  return !to || to === from ? fmtShort(from) : `${fmtShort(from)}–${fmtShort(to)}`;
+}
+
 /**
  * Przesuwa resztę planu: każda jednostka z datą ≥ `fromISO` (dzień tygodnia liczony od startu albo wpisana data)
  * przesuwa się o `days` dni; wcześniejsze zostają. Gdy przesuwa się cały plan o pełne tygodnie — zmienia się
  * tylko data startu (i wpisane daty), dni tygodnia zostają. Inaczej przesunięte jednostki dostają konkretną datę.
+ * Jednostki już wykonane (sesje z planId/workoutId w `sessions`) zostają na swoim miejscu.
  * Czysta funkcja: zwraca nowy plan (te same id), oryginał bez zmian.
  */
-export function shiftPlanFrom(plan: Plan, fromISO: ISODate, days: number): Plan {
+export function shiftPlanFrom(plan: Plan, fromISO: ISODate, days: number, sessions?: TrainingSession[]): Plan {
   const next: Plan = structuredClone(plan);
   if (!days || plan.extra) return next;
   const dates = planDates(plan);
-  const hit = dates.filter((x) => x.date >= fromISO);
+  const hit = movable(plan, sessions).filter((x) => x.date >= fromISO);
   if (!hit.length) return next;
   const whole = hit.length === dates.length && days % 7 === 0 && !!plan.startDate;
   if (whole) {
@@ -55,11 +74,11 @@ export interface ShiftRow {
   count: number;
 }
 
-/** Podgląd przesunięcia: tydzień po tygodniu „Tydzień 3: 09.11 → 16.11”. */
-export function shiftPreview(plan: Plan, fromISO: ISODate, days: number): ShiftRow[] {
+/** Podgląd przesunięcia: tydzień po tygodniu „Tydzień 3: 09.11 → 16.11” (bez jednostek już wykonanych). */
+export function shiftPreview(plan: Plan, fromISO: ISODate, days: number, sessions?: TrainingSession[]): ShiftRow[] {
   if (!days || plan.extra) return [];
   const rows: ShiftRow[] = [];
-  for (const { wi, date } of planDates(plan)) {
+  for (const { wi, date } of movable(plan, sessions)) {
     if (date < fromISO) continue;
     const name = plan.weeks[wi].name || `Tydzień ${wi + 1}`;
     const r = rows.find((x) => x.week === name);
@@ -78,19 +97,26 @@ export function planEnd(plan: Plan): ISODate | undefined {
   return plan.startDate ? addDays(weekStart(plan.startDate), plan.weeks.length * 7 - 1) : undefined;
 }
 
-/** „S&C — blok 2” → „S&C — blok 3”; inna nazwa → „<nazwa> — blok 2”. */
+/**
+ * „S&C — blok 2” / „S&C – blok 2” / „S&C blok 2” → „S&C — blok 3”; inna nazwa → „<nazwa> — blok 2”.
+ * Dopisek zawsze z pauzą „ — ”; myślniki w samej nazwie („Siła – dół”) zostają.
+ */
 export function nextBlockName(name: string): string {
-  const m = name.match(/^(.*?)\s*[—–-]\s*blok\s+(\d+)\s*$/i);
-  return m ? `${m[1]} — blok ${Number(m[2]) + 1}` : `${name.replace(/\s*\(kopia\)\s*$/, '')} — blok 2`;
+  const clean = name.replace(/\s*\(kopia\)\s*$/i, '').trim();
+  const m = clean.match(/^(.*?)\s*(?:[—–-]\s*|\s)blok\s*(\d+)\s*$/i);
+  return m && m[1].trim() ? `${m[1].trim()} — blok ${Number(m[2]) + 1}` : `${clean} — blok 2`;
 }
 
 /**
- * Duplikat planu jako kolejny blok: nowe id, nazwa „— blok N”, start od najbliższego poniedziałku po końcu oryginału
- * (wpisane daty jednostek przesunięte o tyle samo), nieaktywny.
+ * Duplikat planu jako kolejny blok: nowe id, nazwa „— blok N”, start = później z: poniedziałek po końcu oryginału,
+ * najbliższy poniedziałek ≥ dziś (wpisane daty jednostek przesunięte o tyle samo), nieaktywny.
  */
-export function nextBlock(plan: Plan): Plan {
+export function nextBlock(plan: Plan, today: ISODate = todayISO()): Plan {
   const end = planEnd(plan);
-  const start = end ? addDays(weekStart(end), 7) : undefined;
+  const afterEnd = end ? addDays(weekStart(end), 7) : undefined;
+  const ws = weekStart(today);
+  const nearestMon = ws === today ? today : addDays(ws, 7);
+  const start = afterEnd ? (afterEnd > nearestMon ? afterEnd : nearestMon) : plan.startDate ? nearestMon : undefined;
   const shift = start && plan.startDate ? daysBetween(weekStart(plan.startDate), start) : 0;
   return {
     ...plan,
@@ -120,17 +146,21 @@ export interface Absence {
 }
 
 /**
- * Nieobecność klienta, na którą wypadają jednostki aktywnego planu (od dziś): proponowane przesunięcie
- * w pełnych tygodniach (≥ długość nieobecności), od pierwszego dnia nieobecności.
+ * Nieobecność klienta, na którą wypadają niewykonane jednostki planu (od dziś): krótka (1–3 dni) → przesunięcie
+ * o tyle dni, ile nieobecności przypada od pierwszej trafionej jednostki do końca nieobecności; od 4 dni —
+ * pełne tygodnie (≥ długość nieobecności) od pierwszego dnia nieobecności. `range` — „29.10” albo „29.10–02.11”.
  */
-export function absenceShift(plan: Plan, absences: Absence[] | undefined, today: ISODate): { absence: Absence; from: ISODate; days: number } | null {
+export function absenceShift(plan: Plan, absences: Absence[] | undefined, today: ISODate, sessions?: TrainingSession[]): { absence: Absence; from: ISODate; days: number; range: string } | null {
   if (!absences?.length || plan.extra) return null;
-  const dates = planDates(plan).map((x) => x.date);
+  const dates = movable(plan, sessions).map((x) => x.date);
   for (const a of [...absences].sort((x, y) => x.from.localeCompare(y.from))) {
     if (!a.from || !a.to || a.to < today || a.to < a.from) continue;
-    if (!dates.some((d) => d >= a.from && d <= a.to)) continue;
+    const hit = dates.filter((d) => d >= a.from && d <= a.to).sort();
+    if (!hit.length) continue;
     const len = daysBetween(a.from, a.to) + 1;
-    return { absence: a, from: a.from, days: Math.ceil(len / 7) * 7 };
+    const range = fmtRange(a.from, a.to);
+    if (len <= 3) return { absence: a, from: hit[0], days: daysBetween(hit[0], a.to) + 1, range };
+    return { absence: a, from: a.from, days: Math.ceil(len / 7) * 7, range };
   }
   return null;
 }

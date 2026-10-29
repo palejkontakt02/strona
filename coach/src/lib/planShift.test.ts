@@ -49,7 +49,7 @@ describe('nextBlock', () => {
   it('start od poniedziałku po końcu oryginału, nazwa „— blok 2”, nieaktywny, nowe id', () => {
     const p = plan();
     expect(planEnd(p)).toBe('2026-11-12');
-    const b = nextBlock(p);
+    const b = nextBlock(p, '2026-10-29');
     expect(b.startDate).toBe('2026-11-16');
     expect(b.name).toBe('Siła — blok 2');
     expect(b.active).toBe(false);
@@ -73,5 +73,42 @@ describe('absenceShift', () => {
     expect(absenceShift(plan(), [{ from: '2026-10-01', to: '2026-10-07' }], '2026-10-26')).toBeNull();
     expect(absenceShift(plan(), [{ from: '2027-01-01', to: '2027-01-07' }], '2026-10-26')).toBeNull();
     expect(absenceShift(plan(), undefined, '2026-10-26')).toBeNull();
+  });
+});
+
+describe('r5: wykonane jednostki, krótkie nieobecności, blok 2', () => {
+  const sess = (workoutId: string, extra: object = {}) => ({ id: workoutId, clientId: 'c', date: '2026-10-26', charge: 'brak', exercises: [], planId: 'p', workoutId, ...extra }) as never;
+  it('przesuwanie nie rusza jednostek już wykonanych', () => {
+    // w2k0 (pon. 26.10) zrobiona — zostaje; reszta od 26.10 o 7 dni
+    const s = shiftPlanFrom(plan(), '2026-10-26', 7, [sess('w2k0')]);
+    expect(dates(s).slice(2, 4)).toEqual(['2026-10-26', '2026-11-05']);
+    const rows = shiftPreview(plan(), '2026-10-26', 7, [sess('w2k0')]);
+    expect(rows.reduce((a, r) => a + r.count, 0)).toBe(5);
+    expect(rows[0]).toEqual({ week: 'Tydzień 2', from: '2026-10-29', to: '2026-11-05', count: 1 });
+    // przerwany z bólu — jak niewykonany
+    expect(shiftPreview(plan(), '2026-10-26', 7, [sess('w2k0', { stoppedForPain: { level: 6 } })]).reduce((a, r) => a + r.count, 0)).toBe(6);
+  });
+  it('nieobecność 1–3 dni → +N dni, opis jednego dnia bez zakresu', () => {
+    const r = absenceShift(plan(), [{ from: '2026-10-29', to: '2026-10-29' }], '2026-10-26');
+    expect(r).toMatchObject({ from: '2026-10-29', days: 1, range: '29.10' });
+    const r2 = absenceShift(plan(), [{ from: '2026-10-28', to: '2026-10-30' }], '2026-10-26');
+    expect(r2).toMatchObject({ from: '2026-10-29', days: 2, range: '28.10–30.10' });
+    // od 4 dni — pełne tygodnie
+    expect(absenceShift(plan(), [{ from: '2026-10-28', to: '2026-10-31' }], '2026-10-26')).toMatchObject({ from: '2026-10-28', days: 7 });
+    // jedyna trafiona jednostka już zrobiona — brak propozycji
+    expect(absenceShift(plan(), [{ from: '2026-10-29', to: '2026-10-29' }], '2026-10-26', [sess('w2k1')])).toBeNull();
+  });
+  it('nextBlock: start nie wcześniej niż najbliższy poniedziałek ≥ dziś', () => {
+    expect(nextBlock(plan(), '2026-10-29').startDate).toBe('2026-11-16');
+    expect(nextBlock(plan(), '2026-12-03').startDate).toBe('2026-12-07');
+    expect(nextBlock(plan(), '2026-12-07').startDate).toBe('2026-12-07');
+    expect(dates(nextBlock(plan(), '2026-12-03'))[0]).toBe('2026-12-07');
+  });
+  it('nazwa: jednolity dopisek „ — blok N”', () => {
+    expect(nextBlockName('Siła – dół')).toBe('Siła – dół — blok 2');
+    expect(nextBlockName('Siła – blok 2')).toBe('Siła — blok 3');
+    expect(nextBlockName('Siła - blok 3')).toBe('Siła — blok 4');
+    expect(nextBlockName('Siła blok 2')).toBe('Siła — blok 3');
+    expect(nextBlockName('Siła — blok 2 (kopia)')).toBe('Siła — blok 3');
   });
 });

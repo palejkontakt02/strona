@@ -19,6 +19,8 @@ import './styles/onboarding.css';
 import './styles/automaty.css';
 import './styles/plan.css';
 import './styles/podopieczny.css';
+import './styles/zapis.css';
+import './styles/listy.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

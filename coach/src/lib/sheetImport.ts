@@ -2,13 +2,15 @@ import { SET_TYPES, type Plan, type PlanExercise, type PlanWeek, type PlanWorkou
 import { uid } from '../format';
 import { addDays, weekStart } from './dates';
 import { exerciseBlocks, exerciseLabels, mergeGroups } from './plan';
+import { cardioByName } from './run';
+import { parseDur, parseKm } from './running';
 
 /**
  * Import planu z arkusza (Excel / Google Sheets: wklejony zakres TSV, plik CSV) i eksport do CSV
  * (UTF-8 z BOM, średnik, przecinek dziesiętny) w tym samym układzie kolumn.
  */
 
-export type SheetField = 'week' | 'day' | 'workout' | 'exercise' | 'sets' | 'reps' | 'load' | 'rpe' | 'rest' | 'notes' | 'type' | 'skip';
+export type SheetField = 'week' | 'day' | 'workout' | 'exercise' | 'sets' | 'reps' | 'load' | 'rpe' | 'rest' | 'notes' | 'type' | 'dist' | 'target' | 'skip';
 
 export const FIELD_LABEL: Record<SheetField, string> = {
   week: 'Tydzień',
@@ -22,12 +24,15 @@ export const FIELD_LABEL: Record<SheetField, string> = {
   rest: 'Przerwa',
   notes: 'Uwagi',
   type: 'Typ serii',
+  dist: 'Dystans',
+  target: 'Cel',
   skip: 'Pomiń',
 };
 export const SHEET_FIELDS = Object.keys(FIELD_LABEL) as SheetField[];
 
-/** Kolumny eksportu (i kolejność rozpoznawana przy imporcie bez nagłówka). */
-const EXPORT_COLS: SheetField[] = ['week', 'day', 'workout', 'exercise', 'sets', 'reps', 'load', 'rpe', 'rest', 'notes', 'type'];
+/** Kolumny eksportu (i kolejność rozpoznawana przy imporcie bez nagłówka). Dystans i Cel — tylko w planach z biegiem / cardio. */
+const EXPORT_COLS: SheetField[] = ['week', 'day', 'workout', 'exercise', 'sets', 'reps', 'load', 'rpe', 'rest', 'notes', 'type', 'dist', 'target'];
+const BASE_COLS = EXPORT_COLS.slice(0, 11);
 
 /** Małe litery bez polskich znaków i interpunkcji. */
 export const fold = (s: string) =>
@@ -52,6 +57,8 @@ const HEADERS: [SheetField, RegExp][] = [
   ['rest', /^(przerwa|odpoczynek|przerwa s|rest|rest s|recovery)$/],
   ['notes', /^(uwagi|notatki|notatka|komentarz|opis|tempo|notes?|comments?|cues)$/],
   ['type', /^(typ|typ serii|rodzaj|rodzaj serii|type|set type)$/],
+  ['dist', /^(dystans|distance|dist|km|odleglosc|dlugosc odcinka)( (km|m|w m|w km))?$/],
+  ['target', /^(cel|strefa|strefa tetna|tempo cel|tempo strefa|target|zone|pace|intensywnosc)$/],
 ];
 
 /** Pole dla nagłówka kolumny (PL / EN); nieznany → null. */
@@ -59,6 +66,8 @@ export function headerField(h: string): SheetField | null {
   const f = fold(h);
   if (!f) return null;
   for (const [field, re] of HEADERS) if (re.test(f)) return field;
+  // „Obciążenie (kg)”, „Ciężar [kg]”, „Load (kg)”, „Weight lbs”
+  if (/^(ciezar|obciazenie|load|weight)\b/.test(f)) return 'load';
   return null;
 }
 
@@ -242,6 +251,44 @@ function cleanLoad(v: string): string | null {
 const cleanRpe = (v: string) => v.replace(/rpe|@/gi, '').trim().replace(/,/g, '.').replace(/\s*-\s*/, '–');
 const cleanReps = (v: string) => v.trim().replace(/\s*-\s*/, '–');
 
+/** „8/str.”, „20 s/str.”, „8 na stronę” → [powtórzenia bez dopisku, na stronę]. */
+export function splitSide(reps: string): [string, boolean] {
+  const m = reps.match(/^(.*?)\s*(?:\/\s*(?:str\.?|stron[eęa]|side)|na\s+stron[eę]|per\s+side|each\s+side|e\/s)\s*$/i);
+  return m && m[1].trim() ? [m[1].trim(), true] : [reps, false];
+}
+
+const mss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+
+/** Przerwa do m:ss: „2'” → „2:00”, „90s” → „1:30”, „1'30''” → „1:30”, „2 min trucht” → „2:00 trucht”; inny zapis bez zmian. */
+export function normRest(v: string): string {
+  const t = v.trim();
+  let m = t.match(/^(\d+)\s*'\s*(\d{1,2})\s*(?:''|"|s)?(?=\s|$)(.*)$/i);
+  if (m && +m[2] < 60) return `${m[1]}:${m[2].padStart(2, '0')}${m[3]}`;
+  m = t.match(/^(\d+(?:[.,]\d+)?)\s*(?:'|min\.?|minut[ay]?|m)(?=\s|$)(.*)$/i);
+  if (m) return `${mss(parseFloat(m[1].replace(',', '.')) * 60)}${m[2]}`;
+  m = t.match(/^(\d+)\s*(?:s|sek\.?|sec|''|")(?=\s|$)(.*)$/i);
+  if (m) return `${mss(+m[1])}${m[2]}`;
+  return t;
+}
+
+/** Czas odcinka biegu z arkusza → minuty jak w planie: „1:18:45” → „78:45”, „75” zostaje. */
+function cardioTime(v: string): string {
+  if (!/^\d+:\d{1,2}:\d{1,2}$/.test(v.trim())) return v;
+  const d = parseDur(v);
+  if (d == null) return v;
+  const sec = Math.round(d * 60);
+  return sec % 60 === 0 ? String(sec / 60) : mss(sec);
+}
+
+/** Dystans z kolumny „Dystans”: „800 m” → „800 m”, „10 km” / „10” → „10”, „8,5 km” → „8.5”. */
+function cleanDist(v: string): string {
+  const t = v.trim();
+  if (!t) return '';
+  const km = parseKm(t.replace(/\s+/g, ' ').replace(/\s*(km|m)\.?$/i, ' $1').trim());
+  if (km == null) return t;
+  return km < 1 ? `${Math.round(km * 1000)} m` : String(km);
+}
+
 /** Domyślne dni tygodnia dla n treningów w tygodniu (gdy arkusz nie ma kolumny dnia). */
 const SPREAD: Record<number, number[]> = { 1: [1], 2: [1, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6], 7: [1, 2, 3, 4, 5, 6, 7] };
 
@@ -315,9 +362,13 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
       label = { letter: lm[1].toUpperCase(), n: lm[2] ? Number(lm[2]) : undefined };
       exText = exText.slice(lm[0].length);
     }
-    const inline = exText ? parseInline(exText) : { name: '' };
     let sets = get(r, 'sets');
     let reps = get(r, 'reps');
+    const distRaw = get(r, 'dist');
+    const target = get(r, 'target');
+    // kolumny serii / powtórzeń / dystansu wypełnione — nazwa zostaje w całości („Interwały 6 × 800 m”)
+    const structured = !!(sets || reps || distRaw || target);
+    const inline: Inline = exText ? (structured && cardioByName(exText) ? { name: exText.replace(/\s+/g, ' ').trim() } : parseInline(exText)) : { name: '' };
     if (/[x×]/i.test(sets) && !reps) {
       const m = sets.match(/(\d+)\s*[x×]\s*(.+)/i);
       if (m) [sets, reps] = [m[1], m[2]];
@@ -326,9 +377,11 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     reps = cleanReps(reps || inline.reps || '');
     const loadRaw = get(r, 'load') || inline.load || '';
     const rpe = cleanRpe(get(r, 'rpe') || inline.rpe || '');
-    const rest = get(r, 'rest');
+    const rest = normRest(get(r, 'rest'));
     const notes = get(r, 'notes');
-    if (!inline.name && !reps && !loadRaw && !sets && !rpe) return;
+    if (!inline.name && !reps && !loadRaw && !sets && !rpe && !distRaw && !target) return;
+    const [repsNoSide, side] = splitSide(reps);
+    reps = repsNoSide;
     dataRows++;
 
     // trening (jednostka) dla wiersza
@@ -357,7 +410,12 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     }
     const type = setType(get(r, 'type'));
     const n = /[-–]/.test(sets) ? 1 : Math.max(1, Math.min(20, Number.parseInt(sets, 10) || 1));
-    const groups: SetGroup[] = Array.from({ length: n }, () => ({ type, sets: /[-–]/.test(sets) ? sets.replace('-', '–') : '1', reps, load: load!, rpe }));
+    const exName = inline.name || lastEx?.name || '';
+    const isCardio = !!(distRaw || target) || (lastEx && !inline.name ? !!lastEx.cardio : cardioByName(exName));
+    // bieg / cardio: jeden wiersz = odcinek (× serie), dystans w „ciężarze”, cel w tempie / strefie, przerwa przy odcinku
+    const groups: SetGroup[] = isCardio
+      ? [{ type, sets: String(n), reps: cardioTime(reps), load: cleanDist(distRaw) || load!, rpe, ...(target ? { pace: target } : {}), ...(rest ? { rest } : {}) }]
+      : Array.from({ length: n }, () => ({ type, sets: /[-–]/.test(sets) ? sets.replace('-', '–') : '1', reps, load: load!, rpe }));
 
     // bez nazwy albo ta sama nazwa co w wierszu wyżej — kolejne serie tego samego ćwiczenia
     let ex: PlanExercise | null = !inline.name || (lastEx && fold(lastEx.name) === fold(inline.name) && !label) ? lastEx : null;
@@ -371,8 +429,10 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
       k.exercises.push(ex);
       lastLabel = label ? { letter: label.letter } : null;
     }
+    if (isCardio) ex.cardio = true;
+    if (side) ex.perSide = true;
     ex.groups.push(...groups);
-    if (rest && !ex.rest) ex.rest = rest;
+    if (rest && !ex.rest && !isCardio) ex.rest = rest;
     for (const nt of [notes, extraNote]) if (nt && !(ex.notes ?? '').split(' · ').includes(nt)) ex.notes = ex.notes ? `${ex.notes} · ${nt}` : nt;
     lastEx = ex;
   });
@@ -423,9 +483,31 @@ const dec = (v: string | undefined) => String(v ?? '').replace(/(\d)\.(\d)/g, '$
 const csvCell = (v: string) => (/[;"\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 const dmy = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
 
-/** Plan → CSV (UTF-8 z BOM, średnik, przecinek dziesiętny) — wczytasz go z powrotem przez import. */
+const isCardioEx = (e: PlanExercise) => !!(e.cardio ?? cardioByName(e.name));
+
+/** Czas biegu do arkusza: od 60 min jako „1:18:45” (h:mm:ss), krótszy bez zmian. */
+function exportTime(reps: string): string {
+  const d = parseDur(reps);
+  if (d == null || d < 60) return reps;
+  const sec = Math.round(d * 60);
+  return `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+}
+
+/** Dystans do arkusza: „800 m”, „10 km”, „8,5 km”. */
+function exportDist(load: string): string {
+  const km = parseKm(load);
+  if (km == null) return dec(load);
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${dec(String(km))} km`;
+}
+
+/**
+ * Plan → CSV (UTF-8 z BOM, średnik, przecinek dziesiętny) — wczytasz go z powrotem przez import. Plan z biegiem / cardio
+ * ma dodatkowe kolumny „Dystans” i „Cel” (strefa / tempo); czas ≥ 60 min jako h:mm:ss. Na stronę — „8/str.”.
+ */
 export function planToCsv(plan: Plan): string {
-  const lines: string[][] = [EXPORT_COLS.map((f) => FIELD_LABEL[f === 'type' ? 'type' : f])];
+  const anyCardio = plan.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name.trim() && isCardioEx(e))));
+  const cols = anyCardio ? EXPORT_COLS : BASE_COLS;
+  const lines: string[][] = [cols.map((f) => FIELD_LABEL[f])];
   for (const w of plan.weeks)
     for (const k of w.workouts) {
       const labels = exerciseLabels(k.exercises);
@@ -434,24 +516,28 @@ export function planToCsv(plan: Plan): string {
         if (!e.name.trim()) return;
         const inBlock = blocks.some((b) => b.length > 1 && b.includes(ei));
         const name = inBlock ? `${labels[ei]} ${e.name}` : e.name;
+        const cardio = isCardioEx(e);
         mergeGroups(structuredClone(e.groups)).forEach((g, gi) => {
-          lines.push([
+          const side = e.perSide && g.reps.trim() && !splitSide(g.reps)[1] ? '/str.' : '';
+          const row = [
             w.name,
             k.date ? dmy(k.date) : k.day ? WD[k.day - 1] : '',
             k.name,
             name,
             String(g.sets || 1),
-            g.reps,
-            dec(g.load),
+            cardio ? exportTime(g.reps) : `${g.reps}${side}`,
+            cardio ? '' : dec(g.load),
             dec(g.rpe),
-            g.rest || e.rest || '',
-            gi === 0 ? [e.notes, g.pace ? `tempo ${g.pace}` : ''].filter(Boolean).join(' · ') : g.pace ? `tempo ${g.pace}` : '',
+            cardio ? g.rest || (gi === 0 ? e.rest || '' : '') : g.rest || e.rest || '',
+            cardio ? (gi === 0 ? e.notes || '' : '') : gi === 0 ? [e.notes, g.pace ? `tempo ${g.pace}` : ''].filter(Boolean).join(' · ') : g.pace ? `tempo ${g.pace}` : '',
             g.type === 'Robocze' ? '' : g.type,
-          ]);
+          ];
+          if (anyCardio) row.push(cardio && g.load.trim() ? exportDist(g.load) : '', cardio ? g.pace || '' : '');
+          lines.push(row);
         });
       });
     }
-  return `﻿${lines.map((l) => l.map(csvCell).join(';')).join('\r\n')}\r\n`;
+  return `\uFEFF${lines.map((l) => l.map(csvCell).join(';')).join('\r\n')}\r\n`;
 }
 
 /** Nazwa pliku: „plan-s-c-sila-i-moc.csv”. */

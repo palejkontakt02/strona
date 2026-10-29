@@ -1,6 +1,7 @@
 import { cloudMode } from './config';
 import { supabase } from './supabase';
 import type { TrainingSession } from '../domain';
+import { repsLabel } from '../lib/sessionBadges';
 
 /**
  * Nagrania serii (technika). W chmurze: prywatny koszyk Supabase Storage „set-videos”
@@ -96,7 +97,7 @@ export async function deleteSetVideo(ref: string): Promise<void> {
 export interface SessionVideo {
   video: string;
   exercise: string;
-  /** Opis serii, np. „seria 2 · 5 × 100 kg”. */
+  /** Opis serii, np. „seria 2 · 5 × 100 kg”, „seria 2 · 3/5 L/P × 20 kg”, „seria 1 · 15/10 s L/P”. */
   label: string;
 }
 
@@ -107,7 +108,8 @@ export function sessionVideos(s: TrainingSession): SessionVideo[] {
     return (e.setsLog ?? []).flatMap((x) => {
       if (!x.warmup) n++;
       if (!x.video) return [];
-      const what = [x.reps != null && `${x.reps}`, x.load != null && `${String(x.load).replace('.', ',')} kg`].filter(Boolean).join(' × ');
+      // „5/5 L/P × 20 kg”, „15/10 s L/P”, „1:30/str.”
+      const what = [x.reps != null && repsLabel(x, e.perSide), x.load != null && `${String(x.load).replace('.', ',')} kg`].filter(Boolean).join(' × ');
       return [{ video: x.video, exercise: e.name, label: `${x.warmup ? 'rozgrzewka' : `seria ${n}`}${what ? ` · ${what}` : ''}` }];
     });
   });

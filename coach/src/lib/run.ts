@@ -73,7 +73,7 @@ export function cardioByName(name: string): boolean {
   const strength = /farmer|walizk|suitcase|z (ciężarem|obciążeniem|hantl|kettl|sztang)|hantl|kettl|sztang|wykrok|lunge|step[- ]?up|wejści|wchodzeni|hamstring|curl|uginani|nordyck/i;
   if (/nordic\s*walking|nordic(?!\s*(ham|curl|leg))|marsz\s*nordic/i.test(name)) return !/hamstring|curl|uginani/i.test(name);
   if (/\b(marsz|spacer)/i.test(name)) return !strength.test(name);
-  if (/schod/i.test(name)) return /(bieg|biegani|marsz|chód|chodzeni|podbieg)\S*\s+(po|na)\s+schod|schod\S*\s*[-–(]?\s*(bieg|marsz)|^schody$/i.test(name.trim()) && !strength.test(name);
+  if (/schod|stair/i.test(name)) return /^\s*schody(\s|$|\s*[-–(,])|stair ?(master|climber)|stepmill/i.test(name) && !strength.test(name);
   return false;
 }
 
