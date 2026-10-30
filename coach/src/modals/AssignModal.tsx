@@ -71,7 +71,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     if (s === 'repeat') {
       const se = done.find((x) => x.id === id);
       if (!se) return null;
-      const ex = copyEx(sessionToWorkout(se).exercises);
+      const ex = copyEx(sessionToWorkout(se, plansOf(db, se.clientId)).exercises);
       // bez ciężarów: odtwarzacz dobierze je z historii tej osoby (bieg — dystans zostaje)
       return { name: se.workoutName || 'Trening', exercises: keep ? ex : ex.map((e) => (e.cardio ? e : { ...e, groups: e.groups.map((g) => ({ ...g, load: '' })) })) };
     }
