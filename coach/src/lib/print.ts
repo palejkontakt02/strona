@@ -2,7 +2,8 @@ import type { Client, Plan, TrainingSession } from '../domain';
 import { targetText, ZONES } from './running';
 import { fmtWeekdayDate, planGrid, type GridCell } from './planGrid';
 import { cardioByName, loadPerOf } from './run';
-import { currentMax, resolveLoad, rounderFor } from './strength';
+import { currentMax, rounderFor } from './strength';
+import { planLoads } from './planLoads';
 import { nextDate, nextWorkout } from './plan';
 import { addDays, todayISO } from './dates';
 
@@ -71,13 +72,11 @@ function withKg(plan: Plan, client: Client, sessions: TrainingSession[]): Plan {
         if (e.cardio ?? cardioByName(e.name)) continue;
         if (!e.groups.some((g) => /%/.test(g.load))) continue;
         const mx = currentMax(sessions, client.tests ?? [], e.name.trim());
-        const round = rounderFor(e.name, loadPerOf(e));
-        let prev: number | null = null;
-        for (const g of e.groups) {
-          const r = resolveLoad(g.load, mx?.value ?? null, g.reps, g.rpe, prev, { round });
-          if (r.load != null) prev = r.load;
-          if (r.load != null && /%/.test(g.load)) g.load = `${g.load.trim()} ≈${pl(r.load)} kg`;
-        }
+        const rs = planLoads(e.groups, mx?.value ?? null, rounderFor(e.name, loadPerOf(e)));
+        e.groups.forEach((g, i) => {
+          const kgv = rs[i]?.load;
+          if (kgv != null && /%/.test(g.load)) g.load = `${g.load.trim()} ≈${pl(kgv)} kg`;
+        });
       }
   return out;
 }

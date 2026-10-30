@@ -67,7 +67,9 @@ export function PlanTable({
   onAthlete?: (workoutId: string) => void;
 }) {
   const [warmOpen, setWarmOpen] = useState<Set<string>>(new Set());
-  const slots = planGrid(plan, (s) => warmOpen.has(s));
+  // wiersze w kolejności tygodnia „następny” (gdy kolejność ćwiczeń zmienia się między tygodniami)
+  const refWeek = Math.max(0, plan.weeks.findIndex((w) => w.workouts.some((k) => k.id === nextId)));
+  const slots = planGrid(plan, (s) => warmOpen.has(s), false, { refWeek });
   // suma biegu w tygodniu (gdy w tygodniu jest więcej niż jedna jednostka z biegiem)
   const weekRuns = plan.weeks.map((w) => ({ name: w.name, text: runText(w.workouts, profile), units: w.workouts.filter((k) => runText([k], profile)).length }));
   const showWeekRun = weekRuns.some((w) => w.units > 1);

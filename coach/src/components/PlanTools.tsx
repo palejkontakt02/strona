@@ -21,12 +21,12 @@ export const absencesOf = (c: Client) => (c as Client & { absences?: Absence[] }
 export function AbsenceNotice({ client, plan, sessions, onShift }: { client: Client; plan: Plan; sessions?: TrainingSession[]; onShift: (from: string, days: number) => void }) {
   const hit = absenceShift(plan, absencesOf(client), todayISO(), sessions);
   if (!hit) return null;
-  const { absence: a, from, days } = hit;
+  const { absence: a, from, days, range } = hit;
   return (
     <div className="warn-box pt-absence" role="status">
       <Icon name="alert" size={16} />
       <span className="pt-absence-text">
-        Nieobecność {fmtShort(a.from)}–{fmtShort(a.to)}
+        Nieobecność {range}
         {a.reason ? ` (${a.reason})` : ''} — przesunąć plan o {nDays(days)}?
       </span>
       <button type="button" className="btn btn-secondary btn-sm" onClick={() => onShift(from, days)}>
@@ -222,31 +222,30 @@ export function QuickShift({ plan, sessions }: { plan: Plan; sessions?: Training
   );
 }
 
-const TAG: Record<LoadSuggestion['kind'], { tone: 'neutral' | 'warn' | 'muted'; text: (s: LoadSuggestion) => string }> = {
-  add: { tone: 'neutral', text: (s) => `dodaj +${kg(s.next - s.last)}` },
-  cut: { tone: 'warn', text: () => 'zmniejsz −5%' },
-  hold: { tone: 'muted', text: () => 'utrzymaj' },
-};
+const TONE: Record<LoadSuggestion['kind'], 'neutral' | 'warn' | 'muted'> = { add: 'neutral', cut: 'warn', hold: 'muted' };
 
-/** Panel „Sugestie na tydzień X”: ciężary na kolejny tydzień z ostatnich wykonań, z wyborem i zastosowaniem w planie. */
+/** Panel sugestii ciężaru na najbliższe treningi: z ostatnich wykonań, z wyborem i zastosowaniem w planie (każda pozycja w swoim tygodniu). */
 export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: TrainingSession[] }) {
   const { db, apply, toast } = useStore();
   const res = useMemo(() => suggestLoads(plan, sessions, todayISO()), [plan, sessions]);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   if (!res || !res.items.length) return null;
-  const week = plan.weeks[res.weekIndex];
+  const wkOf = (s: LoadSuggestion) => s.weekIndex ?? res.weekIndex;
+  const weeksIn = [...new Set(res.items.map(wkOf))];
+  const wName = (wi: number) => plan.weeks[wi]?.name || `Tydzień ${wi + 1}`;
   const chosen = picked ?? new Set(res.items.filter((s) => s.applicable && s.kind !== 'hold' && !s.already).map((s) => s.exercise));
   const count = (k: LoadSuggestion['kind']) => res.items.filter((s) => s.kind === k).length;
   const summary = [count('add') && `${count('add')} × dodaj`, count('cut') && `${count('cut')} × zmniejsz`, count('hold') && `${count('hold')} × utrzymaj`].filter(Boolean).join(' · ');
-  const title = `Sugestie na tydzień ${res.weekIndex + 1}`;
+  const title = weeksIn.length > 1 ? 'Sugestie na najbliższe treningi' : `Sugestie na tydzień ${weeksIn[0] + 1}`;
 
   const run = async () => {
     const items = res.items.filter((s) => chosen.has(s.exercise) && s.applicable);
     if (!items.length) return;
     const before = plan;
     if (!(await apply(savePlan(db, applySuggestions(plan, res.weekIndex, items))))) return;
-    toast(`Zmieniono ciężary w ${week.name}: ${items.map((s) => `${s.exercise} ${kg(s.next)}`).join(', ')}.`, {
+    const byWeek = [...new Set(items.map(wkOf))].map((wi) => `w ${wName(wi)}: ${items.filter((s) => wkOf(s) === wi).map((s) => `${s.exercise} ${kg(s.next)}`).join(', ')}`);
+    toast(`Zmieniono ciężary ${byWeek.join('; ')}.`, {
       label: 'Cofnij',
       run: () => void apply([put('plans', before)], 'Cofnięto zmianę ciężarów.'),
     });
@@ -261,7 +260,7 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
         <span className="ls-title">
           <strong>{title}</strong>
           <span className="muted small">
-            {week.name !== `Tydzień ${res.weekIndex + 1}` ? `${week.name} · ` : ''}
+            {weeksIn.length === 1 && wName(weeksIn[0]) !== `Tydzień ${weeksIn[0] + 1}` ? `${wName(weeksIn[0])} · ` : ''}
             {summary}
           </span>
         </span>
@@ -286,9 +285,12 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
                         setPicked(n);
                       }}
                     />
-                    <span className="ls-name">{s.exercise}</span>
+                    <span className="ls-name">
+                      {s.exercise}
+                      {weeksIn.length > 1 && <span className="muted small ls-week"> · {wName(wkOf(s))}</span>}
+                    </span>
                   </label>
-                  <Tag tone={TAG[s.kind].tone} outline={s.kind === 'add'}>{TAG[s.kind].text(s)}</Tag>
+                  <Tag tone={TONE[s.kind]} outline={s.kind === 'add'}>{s.tag}</Tag>
                   <span className="ls-load">
                     <span className="pt-num">{kg(s.last)}</span>
                     {s.next !== s.last && (

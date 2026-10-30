@@ -17,7 +17,8 @@ import { Field, Icon, IconBtn, Modal } from '../components/ui';
 import { SET_TYPES, type Plan, type PlanExercise, type PlanWorkout, type SetGroup, type SetType } from '../domain';
 import { cloneWeek, nextWeekName, PROGRESSIONS, savePlan, sessionsOf, type Progression } from '../data/ops';
 import { isTemplate, pctOf } from '../lib/analytics';
-import { currentMax, resolveLoad, rounderFor, type MaxSource } from '../lib/strength';
+import { currentMax, rounderFor, type MaxSource } from '../lib/strength';
+import { planLoads } from '../lib/planLoads';
 import { fnum } from '../format';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
@@ -57,15 +58,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     return maxCache.get(name)!;
   };
   /** Ciężary serii po kolei (kg z %, z „-10%” od poprzedniej, z RPE przy pustym polu) — do podpowiedzi „≈ X kg”. */
-  const resolved = (e: PlanExercise, mx: MaxSource | null) => {
-    const round = rounderFor(e.name, loadPerOf(e));
-    let prev: number | null = null;
-    return e.groups.map((g) => {
-      const r = resolveLoad(g.load, mx?.value ?? null, g.reps, g.rpe, prev, { round, maxLabel: mx?.label });
-      if (r.load != null) prev = r.load;
-      return r;
-    });
-  };
+  const resolved = (e: PlanExercise, mx: MaxSource | null) => planLoads(e.groups, mx?.value ?? null, rounderFor(e.name, loadPerOf(e)), mx?.label);
+
   // Edytujemy kopię (draft) i zapisujemy całość na końcu.
   const [p, setP] = useState<Plan>(() => structuredClone(m.plan));
   // Rozwinięty tylko pierwszy tydzień — reszta na kliknięcie (długie plany).
