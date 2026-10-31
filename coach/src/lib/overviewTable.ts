@@ -1,6 +1,7 @@
-import type { Appointment, Client, ISODate, TrainingSession } from '../domain';
+import type { Appointment, Client, ISODate, Plan, TrainingSession } from '../domain';
 import { isOverdue, packageStatus, PACKAGE_WARN_AT } from './billing';
-import { reportExpected, reportFor, reportWeek, trainerUnread } from './comms';
+import { reportExpected, reportFor, trainerUnread } from './comms';
+import { activePlanOf, planLabel, planProgress, requiredReportWeek } from './dashboard';
 import { addDays, daysBetween } from './dates';
 import { dayProgress, rangeProgress } from './habits';
 import { weeklyAverages } from './nutrition';
@@ -33,8 +34,13 @@ export interface OverviewRow {
   /** Zadania dzienne z 7 dni (0–1), null — brak zadań. */
   habitsPct: number | null;
   habitsTone: Tone;
-  /** Raport tygodniowy za bieżący tydzień raportu. */
+  /** Raport tygodniowy za ostatni pełny tydzień (wymagany od poniedziałku; raport za bieżący tydzień też się liczy). */
   report: 'sent' | 'missing' | 'off';
+  /** Aktywny plan: „tydz. 3/4 · do 15.11” / „zakończony” (bursztyn) / „—”. */
+  plan: string;
+  planEnded: boolean;
+  /** Koniec planu (sortowanie), null — brak planu. */
+  planEnd: ISODate | null;
   unread: number;
   /** Coś wymaga uwagi trenera (którykolwiek sygnał bursztynowy / czerwony). */
   attention: boolean;
@@ -44,6 +50,8 @@ export interface OverviewInput {
   clients: Client[];
   sessions: TrainingSession[];
   appointments: Appointment[];
+  /** Plany (kolumna „Plan”); bez — kolumna pusta. */
+  plans?: Plan[];
 }
 
 /** Ostatnie odczyty samopoczucia (check-iny + wellness z treningów, jeden na dzień), od najstarszego. */
@@ -109,9 +117,12 @@ export function overviewRow(c: Client, input: OverviewInput, today: ISODate): Ov
   const food = food7(c, today);
   const habitsPct = habits7(c, today);
   const habitsTone: Tone = habitsPct == null ? undefined : habitsPct < 0.5 ? 'danger' : habitsPct < 0.8 ? 'warn' : undefined;
-  const report = reportExpected(c) ? (reportFor(c, reportWeek(today)) ? 'sent' : 'missing') : 'off';
+  const rw = requiredReportWeek(today);
+  const report = reportExpected(c) ? (reportFor(c, rw) || reportFor(c, addDays(rw, 7)) ? 'sent' : 'missing') : 'off';
+  const ap = activePlanOf(input.plans ?? [], c.id);
+  const pl = planLabel(ap, today);
   const unread = trainerUnread(c);
-  const attention = !!(lastTone || pkgTone || overdue > 0 || wt.drop || food.tone || habitsTone || unread > 0 || report === 'missing');
+  const attention = !!(lastTone || pkgTone || overdue > 0 || wt.drop || food.tone || habitsTone || unread > 0 || report === 'missing' || pl.ended);
   return {
     id: c.id,
     name: c.name,
@@ -129,6 +140,9 @@ export function overviewRow(c: Client, input: OverviewInput, today: ISODate): Ov
     habitsPct,
     habitsTone,
     report,
+    plan: pl.text,
+    planEnded: pl.ended,
+    planEnd: ap ? (planProgress(ap, today).end ?? null) : null,
     unread,
     attention,
   };
@@ -142,7 +156,7 @@ export function overviewRows(input: OverviewInput, today: ISODate): OverviewRow[
     .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
 }
 
-export type SortKey = 'name' | 'last' | 'next' | 'pkg' | 'overdue' | 'wellness' | 'food' | 'habits' | 'report' | 'unread';
+export type SortKey = 'name' | 'last' | 'next' | 'plan' | 'pkg' | 'overdue' | 'wellness' | 'food' | 'habits' | 'report' | 'unread';
 
 /** Wartość do sortowania; null zawsze na końcu. */
 function sortValue(r: OverviewRow, k: SortKey): string | number | null {
@@ -153,6 +167,8 @@ function sortValue(r: OverviewRow, k: SortKey): string | number | null {
       return r.lastDays;
     case 'next':
       return r.next ? r.next.date + r.next.time : null;
+    case 'plan':
+      return r.planEnd;
     case 'pkg':
       return r.pkgLeft;
     case 'overdue':
@@ -175,6 +191,7 @@ export const DEFAULT_DIR: Record<SortKey, 'asc' | 'desc'> = {
   name: 'asc',
   last: 'desc',
   next: 'asc',
+  plan: 'asc',
   pkg: 'asc',
   overdue: 'desc',
   wellness: 'asc',

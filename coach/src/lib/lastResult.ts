@@ -127,13 +127,50 @@ export function workoutStats(s: TrainingSession): WorkoutStats {
   return { sets: work.reduce((a, n) => a + n, 0), tonnage: Math.round(tonnage(s)), exercises: work.filter((n) => n > 0).length };
 }
 
-/** Poprzednie wykonanie tego samego treningu: ten sam trening z planu, a bez planu — ta sama nazwa. */
-export function previousWorkout(history: TrainingSession[], s: TrainingSession): TrainingSession | undefined {
-  const same = (x: TrainingSession) =>
-    s.workoutId ? x.workoutId === s.workoutId && (!s.planId || x.planId === s.planId) : !!s.workoutName && !x.workoutId && norm(x.workoutName ?? '') === norm(s.workoutName);
-  return history
-    .filter((x) => x.id !== s.id && x.clientId === s.clientId && x.date <= s.date && same(x))
-    .sort((a, b) => b.date.localeCompare(a.date))[0];
+/** Miejsce jednostki w planie: numer tygodnia i indeks jednostki w tym tygodniu. */
+function slotOf(plans: { id: string; weeks: { workouts: { id: string }[] }[] }[] | undefined, planId?: string, workoutId?: string): { week: number; idx: number } | null {
+  if (!plans || !planId || !workoutId) return null;
+  const p = plans.find((x) => x.id === planId);
+  if (!p) return null;
+  for (let w = 0; w < p.weeks.length; w++) {
+    const idx = p.weeks[w].workouts.findIndex((x) => x.id === workoutId);
+    if (idx >= 0) return { week: w, idx };
+  }
+  return null;
+}
+
+/**
+ * Poprzednie wykonanie tego samego treningu. Każdy tydzień planu ma inne id jednostek, więc
+ * kolejno: to samo id jednostki → ten sam plan i ta sama nazwa jednostki → ten sam plan i ten sam
+ * indeks jednostki w tygodniu (gdy podano plany) → w ostateczności ta sama nazwa treningu.
+ */
+export function previousWorkout(
+  history: TrainingSession[],
+  s: TrainingSession,
+  plans?: { id: string; weeks: { workouts: { id: string }[] }[] }[],
+): TrainingSession | undefined {
+  const cand = history
+    .filter((x) => x.id !== s.id && x.clientId === s.clientId && x.date <= s.date)
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  const name = norm(s.workoutName ?? '');
+  const samePlan = (x: TrainingSession) => !!s.planId && x.planId === s.planId;
+  const slot = slotOf(plans, s.planId, s.workoutId);
+  const tests: ((x: TrainingSession) => boolean)[] = [
+    (x) => !!s.workoutId && x.workoutId === s.workoutId && (!s.planId || x.planId === s.planId),
+    (x) => samePlan(x) && !!name && norm(x.workoutName ?? '') === name,
+    (x) => {
+      if (!slot || !samePlan(x)) return false;
+      const o = slotOf(plans, x.planId, x.workoutId);
+      return !!o && o.idx === slot.idx && o.week !== slot.week;
+    },
+    // bez planu (trening własny) — tylko inne treningi bez planu; z planem — ta sama nazwa gdziekolwiek
+    (x) => !!name && norm(x.workoutName ?? '') === name && (!!s.workoutId || !x.workoutId),
+  ];
+  for (const t of tests) {
+    const hit = cand.find(t);
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 /** Różnica do poprzedniego wykonania: tonaż i liczba serii. */

@@ -4,6 +4,7 @@ import type { Intake } from '../lib/intake';
 import { normalizeDb, type Change, type Collection, type Db, type Repository } from './db';
 import { supabase } from './supabase';
 import { SUPABASE_URL } from './config';
+import { loadProfileCloud, saveProfileCloud } from './trainerProfile';
 
 const TABLES: Collection[] = ['clients', 'plans', 'sessions', 'appointments', 'library', 'locations', 'trainer_notes'];
 /** Tabele dodane później (SQL może nie być jeszcze uruchomiony) — brak tabeli nie blokuje aplikacji. */
@@ -98,6 +99,9 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
       const { error } = await supabase.rpc('add_client_note', { p_client_id: clientId, p_note: note });
       if (error) throw error;
     },
+
+    loadTrainerProfile: loadProfileCloud,
+    saveTrainerProfile: saveProfileCloud,
 
     async pollLive() {
       const { data, error } = await supabase.from('clients').select('id, liveBy:data->liveBy, athleteLive:data->athleteLive');

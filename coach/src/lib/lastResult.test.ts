@@ -97,6 +97,26 @@ describe('podsumowanie treningu', () => {
     const b = S('b', '2026-10-03', [], { workoutName: 'trening  własny' });
     expect(previousWorkout([a, b], b)?.id).toBe('a');
   });
+  it('kolejny tydzień planu (inne id jednostki) — ta sama nazwa w tym samym planie', () => {
+    const w1 = S('w1', '2026-10-01', [], { workoutId: 'a1', planId: 'p1', workoutName: 'A – siła' });
+    const w1b = S('w1b', '2026-10-02', [], { workoutId: 'b1', planId: 'p1', workoutName: 'B – góra' });
+    const otherPlan = S('x', '2026-10-05', [], { workoutId: 'z1', planId: 'p2', workoutName: 'A – siła' });
+    const w2 = S('w2', '2026-10-08', [], { workoutId: 'a2', planId: 'p1', workoutName: 'A – siła' });
+    expect(previousWorkout([w1, w1b, otherPlan, w2], w2)?.id).toBe('w1');
+  });
+  it('ten sam indeks jednostki w tygodniu, gdy nazwa się zmieniła', () => {
+    const plans = [{ id: 'p1', weeks: [{ workouts: [{ id: 'a1' }, { id: 'b1' }] }, { workouts: [{ id: 'a2' }, { id: 'b2' }] }] }];
+    const w1 = S('w1', '2026-10-01', [], { workoutId: 'a1', planId: 'p1', workoutName: 'Siła' });
+    const w1b = S('w1b', '2026-10-03', [], { workoutId: 'b1', planId: 'p1', workoutName: 'Góra' });
+    const w2 = S('w2', '2026-10-08', [], { workoutId: 'a2', planId: 'p1', workoutName: 'Siła 2' });
+    expect(previousWorkout([w1, w1b, w2], w2, plans)?.id).toBe('w1');
+    expect(previousWorkout([w1, w1b, w2], w2)).toBeUndefined();
+  });
+  it('w ostateczności po nazwie treningu (inny plan)', () => {
+    const old = S('o', '2026-09-01', [], { workoutId: 'q', planId: 'p0', workoutName: 'Full body' });
+    const cur = S('c', '2026-10-08', [], { workoutId: 'r', planId: 'p1', workoutName: 'full  body' });
+    expect(previousWorkout([old, cur], cur)?.id).toBe('o');
+  });
   it('wysiłek z RPE serii', () => {
     expect(srpeFromSets(['7', '8', '', '8,5'])).toBe(8);
     expect(srpeFromSets(['', undefined])).toBeNull();

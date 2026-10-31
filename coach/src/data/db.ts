@@ -140,6 +140,9 @@ export interface Repository {
   setAthleteLive?(clientId: string, mark: { name: string; workoutId?: string } | null): Promise<void>;
   /** Lekki odczyt znaczników treningu w toku (trener / podopieczny) — bez pobierania całej bazy. */
   pollLive?(): Promise<{ id: string; liveBy?: import('../domain').LiveMark; athleteLive?: import('../domain').LiveMark }[]>;
+  /** Profil trenera (jeden rekord, odczyt także dla podopiecznych) — data/trainerProfile.ts, sekcja 29 w hardening.sql. */
+  loadTrainerProfile?(): Promise<import('./trainerProfile').TrainerProfile>;
+  saveTrainerProfile?(p: import('./trainerProfile').TrainerProfile): Promise<void>;
 }
 
 export type ClientEntryKind = 'weeklyReports' | 'progressPhotos' | 'dayLog' | 'consents' | 'absences' | 'exNotes';

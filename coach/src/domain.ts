@@ -41,7 +41,15 @@ export interface Payment {
   /** Miesiąc abonamentu (tylko `abonament`). */
   month?: YearMonth;
   desc?: string;
+  /** Forma wpłaty (raport miesięczny, eksport dla księgowej). */
+  method?: PayMethod;
+  /** Nr paragonu / faktury (opcjonalnie). */
+  doc?: string;
+  /** Kiedy trener ostatnio przypomniał o tej płatności. */
+  remindedAt?: ISODate;
 }
+
+export type PayMethod = 'gotówka' | 'przelew' | 'blik' | 'karta' | 'inna';
 
 export interface Measurement {
   id: string;

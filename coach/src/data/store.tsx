@@ -8,6 +8,8 @@ import { useDialog } from '../components/useDialog';
 import { applyChanges, withEntry, type Change, type ClientEntryKind, type Db, type Repository } from './db';
 import { createEmpty, createSeed } from './seed';
 import { Outbox } from './outbox';
+import { vacationAutoReply } from '../lib/trainerProfile';
+import { getTrainerProfileCache } from './trainerProfile';
 
 interface AskState {
   message: string;
@@ -310,7 +312,9 @@ export function StoreProvider({
     async (clientId: string, text: string, extra: Pick<ClientNote, 'ref' | 'media' | 'textAuto' | 'sessionId'>): Promise<boolean> => {
       const note: ClientNote = { id: uid(), at: new Date().toISOString(), text: text.trim().slice(0, 2000), ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v != null)) };
       const client = db?.clients.find((c) => c.id === clientId);
-      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note] } : c)) } : cur));
+      // trener na urlopie: automatyczna odpowiedź (ta sama, którą dopisze baza — sekcja 29; id raz na dzień)
+      const vac = client ? vacationAutoReply(client, getTrainerProfileCache()) : null;
+      setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note], ...(vac && !(c.replies ?? []).some((r) => r.id === vac.id) ? { replies: [...(c.replies ?? []), vac] } : {}) } : c)) } : cur));
       let saved = true;
       try {
         await repo.addClientNote(clientId, note);

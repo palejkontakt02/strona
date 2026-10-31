@@ -87,3 +87,51 @@ export function packageHint(left: number | null, consumes: boolean): string {
   if (after < 0) return `Pakiet wykorzystany — po zapisie: ${overPackage(-after)}.`;
   return consumes ? `W pakiecie zostało ${left} (po zapisie: ${after}).` : `W pakiecie zostało ${left}.`;
 }
+
+/* ---------- abonamenty miesięczne hurtem (#13) ---------- */
+
+/** „2026-10” → „2026-11” (n może być ujemne). */
+export function shiftMonth(ym: string, n: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+}
+
+/** Domyślny miesiąc do wystawienia: od 20. dnia — następny, wcześniej — bieżący. */
+export function defaultSubMonth(today: ISODate = todayISO()): string {
+  const ym = today.slice(0, 7);
+  return Number(today.slice(8, 10)) >= 20 ? shiftMonth(ym, 1) : ym;
+}
+
+/** Domyślny termin: 7. dzień miesiąca; gdy już minął — za 7 dni. */
+export function defaultSubDue(month: string, today: ISODate = todayISO()): ISODate {
+  const d = `${month}-07`;
+  return d < today ? addDays(today, 7) : d;
+}
+
+export interface SubCandidate {
+  client: Client;
+  /** Kwota z profilu (subRate); 0 = brak stawki. */
+  amount: number;
+  /** Ma już abonament za ten miesiąc — pomijany. */
+  issued: boolean;
+  /** Domyślnie zaznaczony: aktywny, ze stawką, bez abonamentu za ten miesiąc. */
+  checked: boolean;
+}
+
+/** Klienci rozliczani abonamentem (bez zakończonych), z informacją, czy mają już abonament za `month`; `fallback` — cena z profilu trenera. */
+export function subscriptionCandidates(clients: Client[], month: string, fallback = 0): SubCandidate[] {
+  return clients
+    .filter((c) => c.billing === 'abonament' && c.status !== 'zakończony')
+    .map((client) => {
+      const issued = client.payments.some((p) => p.type === 'abonament' && p.month === month);
+      const amount = client.subRate || fallback || 0;
+      return { client, amount, issued, checked: !issued && amount > 0 && client.status === 'aktywny' };
+    })
+    .sort((a, b) => Number(a.issued) - Number(b.issued) || a.client.name.localeCompare(b.client.name, 'pl'));
+}
+
+/** Nowa płatność „abonament” do zapłaty. */
+export function subscriptionPayment(id: string, month: string, amount: number, dueDate: ISODate, today: ISODate): Payment {
+  return { id, type: 'abonament', amount, month, date: today, dueDate, status: 'due' };
+}

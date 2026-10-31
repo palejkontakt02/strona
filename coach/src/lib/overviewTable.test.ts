@@ -81,4 +81,17 @@ describe('overviewTable', () => {
     expect(sortRows(withNull, 'last', 'desc').map((r) => r.name)).toEqual(['Bartek', 'Anna']);
     expect(sortRows(withNull, 'last', 'asc').map((r) => r.name)).toEqual(['Bartek', 'Anna']);
   });
+
+  it('kolumna Plan i raport za ostatni pełny tydzień', () => {
+    const plan = { id: 'p', clientId: 'a', name: 'S&C', startDate: '2026-10-12', active: true, weeks: [1, 2, 3, 4].map((i) => ({ id: `w${i}`, name: `T${i}`, workouts: [] })) };
+    const r = overviewRow(base, { clients: [base], sessions: [], appointments: [], plans: [plan] }, today);
+    expect(r.plan).toBe('tydz. 3/4 · do 8.11');
+    expect(r.planEnded).toBe(false);
+    const done = overviewRow(base, { clients: [base], sessions: [], appointments: [], plans: [{ ...plan, startDate: '2026-09-14' }] }, today);
+    expect(done).toMatchObject({ plan: 'zakończony', planEnded: true, attention: true });
+    // poniedziałek 26 paź: wymagany raport za 19–25 paź
+    const rep: Client = { ...base, weeklyReport: true, weeklyReports: [{ id: 'r', week: '2026-10-19', at: '2026-10-26T08:00:00Z' }] };
+    expect(overviewRow(rep, { clients: [rep], sessions: [], appointments: [] }, today).report).toBe('sent');
+    expect(overviewRow(rep, { clients: [rep], sessions: [], appointments: [] }, '2026-11-02').report).toBe('missing');
+  });
 });

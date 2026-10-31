@@ -88,10 +88,13 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
         )}
       </div>
       <dl className="wdone-stats">
-        <div>
-          <dt>Czas</dt>
-          <dd>{durText(info.duration)}</dd>
-        </div>
+        {/* kafle bez danych („—”) się nie pokazują */}
+        {info.duration != null && (
+          <div>
+            <dt>Czas</dt>
+            <dd>{durText(info.duration)}</dd>
+          </div>
+        )}
         {!stats.tonnage && info.km ? (
           <div>
             <dt>Dystans</dt>
@@ -100,15 +103,15 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
               <small> km</small>
             </dd>
           </div>
-        ) : (
+        ) : stats.tonnage ? (
           <div>
             <dt>Tonaż</dt>
             <dd>
-              {stats.tonnage ? nf.format(stats.tonnage) : '—'}
-              {stats.tonnage ? <small> kg</small> : null}
+              {nf.format(stats.tonnage)}
+              <small> kg</small>
             </dd>
           </div>
-        )}
+        ) : null}
         <div>
           <dt>Serie</dt>
           <dd>{stats.sets}</dd>

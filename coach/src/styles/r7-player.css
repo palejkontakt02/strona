@@ -1,0 +1,486 @@
+/* ================= R7 — ODTWARZACZ (agent „player”) =================
+   Ewolucja obecnego wyglądu: te same kolory, kroje i karty. Cel: pierwsza seria wyżej,
+   większe pola i cyfry, czytelny pasek przerwy. Ładowany po pozostałych arkuszach. */
+
+.player {
+  --ath-field: 60px; /* wysokość pól serii i ✓ */
+  --r7-field-border: var(--color-neutral-500); /* ramka pól widoczna w jasnym i ciemnym motywie */
+}
+
+/* ---------- nagłówek treningu: ciaśniej nad pierwszą serią ---------- */
+.player .player-head {
+  margin: var(--space-4) 0 var(--space-2);
+}
+.player .segs {
+  margin: var(--space-3) 0 var(--space-2);
+}
+.player .acard {
+  margin-top: var(--space-2);
+  padding-top: var(--space-4);
+}
+
+/* ---------- nagłówek ćwiczenia: tytuł, linia meta, rząd narzędzi ---------- */
+.run-ex-head h2 {
+  overflow-wrap: anywhere;
+}
+.run-ex-head .ex-meta {
+  margin: 4px 0 0;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.run-ex-head .ex-meta-k {
+  color: var(--color-neutral-300);
+  font-weight: 600;
+}
+.run-ex-head .exnote-text {
+  margin: 4px 0 0;
+}
+.player .ex-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+/* jeden wzór przycisku: ghost-sm z ikoną i etykietą (notatka, komentarz, kamera, ciężar, wideo) */
+.player .ex-tools .btn,
+.player .ex-tools .ex-cam .cam-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.player .ex-tools .btn svg,
+.player .ex-tools .cam-btn svg {
+  flex: none;
+  color: var(--color-neutral-400);
+}
+.player .ex-tools .exnote-btn.has-note svg,
+.player .ex-tools .ex-cam.has-video svg {
+  color: var(--color-text);
+}
+.player .ex-tools .ex-cam {
+  display: inline-flex;
+}
+.player .ex-tools .ex-cam .cam-btn::after {
+  content: 'Nagraj';
+}
+.player .ex-tools .ex-cam.has-video .cam-btn::after {
+  content: 'Nagranie';
+}
+
+/* ---------- siatka serii: większe pola i cyfry ---------- */
+.sgrid {
+  grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.8fr) 44px 60px;
+  gap: 5px;
+}
+.sgrid.cardio {
+  grid-template-columns: 22px repeat(4, minmax(0, 1fr)) 60px;
+}
+.sgrid.noload {
+  grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1fr) 60px;
+}
+.sgrid.sides {
+  grid-template-columns: 22px minmax(96px, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) 40px 60px;
+  gap: 4px;
+}
+.player .sgrid input {
+  height: var(--ath-field);
+  border: 1.5px solid var(--r7-field-border);
+  font-size: 1.875rem; /* 30 */
+}
+.player .sgrid.cardio input {
+  font-size: 1.5rem;
+}
+.player .sgrid .lr input {
+  font-size: 1.75rem; /* 28 */
+}
+.player .sgrid .ok {
+  width: 60px;
+  height: 60px;
+  border: 1.5px solid var(--r7-field-border);
+  font-size: 1.75rem;
+}
+.player .sgrid.done .ok {
+  border-color: var(--color-ok);
+}
+.player .sgrid .cam-btn {
+  height: var(--ath-field);
+  border: 1.5px solid var(--r7-field-border);
+}
+.player .sgrid .sn,
+.player .sgrid .sn-btn {
+  font-size: 1.125rem;
+  text-align: center;
+}
+.player .sgrid .sn-btn {
+  height: var(--ath-field);
+}
+.player .sughint,
+.player .prevhint {
+  padding-left: 27px;
+}
+.player .hold-start,
+.player .warm-remove {
+  margin-left: 27px;
+}
+
+/* nagłówek kolumn: lekki, w siatce pól (zamiast ciemnego paska) */
+.player .sgrid-head {
+  min-height: 0;
+  margin-top: var(--space-3);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-neutral-400);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.player .sgrid-head > span {
+  padding: 0 0 2px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player .sgrid-head + div > .ghead,
+.player .sgrid-head + div > div > .ghead {
+  margin-top: var(--space-1, 4px);
+}
+.player .ghead {
+  margin-top: var(--space-3);
+}
+
+/* ---------- pasek przerwy: pełne tło, warstwa nad treścią ---------- */
+.restbar {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto;
+  column-gap: 6px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--color-divider);
+  opacity: 1;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* postęp przerwy: pasek 4 px u góry */
+.restbar .rb-fill {
+  inset: 0 auto auto 0;
+  height: 4px;
+  background: var(--color-accent);
+  border-radius: 0;
+}
+.restbar.holdbar .rb-fill {
+  background: var(--color-ok);
+}
+.restbar .rb-time {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.restbar .rb-time .rb-label {
+  max-width: 100%;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-neutral-300);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.restbar .rb-time b {
+  font-family: var(--font-display);
+  font-size: 3.5rem; /* 56 */
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.restbar .rb-btn {
+  grid-row: 1;
+  min-width: 52px;
+  min-height: 56px;
+  padding: 0 var(--space-3);
+  border: 1.5px solid var(--r7-field-border, var(--color-neutral-500));
+  background: var(--color-bg);
+  font-size: 1.25rem;
+}
+.restbar .rb-btn.rb-skip {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+.player:has(.pnav):has(.restbar) .pnav {
+  margin-top: 124px;
+}
+
+/* ---------- przerwa na cały ekran ---------- */
+.rest-full {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: var(--space-4);
+  padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+  background: var(--color-bg);
+  color: var(--color-text);
+  animation: r7-rest-in 0.18s ease-out;
+}
+.rest-full:focus {
+  outline: none;
+}
+.rf-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+.rf-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.5s linear;
+}
+.rest-full.is-hold .rf-bar > span {
+  background: var(--color-ok);
+}
+.rf-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.rf-label {
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-neutral-300);
+  overflow-wrap: anywhere;
+}
+.rf-note {
+  font-weight: 500;
+}
+.rf-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+}
+.rf-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 0;
+  text-align: center;
+}
+.rf-time {
+  font-family: var(--font-display);
+  font-size: 7.5rem; /* 120 */
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rf-next {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  max-width: 28rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.rf-next-k {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-neutral-400);
+}
+.rf-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.rf-btn {
+  min-height: 64px;
+  border: 1.5px solid var(--color-neutral-500);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.rf-btn.rf-skip {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+@keyframes r7-rest-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- menu Więcej: „?” z instrukcją wpisywania ---------- */
+.more-help {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.more-help summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: 0 var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.more-help summary::-webkit-details-marker {
+  display: none;
+}
+.more-help-q {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.more-help p {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ---------- szeroki ekran ---------- */
+@media (min-width: 700px) {
+  .sgrid {
+    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 52px 64px;
+    gap: 8px;
+  }
+  .sgrid.cardio {
+    grid-template-columns: 34px repeat(4, minmax(0, 1fr)) 64px;
+  }
+  .sgrid.noload {
+    grid-template-columns: 34px minmax(0, 1.4fr) minmax(0, 1fr) 64px;
+  }
+  .sgrid.sides {
+    grid-template-columns: 34px minmax(120px, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) 52px 64px;
+    gap: 8px;
+  }
+  .player .sgrid input {
+    font-size: 2rem; /* 32 */
+  }
+  .player .sgrid .ok {
+    width: 64px;
+  }
+  .player .sughint,
+  .player .prevhint {
+    padding-left: 42px;
+  }
+  .player .hold-start,
+  .player .warm-remove {
+    margin-left: 42px;
+  }
+  .rf-time {
+    font-size: 10rem;
+  }
+}
+
+/* ---------- wąski telefon (≤ 380) ---------- */
+@media (max-width: 380px) {
+  .sgrid {
+    grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 0.75fr) 40px 56px;
+    gap: 4px;
+  }
+  .sgrid.cardio {
+    grid-template-columns: 20px repeat(4, minmax(0, 1fr)) 56px;
+  }
+  .sgrid.noload {
+    grid-template-columns: 20px minmax(0, 1.4fr) minmax(0, 1fr) 56px;
+  }
+  .sgrid.sides {
+    grid-template-columns: 20px minmax(90px, 2fr) minmax(0, 1.2fr) minmax(0, 0.8fr) 36px 56px;
+  }
+  .player .sgrid .ok {
+    width: 56px;
+  }
+  .player .sgrid input {
+    font-size: 1.75rem;
+  }
+  .player .sgrid .lr input {
+    font-size: 1.5rem;
+  }
+  .restbar .rb-time b {
+    font-size: 3rem;
+  }
+  .restbar .rb-btn {
+    min-width: 48px;
+    padding: 0 var(--space-2);
+  }
+}
+
+/* ---------- bez animacji ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .rest-full {
+    animation: none;
+  }
+  .restbar .rb-fill,
+  .rf-bar > span {
+    transition: none;
+  }
+}

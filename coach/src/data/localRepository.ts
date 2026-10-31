@@ -2,6 +2,8 @@ import { apptWithReply } from '../lib/appts';
 import { applyChanges, normalizeDb, withEntry, type Db, type Repository } from './db';
 import { createSeed } from './seed';
 import { withDay } from '../lib/habits';
+import { vacationAutoReply } from '../lib/trainerProfile';
+import { loadProfileLocal, saveProfileLocal } from './trainerProfile';
 
 const KEY = 'panel-trenera:v1';
 
@@ -87,8 +89,16 @@ export function createLocalRepository(): Repository {
       persist();
     },
     async addClientNote(clientId, note) {
-      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200) } : c)) };
+      // trener na urlopie: automatyczna odpowiedź raz dziennie (jak w bazie — sekcja 29)
+      const vac = (c: Db['clients'][number]) => vacationAutoReply(c, loadProfileLocal());
+      db = { ...db, clients: db.clients.map((c) => (c.id === clientId ? { ...c, inbox: [...(c.inbox ?? []), note].slice(-200), ...(vac(c) ? { replies: [...(c.replies ?? []), vac(c)!].slice(-200) } : {}) } : c)) };
       persist();
+    },
+    async loadTrainerProfile() {
+      return loadProfileLocal();
+    },
+    async saveTrainerProfile(p) {
+      saveProfileLocal(p);
     },
     async setAthleteLive(clientId, mark) {
       db = {

@@ -48,6 +48,8 @@ import { applyComeback, comebackFor, comebackText, restoreFull, type Comeback, t
 import { flashText, nextSetInfo, speechText } from '../lib/announce';
 import { exNoteEntry, exNoteFor } from '../lib/exNotes';
 import { WorkoutDone, type DoneInfo } from './WorkoutDone';
+import { commaNum, showRunHelp, soloByDefault } from '../lib/playerView';
+import { storeRun } from './AthleteApp';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -224,6 +226,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     speak(speechText(x));
   };
 
+  // po zapisie nowego treningu (ekran „Trening zakończony”) w pamięci urządzenia nie zostaje nic — zamknięcie
+  // aplikacji na tym ekranie nie zostawia treningu w trybie poprawek; po zapisie efektu rodzica (stąd setTimeout)
+  useEffect(() => {
+    if (!doneInfo || trainer) return;
+    const clear = () => storeRun(client.id, null);
+    const t = window.setTimeout(clear, 0);
+    window.addEventListener('pagehide', clear);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('pagehide', clear);
+    };
+  }, [doneInfo, trainer, client.id]);
   // ekran nie gaśnie w trakcie treningu (zwolnienie po zakończeniu / wyjściu)
   useWakeLock(!doneInfo);
   // przerwa: plik „cisza + sygnał” gra przy zablokowanym ekranie; pominięcie / zmiana — nowy plik albo stop
@@ -572,7 +586,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       });
       return;
     }
-    const solo = !trainer && !db.appointments.some((a) => a.clientId === client.id && a.date === run.date && a.status !== 'cancel' && a.status !== 'noshow');
+    // podopieczny: „Z trenerem” tylko, gdy wizyta zaczyna się w oknie ±2 h od startu treningu
+    const solo = !trainer && soloByDefault(db.appointments, client.id, run.date, run.startedAt);
     // wysiłek całego treningu podpowiedziany ze średniego RPE serii — zwykle wystarczy „Zapisz”
     const fromRpe = srpeFromSets(run.ex.flatMap((e) => e.sets.filter((x) => x.done && !x.warmup).map((x) => x.rpe)));
     setSrpeHint(fromRpe != null ? String(fromRpe) : null);
@@ -591,13 +606,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       amount: run.pairWith?.length && client.pairRate ? String(client.pairRate) : client.singleRate ? String(client.singleRate) : '',
       paidNow: true,
       locationId: db.appointments.find((a) => a.id === appointmentId)?.locationId ?? client.locationId ?? '',
-      // podopieczny: domyślnie sam, chyba że ma dziś wizytę; trener prowadzący: z trenerem
+      // podopieczny: domyślnie sam, chyba że wizyta blisko startu treningu; trener prowadzący: z trenerem
       solo,
       painMap: ps ? ps.spots : [],
     });
   };
 
   const totalSets = run.ex.reduce((a, x) => a + x.sets.length, 0);
+  const helpText = run.ex.every((x) => x.cardio)
+    ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.'
+    : run.ex.some((x) => x.cardio)
+      ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'
+      : 'Wpisz wynik, potem ✓. „ostatnio” pod serią wpisuje wynik z poprzedniego razu. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.';
   const doneSets = run.ex.reduce((a, x) => a + x.sets.filter((s) => s.done).length, 0);
   const blockName = (b: number[]) => b.map((k) => run.ex[k].name).join(' + ');
 
@@ -736,8 +756,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           )}
           {!run.ex[k].cardio && (
             <>
-              {!sidesWide(run.ex[k]) && !bare && <input inputMode="decimal" value={s.load} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
-              <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
+              {!sidesWide(run.ex[k]) && !bare && <input inputMode="decimal" value={commaNum(s.load)} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
+              <input inputMode="decimal" value={commaNum(s.rpe)} placeholder={commaNum(s.tRpe)} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
               {!bare && <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />}
             </>
           )}
@@ -759,7 +779,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </div>
         )}
         {(() => {
-          const sug = s.sug && !s.done && !e.cardio ? <div className="sughint">{s.sug}</div> : null;
+          const sug = s.sug && !s.done && !e.cardio ? <div className="sughint">{commaNum(s.sug)}</div> : null;
           const hint = sug || lastLine ? (sug && lastLine ? <div className="hintcol">{sug}{lastLine}</div> : sug ?? lastLine) : null;
           if (!tools) return hint;
           return (
@@ -867,7 +887,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     removeWarmup(k, i);
   };
 
-  const header = (k: number, blockBare?: boolean) => {
+  const header = (k: number, blockBare?: boolean, rest?: string) => {
     const e = run.ex[k];
     const bare = blockBare ?? noLoad(k);
     // bez ciężaru: jedna kamera na ćwiczenie — nagranie trafia do bieżącej serii
@@ -877,46 +897,53 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     })();
     const kind = [e.cardio && 'cardio', e.timed && 'na czas', e.perSide && 'na każdą stronę'].filter(Boolean).join(' · ');
     const note = exNoteFor(client.exNotes, e.name);
+    // jedna linia meta: rodzaj, przerwa, tempo, wskazówka z planu
+    const meta = [!trainer && kind, rest && `przerwa ${fmtRest(rest)}`, e.tempo && `tempo ${e.tempoStr}`].filter(Boolean).join(' · ');
+    const cam = bare && camAt >= 0 && !e.cardio;
     return (
       <div key={`h${k}`} className="run-ex-head">
-        <div className="between">
-          <h2>
-            {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
-          </h2>
-          <span className="ex-head-side">
-            {!trainer && (
-              <button type="button" className={`icon-btn exnote-btn ${note ? 'has-note' : ''}`} aria-label={`${note ? 'Twoja notatka' : 'Dodaj notatkę'}: ${e.name}`} title="Twoja notatka do ćwiczenia (np. ustawienie maszyny)" onClick={() => setNoteFor(k)}>
-                <Icon name="edit" size={16} />
-              </button>
-            )}
-            {e.video && (
-              <a className="small" href={e.video} target="_blank" rel="noreferrer">
-                ▶ Wideo
-              </a>
-            )}
-            {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />}
-          </span>
-        </div>
+        <h2>
+          {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
+        </h2>
+        {(meta || e.notes) && (
+          <p className="ex-meta muted small">
+            {meta && <span className="ex-meta-k">{meta}</span>}
+            {meta && e.notes && ' · '}
+            {e.notes}
+          </p>
+        )}
         {note && (
           <p className="exnote-text">
             {trainer && <span className="exnote-who">Notatka podopiecznego: </span>}
             {note.text}
           </p>
         )}
-        <div className="ex-tools">
-          {bare && camAt >= 0 && !e.cardio && (
-            <span className="ex-cam">
-              <SetVideoButton clientId={client.id} video={e.sets[camAt]?.video} title={`${e.name} · nagranie techniki`} onChange={(video) => setSet(k, camAt, { video })} />
-              <span className="muted small">{e.sets.some((x) => x.video) ? 'nagranie dodane' : 'nagraj technikę'}</span>
-            </span>
-          )}
-          {bare && !e.cardio && (
-            <button type="button" className="link small ex-kg-on" onClick={() => setKgOn((o) => new Set([...o, k]))}>
-              + ciężar
-            </button>
-          )}
-        </div>
-        {!trainer && kind && <div className="ex-kind muted small">{kind}</div>}
+        {/* rząd narzędzi ćwiczenia — jeden wzór: przycisk z ikoną i etykietą */}
+        {(!trainer || e.video || cam || (bare && !e.cardio)) && (
+          <div className="ex-tools">
+            {!trainer && (
+              <button type="button" className={`btn btn-ghost btn-sm ex-tool exnote-btn ${note ? 'has-note' : ''}`} aria-label={`${note ? 'Twoja notatka' : 'Dodaj notatkę'}: ${e.name}`} title="Twoja notatka do ćwiczenia (np. ustawienie maszyny)" onClick={() => setNoteFor(k)}>
+                <Icon name="edit" size={16} /> Notatka
+              </button>
+            )}
+            {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} exIndex={k} />}
+            {cam && (
+              <span className={`ex-cam ex-tool ${e.sets.some((x) => x.video) ? 'has-video' : ''}`}>
+                <SetVideoButton clientId={client.id} video={e.sets[camAt]?.video} title={`${e.name} · nagranie techniki`} onChange={(video) => setSet(k, camAt, { video })} />
+              </span>
+            )}
+            {bare && !e.cardio && (
+              <button type="button" className="btn btn-ghost btn-sm ex-tool ex-kg-on" onClick={() => setKgOn((o) => new Set([...o, k]))}>
+                <Icon name="plus" size={16} /> Ciężar
+              </button>
+            )}
+            {e.video && (
+              <a className="btn btn-ghost btn-sm ex-tool" href={e.video} target="_blank" rel="noreferrer">
+                <Icon name="play" size={16} /> Wideo
+              </a>
+            )}
+          </div>
+        )}
         {/* typ ćwiczenia (cardio / na czas / na stronę) schowany — na wierzchu tylko włączone; podopieczny go nie zmienia */}
         {trainer && !optsOpen.has(k) && !e.sets.some((x) => x.done) && (
           <button type="button" className="link small ex-opts-btn" onClick={() => setOptsOpen((o) => new Set([...o, k]))}>
@@ -971,13 +998,6 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           ↔ {e.perSide ? (e.sets.some((x) => x.unit) ? 'Na każdą stronę — czas na stronę' : 'Na każdą stronę — powt. na stronę') : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
         </button>
         )}
-        {(e.tempo || e.notes) && (
-          <div className="muted small">
-            {e.tempo && `tempo ${e.tempoStr}`}
-            {e.tempo && e.notes && ' · '}
-            {e.notes}
-          </div>
-        )}
       </div>
     );
   };
@@ -988,8 +1008,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     let n = 0;
     return (
       <>
-        {header(k)}
-        <div className="muted small">{e.rest && `przerwa ${fmtRest(e.rest)}`}</div>
+        {header(k, undefined, e.rest)}
         {trainer && !e.cardio && (
           <button className="link small" onClick={() => addWarmup(k)}>
             + seria wstępna
@@ -1187,7 +1206,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </button>
           </div>
         )}
-        {!trainer && doneSets === 0 && <p className="muted small rpe-legend">{run.ex.every((x) => x.cardio) ? 'Wpisz czas i dystans (tętno, jeśli masz), potem ✓. RPE (1–10) = jak ciężko było; możesz zostawić puste.' : run.ex.some((x) => x.cardio) ? 'Wpisz wynik (powtórzenia i kg albo czas i dystans), potem ✓. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.' : 'Wpisz wynik, potem ✓. „ostatnio” pod serią wpisuje wynik z poprzedniego razu. RPE (1–10) = jak ciężka była seria; możesz zostawić puste.'}</p>}
+        {/* instrukcja tylko przy pierwszych treningach — potem pod „?” w menu Więcej */}
+        {!trainer && doneSets === 0 && showRunHelp(sessionsOf(db, client.id).filter((x) => x.id !== run.editSessionId).length) && <p className="muted small rpe-legend">{helpText}</p>}
       </header>
       <div className="segs">
         {blocks.map((b, i) => (
@@ -1374,13 +1394,32 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </button>
             )}
             {!trainer && <RefComment clientId={client.id} sessionId={run.editSessionId} label="Komentarz do treningu" />}
+            {!trainer && (
+              <details className="more-help">
+                <summary>
+                  <span className="more-help-q" aria-hidden="true">?</span> Jak wpisywać wyniki
+                </summary>
+                <p className="muted small">{helpText}</p>
+              </details>
+            )}
           </div>
           <button type="button" className="btn btn-ghost btn-block" onClick={() => setMoreOpen(false)}>
             Zamknij
           </button>
         </Sheet>
       )}
-      {rest && !hold && <RestBar rest={rest} setRest={setRest} note={rest.note} onFinished={announceNext} />}
+      {rest && !hold && (
+        <RestBar
+          rest={rest}
+          setRest={setRest}
+          note={rest.note}
+          onFinished={announceNext}
+          next={(() => {
+            const x = nextSetInfo(run, nextSet);
+            return x ? flashText(x) : undefined;
+          })()}
+        />
+      )}
       {flash && <RestFlash text={flash} onClose={() => setFlash(null)} />}
       {painFor != null && run.ex[painFor] && (
         <PainStopSheet
@@ -1590,6 +1629,7 @@ function RestBar({
   label = 'Przerwa',
   endText = 'Koniec przerwy – następna seria!',
   note,
+  next,
   onEnd,
   onFinished,
 }: {
@@ -1599,6 +1639,8 @@ function RestBar({
   endText?: string;
   /** Dopisek, np. „dalej runda 2 z 3”. */
   note?: string;
+  /** Następna seria (na pełnym ekranie przerwy), np. „Seria 3 — przysiad 60 kg × 8”. */
+  next?: string;
   /** Zamiast domyślnego końca (sygnał + komunikat + zamknięcie) — np. zmiana strony. */
   onEnd?: () => void;
   /** Po domyślnym końcu przerwy (np. pełnoekranowy napis i zapowiedź głosowa następnej serii). */
@@ -1607,6 +1649,8 @@ function RestBar({
   const fired = useRef(0);
   const { toast } = useStore();
   const [, tick] = useState(0);
+  // stuknięcie w licznik: przerwa na cały ekran (duże cyfry, następna seria)
+  const [full, setFull] = useState(false);
   const left = Math.max(0, Math.round((rest.end - Date.now()) / 1000));
   useEffect(() => {
     const t = setInterval(() => tick((x) => x + 1), 500);
@@ -1624,17 +1668,68 @@ function RestBar({
     onFinished?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, rest.end, setRest, toast, endText, onEnd]);
+  const pct = Math.min(100, Math.max(0, 100 - (left / rest.total) * 100));
+  const minus = () => setRest({ ...rest, note, end: Math.max(Date.now() + 1000, rest.end - 15000) });
+  const plus = () => setRest({ ...rest, note, end: rest.end + 15000, total: rest.total + 15 });
+  const skip = () => setRest(null);
   return (
-    <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
-      <div className="rb-fill" style={{ width: `${100 - (left / rest.total) * 100}%` }} />
-      <span>
-        {label}
-        {note && <small className="rb-note"> · {note}</small>}
-      </span>
-      <b>{fmtSec(left)}</b>
-      <button aria-label="Skróć przerwę o 15 sekund" onClick={() => setRest({ ...rest, note, end: Math.max(Date.now() + 1000, rest.end - 15000) })}>−15</button>
-      <button aria-label="Wydłuż przerwę o 15 sekund" onClick={() => setRest({ ...rest, note, end: rest.end + 15000, total: rest.total + 15 })}>+15</button>
-      <button aria-label="Pomiń przerwę" onClick={() => setRest(null)}>Pomiń</button>
+    <>
+      <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
+        <div className="rb-fill" style={{ width: `${pct}%` }} />
+        <button type="button" className="rb-time" aria-label={`${label}: ${fmtSec(left)} — pokaż na cały ekran`} onClick={() => setFull(true)}>
+          <span className="rb-label">
+            {label}
+            {note && <small className="rb-note"> · {note}</small>}
+          </span>
+          <b>{fmtSec(left)}</b>
+        </button>
+        <button type="button" className="rb-btn" aria-label="Skróć przerwę o 15 sekund" onClick={minus}>−15</button>
+        <button type="button" className="rb-btn" aria-label="Wydłuż przerwę o 15 sekund" onClick={plus}>+15</button>
+        <button type="button" className="rb-btn rb-skip" aria-label="Pomiń przerwę" onClick={skip}>Pomiń</button>
+      </div>
+      {full && <RestFull label={label} note={note} left={left} pct={pct} next={next} onMinus={minus} onPlus={plus} onSkip={skip} onClose={() => setFull(false)} />}
+    </>
+  );
+}
+
+/** Przerwa na cały ekran: cyfry ~120 px, następna seria, −15 / +15 / Pomiń, zamknięcie (wraca do paska). */
+function RestFull({ label, note, left, pct, next, onMinus, onPlus, onSkip, onClose }: { label: string; note?: string; left: number; pct: number; next?: string; onMinus: () => void; onPlus: () => void; onSkip: () => void; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialog(ref, onClose);
+  return (
+    <div ref={ref} className={`rest-full ${label !== 'Przerwa' ? 'is-hold' : ''}`} role="dialog" aria-modal="true" aria-label={`${label} na cały ekran`} tabIndex={-1}>
+      <div className="rf-bar" aria-hidden="true">
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <div className="rf-top">
+        <span className="rf-label">
+          {label}
+          {note && <span className="rf-note"> · {note}</span>}
+        </span>
+        <button type="button" className="btn btn-ghost btn-sm rf-close" onClick={onClose}>
+          <Icon name="x" size={18} /> Zamknij
+        </button>
+      </div>
+      <div className="rf-main" role="timer" aria-live="off">
+        <b className="rf-time">{fmtSec(left)}</b>
+        {next && (
+          <p className="rf-next">
+            <span className="rf-next-k">Następna</span>
+            {next}
+          </p>
+        )}
+      </div>
+      <div className="rf-actions">
+        <button type="button" className="rf-btn" aria-label="Skróć przerwę o 15 sekund" onClick={onMinus}>
+          −15
+        </button>
+        <button type="button" className="rf-btn" aria-label="Wydłuż przerwę o 15 sekund" onClick={onPlus}>
+          +15
+        </button>
+        <button type="button" className="rf-btn rf-skip" aria-label="Pomiń przerwę" onClick={onSkip}>
+          Pomiń
+        </button>
+      </div>
     </div>
   );
 }

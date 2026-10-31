@@ -1841,3 +1841,43 @@ drop trigger if exists guard_client_athlete_live on public.clients;
 create trigger guard_client_athlete_live before update on public.clients
   for each row execute function public.guard_client_athlete_live();
 notify pgrst, 'reload schema';
+
+-- ============================================================================================================
+-- 30. Odczyt zrzutu z Fitatu przez AI (funkcja Edge „read-screenshot”, instrukcja: supabase/AI.md):
+--     dzienny licznik odczytów na konto (domyślnie 20 dziennie, liczony w czasie polskim). Samo zdjęcie
+--     nie trafia do bazy. Tabela bez dostępu z aplikacji — licznik zwiększa tylko funkcja ai_quota_take.
+--     Można uruchomić ponownie.
+-- ============================================================================================================
+create table if not exists public.ai_usage (
+  user_id uuid not null references auth.users on delete cascade,
+  kind text not null default 'screenshot',
+  day date not null,
+  count int not null default 0,
+  primary key (user_id, kind, day)
+);
+alter table public.ai_usage enable row level security;
+revoke all on public.ai_usage from public, anon, authenticated;
+
+-- Zwiększa licznik i zwraca liczbę odczytów dziś (z tym), albo -1 gdy limit już wyczerpany (licznik bez zmian).
+create or replace function public.ai_quota_take(p_kind text default 'screenshot', p_limit int default 20) returns int
+language plpgsql security definer set search_path = public as $$
+declare
+  v_day date := (now() at time zone 'Europe/Warsaw')::date;
+  v_kind text := left(coalesce(nullif(p_kind, ''), 'screenshot'), 30);
+  v_limit int := least(greatest(coalesce(p_limit, 20), 1), 100);
+  v_count int;
+begin
+  if auth.uid() is null or not (is_trainer() or exists (select 1 from my_client_ids())) then
+    raise exception 'Brak dostępu';
+  end if;
+  insert into ai_usage (user_id, kind, day, count) values (auth.uid(), v_kind, v_day, 1)
+  on conflict (user_id, kind, day) do update set count = ai_usage.count + 1
+    where ai_usage.count < v_limit
+  returning count into v_count;
+  -- stare wpisy (ponad 60 dni) — sprzątanie przy okazji
+  delete from ai_usage where user_id = auth.uid() and day < v_day - 60;
+  return coalesce(v_count, -1);
+end $$;
+revoke all on function public.ai_quota_take(text, int) from public, anon;
+grant execute on function public.ai_quota_take(text, int) to authenticated;
+notify pgrst, 'reload schema';

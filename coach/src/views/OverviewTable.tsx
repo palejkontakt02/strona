@@ -12,12 +12,13 @@ const COLS: { key: SortKey; label: string; title?: string }[] = [
   { key: 'name', label: 'Podopieczny' },
   { key: 'last', label: 'Ostatni trening', title: 'Dni od ostatniego treningu (bursztyn > 7, czerwony > 14)' },
   { key: 'next', label: 'Następna wizyta' },
+  { key: 'plan', label: 'Plan', title: 'Aktywny plan: tydzień i data końca (bursztyn — zakończony)' },
   { key: 'pkg', label: 'Pakiet', title: 'Ile treningów zostało w pakiecie' },
   { key: 'overdue', label: 'Zaległość' },
   { key: 'wellness', label: 'Samopoczucie', title: 'Ostatni odczyt (średnia 1–5); bursztyn — wyraźny spadek względem poprzednich' },
   { key: 'food', label: 'Jedzenie 7 dni', title: 'Średnio z dni z wpisem względem celu: kalorie i białko' },
   { key: 'habits', label: 'Nawyki 7 dni', title: 'Odhaczone zadania dzienne z 7 dni' },
-  { key: 'report', label: 'Raport', title: 'Raport tygodniowy za bieżący tydzień' },
+  { key: 'report', label: 'Raport', title: 'Raport tygodniowy za ostatni pełny tydzień (wymagany od poniedziałku)' },
   { key: 'unread', label: 'Wiadomości', title: 'Nieprzeczytane wiadomości' },
 ];
 
@@ -104,6 +105,9 @@ function Row({ r, today, onOpen }: { r: OverviewRow; today: string; onOpen: () =
       </th>
       <Cell tone={r.lastTone}>{r.lastDays == null ? 'brak' : r.lastDays === 0 ? 'dziś' : r.lastDays === 1 ? 'wczoraj' : `${r.lastDays} dni`}</Cell>
       <Cell>{r.next ? (r.next.date === today ? `dziś ${r.next.time}` : `${fmtWeekday(r.next.date)} ${fmtDay(r.next.date)} ${r.next.time}`) : '—'}</Cell>
+      <Cell tone={r.planEnded ? 'warn' : undefined}>
+        <span className="nowrap">{r.plan}</span>
+      </Cell>
       <Cell tone={r.pkgTone}>{r.pkgLeft == null ? '—' : r.pkgLeft < 0 ? `${-r.pkgLeft} ponad` : `zostało ${r.pkgLeft}`}</Cell>
       <Cell tone={r.overdue > 0 ? 'danger' : undefined}>{r.overdue > 0 ? pln(r.overdue) : '—'}</Cell>
       <Cell tone={r.wellnessDrop ? 'warn' : undefined} label={r.wellnessDrop ? 'spadek samopoczucia' : undefined}>

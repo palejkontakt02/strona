@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, Empty, IconBtn, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { put } from '../../data/db';
@@ -9,6 +10,7 @@ import { isOverdue, overPackage, packageStatus } from '../../lib/billing';
 import { todayISO } from '../../lib/dates';
 import { useNav } from '../../nav';
 import { clubSessions } from '../../lib/club';
+import { AddPaymentButton, DueCell, ReminderModal, RemindButton } from '../payments/PayParts';
 
 /** Sztanga z talerzami: każdy talerz = jedna sesja z ostatniego pakietu; pełne = pozostałe. */
 export function Barbell({ left, size }: { left: number; size: number }) {
@@ -41,6 +43,7 @@ export function Barbell({ left, size }: { left: number; size: number }) {
 export function ClientPayments({ client }: { client: Client }) {
   const { db, apply, ask, toast } = useStore();
   const { openModal } = useNav();
+  const [remind, setRemind] = useState<{ clientId: string; paymentId: string } | null>(null);
   const today = todayISO();
   const pk = packageStatus(client, sessionsOf(db, client.id));
   const pays = [...client.payments].sort((a, b) => b.date.localeCompare(a.date));
@@ -51,18 +54,7 @@ export function ClientPayments({ client }: { client: Client }) {
       <div className="toolbar">
         <h3>Płatności</h3>
         <div className="actions">
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'pakiet' })}>
-            + Pakiet
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'abonament' })}>
-            + Abonament
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'pojedyncza' })}>
-            + Sesja
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: 'inna' })}>
-            + Inna płatność
-          </button>
+          <AddPaymentButton clientId={client.id} />
         </div>
       </div>
 
@@ -125,7 +117,7 @@ export function ClientPayments({ client }: { client: Client }) {
           <table className="table table-cards">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Wystawiono</th>
                 <th>Opis</th>
                 <th className="num">Kwota</th>
                 <th>Termin</th>
@@ -139,7 +131,9 @@ export function ClientPayments({ client }: { client: Client }) {
                   <td className="nowrap">{fmtDate(p.date)}</td>
                   <td>{paymentLabel(p)}</td>
                   <td className="num">{pln(p.amount)}</td>
-                  <td className="nowrap">{p.status === 'paid' ? <span className="muted small">opł. {fmtDate(p.paidDate)}</span> : fmtDate(p.dueDate)}</td>
+                  <td className="nowrap">
+                    <DueCell p={p} />
+                  </td>
                   <td>{p.status === 'paid' ? <Tag tone="ok">Opłacone</Tag> : isOverdue(p, today) ? <Tag tone="danger">Zaległe</Tag> : <Tag>Do zapłaty</Tag>}</td>
                   <td className="actions">
                     {p.status === 'paid' ? (
@@ -151,6 +145,7 @@ export function ClientPayments({ client }: { client: Client }) {
                         Oznacz opłacone
                       </button>
                     )}
+                    <RemindButton client={client} p={p} onOpen={setRemind} />
                     <IconBtn icon="edit" label="Edytuj płatność" onClick={() => openModal({ kind: 'payment', clientId: client.id, type: p.type, payment: p })} />
                     <IconBtn
                       icon="trash"
@@ -167,6 +162,7 @@ export function ClientPayments({ client }: { client: Client }) {
           </table>
         </div>
       )}
+      {remind && <ReminderModal {...remind} onClose={() => setRemind(null)} />}
     </>
   );
 }
