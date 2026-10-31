@@ -21,6 +21,7 @@ import './styles/plan.css';
 import './styles/podopieczny.css';
 import './styles/zapis.css';
 import './styles/listy.css';
+import './styles/r7-player.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());
