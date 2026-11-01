@@ -31,7 +31,7 @@
   row-gap: 0;
 }
 .last-btn {
-  min-height: 44px;
+  min-height: var(--control-h);
   margin: -8px 0 -8px -6px;
   padding: 0 6px;
   border: 0;
@@ -96,7 +96,7 @@
 }
 .ex-cam .cam-btn {
   width: 48px;
-  height: 44px;
+  height: var(--control-h);
   border-color: var(--color-divider);
 }
 .ex-kg-on {
@@ -163,7 +163,7 @@
   box-shadow: 0 -1px 0 var(--color-divider);
 }
 .player .pnav .btn {
-  min-height: 56px;
+  min-height: var(--control-lg);
 }
 .player .pnav .pnav-prev {
   flex: 0 0 64px;
@@ -202,15 +202,16 @@
 }
 .sheet .scale-fit button {
   min-width: 0;
-  height: 44px;
+  height: var(--control-h);
   padding: 0;
   font-family: var(--font-display);
   font-size: var(--fs-md);
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 560px) {
+  /* telefon: nadal jeden rząd 0–10 (11 kolumn), węższe odstępy */
   .sheet .scale-fit {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 3px;
   }
 }
 
@@ -293,7 +294,7 @@
   margin-top: auto;
 }
 .wdone-actions .btn {
-  min-height: 56px;
+  min-height: var(--control-lg);
   display: inline-flex;
   align-items: center;
   justify-content: center;

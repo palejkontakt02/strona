@@ -2,7 +2,7 @@ import { consentWithdrawn, erasureStatus } from '../lib/rodo';
 import type { Client as RodoClient } from '../domain';
 import { AccountBadge } from '../components/accounts';
 import { useAccounts } from '../data/accounts';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar, Dot, Icon, Seg, Tag, type Tone } from '../components/ui';
 import type { ClientStatus } from '../domain';
 import { lastSessionDate, sessionsOf } from '../data/ops';
@@ -153,11 +153,13 @@ export function ClientsView() {
               <Avatar name={selected.name} size={64} />
               <div className="grow">
                 <h2>{selected.name}</h2>
+                {/* telefon: status, cel i dane w jednej linii z wielokropkiem (CSS) */}
+                <div className="detail-sub" title={[selected.goal, ageOf(selected.dob) != null && `${ageOf(selected.dob)} lat`, selected.sport, selected.level].filter(Boolean).join(' · ')}>
                 <div className="tags">
                   <StatusTag status={selected.status} />
                   {selected.goal && <Tag outline>{selected.goal}</Tag>}
                 </div>
-                <div className="muted small">
+                <div className="muted small detail-meta">
                   {[
                     ageOf(selected.dob) != null && `${ageOf(selected.dob)} lat`,
                     selected.height && `${selected.height} cm`,
@@ -166,6 +168,7 @@ export function ClientsView() {
                   ]
                     .filter(Boolean)
                     .join(' · ')}
+                </div>
                 </div>
               </div>
               <div className="detail-actions">
@@ -187,9 +190,7 @@ export function ClientsView() {
 
             <ConsentAlerts client={selected} />
 
-            <div className="tabs-scroll">
-              <Seg options={CLIENT_TABS} value={clientTab} onChange={setClientTab} label="Zakładki klienta" />
-            </div>
+            <ClientTabs value={clientTab} onChange={setClientTab} />
 
             <div className="fade" key={`${selected.id}-${clientTab}`}>
               {clientTab === 'Przegląd' && <ClientOverview client={selected} />}
@@ -207,6 +208,39 @@ export function ClientsView() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Zakładki karty klienta: wygaszanie przy krawędzi, gdy jest coś do przewinięcia, i aktywna zakładka zawsze w widoku. */
+function ClientTabs({ value, onChange }: { value: (typeof CLIENT_TABS)[number]; onChange: (t: (typeof CLIENT_TABS)[number]) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ start: false, end: false });
+  const measure = () => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.scrollLeft > 2;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setEdge((e) => (e.start === start && e.end === end ? e : { start, end }));
+  };
+  useEffect(() => {
+    const el = ref.current;
+    const btn = el?.querySelector<HTMLElement>('button.active');
+    if (el && btn) {
+      const left = btn.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+      const pad = 32;
+      if (left - pad < el.scrollLeft) el.scrollLeft = Math.max(0, left - pad);
+      else if (left + btn.offsetWidth + pad > el.scrollLeft + el.clientWidth) el.scrollLeft = left + btn.offsetWidth + pad - el.clientWidth;
+    }
+    measure();
+  }, [value]);
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  return (
+    <div ref={ref} className="tabs-scroll" data-fade-start={edge.start || undefined} data-fade-end={edge.end || undefined} onScroll={measure}>
+      <Seg options={CLIENT_TABS} value={value} onChange={onChange} label="Zakładki klienta" />
     </div>
   );
 }

@@ -109,7 +109,7 @@
 }
 @media (max-width: 600px) {
   .onb-step .btn {
-    min-height: 44px;
+    min-height: var(--control-h);
   }
 }
 
@@ -184,7 +184,7 @@
 }
 .invite-actions .btn {
   justify-content: center;
-  min-height: 44px;
+  min-height: var(--control-h);
   text-decoration: none;
 }
 @media (min-width: 700px) {

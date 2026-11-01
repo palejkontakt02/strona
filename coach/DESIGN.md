@@ -34,20 +34,51 @@ Zasady:
 
 ## Typografia
 
-- **Barlow Condensed** (`--font-display`) — tytuły ekranów i **liczby treningowe** (ciężar, powtórzenia,
-  czas, tonaż, km). Cyfry: `font-variant-numeric: tabular-nums`.
-- **Inter** (`--font-body`) — cała reszta.
+- **Barlow Condensed** (`--font-display`) — tytuły ekranów (H1) i **liczby treningowe** (ciężar, powtórzenia,
+  czas, tonaż, km, skale 0–10). Cyfry: `font-variant-numeric: tabular-nums`.
+- **Inter** (`--font-body`) — cała reszta, w tym **wszystkie przyciski** (Inter 600, także `.btn-lg`).
 - Tytuły i etykiety **zdaniem, nie WERSALIKAMI**. Bez rozstrzelonych etykiet nad treścią.
   `.eyebrow` = mała półgruba etykieta w kolorze drugorzędnym, bez uppercase.
-- Skala: 13 / 15 (tekst) / 17 / 20 / 26 / 34 px. Wysokość linii tekstu 1,45.
+- Logo: jedno — „Fitowa” (Barlow 700, bez uppercase i bez rozstrzelenia) + szare „/ coach”.
+- **Trzy poziomy nagłówków:**
+  1. H1 ekranu — Barlow Condensed 600 (`h1`, `.page-head h2`, imię w karcie klienta);
+  2. H2 karty — Inter 600 17 px, kolor tekstu (`.card-head h4`, `.toolbar h3`, `.acard h3`);
+  3. H3 podsekcji — Inter 600 13 px, szary (`.form-section`, `.sub-title`, `.notes-head`, `.dash-due-h`, `.nt-title`, `.mydata-sub`).
+- Skala pisma (tokeny): `--fs-2xs` 12 · `--fs-xs` 13 · `--fs-body` 15 · `--fs-md` 17 · `--fs-lg` 20 · `--fs-xl` 26 ·
+  `--fs-2xl` 34 · liczby „display” `--fs-display` 48 i `--fs-display-lg` 56. `--fs-sm` (14) zostaje tylko
+  dla zgodności starszych reguł. 16 px zostaje dosłownie w polach (iOS nie powiększa wtedy ekranu przy fokusie).
+  Wysokość linii tekstu 1,45. Wartość dosłowną zamieniamy na token, gdy różni się o ≤ 1 px.
 
 ## Kształt i przestrzeń
 
-- Promienie wg hierarchii: pola i przyciski 8px, karty 14px, arkusze (sheet / modal) 20px, chipy pełne.
+- Promienie (tokeny): `--radius-sm` 6 (małe elementy, segmenty) · `--radius-md` 8 (pola, przyciski) ·
+  `--radius-lg` 14 (karty) · `--radius-xl` 20 (arkusze, modale) · `--radius-pill` (chipy, tagi — zamiast `999px`).
+  Okrąg = `50%`. Paski postępu 2–4 px mogą zostać dosłowne.
+- Odstępy (tokeny, nazwy historyczne): `--space-1` 4 · `--space-2` 6 · `--space-3` 8 · `--space-4` 12 ·
+  `--space-6` 16 · `--space-5` 20 · `--space-8` 24 · `--space-10` 32. Margines boczny na telefonie 16px.
+- Wysokości kontrolek: `--control-sm` 36 · `--control-h` 44 (= `--tap`, cel dotyku) · `--control-lg` 56
+  (przycisk główny ekranu podopiecznego, ankieta tak/nie). `.btn-sm` 32 tylko na komputerze.
 - Hierarchia przez odcień powierzchni (bg → surface → surface-2), nie przez cienie. Cień tylko dla
-  warstw nad treścią (modal, sheet, toast, pływający przycisk).
-- Odstępy z tokenów `--space-*`. Margines boczny na telefonie 16px.
+  warstw nad treścią (modal, sheet, toast, pływający przycisk): `--shadow`, `--shadow-lg`.
+  **Bez „poświaty”** (`box-shadow 0 0 20px` w kolorze akcentu, `drop-shadow` na wykresach).
 - Cel dotyku min. 44×44px na telefonie (podopieczny ma spocone ręce).
+
+## Komponenty — zasady
+
+- **Jedna akcja główna na ekran.** Czarne (akcent) są tylko przyciski główne (`.btn-primary`) i „+”.
+  Aktywny segment przełącznika (`.seg button.active`) to **jasny kafelek na szarym torze**
+  (`--seg-on`: w jasnych motywach biała powierzchnia, w ciemnych jaśniejsza powierzchnia na ciemnym torze).
+  Zakładki karty klienta = podkreślenie, wygaszanie przy krawędzi (`data-fade-start/end`), aktywna przewija się do widoku.
+- **Pola formularzy** (`.input`): tło pola (`--field-bg`: jasny = biel, ciemny = ciemniejsze od karty) i ramka 1 px
+  (`--field-border`: jasny = `--color-neutral-600`, ciemny = `--color-neutral-700`); fokus = ramka 2 px w akcencie.
+  Pola zablokowane i tylko do odczytu: **bez wypełnienia, ramka przerywana**, szary tekst.
+- **Skala 0–10** (sRPE, ból): zawsze jeden rząd, 11 kolumn, przyciski 44 px wysokości — także na telefonie.
+- **Ankieta tak / nie**: dwa duże przyciski (56 px) wypełniające całą szerokość.
+- **Puste stany** (`.empty`, `.review-empty`): bez ramki i tła — tekst + najwyżej jedna akcja.
+- **Edytor planu**: tydzień = nagłówek sekcji, jednostka = karta, ćwiczenie = wiersz z linią podziału
+  (bez własnej ramki); na telefonie nazwa ćwiczenia w osobnym wierszu na całą szerokość.
+- **Nagłówek karty klienta na telefonie**: awatar 44, imię 26 px, status + cel + dane w jednej linii z wielokropkiem,
+  „Prowadź trening” na całą szerokość, pod nim „Tryb zawodnika” i „+ Zadaj trening” (muszą być widoczne — używają ich testy).
 
 ## Ruch
 
@@ -60,6 +91,7 @@ każdej karty. Szanuj `prefers-reduced-motion`.
 2. **Nie zmieniaj nazw klas, `aria-label`, tekstów przycisków ani `role`** — używają ich testy
    automatyczne. Nowe klasy dodawaj obok istniejących.
 3. Style piszesz w **swoim pliku** w `src/styles/` (ładowany po `styles.css`, więc nadpisuje).
-   `src/styles.css` zmienia tylko warstwa fundamentów.
+   `src/styles.css` zmienia tylko warstwa fundamentów. Jeden selektor = jedna reguła w pliku (bez duplikatów
+   do „dopisywania” — popraw istniejącą). Wartości tylko z tokenów (kolor, promień, pismo, wysokość).
 4. Każdy ekran sprawdź na 390px (telefon) i 1366px (komputer), w motywie Biały i Czarny.
    Bez poziomego przewijania strony, bez uciętych tekstów.

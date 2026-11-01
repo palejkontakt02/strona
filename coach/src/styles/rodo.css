@@ -67,7 +67,7 @@
   margin-top: var(--space-2);
 }
 .consent-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .consent-row {
   display: flex;
@@ -116,8 +116,7 @@
   border-top: 0;
 }
 .mydata-sub {
-  margin: var(--space-5, 20px) 0 var(--space-2);
-  font-size: var(--fs-body);
+  margin: var(--space-5) 0 var(--space-2);
 }
 .mydata-actions {
   display: flex;
@@ -127,7 +126,7 @@
 .mydata-actions .btn,
 .mydata-danger,
 .mydata-status .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .mydata-danger {
   color: var(--color-text);

@@ -233,7 +233,7 @@ th[aria-sort] .ov-sort {
 .inbox-tab {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: var(--control-h);
   padding: 0 var(--space-4);
   border: 0;
   border-bottom: 2px solid transparent;
@@ -414,6 +414,12 @@ th[aria-sort] .ov-sort {
   gap: var(--space-4);
   min-width: 0;
 }
+/* pusty stan bez ramki: tekst + jedna akcja */
+.card.review-empty {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
 .review-empty {
   display: flex;
   flex-direction: column;
@@ -525,7 +531,7 @@ th[aria-sort] .ov-sort {
   gap: var(--space-2);
 }
 .review-reply-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .review-actions {
   display: flex;
@@ -533,7 +539,7 @@ th[aria-sort] .ov-sort {
   gap: var(--space-2);
 }
 .review-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .review-actions .btn:last-child {
   margin-left: auto;
@@ -593,7 +599,7 @@ th[aria-sort] .ov-sort {
 @media (max-width: 900px) {
   .quick-reply .input,
   .quick-reply .btn {
-    min-height: 44px;
+    min-height: var(--control-h);
   }
 }
 .dash-review .card-body p,

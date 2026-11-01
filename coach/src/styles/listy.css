@@ -87,7 +87,7 @@
   }
   .sess-next-actions .btn {
     flex: 1;
-    min-height: 44px;
+    min-height: var(--control-h);
   }
 }
 
@@ -95,7 +95,7 @@
   margin-bottom: var(--space-3);
 }
 .sess-filters .chip {
-  min-height: 36px;
+  min-height: var(--control-sm);
 }
 @media (max-width: 900px) {
   .sess-filters {

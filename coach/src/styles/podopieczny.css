@@ -28,7 +28,7 @@
 /* --- notatka podopiecznego do ćwiczenia --- */
 .exnote-btn {
   width: 44px;
-  height: 44px;
+  height: var(--control-h);
   color: var(--color-neutral-400);
 }
 .exnote-btn.has-note {
@@ -173,7 +173,7 @@
   flex-wrap: wrap;
 }
 .absence-reasons button {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 
 /* --- waga: średnia 7 dni --- */

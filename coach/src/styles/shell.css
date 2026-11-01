@@ -46,7 +46,7 @@
   gap: 2px;
 }
 .nav-links button {
-  min-height: 36px;
+  min-height: var(--control-sm);
   padding: 0 14px;
   border-radius: var(--radius-md);
   color: var(--color-neutral-400);
@@ -68,14 +68,14 @@
 }
 .topbar .icon-btn {
   width: 44px;
-  height: 44px;
+  height: var(--control-h);
 }
 
 /* =========================================================
    Pasek „W toku” (trening na żywo czeka na dokończenie)
    ========================================================= */
 .live-banner button {
-  min-height: 44px;
+  min-height: var(--control-h);
   background: color-mix(in srgb, var(--color-ok) 13%, var(--color-surface));
   border-bottom: 1px solid color-mix(in srgb, var(--color-ok) 28%, transparent);
   font-size: var(--fs-body);
@@ -111,7 +111,7 @@
     border-top: 1px solid var(--color-divider);
   }
   .bottombar > button {
-    min-height: 56px;
+    min-height: var(--control-lg);
     justify-content: center;
     gap: 4px;
     font-size: var(--fs-2xs);
@@ -455,7 +455,7 @@
   }
   .dash-visit .icon-btn {
     width: 44px;
-    height: 44px;
+    height: var(--control-h);
   }
   .dash-visit .btn-sm-placeholder {
     display: none;
@@ -621,6 +621,19 @@
 .tabs-scroll::-webkit-scrollbar {
   display: none;
 }
+/* zakładki: wygaszanie przy krawędzi, za którą jest jeszcze coś do przewinięcia */
+.tabs-scroll[data-fade-end] {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.tabs-scroll[data-fade-start] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 40px);
+  mask-image: linear-gradient(to right, transparent, #000 40px);
+}
+.tabs-scroll[data-fade-start][data-fade-end] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
 .tabs-scroll .seg {
   display: flex;
   gap: 2px;
@@ -635,7 +648,7 @@
 .tabs-scroll .seg button {
   position: relative;
   flex: 0 0 auto;
-  min-height: 44px;
+  min-height: var(--control-h);
   padding: 0 14px;
   border-radius: 0;
   background: none;
@@ -669,31 +682,68 @@
     margin: var(--space-4) -16px var(--space-6);
     padding: 0 6px;
   }
+  /* telefon: zwarty nagłówek (~200 px): awatar 44, imię 26, jedna linia opisu, akcje w dwóch rzędach */
   .detail-header {
-    gap: var(--space-4);
+    gap: var(--space-3) var(--space-4);
   }
   .detail-header .avatar {
-    width: 52px !important;
-    height: 52px !important;
-    font-size: var(--fs-lg) !important;
+    width: 44px !important;
+    height: 44px !important;
+    font-size: var(--fs-md) !important;
   }
   .detail-header > .grow {
     flex: 1 1 0;
     min-width: 0;
   }
   .detail-header h2 {
-    font-size: 30px;
+    font-size: var(--fs-xl);
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .detail-sub {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .detail-sub .tags {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 62%;
+    margin: 0;
+    overflow: hidden;
+  }
+  .detail-sub .tags .tag {
+    flex: none;
+  }
+  .detail-sub .tags .tag-outline {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 20px;
+  }
+  .detail-sub .detail-meta {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .detail-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
   .detail-actions .btn:first-child {
     grid-column: 1 / -1;
   }
   .detail-pane .back {
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-1);
     padding-left: 0;
     border: 0;
     background: none;
@@ -731,7 +781,7 @@
     gap: var(--space-2);
   }
   .page-pay .page-head .actions .btn {
-    min-height: 44px;
+    min-height: var(--control-h);
     padding-inline: var(--space-2);
   }
   .page-pay .filters .input {

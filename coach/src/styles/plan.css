@@ -26,7 +26,7 @@
   min-width: 0;
 }
 .pt-absence .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 
 /* panel „Przesuń plan” */
@@ -61,7 +61,7 @@
   gap: var(--space-2);
 }
 .pt-chips .chip {
-  min-height: 44px;
+  min-height: var(--control-h);
   padding: 3px 14px;
 }
 .pt-preview {
@@ -89,7 +89,7 @@
   flex: 1 1 200px;
 }
 .pt-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 
 /* sugestie ciężaru */
@@ -445,7 +445,7 @@
   order: 1;
 }
 .pt-quick-row .chip {
-  min-height: 44px;
+  min-height: var(--control-h);
   padding: 3px 14px;
   font-family: var(--font-display);
   font-size: 1rem;
@@ -474,7 +474,7 @@
   }
   .pl-actions .icon-btn,
   .pl-actions .btn {
-    min-height: 44px;
+    min-height: var(--control-h);
     min-width: 44px;
   }
 }
@@ -519,7 +519,7 @@
   gap: var(--space-2);
 }
 .pl-ended-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .pi-active {
   display: flex;

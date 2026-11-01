@@ -26,7 +26,7 @@
 }
 .pg .pg-sub {
   font-family: var(--font-body);
-  font-size: var(--fs-sm, 0.9375rem);
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -57,7 +57,7 @@
 }
 .pg-nav-btn {
   width: 44px;
-  height: 44px;
+  height: var(--control-h);
   display: inline-flex;
   align-items: center;
   justify-content: center;

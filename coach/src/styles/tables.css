@@ -9,7 +9,7 @@
 .ptab-head {
   gap: var(--space-3);
   margin-bottom: var(--space-3);
-  min-height: 36px;
+  min-height: var(--control-sm);
 }
 .ptab-head strong {
   font-family: var(--font-display);
@@ -40,7 +40,7 @@
   }
   .ptab-head .plan-workout-actions .btn {
     flex: 1 1 40%;
-    min-height: 44px;
+    min-height: var(--control-h);
     justify-content: center;
   }
   .ptab-head .plan-workout-actions .btn-primary {
@@ -548,7 +548,7 @@
     margin-right: calc(-1 * var(--space-2));
   }
   .pe-set .input {
-    min-height: 44px;
+    min-height: var(--control-h);
   }
   .pe-set > input.input {
     padding-left: 2px;
@@ -588,6 +588,51 @@
   }
   .pe-set.cardio {
     grid-template-columns: 28px 150px repeat(4, 104px) 36px;
+  }
+}
+
+/* edytor planu — mniej „karty w karcie”: tydzień = nagłówek sekcji, jednostka = karta,
+   ćwiczenie = wiersz oddzielony linią (bez własnej ramki i tła) */
+.pe-workout.card > .pe-ex-wrap > .pe-ex,
+.pe-workout.card .pe-ex {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-4) 0 var(--space-3);
+}
+.pe-workout .pe-ex-wrap + .pe-ex-wrap {
+  margin-top: 0;
+  border-top: 1px solid var(--color-divider);
+}
+.pe-workout > .pe-week-head + .pe-ex-wrap > .pe-ex {
+  padding-top: var(--space-2);
+}
+/* superseria / blok: znacznik po lewej zamiast ramki */
+.pe-workout.card .pe-ex.in-block {
+  border: 0;
+  box-shadow: inset 3px 0 0 var(--color-accent-600);
+  padding-left: var(--space-4);
+}
+/* ćwiczenie połączone z poprzednim (blok) — bez linii podziału, żeby blok czytał się jako całość */
+.pe-workout .pe-ex-wrap + .pe-ex-wrap:has(> .pe-link.on) {
+  border-top: 0;
+}
+.pe-link.on {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+@media (max-width: 640px) {
+  /* telefon: nazwa ćwiczenia w osobnym wierszu na całą szerokość, przerwa / serie / strzałki / kosz pod nią */
+  .pe-ex-head > .input:not(.pe-rest) {
+    flex: 1 1 calc(100% - 40px);
+  }
+  .pe-ex-head > .icon-btn {
+    order: 2;
+  }
+  .pe-ex-head > .nowrap {
+    margin-right: auto;
+  }
+  .pe-ex-head > .grow {
+    flex: 0 0 0;
   }
 }
 
@@ -673,8 +718,8 @@
 @media (max-width: 600px) {
   .set-edit-row .input,
   .set-no {
-    min-height: 44px;
-    height: 44px;
+    min-height: var(--control-h);
+    height: var(--control-h);
   }
 }
 
@@ -887,7 +932,7 @@
   margin: 0;
 }
 .multi-pick-chosen .chip {
-  min-height: 36px;
+  min-height: var(--control-sm);
 }
 .multi-pick-list {
   list-style: none;

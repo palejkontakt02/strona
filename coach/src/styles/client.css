@@ -23,7 +23,7 @@
   gap: var(--space-3);
 }
 .loc-filter button {
-  min-height: 36px;
+  min-height: var(--control-sm);
   padding: 4px 14px;
   font-size: var(--fs-sm);
   color: var(--color-neutral-300);
@@ -921,7 +921,7 @@
   margin-bottom: var(--space-6);
 }
 .imp-btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .imp-err {
   margin: var(--space-2) 0 0;
@@ -1005,7 +1005,7 @@
   }
   .imp-actions .btn {
     flex: 1;
-    min-height: 44px;
+    min-height: var(--control-h);
   }
 }
 
@@ -1057,6 +1057,6 @@
 @media (max-width: 720px) {
   .chip-btn,
   .appt-move-btns .btn {
-    min-height: 44px;
+    min-height: var(--control-h);
   }
 }

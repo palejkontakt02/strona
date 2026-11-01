@@ -18,7 +18,7 @@
   resize: none;
 }
 .chat-compose-row .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
   flex: none;
 }
 .chat-tool {
@@ -209,7 +209,7 @@ button.chat-ref {
 .voice-btn {
   flex: none;
   width: 44px;
-  height: 44px;
+  height: var(--control-h);
   display: inline-grid;
   place-items: center;
   border: 0;
@@ -347,7 +347,7 @@ button.chat-ref {
   margin-left: auto;
 }
 .visit-actions .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .visit-cancelled .visit-time {
   text-decoration: line-through;
@@ -375,7 +375,7 @@ button.chat-ref {
 
 /* --- komentarz do treningu / ćwiczenia --- */
 .ref-btn {
-  min-height: 44px;
+  min-height: var(--control-h);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -408,7 +408,7 @@ button.chat-ref {
   gap: var(--space-2);
 }
 .ref-attach .btn {
-  min-height: 44px;
+  min-height: var(--control-h);
 }
 .ref-reply-actions {
   justify-content: flex-end;
@@ -587,24 +587,7 @@ button.chat-ref {
 .scale.scale-form {
   flex-wrap: wrap;
 }
-@media (max-width: 900px) {
-  .scale.scale-form {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 6px;
-  }
-  .scale.scale-form button {
-    min-width: 44px;
-    min-height: 44px;
-    height: 44px;
-  }
-}
-@media (min-width: 901px) {
-  .scale.scale-form button {
-    flex: 1 0 36px;
-    height: 36px;
-  }
-}
+/* skala 0–10 w formularzu: jeden rząd 11 kolumn (reguła .scale.scale-11 w styles.css) */
 .set-edit .set-add {
   white-space: nowrap;
   flex: none;
