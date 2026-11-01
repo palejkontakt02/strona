@@ -1014,17 +1014,17 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     return (
       <>
         {header(k, undefined, e.rest)}
+        {trainer && !e.cardio && (
+          <button className="link small" onClick={() => addWarmup(k)}>
+            + seria wstępna
+          </button>
+        )}
         {/* nagłówek pierwszej grupy serii („Robocze 4 × 5”) nad etykietami kolumn — etykiety tuż nad polami */}
         {g0 && (
           <div className="ghead ghead-top">
             <b>{g0.gdesc}</b>
             {g0.rest && <span className="muted small">przerwa {fmtRest(g0.rest)}</span>}
           </div>
-        )}
-        {trainer && !e.cardio && (
-          <button className="link small" onClick={() => addWarmup(k)}>
-            + seria wstępna
-          </button>
         )}
         {e.cardio ? (
           <div className="sgrid sgrid-head cardio">
