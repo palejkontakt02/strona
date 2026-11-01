@@ -376,7 +376,7 @@ function EndClientModal({ client, s, onClose, onConfirm }: { client: Client; s: 
         </div>
       )}
       <p className="small coach-note-lite">
-        Konto {first} w aplikacji przejdzie w tryb tylko do odczytu — historia treningów, planów i wiadomości zostaje. Status możesz w każdej chwili zmienić z powrotem.
+        Konto podopiecznego ({first}) w aplikacji przejdzie w tryb tylko do odczytu — historia treningów, planów i wiadomości zostaje. Status możesz w każdej chwili zmienić z powrotem.
       </p>
     </Modal>
   );

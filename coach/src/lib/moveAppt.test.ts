@@ -16,6 +16,8 @@ describe('przesuń wizytę z rozmowy', () => {
       { key: 'minus1', label: '−1 h', date: '2026-11-04', time: '17:00' },
       { key: 'tomorrow', label: 'jutro', date: '2026-11-05', time: '18:00' },
     ]);
+    expect(moveOptions({ date: '2026-11-04', time: '18:00' }, '2026-11-04')[2]).toEqual({ key: 'tomorrow', label: 'jutro', date: '2026-11-05', time: '18:00' });
+    expect(moveOptions({ date: '2026-11-05', time: '18:00' }, '2026-11-04')[2]).toEqual({ key: 'tomorrow', label: '+1 dzień', date: '2026-11-06', time: '18:00' });
     expect(shiftTime('23:30', 60)).toBeNull();
     expect(moveOptions({ date: '2026-11-04', time: '00:30' }).map((o) => o.key)).toEqual(['plus1', 'tomorrow']);
   });

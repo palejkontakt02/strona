@@ -29,14 +29,16 @@ export interface MoveOption {
   time: string;
 }
 
-/** Szybkie opcje: +1 h, −1 h, „jutro” (dzień później, ta sama godzina). */
-export function moveOptions(a: Pick<Appointment, 'date' | 'time'>): MoveOption[] {
+/** Szybkie opcje: +1 h, −1 h, „jutro” (ta sama godzina; gdy wizyta jest już jutro lub później — „+1 dzień”). */
+export function moveOptions(a: Pick<Appointment, 'date' | 'time'>, today?: ISODate): MoveOption[] {
   const out: MoveOption[] = [];
   const p = shiftTime(a.time, 60);
   const m = shiftTime(a.time, -60);
   if (p) out.push({ key: 'plus1', label: '+1 h', date: a.date, time: p });
   if (m) out.push({ key: 'minus1', label: '−1 h', date: a.date, time: m });
-  out.push({ key: 'tomorrow', label: 'jutro', date: addDays(a.date, 1), time: a.time });
+  const tomorrow = today ? addDays(today, 1) : addDays(a.date, 1);
+  if (a.date < tomorrow) out.push({ key: 'tomorrow', label: 'jutro', date: tomorrow, time: a.time });
+  else out.push({ key: 'tomorrow', label: '+1 dzień', date: addDays(a.date, 1), time: a.time });
   return out;
 }
 

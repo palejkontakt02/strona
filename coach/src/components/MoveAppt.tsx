@@ -50,7 +50,7 @@ export function MoveApptBar({ client, onReply }: { client: Client; onReply: (tex
       {open && (
         <div className="mv-panel" role="group" aria-label="Przesuń najbliższą wizytę">
           <div className="mv-quick">
-            {moveOptions(appt).map((o) => (
+            {moveOptions(appt, today).map((o) => (
               <button key={o.key} type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void go(appt, o.date, o.time)} title={whenLabel(o.date, o.time, today)}>
                 {o.label}
               </button>

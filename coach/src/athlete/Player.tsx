@@ -49,7 +49,6 @@ import { flashText, nextSetInfo, speechText } from '../lib/announce';
 import { exNoteEntry, exNoteFor } from '../lib/exNotes';
 import { WorkoutDone, type DoneInfo } from './WorkoutDone';
 import { commaNum, showRunHelp, soloByDefault } from '../lib/playerView';
-import { storeRun } from './AthleteApp';
 
 let audio: AudioContext | null = null;
 function beep(freq: number, dur: number) {
@@ -228,18 +227,6 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     speak(speechText(x));
   };
 
-  // po zapisie nowego treningu (ekran „Trening zakończony”) w pamięci urządzenia nie zostaje nic — zamknięcie
-  // aplikacji na tym ekranie nie zostawia treningu w trybie poprawek; po zapisie efektu rodzica (stąd setTimeout)
-  useEffect(() => {
-    if (!doneInfo || trainer) return;
-    const clear = () => storeRun(client.id, null);
-    const t = window.setTimeout(clear, 0);
-    window.addEventListener('pagehide', clear);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('pagehide', clear);
-    };
-  }, [doneInfo, trainer, client.id]);
   // ekran nie gaśnie w trakcie treningu (zwolnienie po zakończeniu / wyjściu)
   useWakeLock(!doneInfo);
   // przerwa: plik „cisza + sygnał” gra przy zablokowanym ekranie; pominięcie / zmiana — nowy plik albo stop
@@ -493,7 +480,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       ? null
       : (() => {
           const stats = workoutStats(session);
-          const prev = previousWorkout(before, session);
+          const prev = previousWorkout(before, session, db.plans);
           const cmp = compareWorkouts(stats, prev ? workoutStats(prev) : undefined);
           return {
             sessionId: session.id,
