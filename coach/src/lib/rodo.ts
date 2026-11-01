@@ -24,7 +24,7 @@ export const ADMIN = {
 };
 
 /** Wersja klauzuli informacyjnej — zwiększ, gdy zmienisz jej treść (zapisuje się przy zgodzie). */
-export const CLAUSE_VERSION = 1;
+export const CLAUSE_VERSION = 2;
 
 export const CONSENT_TEXT: Record<ConsentKind, { title: string; short: string; needed: string }> = {
   health: {

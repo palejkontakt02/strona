@@ -25,7 +25,7 @@
 .loc-filter button {
   min-height: var(--control-sm);
   padding: 4px 14px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--color-neutral-300);
   background: transparent;
   border: 1px solid var(--color-divider);
@@ -76,7 +76,7 @@
 }
 .day-strip-btn i {
   min-height: 1.2em;
-  font-size: var(--fs-2xs);
+  font-size: 0.6875rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--color-accent);
@@ -121,14 +121,14 @@
   min-height: 34px;
   margin: 0 0 var(--space-3);
   padding: 0 0 0 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--color-neutral-400);
 }
 .week-day header > span {
   font-weight: 500;
 }
 .week-day header strong {
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
@@ -162,7 +162,7 @@
   content: 'Nic tego dnia';
   display: block;
   padding: var(--space-4) 4px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   color: var(--color-neutral-500);
 }
 
@@ -186,7 +186,7 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--c) 9%, var(--color-surface-2));
   color: var(--color-text);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   line-height: 1.3;
   text-align: left;
   transition: background-color 0.12s ease;
@@ -284,7 +284,7 @@
   padding: 1px 6px;
   border-radius: var(--radius-pill);
   font-family: var(--font-body);
-  font-size: var(--fs-2xs);
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.3;
@@ -332,7 +332,7 @@
 }
 .tile.tile-overdue::after {
   grid-column: 1 / -1;
-  font-size: var(--fs-2xs);
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-warn);
 }
@@ -358,7 +358,7 @@
   min-height: 56px;
   padding: 9px 12px;
   align-items: center;
-  font-size: var(--fs-body);
+  font-size: var(--fs-sm);
 }
 .week-one .tile-time {
   grid-column: 1;
@@ -369,7 +369,7 @@
 }
 .week-one .clash-mark {
   display: block;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
 }
 .week-one .tile-done .tile-time::before {
   font-size: 0.8em;
@@ -385,7 +385,7 @@
   grid-column: 2;
 }
 .week-one .tile-status {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
 }
 .week-one .tile-loose .tile-time,
 .week-one .tile-loose .tile-name,
@@ -394,7 +394,7 @@
   grid-row: auto;
 }
 .week-one .tile-loose .tile-time {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
 }
 
 /* telefon: tydzień jako lista dni — kafelki jak w widoku dnia */
@@ -411,7 +411,7 @@
     min-height: 56px;
     padding: 9px 12px;
     align-items: center;
-    font-size: var(--fs-body);
+    font-size: var(--fs-sm);
   }
   .week .tile-time {
     grid-column: 1;
@@ -422,7 +422,7 @@
   }
   .week .clash-mark {
     display: block;
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
   }
   .week .tile-done .tile-time::before {
     font-size: 0.8em;
@@ -438,7 +438,7 @@
     grid-column: 2;
   }
   .week .tile-status {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-2xs);
   }
   .week .tile-loose .tile-time,
   .week .tile-loose .tile-name,
@@ -447,7 +447,7 @@
     grid-row: auto;
   }
   .week .tile-loose .tile-time {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-2xs);
   }
 }
 
@@ -459,7 +459,7 @@
 }
 .month-dow {
   padding-bottom: 6px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   font-weight: 500;
   color: var(--color-neutral-400);
 }
@@ -491,7 +491,7 @@
   padding: 0 5px;
   margin-bottom: 2px;
   border-radius: var(--radius-pill);
-  font-size: var(--fs-body);
+  font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 22px;
   text-align: center;
@@ -548,7 +548,7 @@
 .legend-note {
   margin-top: var(--space-6);
   max-width: 72ch;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   line-height: 1.5;
   color: var(--color-neutral-400);
 }
@@ -621,7 +621,7 @@
   }
   .month-num {
     align-self: center;
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
     min-width: 22px;
     height: 20px;
     line-height: 20px;
@@ -656,7 +656,7 @@
   .month-more {
     padding: 0;
     text-align: center;
-    font-size: var(--fs-2xs);
+    font-size: 0.6875rem;
   }
 }
 
@@ -711,7 +711,7 @@
 .chart-fig .legend {
   gap: var(--space-3) var(--space-6);
   margin-top: var(--space-3);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
 }
 .legend-swatch {
   width: 12px;
@@ -799,7 +799,7 @@
   padding-bottom: var(--space-2);
   margin-bottom: var(--space-1);
   border-bottom: 1px solid var(--color-divider);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -834,10 +834,10 @@
 .habit-rings > div {
   min-width: 72px;
   text-align: center;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
 }
 .habit-days > div {
-  font-size: var(--fs-2xs);
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -954,12 +954,12 @@
   min-width: 0;
 }
 .imp-kpis dt {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-2xs);
   color: var(--color-neutral-400);
 }
 .imp-kpis dd {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: 1.625rem;
   font-weight: 600;
   line-height: 1.15;
   white-space: nowrap;

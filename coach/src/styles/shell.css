@@ -838,7 +838,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-display);
-  font-size: var(--fs-xl);
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -855,7 +855,7 @@
 .auth-logo span,
 .auth-hero .auth-logo span {
   font-weight: 500;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   color: var(--color-neutral-400);
   margin-left: -2px;
 }
@@ -1078,7 +1078,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 .wr-vals b {

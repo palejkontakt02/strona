@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Client } from '../domain';
 import { createSeed } from '../data/seed';
-import { ERASURE_PREFIX, consentDate, consentEntry, consentState, consentWithdrawn, erasureStatus, exportData, exportFileName, hasConsent, isArchived, needsConsentPrompt, sessionsCsv } from './rodo';
+import { ERASURE_PREFIX, consentDate, consentEntry, consentState, consentWithdrawn, erasureStatus, exportData, exportFileName, hasConsent, isArchived, needsConsentPrompt, sessionsCsv , CLAUSE_VERSION } from './rodo';
 
 const base = { id: 'c1', name: 'Jan', status: 'aktywny', payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] } as Client;
 
@@ -18,7 +18,7 @@ describe('rodo: zgody', () => {
 
   it('udzielenie, wycofanie, ponowne udzielenie — daty i historia', () => {
     const a = consentEntry(undefined, 'media', true, '2026-10-01T00:00:00Z');
-    expect(a).toMatchObject({ id: 'media', on: true, givenAt: '2026-10-01T00:00:00Z', v: 1 });
+    expect(a).toMatchObject({ id: 'media', on: true, givenAt: '2026-10-01T00:00:00Z', v: CLAUSE_VERSION });
     const b = consentEntry(a, 'media', false, '2026-10-05T00:00:00Z');
     expect(b).toMatchObject({ on: false, givenAt: '2026-10-01T00:00:00Z', withdrawnAt: '2026-10-05T00:00:00Z' });
     const c = consentEntry(b, 'media', true, '2026-10-09T00:00:00Z');

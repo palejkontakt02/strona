@@ -104,11 +104,11 @@
   color: var(--pg-muted);
 }
 .pg-stat-val {
-  font-size: var(--fs-2xl); /* 34 */
+  font-size: 2.125rem; /* 34 */
   line-height: 1.05;
 }
 .pg-stat-val small {
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--pg-muted);
 }
@@ -122,7 +122,7 @@
     padding: var(--space-2);
   }
   .pg-stats-3 .pg-stat-val {
-    font-size: var(--fs-xl); /* 26 */
+    font-size: 1.625rem; /* 26 */
   }
 }
 .pg-rec,
@@ -215,7 +215,7 @@
   white-space: nowrap;
 }
 .pg-bar-val b {
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
 }
 
 /* odcienie: 0 — brak, 1 — trochę, 2 — dawka tygodniowa (wyróżnione czernią) */
@@ -334,7 +334,7 @@
   color: var(--color-warn);
 }
 .pg-well-val {
-  font-size: var(--fs-lg);
+  font-size: 1.25rem;
   text-align: right;
 }
 .pg-spark {
@@ -373,7 +373,7 @@
   gap: var(--space-3);
 }
 .pg-next-val {
-  font-size: var(--fs-md);
+  font-size: var(--fs-body);
   white-space: nowrap;
 }
 .pg-meter {

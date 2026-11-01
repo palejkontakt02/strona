@@ -240,6 +240,7 @@ export function ClauseSheet({ onClose }: { onClose: () => void }) {
         <h4>Odbiorcy</h4>
         <ul>
           <li>Supabase (hosting bazy danych i plików aplikacji) — dostawca działa na podstawie umowy powierzenia; serwer: {ADMIN.hostingRegion}.</li>
+          <li>Anthropic (odczyt liczb ze zrzutu ekranu z aplikacji Fitatu przez AI, tylko gdy dodasz zrzut) — zrzut jest przetwarzany wyłącznie w celu odczytu i nie jest zapisywany.</li>
           <li>FormSubmit — przekazuje Twoje wiadomości z aplikacji na e-mail trenera.</li>
           <li>Usługi powiadomień przeglądarki (Google, Apple, Mozilla) — tylko gdy włączysz powiadomienia push.</li>
         </ul>
