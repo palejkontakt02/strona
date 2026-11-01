@@ -47,8 +47,10 @@ export interface MonthReport {
   byMethod: Bucket<PayMethod | 'brak'>[];
   byKind: Bucket<ReportKind>[];
   byClient: Bucket[];
-  /** Zaległości na koniec miesiąca: termin ≤ ostatni dzień, nieopłacone do końca miesiąca. */
+  /** Zaległości na koniec miesiąca (bieżący miesiąc: na dziś): termin minął, nieopłacone do tego dnia. */
   arrears: { amount: number; count: number; clients: number };
+  /** Dzień, na który liczone są zaległości i pakiety (koniec miesiąca albo dziś). */
+  asOf: ISODate;
   /** Wartość niewykorzystanych sesji z pakietów na koniec miesiąca. */
   unusedPackages: { sessions: number; value: number; clients: number };
   prevMonth: YearMonth;
@@ -146,12 +148,13 @@ function bucketize<K extends string>(rows: ReportRow[], key: (r: ReportRow) => K
 }
 
 /** Raport miesięczny wpłat. */
-export function monthReport(input: ReportInput, month: YearMonth, label: (p: Payment) => string): MonthReport {
+export function monthReport(input: ReportInput, month: YearMonth, label: (p: Payment) => string, today?: ISODate): MonthReport {
   const rows = paidRows(input, month, label);
   const total = round2(rows.reduce((a, r) => a + r.amount, 0));
   const prevMonth = shiftMonth(month, -1);
   const prevTotal = round2(paidRows(input, prevMonth, label).reduce((a, r) => a + r.amount, 0));
   const end = monthEnd(month);
+  const asOf = today && today < end ? today : end;
   return {
     month,
     total,
@@ -159,8 +162,9 @@ export function monthReport(input: ReportInput, month: YearMonth, label: (p: Pay
     byMethod: bucketize(rows, (r) => r.method ?? 'brak', (k) => (k === 'brak' ? 'Bez formy' : PAY_METHOD_LABEL[k]), [...PAY_METHODS, 'brak'] as const),
     byKind: bucketize(rows, (r) => r.kind, (k) => REPORT_KIND_LABEL[k], REPORT_KINDS),
     byClient: bucketize(rows, (r) => r.clientId ?? `klub:${r.client}`, (_k, r) => r.client),
-    arrears: arrearsAt(input.clients, end),
-    unusedPackages: unusedPackagesAt(input, end),
+    arrears: arrearsAt(input.clients, asOf),
+    asOf,
+    unusedPackages: unusedPackagesAt(input, asOf),
     prevMonth,
     prevTotal,
     diff: round2(total - prevTotal),

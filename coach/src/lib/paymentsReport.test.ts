@@ -47,6 +47,12 @@ describe('raport miesięczny', () => {
     expect(unusedPackagesAt({ ...input, clients: [a2] }, '2026-10-31')).toEqual({ sessions: 7, value: 700, clients: 1 });
     expect(unusedPackagesAt({ ...input, clients: [a2] }, '2026-11-30').sessions).toBe(6);
   });
+  it('bieżący miesiąc: zaległości na dziś', () => {
+    const r = monthReport(input, '2026-10', label, '2026-10-20');
+    expect(r.asOf).toBe('2026-10-20');
+    expect(r.arrears.amount).toBe(120.5);
+    expect(monthReport(input, '2026-10', label, '2026-11-15').asOf).toBe('2026-10-31');
+  });
   it('monthEnd', () => {
     expect(monthEnd('2026-02')).toBe('2026-02-28');
     expect(monthEnd('2028-02')).toBe('2028-02-29');

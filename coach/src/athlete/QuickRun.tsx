@@ -24,8 +24,8 @@ export function QuickRun({ client }: { client: Client }) {
         <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
           <Icon name="run" size={18} /> {word} — wpisz bieg
         </button>
+        <ImportActivity clientId={client.id} small />
       </div>
-      <ImportActivity clientId={client.id} small />
       {open && <QuickRunSheet client={client} word={word} onClose={() => setOpen(false)} />}
     </section>
   );

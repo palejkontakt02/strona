@@ -1,0 +1,175 @@
+/* Runda 7 — agent „klienci”: profil trenera, wiadomość do wielu, przesuń wizytę, notatki, koniec współpracy. */
+
+/* ---------- profil trenera ---------- */
+.tp-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.tp-summary .grow {
+  min-width: 12rem;
+}
+.tp-avatar {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tp-lead {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.tp-lead svg {
+  flex: none;
+  margin-top: 2px;
+}
+.tp-photo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+}
+.tp-days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.tp-days .chip {
+  min-width: 2.75rem;
+  justify-content: center;
+}
+.tp-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap, 44px);
+  cursor: pointer;
+}
+.tp-check input {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  accent-color: var(--color-text);
+}
+.tp-cancel,
+.bc-pick {
+  max-height: 16rem;
+  overflow: auto;
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+/* ---------- wiadomość do wielu ---------- */
+.inbox-head-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.bc-kinds {
+  margin-bottom: var(--space-3);
+}
+.bc-count {
+  margin: var(--space-2) 0 var(--space-3);
+}
+.bc-preview {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+}
+.bc-preview p {
+  margin: var(--space-1, 4px) 0 0;
+}
+
+/* ---------- przesuń wizytę (rozmowa, trener) ---------- */
+.mv-bar {
+  border-bottom: 1px solid var(--color-divider);
+  padding: var(--space-2) 0;
+}
+.mv-toggle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mv-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-1, 4px);
+}
+.mv-quick,
+.mv-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.mv-custom .input {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+/* ---------- notatki: „Tylko Ty” / „Widzi podopieczny” ---------- */
+.notes-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+.notes-split {
+  display: grid;
+  gap: var(--space-3);
+}
+.notes-part {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.notes-part p {
+  margin: 0 0 var(--space-2);
+}
+.notes-part p:last-child {
+  margin-bottom: 0;
+}
+.notes-shared {
+  border-style: dashed;
+}
+.notes-private {
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-3);
+  scroll-margin-top: calc(var(--topbar-h, 56px) + var(--space-4));
+}
+.notes-warn {
+  display: inline-flex;
+  gap: var(--space-1, 4px);
+  align-items: flex-start;
+}
+.notes-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ---------- biblioteka: cały wiersz otwiera edycję ---------- */
+.lib-row {
+  cursor: pointer;
+}
+.lib-row:hover {
+  background: var(--color-surface-2);
+}
+
+/* ---------- koniec współpracy ---------- */
+.end-block {
+  margin-bottom: var(--space-4);
+}
+.end-list {
+  margin: var(--space-1, 4px) 0 0 calc(1.15rem + var(--space-3));
+}
+.coach-note-lite {
+  border-left: 3px solid var(--color-divider);
+  padding-left: var(--space-3);
+}

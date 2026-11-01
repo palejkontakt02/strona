@@ -1,3 +1,4 @@
+import { recordRow } from '../../lib/clientCard';
 import { useState } from 'react';
 import { BarChart, LineChart, type Pt } from '../../components/charts';
 import { Card, Empty, Kpi } from '../../components/ui';
@@ -191,13 +192,13 @@ export function ClientMonitoring({ client }: { client: Client }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...RECORD_REPS.map((n) => [`${n}RM`, exRec.rm[n]] as const), ['Najlepszy e1RM', exRec.e1] as const].map(([label, r]) => (
+                    {[...RECORD_REPS.map((n) => [`${n}RM`, recordRow(n, exRec.rm[n])] as const), ['Najlepszy e1RM', exRec.e1] as const].map(([label, r]) => (
                       <RecRow key={label} label={label} r={r} best={label === 'Najlepszy e1RM'} />
                     ))}
                   </tbody>
                 </table>
               )}
-              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && <p className="muted small">3RM = najcięższa seria na co najmniej 3 powtórzenia (tak samo 1RM, 5RM). e1RM — szacowane maks. z serii (Epley z RPE).</p>}
+              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && <p className="muted small">1RM = najcięższa seria pojedyncza (1 powtórzenie; „—”, gdy cięższa była seria na więcej powtórzeń). 3RM / 5RM = najcięższa seria na co najmniej 3 / 5 powtórzeń. e1RM — szacowane maks. z serii (Epley z RPE).</p>}
               {hist.length > 0 && (
                 <p className="muted small">
                   {hist.length} {hist.length === 1 ? 'trening' : hist.length < 5 ? 'treningi' : 'treningów'} z tym ćwiczeniem · ostatnio {fmtDay(hist[hist.length - 1].date)}: {fnum(hist[hist.length - 1].load)} kg × {hist[hist.length - 1].reps} (e1RM {fnum(hist[hist.length - 1].e1, 1)})

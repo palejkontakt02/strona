@@ -1,7 +1,7 @@
 import { ComebackSettings } from './ComebackSettings';
 import { ClientHealth, ClientIntakeCard } from './Health';
 import { useEffect, useRef, useState } from 'react';
-import { Card, Empty, Field, IconBtn, Modal, Tag } from '../../components/ui';
+import { Card, Empty, Field, Icon, IconBtn, Modal, Tag } from '../../components/ui';
 import type { Billing, Client, ClientStatus } from '../../domain';
 import { del, put } from '../../data/db';
 import { sessionsOf } from '../../data/ops';
@@ -147,7 +147,15 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Urazy (podsumowanie)" wide>
             {inp('injuries')}
           </Field>
-          <Field label="Notatki" wide hint="Podopieczny ma techniczny dostęp do swojego profilu — nie wpisuj tu nic, czego nie powinien przeczytać.">
+          <Field
+            label="Notatki — widzi podopieczny"
+            wide
+            hint={
+              <span className="warn-text notes-warn">
+                <Icon name="eye" size={13} /> Widoczne dla podopiecznego. Prywatne rzeczy wpisuj w „Tylko Ty” (karta Zdrowie i wywiad).
+              </span>
+            }
+          >
             <textarea className="input" rows={3} value={d.notes} onChange={(e) => set('notes', e.target.value)} />
           </Field>
         </>

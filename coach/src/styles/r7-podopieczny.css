@@ -152,8 +152,12 @@
   flex-wrap: wrap;
   margin: var(--space-3) 0 var(--space-2);
 }
-.r7-qrun .imp {
-  margin-top: var(--space-2);
+.r7-qrun-row {
+  align-items: center;
+}
+.r7-qrun-row .imp:has(.imp-preview),
+.r7-qrun-row .imp:has(.imp-err) {
+  flex-basis: 100%;
 }
 .r7-qrun-grid {
   display: grid;

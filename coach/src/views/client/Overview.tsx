@@ -8,7 +8,7 @@ import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { ago, fmtDate, fx, pln } from '../../format';
 import { clientAlerts } from '../../lib/alerts';
-import { healthFlags, trainerNotesOf } from './Health';
+import { healthFlags, requestPrivateNotesFocus, trainerNotesOf } from './Health';
 import { packageStatus } from '../../lib/billing';
 import { addDays, todayISO } from '../../lib/dates';
 import { acwrZone, loadStats } from '../../lib/load';
@@ -131,15 +131,45 @@ export function ClientOverview({ client }: { client: Client }) {
           </div>
         </Card>
 
-        <Card title="Notatki" action={<button className="btn btn-ghost btn-sm" onClick={() => setClientTab('Profil')}>Edytuj</button>}>
-          {client.notes || client.injuries ? (
-            <div className="stack-sm">
-              {client.injuries && <p className="small"><strong>Urazy:</strong> {client.injuries}</p>}
-              {client.notes && <p className="small pre">{client.notes}</p>}
-            </div>
-          ) : (
-            <Empty>Brak notatek.</Empty>
-          )}
+        <Card title="Notatki" action={<button className="btn btn-ghost btn-sm" onClick={() => (requestPrivateNotesFocus(client.id), setClientTab('Profil'))}>Edytuj</button>}>
+          {(() => {
+            const tn = trainerNotesOf(db.trainer_notes, client.id);
+            const lastVisit = [...(tn.visits ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0];
+            return (
+              <div className="notes-split">
+                <section className="notes-part notes-mine" aria-label="Notatki tylko dla Ciebie">
+                  <h5 className="notes-head">
+                    <Icon name="lock" size={14} /> Tylko Ty
+                  </h5>
+                  {tn.notes || lastVisit ? (
+                    <>
+                      {tn.notes && <p className="small pre">{tn.notes}</p>}
+                      {lastVisit && (
+                        <p className="small">
+                          <span className="muted">Wizyta {fmtDate(lastVisit.date)}:</span> {lastVisit.text.length > 160 ? `${lastVisit.text.slice(0, 160)}…` : lastVisit.text}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="small muted">Brak prywatnych notatek.</p>
+                  )}
+                </section>
+                <section className="notes-part notes-shared" aria-label="Notatki widoczne dla podopiecznego">
+                  <h5 className="notes-head">
+                    <Icon name="eye" size={14} /> Widzi podopieczny
+                  </h5>
+                  {client.notes || client.injuries ? (
+                    <>
+                      {client.injuries && <p className="small"><strong>Urazy:</strong> {client.injuries}</p>}
+                      {client.notes && <p className="small pre">{client.notes}</p>}
+                    </>
+                  ) : (
+                    <p className="small muted">Brak — dane zawodnika (Profil).</p>
+                  )}
+                </section>
+              </div>
+            );
+          })()}
         </Card>
       </div>
       <div className="two-col comms-cols">

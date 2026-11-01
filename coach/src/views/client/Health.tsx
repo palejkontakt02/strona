@@ -114,6 +114,15 @@ export function ClientHealth({ client }: { client: Client }) {
   const [dirty, setDirty] = useState(false);
   const [visit, setVisit] = useState('');
   const [open, setOpen] = useState(!rec.health);
+  const privRef = useRef<HTMLDivElement>(null);
+  const privArea = useRef<HTMLTextAreaElement>(null);
+  // Przegląd → Notatki → „Edytuj”: przewiń do prywatnych notatek
+  useEffect(() => {
+    if (takePrivateNotesFocus(client.id)) {
+      privRef.current?.scrollIntoView?.({ block: 'center' });
+      privArea.current?.focus({ preventScroll: true });
+    }
+  }, [client.id]);
   useEffect(() => {
     setH(rec.health ?? {});
     setNotes(rec.notes ?? '');
@@ -236,18 +245,6 @@ export function ClientHealth({ client }: { client: Client }) {
             <Field label="Czego unikać na treningu (pokaże się przy prowadzeniu)" wide>
               <input className="input" {...tf('contraindications')} placeholder="np. głębokie zgięcie kolana pod obciążeniem, Valsalva" />
             </Field>
-            <Field label="Prywatne notatki trenera" wide>
-              <textarea
-                className="input"
-                rows={3}
-                value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value);
-                  setDirty(true);
-                }}
-                placeholder="Rzeczy, których podopieczny nie powinien widzieć."
-              />
-            </Field>
           </div>
           <div className="between save-row">
             <span className="muted small">{rec.health?.updated ? `Wywiad z ${fmtDay(rec.health.updated)}` : 'Uzupełnij — zapisuje się samo'}</span>
@@ -261,7 +258,31 @@ export function ClientHealth({ client }: { client: Client }) {
           </div>
         </>
       )}
-      <div className="sub-section">
+      <div className="sub-section notes-private" id={`private-notes-${client.id}`} ref={privRef}>
+        <h4 className="sub-title notes-head">
+          <Icon name="lock" size={15} /> Tylko Ty <span className="muted">· podopieczny tego nie widzi</span>
+        </h4>
+        <Field label="Prywatne notatki trenera" wide>
+          <textarea
+            ref={privArea}
+            className="input"
+            rows={3}
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              setDirty(true);
+            }}
+            placeholder="Rzeczy, których podopieczny nie powinien widzieć."
+          />
+        </Field>
+        {dirty && !open && (
+          <div className="between save-row">
+            <span className="muted small">Zapisuje się samo</span>
+            <button className="btn btn-primary btn-sm" onClick={() => void save()}>
+              Zapisz
+            </button>
+          </div>
+        )}
         <h4 className="sub-title">Notatki z wizyt <span className="muted">· prywatne</span></h4>
         <div className="reply-box">
           <textarea className="input" rows={2} value={visit} onChange={(e) => setVisit(e.target.value)} placeholder="np. S: ból 3/10 po schodach · O: przysiad do 90° bez bólu · A: lepiej · P: dodać step-up" aria-label="Notatka z wizyty" />
@@ -296,4 +317,23 @@ export function ClientHealth({ client }: { client: Client }) {
       </div>
     </Card>
   );
+}
+
+const FOCUS_KEY = 'focus-private-notes';
+/** Przegląd → „Edytuj” notatki: Profil otworzy się przewinięty do prywatnych notatek (jednorazowo). */
+export function requestPrivateNotesFocus(clientId: string) {
+  try {
+    sessionStorage.setItem(FOCUS_KEY, clientId);
+  } catch {
+    /* bez sessionStorage — samo przejście */
+  }
+}
+function takePrivateNotesFocus(clientId: string): boolean {
+  try {
+    const v = sessionStorage.getItem(FOCUS_KEY);
+    if (v === clientId) sessionStorage.removeItem(FOCUS_KEY);
+    return v === clientId;
+  } catch {
+    return false;
+  }
 }

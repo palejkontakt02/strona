@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card, Empty, Icon, Kpi } from '../../components/ui';
 import { paymentLabel } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { fmtMonth, plural, pln } from '../../format';
+import { fmtDate, fmtMonth, plural, pln } from '../../format';
 import { shiftMonth } from '../../lib/billing';
 import { todayISO } from '../../lib/dates';
 import { csvFileName, exportRows, monthReport, toCsv, type Bucket } from '../../lib/paymentsReport';
@@ -43,7 +43,7 @@ export function PaymentsReport() {
   const today = todayISO();
   const [month, setMonth] = useState(today.slice(0, 7));
   const input = { clients: db.clients, sessions: db.sessions, locations: db.locations, appointments: db.appointments };
-  const r = monthReport(input, month, paymentLabel);
+  const r = monthReport(input, month, paymentLabel, today);
   const isFuture = month > today.slice(0, 7);
   const diffTxt =
     r.prevTotal || r.total
@@ -80,7 +80,7 @@ export function PaymentsReport() {
         <Kpi label="Wpłaty razem" value={pln(r.total)} sub={diffTxt ?? `${r.count} ${plural(r.count, 'wpłata', 'wpłaty', 'wpłat')}`} />
         <Kpi label="Poprzedni miesiąc" value={pln(r.prevTotal)} sub={fmtMonth(r.prevMonth)} />
         <Kpi
-          label="Zaległości na koniec miesiąca"
+          label={r.asOf === today ? 'Zaległości na dziś' : 'Zaległości na koniec miesiąca'}
           value={pln(r.arrears.amount)}
           tone={r.arrears.amount ? 'danger' : undefined}
           sub={r.arrears.count ? `${r.arrears.count} ${plural(r.arrears.count, 'pozycja', 'pozycje', 'pozycji')} · ${r.arrears.clients} ${plural(r.arrears.clients, 'osoba', 'osoby', 'osób')}` : 'brak'}
@@ -88,7 +88,7 @@ export function PaymentsReport() {
         <Kpi
           label="Niewykorzystane sesje z pakietów"
           value={pln(r.unusedPackages.value)}
-          hint="Wartość sesji wykupionych, a jeszcze nieodbytych na koniec miesiąca (cena za sesję z ostatniego pakietu)."
+          hint={`Wartość sesji wykupionych, a jeszcze nieodbytych na dzień ${fmtDate(r.asOf)} (cena za sesję z ostatniego pakietu).`}
           sub={`${r.unusedPackages.sessions} ${plural(r.unusedPackages.sessions, 'sesja', 'sesje', 'sesji')} · ${r.unusedPackages.clients} ${plural(r.unusedPackages.clients, 'osoba', 'osoby', 'osób')}`}
         />
       </div>

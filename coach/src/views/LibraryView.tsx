@@ -4,7 +4,8 @@ import { EXERCISE_CATEGORIES } from '../domain';
 import { useStore } from '../data/store';
 import { normalize, uid, nEx } from '../format';
 import { put } from '../data/db';
-import { missingFromAtlas } from '../data/atlas';
+import { atlasToAdd } from '../lib/library';
+import { plural } from '../format';
 import { useNav } from '../nav';
 import { del } from '../data/db';
 import { templatesOf } from '../lib/analytics';
@@ -12,8 +13,15 @@ import { TemplateAssignModal } from '../modals/AssignModal';
 import type { Plan } from '../domain';
 
 export function LibraryView() {
-  const { db, apply } = useStore();
-  const missing = missingFromAtlas(db.library.map((e) => e.name));
+  const { db, apply, ask, toast } = useStore();
+  const missing = atlasToAdd(db.library.map((e) => e.name));
+  const addAtlas = async () => {
+    const n = missing.length;
+    if (!(await ask(`Dodać ${nEx(n)} z atlasu (nazwy po angielsku)? Ćwiczenia, które już masz — także pod polską nazwą (np. Przysiad ze sztangą = Back Squat) — zostaną pominięte.`, { confirm: `Dodaj ${n}`, danger: false }))) return;
+    const items = missing.map(([name, cat]) => ({ id: uid(), name, cat }));
+    if (!(await apply(items.map((x) => put('library', x))))) return;
+    toast(`Dodano ${nEx(n)} z atlasu.`, { label: 'Cofnij', run: () => void apply(items.map((x) => del('library', x.id)), `Cofnięto — usunięto ${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')} z atlasu.`) });
+  };
   const { openModal } = useNav();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
@@ -33,7 +41,7 @@ export function LibraryView() {
           {missing.length > 0 && (
             <button
               className="btn btn-secondary"
-              onClick={() => apply(missing.map(([name, cat]) => put('library', { id: uid(), name, cat })), `Dodano ${nEx(missing.length)} z atlasu.`)}
+              onClick={() => void addAtlas()}
               title="Ćwiczenia siłowe, dwubojowe, plyometryczne, kondycyjne i rehabilitacyjne — nazwy po angielsku"
             >
               + Atlas ćwiczeń ({missing.length})
@@ -64,10 +72,10 @@ export function LibraryView() {
             </div>
             <ul className="rows">
               {items.map((e) => (
-                <li key={e.id} className="row">
+                <li key={e.id} className="row lib-row" onClick={(ev) => !(ev.target as HTMLElement).closest('a,button') && openModal({ kind: 'exercise', exercise: e })}>
                   <span className="grow">{e.name}</span>
                   {e.video && (
-                    <a href={e.video} target="_blank" rel="noreferrer" className="small">
+                    <a href={e.video} target="_blank" rel="noreferrer" className="small" onClick={(ev) => ev.stopPropagation()}>
                       wideo ↗
                     </a>
                   )}

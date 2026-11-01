@@ -109,7 +109,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
         <section className="acard acard-warn r7-parq" role="alert">
           <span className="eyebrow">Ważne — zdrowie</span>
           <h3>Skonsultuj się z lekarzem przed rozpoczęciem treningów — trener dostał informację.</h3>
-          <p className="small">Zaznaczono „tak” przy: {parqAlert.join(' · ')}.</p>
+          <p className="small">Zaznaczono „tak” przy: {parqAlert.join(' · ')}</p>
           <p className="muted small">Do czasu rozmowy z lekarzem i trenerem nie rób intensywnych treningów samodzielnie. Jeśli lekarz da zgodę, napisz o tym trenerowi.</p>
           <button className="btn btn-primary btn-block" onClick={onClose}>
             Rozumiem

@@ -241,10 +241,10 @@
   right: 4px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
   gap: 2px;
-  padding: 4px 12px;
+  padding: 8px 12px 4px;
   border: 1px dashed var(--color-divider);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-surface-2) 45%, transparent);

@@ -23,6 +23,7 @@ import { isEmail, normalizePhone } from '../lib/onboarding';
 import { TrainerProfileSummary } from '../views/TrainerProfile';
 import { useTrainerProfile } from '../data/trainerProfile';
 import { priceDefaults, pricesLine } from '../lib/trainerProfile';
+import { renameCounts, renameIn } from '../lib/library';
 
 function useClient(id: string): Client | undefined {
   const { db } = useStore();
@@ -415,7 +416,7 @@ export function InjuryModal({ m }: { m: Extract<ModalState, { kind: 'injury' }> 
 
 /* ---------- ćwiczenie w bibliotece ---------- */
 export function ExerciseModal({ m }: { m: Extract<ModalState, { kind: 'exercise' }> }) {
-  const { apply, ask } = useStore();
+  const { apply, ask, db } = useStore();
   const { closeModal } = useNav();
   const e = m.exercise;
   const [name, setName] = useState(e?.name ?? '');
@@ -442,7 +443,16 @@ export function ExerciseModal({ m }: { m: Extract<ModalState, { kind: 'exercise'
       }
       onSubmit={async () => {
         if (!name.trim()) return;
-        await apply([put('library', { id: e?.id ?? uid(), name: name.trim(), cat, video: video.trim() || undefined })], 'Zapisano ćwiczenie.');
+        const item = put('library', { id: e?.id ?? uid(), name: name.trim(), cat, video: video.trim() || undefined });
+        // zmiana nazwy: ta sama nazwa w planach i historii — inaczej rozetnie historię i rekordy ćwiczenia
+        const n = e && e.name.trim() !== name.trim() ? renameCounts(db.plans, db.sessions, e.name) : null;
+        if (e && n && (n.plans || n.sessions)) {
+          const all = await ask(`Zmienić nazwę „${e.name}” → „${name.trim()}” też w planach (${n.plans}) i historii treningów (${n.sessions})? Dzięki temu historia i rekordy ćwiczenia zostaną razem.`, { confirm: 'Zmień wszędzie', cancel: 'Tylko w bibliotece', danger: false });
+          const r = all ? renameIn(db.plans, db.sessions, e.name, name.trim()) : { plans: [], sessions: [] };
+          await apply([item, ...r.plans.map((p) => put('plans', p)), ...r.sessions.map((s) => put('sessions', s))], all ? `Zmieniono nazwę w bibliotece, ${n.plans} ${plural(n.plans, 'planie', 'planach', 'planach')} i ${n.sessions} ${plural(n.sessions, 'treningu', 'treningach', 'treningach')}.` : 'Zapisano ćwiczenie (plany i historia bez zmian).');
+          return closeModal();
+        }
+        await apply([item], 'Zapisano ćwiczenie.');
         closeModal();
       }}
     >

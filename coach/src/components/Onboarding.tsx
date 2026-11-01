@@ -1,3 +1,4 @@
+import { onboardingAutoHidden } from '../lib/clientCard';
 import { useEffect, useMemo, useState } from 'react';
 import type { Client } from '../domain';
 import { put } from '../data/db';
@@ -230,7 +231,8 @@ export function OnboardingChecklist({ client }: { client: Client }) {
     sessions: sessionsOf(db, client.id).length,
   });
   const modal = invite && <InviteModal clientId={client.id} onClose={() => setInvite(false)} />;
-  if (client.onboardingHidden || onboardingComplete(steps)) return modal || null;
+  // ≥ 3 zapisane treningi — współpraca ruszyła, checklista chowa się sama
+  if (client.onboardingHidden || onboardingComplete(steps) || onboardingAutoHidden(sessionsOf(db, client.id).length)) return modal || null;
   const doneN = steps.filter((s) => s.done).length;
   const nextId = steps.find((s) => !s.done)?.id;
 
