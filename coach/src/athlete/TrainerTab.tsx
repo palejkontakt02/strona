@@ -10,6 +10,9 @@ import { CANCEL_HOURS, hoursUntil, isLateCancel } from '../lib/appts';
 import { todayISO } from '../lib/dates';
 import { apptIcs, icsName } from '../lib/ics';
 import { upcomingVisits } from './History';
+import { AthletePayments } from './AthletePayments';
+import { TrainerCard, VacationBanner } from './TrainerInfo';
+import { useTrainerProfile } from '../data/trainerProfile';
 
 const OPEN_KEY = 'fitowa-visits-open';
 
@@ -208,8 +211,12 @@ function CancelSheet({ a, preview, onClose }: { a: Appointment; preview?: boolea
  */
 export function TrainerTab({ client, mode }: { client: Client; mode: 'client' | 'preview' }) {
   const preview = mode === 'preview';
+  const { profile } = useTrainerProfile();
   return (
     <div className="trainer-tab">
+      <TrainerCard />
+      <VacationBanner profile={profile} />
+      <AthletePayments client={client} preview={preview} />
       <Visits client={client} preview={preview} />
       <section className="trainer-chat" aria-label={preview ? `Rozmowa: ${client.name}` : 'Rozmowa z trenerem'}>
         <h2 className="trainer-chat-title">{preview ? `Rozmowa: ${client.name}` : 'Rozmowa z trenerem'}</h2>

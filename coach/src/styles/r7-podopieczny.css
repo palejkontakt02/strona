@@ -1,0 +1,176 @@
+/* Runda 7 — agent „podopieczny”: profil trenera, płatności, szybki bieg, podgląd treningu z Dziś. Tylko tokeny. */
+
+/* zdjęcie / inicjały trenera (bez ikony osoby) */
+.r7-av {
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--card-border);
+}
+.r7-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ath-top .ath-coach {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* karta trenera w zakładce Trener */
+.ath .r7-coach-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.r7-coach-card .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.r7-coach-card a.btn {
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+/* urlop trenera — bursztyn (uwaga) */
+.r7-vac {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-warn) 45%, transparent);
+  background: color-mix(in srgb, var(--color-warn) 7%, var(--color-surface));
+  color: var(--color-text);
+  font-size: 0.9375rem;
+}
+.r7-vac svg {
+  color: var(--warn-fg, var(--color-warn));
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.r7-vac:not(.now) {
+  border-color: var(--card-border);
+  background: var(--color-surface);
+}
+
+/* płatności */
+.r7-bad {
+  color: var(--danger-fg, var(--color-danger));
+}
+.r7-pay-pkg {
+  font-weight: 600;
+  margin: var(--space-2) 0 0;
+}
+.r7-due {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-divider);
+}
+.r7-due-line {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+.r7-due-line svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.r7-due .actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.r7-pay-how {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.r7-copy-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.r7-copy-row .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.r7-copy-val {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.r7-via {
+  align-self: flex-start;
+}
+
+/* Dziś: nazwa następnego treningu otwiera podgląd */
+.r7-hero-open {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.r7-hero-open h2 {
+  margin-top: 0;
+}
+.r7-hero-more {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.r7-hero-open:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+/* szybki wpis biegu */
+.r7-qrun-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.r7-qrun .imp {
+  margin-top: var(--space-2);
+}
+.r7-qrun-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.r7-qrun-pace {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+}
+.r7-scale10 button {
+  height: 40px;
+}
+
+/* PAR-Q po zapisie ankiety */
+.r7-parq h3 {
+  color: var(--warn-fg, var(--color-warn));
+}
+.consent-why {
+  color: var(--color-text);
+}

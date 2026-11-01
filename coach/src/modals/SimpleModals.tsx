@@ -1,5 +1,5 @@
 import { AccountsPanel } from '../components/accounts';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Field, Modal } from '../components/ui';
 import { EXERCISE_CATEGORIES, type Client, type ExerciseCategory, type Injury, type Measurement, type Payment, type TestResult } from '../domain';
 import { del, normalizeDb, put, type Db } from '../data/db';
@@ -7,6 +7,8 @@ import { clientById } from '../data/ops';
 import { isTemplate } from '../lib/analytics';
 import { useStore } from '../data/store';
 import { fnum, plural, uid } from '../format';
+import type { PayMethod } from '../domain';
+import { PAY_METHODS, PAY_METHOD_LABEL } from '../lib/paymentsReport';
 import { addDays, todayISO } from '../lib/dates';
 import { num, numIn } from '../lib/parse';
 import { computeLsi } from '../lib/tests';
@@ -18,6 +20,9 @@ import { ClientFields, fromDraft, toDraft } from '../views/client/Profile';
 import { ClientSelect } from './ModalHost';
 import { requestInvite } from '../components/Onboarding';
 import { isEmail, normalizePhone } from '../lib/onboarding';
+import { TrainerProfileSummary } from '../views/TrainerProfile';
+import { useTrainerProfile } from '../data/trainerProfile';
+import { priceDefaults, pricesLine } from '../lib/trainerProfile';
 
 function useClient(id: string): Client | undefined {
   const { db } = useStore();
@@ -28,8 +33,15 @@ function useClient(id: string): Client | undefined {
 export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> }) {
   const { apply, toast, db } = useStore();
   const { closeModal, openClient } = useNav();
-  const [d, setD] = useState(() => toDraft(m.client ?? { status: 'aktywny' }));
+  const { profile } = useTrainerProfile();
+  const [d, setD] = useState(() => (m.client ? toDraft(m.client) : priceDefaults(profile, toDraft({ status: 'aktywny' }))));
   const set = (k: string, v: string) => setD((x) => ({ ...x, [k]: v }));
+  // cennik z profilu dochodzi po chwili (chmura) — uzupełnia tylko puste stawki
+  const prices = JSON.stringify(profile.prices ?? null);
+  useEffect(() => {
+    if (!m.client) setD((x) => priceDefaults(profile, x));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prices]);
   return (
     <Modal
       title={m.client ? 'Edytuj podopiecznego' : 'Nowy podopieczny'}
@@ -51,6 +63,7 @@ export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> 
       }}
     >
       <ClientFields d={d} set={set} compact />
+      {!m.client && profile.prices && <p className="muted small">Stawki z Twojego cennika ({pricesLine(profile)}) — zmienisz je tutaj albo w Ustawieniach → Mój profil.</p>}
       {!m.client && <p className="muted small">Pozostałe dane (data urodzenia, staż, urazy…) uzupełnisz w zakładce Profil.</p>}
     </Modal>
   );
@@ -226,6 +239,8 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
   const [dueTouched, setDueTouched] = useState(false);
   // abonament i inna pozycja — zwykle do zapłaty; pakiet i sesja — zwykle płacone od razu
   const [paid, setPaid] = useState(p ? p.status === 'paid' : m.type !== 'abonament' && m.type !== 'inna');
+  const [method, setMethod] = useState<PayMethod | ''>(p?.method ?? '');
+  const [docNo, setDocNo] = useState(p?.doc ?? '');
 
   return (
     <Modal
@@ -246,6 +261,9 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
           // Wpłata wpisywana wstecz liczy się w miesiącu swojej daty, nie dzisiejszym.
           paidDate: paid ? (p?.paidDate ?? (date && date < today ? date : today)) : undefined,
         };
+        if (method) pay.method = method;
+        if (docNo.trim()) pay.doc = docNo.trim().slice(0, 60);
+        if (p?.remindedAt && !paid) pay.remindedAt = p.remindedAt;
         if (m.type === 'pakiet') pay.sessions = parseInt(sessions, 10) || 0;
         if (m.type === 'abonament') pay.month = month;
         const payments = p ? client.payments.map((x) => (x.id === p.id ? pay : x)) : [...client.payments, pay];
@@ -307,6 +325,19 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
             <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Opłacone
           </label>
         </div>
+        <Field label="Forma">
+          <select className="input" value={method} onChange={(e) => setMethod(e.target.value as PayMethod | '')}>
+            <option value="">—</option>
+            {PAY_METHODS.map((k) => (
+              <option key={k} value={k}>
+                {PAY_METHOD_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Dokument (opcjonalnie)">
+          <input className="input" value={docNo} maxLength={60} onChange={(e) => setDocNo(e.target.value)} placeholder="nr paragonu / faktury" />
+        </Field>
       </div>
     </Modal>
   );
@@ -464,7 +495,9 @@ export function DataModal() {
 
   return (
     <Modal title="Ustawienia" onClose={closeModal}>
-      <h4>Kolory</h4>
+      <h4>Mój profil</h4>
+      <TrainerProfileSummary />
+      <h4 className="form-section">Kolory</h4>
       <PalettePicker />
       <PushSettings role="trainer" />
       <h4 className="form-section">Konta w aplikacji</h4>

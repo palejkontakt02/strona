@@ -9,6 +9,7 @@ import { SessionModal } from './SessionModal';
 import { ReviewModal } from './ReviewModal';
 import { AssignModal } from './AssignModal';
 import { AutoMessages } from '../views/AutoMessages';
+import { TrainerProfileModal } from '../views/TrainerProfile';
 
 export function ModalHost({ modal }: { modal: ModalState }) {
   const { db } = useStore();
@@ -39,6 +40,7 @@ export function ModalHost({ modal }: { modal: ModalState }) {
       {modal.kind === 'data' && <DataModal />}
       {modal.kind === 'locations' && <LocationsModal />}
       {modal.kind === 'autoMessages' && <AutoMessages />}
+      {modal.kind === 'trainerProfile' && <TrainerProfileModal />}
       {modal.kind === 'location' && <LocationModal m={modal} />}
     </>
   );

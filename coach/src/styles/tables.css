@@ -57,7 +57,7 @@
 .ptab-restnote {
   display: none;
   margin-top: 3px;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 400;
   color: var(--color-neutral-400);
 }
@@ -73,7 +73,7 @@
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
@@ -91,7 +91,7 @@
   background: var(--band);
   color: var(--band-fg);
   font-family: var(--font-body);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -105,7 +105,7 @@
 }
 .ptab-table thead .ptab-week {
   font-family: var(--font-display);
-  font-size: 1.125rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   text-align: center;
   line-height: 1.1;
@@ -115,7 +115,7 @@
   display: block;
   margin-top: 2px;
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
@@ -125,7 +125,7 @@
 .ptab-table thead .ptab-sub {
   background: color-mix(in srgb, var(--band) 52%, var(--color-surface));
   color: color-mix(in srgb, var(--band-fg) 80%, transparent);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   padding-top: 5px;
   padding-bottom: 5px;
@@ -179,7 +179,7 @@
   max-width: 240px;
   white-space: normal;
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: var(--fs-body);
   line-height: 1.3;
   vertical-align: top;
   padding-top: 10px;
@@ -195,7 +195,7 @@
 .ptab-note {
   display: block;
   margin-top: 3px;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 400;
   line-height: 1.35;
   color: var(--color-neutral-400);
@@ -208,7 +208,7 @@
 .ptab-table .ptab-no,
 .ptab-table .ptab-rest {
   font-family: var(--font-display);
-  font-size: 0.9375rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--color-neutral-400);
   white-space: nowrap;
@@ -223,7 +223,7 @@
 .ptab-table thead .ptab-no,
 .ptab-table thead .ptab-rest {
   font-family: var(--font-body);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
 }
 .ptab-table tbody .ptab-rest {
   vertical-align: top;
@@ -236,7 +236,7 @@
 .ptab-table tbody td.ptab-load,
 .ptab-table tbody td.ptab-rpe {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
@@ -279,7 +279,7 @@
 /* rozgrzewki — wyciszone */
 .ptab-table tbody td.ptab-warm {
   color: var(--color-neutral-400);
-  font-size: 0.9375rem;
+  font-size: var(--fs-body);
   font-weight: 400;
 }
 .ptab-table tbody tr.ptab-warmline > td.ptab-no {
@@ -299,7 +299,7 @@
 /* telefon: ciaśniej, dalej czytelnie; przewijanie tylko wewnątrz tabeli */
 @media (max-width: 640px) {
   .ptab-head strong {
-    font-size: 1.25rem;
+    font-size: var(--fs-lg);
   }
   .ptab-table th,
   .ptab-table td {
@@ -308,7 +308,7 @@
   .ptab-table .ptab-ex {
     min-width: 124px;
     max-width: 148px;
-    font-size: 0.875rem;
+    font-size: var(--fs-sm);
   }
   .ptab-table td.ptab-wk {
     min-width: 46px;
@@ -333,7 +333,7 @@
   .ptab-one .ptab-table .ptab-ex {
     min-width: 96px;
     max-width: 120px;
-    font-size: 0.8125rem;
+    font-size: var(--fs-xs);
   }
 }
 
@@ -357,12 +357,12 @@
     font-size: 1rem;
   }
   .ptab-two .ptab-table thead .ptab-sub {
-    font-size: 0.6875rem;
+    font-size: var(--fs-2xs);
   }
   .ptab-two .ptab-table .ptab-ex {
     min-width: 78px;
     max-width: 92px;
-    font-size: 0.8125rem;
+    font-size: var(--fs-xs);
     padding-left: 7px;
   }
   .ptab-two .ptab-table td.ptab-wk {
@@ -377,7 +377,7 @@
     min-width: 26px;
   }
   .ptab-two .ptab-note {
-    font-size: 0.6875rem;
+    font-size: var(--fs-2xs);
   }
 }
 
@@ -394,7 +394,7 @@
 /* nazwa tygodnia / jednostki jak nagłówek; ramka pola widoczna dopiero przy najechaniu / edycji */
 .pe-week-head > .pe-title {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   letter-spacing: 0;
   background: transparent;
@@ -441,14 +441,14 @@
 .pe-ex-head .ex-label {
   height: 28px;
   min-width: 32px;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
 }
 .pe-ex-head > .muted.small {
   font-variant-numeric: tabular-nums;
 }
 .pe-rest {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   text-align: center;
 }
 
@@ -463,7 +463,7 @@
   gap: 6px;
 }
 .pe-set-head {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
@@ -484,21 +484,21 @@
 }
 .pe-set-head > span:first-child {
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 .pe-set .input {
   min-height: 40px;
 }
 .pe-set > input.input {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
 .pe-set > input.input::placeholder {
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 .pe-set.is-warmup {
   opacity: 1;
@@ -555,7 +555,7 @@
     padding-right: 2px;
   }
   .pe-set > span:first-child {
-    font-size: 0.875rem;
+    font-size: var(--fs-sm);
   }
   /* nagłówek ćwiczenia: nazwa + strzałka + kosz w 1. wierszu, przerwa i liczba serii w 2. */
   .pe-ex-head {
@@ -579,7 +579,7 @@
     margin-right: var(--space-2);
   }
   .pe-set select.input {
-    font-size: 0.75rem;
+    font-size: var(--fs-2xs);
   }
 }
 @media (min-width: 641px) {
@@ -593,7 +593,7 @@
 
 /* ---------- zapis treningu (SessionModal) ---------- */
 .ex-head {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
@@ -614,14 +614,14 @@
 }
 .ex-row > input.input:not(:first-child):not(.ex-notes) {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
 .ex-row > input.input::placeholder {
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 .ex-row > input.input:first-child {
   font-weight: 600;
@@ -634,21 +634,21 @@
   gap: 6px;
 }
 .set-edit-head {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
 }
 .set-edit-row .input {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   min-height: 40px;
 }
 .set-edit-row .input::placeholder {
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 .set-edit-row.warm .input {
   opacity: 1;
@@ -660,7 +660,7 @@
   height: 40px;
   border-radius: var(--radius-md);
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   background: var(--color-surface-2);
   border-color: transparent;
@@ -733,7 +733,7 @@
   place-items: center;
   min-width: 28px;
   height: 28px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-surface-2);
   font-family: var(--font-display);
   font-size: 1rem;
@@ -741,15 +741,15 @@
 }
 .rb-reps .input {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
 }
 .rb-grid .field > span {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--color-neutral-400);
 }
 .rb-total {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-variant-numeric: tabular-nums;
 }
 
@@ -792,7 +792,7 @@
 }
 .rec-table td.num {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -813,7 +813,7 @@
 }
 .pain-hist-list .num {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-variant-numeric: tabular-nums;
 }
 .pain-hist-list .danger-text {
@@ -845,7 +845,7 @@
 }
 .pe-load > input.input {
   font-family: var(--font-display);
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -854,7 +854,7 @@
 }
 .pe-pct {
   font-family: var(--font-display);
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   text-align: center;
   color: var(--color-accent);
@@ -863,7 +863,7 @@
 }
 .pe-pct.none {
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   color: var(--color-neutral-400);
 }
 .pe-max {
@@ -875,7 +875,7 @@
     padding-right: 2px;
   }
   .pe-pct {
-    font-size: 0.75rem;
+    font-size: var(--fs-2xs);
   }
 }
 /* zadaj trening wielu osobom */

@@ -40,6 +40,11 @@ import { AthletePhotos } from '../components/ProgressPhotos';
 import { runFromStart, type RunStart } from './start';
 import { AthleteRunCards, isRunner } from '../components/RunVolume'; // funkcje: bieg
 import { History, SessionSheet, upcomingVisits } from './History';
+import { TrainerTop, VacationBanner } from './TrainerInfo';
+import { QuickRun } from './QuickRun';
+import { useTrainerProfile } from '../data/trainerProfile';
+import { isUnchangedEdit } from '../lib/editRun';
+import { intakeFullDue, readLater, storeLater } from '../lib/intakeLater';
 
 /** Trening w toku: `run` — zawodnik, `live` — trener prowadzi 1:1. */
 export type RunKind = 'run' | 'live';
@@ -135,14 +140,12 @@ export function AthleteApp({
   const { db, toast, ask, apply, saveCheckin } = useStore();
   const client = clientById(db, clientId);
   const [run, setRun] = useState<Run | null>(() => loadRun(clientId));
-  // ankieta startowa: przy pierwszym wejściu podopiecznego (raz na sesję, „Uzupełnię później” odkłada)
+  // ankieta startowa: przy pierwszym wejściu podopiecznego; „Uzupełnię później” odkłada pełny ekran o 3 dni
+  // (data na urządzeniu), w międzyczasie przypomina karta na Dziś. Bez zgody na dane o zdrowiu — nie otwieramy
+  // jej sama (zgody były już pytane na ekranie zgód; drugi raz pod rząd nie pytamy).
   const [screen, setScreen] = useState<'home' | 'run' | 'intake'>(() => {
-    try {
-      const c = db.clients.find((x) => x.id === clientId);
-      if (mode === 'client' && c && !c.intake?.completedAt && !sessionStorage.getItem(`fitowa-intake-later:${clientId}`)) return 'intake';
-    } catch {
-      // brak sessionStorage
-    }
+    const c = db.clients.find((x) => x.id === clientId);
+    if (mode === 'client' && c && !c.intake?.completedAt && hasConsent(c, 'health') && intakeFullDue(readLater(clientId))) return 'intake';
     return 'home';
   });
   const [tab, setTabState] = useState<Tab>(() => loadTab(clientId));
@@ -175,6 +178,33 @@ export function AthleteApp({
   useEffect(() => {
     document.body.classList.add('athlete-mode');
     return () => document.body.classList.remove('athlete-mode');
+  }, []);
+  // poprawki zapisanego treningu bez żadnej zmiany (np. aplikacja zamknięta na ekranie „Trening zakończony”) —
+  // odrzucamy po cichu, żeby na Dziś nie wisiała karta „Poprawki zapisanego treningu”
+  const editSaved = run?.editSessionId ? db.sessions.find((x) => x.id === run.editSessionId) : undefined;
+  useEffect(() => {
+    if (screen !== 'run' && run?.editSessionId && isUnchangedEdit(run, editSaved)) setRun(null);
+  }, [screen, run, editSaved]);
+  // powiadomienie „Twój tydzień” (niedziela wieczorem): /app/?tydzien=1 → Dziś z paskiem tygodnia
+  useEffect(() => {
+    const showWeek = () => {
+      setScreen((s) => (s === 'intake' ? 'home' : s));
+      setTabState('today');
+      setTimeout(() => document.getElementById('ath-week')?.scrollIntoView({ block: 'center' }), 150);
+    };
+    const q = new URLSearchParams(location.search);
+    if (q.get('tydzien')) {
+      q.delete('tydzien');
+      const rest = q.toString();
+      history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : ''));
+      showWeek();
+    }
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { type?: string; url?: string } | null;
+      if (d?.type === 'fitowa-open' && typeof d.url === 'string' && d.url.includes('tydzien=')) showWeek();
+    };
+    navigator.serviceWorker?.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
   }, []);
 
   if (!client) return null;
@@ -266,12 +296,7 @@ export function AthleteApp({
     <div className={`ath ${home ? 'ath-tabbed' : ''}`}>
       {mode === 'client' ? (
         <div className="ath-top">
-          <span className="ath-coach">
-            <span className="ath-coach-av" aria-hidden>
-              <Icon name="user" size={16} />
-            </span>
-            Twój trener
-          </span>
+          <TrainerTop />
           <span className="row-inline">
             <OfflineBadge />
             <button className="icon-btn ath-gear" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
@@ -343,11 +368,7 @@ export function AthleteApp({
           first={!client.intake?.completedAt}
           asTrainer={mode === 'preview'}
           onClose={() => {
-            try {
-              sessionStorage.setItem(`fitowa-intake-later:${clientId}`, '1');
-            } catch {
-              // nic
-            }
+            if (mode === 'client' && !clientById(db, clientId)?.intake?.completedAt) storeLater(clientId);
             setScreen('home');
             window.scrollTo(0, 0);
           }}
@@ -494,8 +515,12 @@ function TodayTab({
   onIntake: () => void;
 }) {
   const { db, ask, saveCheckin } = useStore();
+  const { profile } = useTrainerProfile();
   const client = clientById(db, clientId)!;
   const today = todayISO();
+  const [peek, setPeek] = useState(false);
+  const [shown, setShown] = useState<TrainingSession | null>(null);
+  const intakeLater = readLater(clientId);
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
   const extra = extraPlanOf(db, clientId);
@@ -533,6 +558,7 @@ function TodayTab({
         <h1>Cześć, {first}!</h1>
         <p className="muted first-cap">{fmtLong(today)}</p>
       </header>
+      <VacationBanner profile={profile} />
 
       {liveMarkActive(client.liveBy) && (
         <div className="live-by-trainer" role="status">
@@ -616,10 +642,14 @@ function TodayTab({
       ) : nx ? (
         <section className="acard acard-hero">
           <span className="eyebrow">Następny trening</span>
-          <h2>{nx.workout.name}</h2>
-          <p className="muted small">
-            {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
-          </p>
+          {/* stuknięcie w nazwę / opis → podgląd ćwiczeń; Start bez zmian */}
+          <button type="button" className="r7-hero-open" onClick={() => setPeek(true)} aria-label={`Zobacz ćwiczenia: ${nx.workout.name}`}>
+            <h2>{nx.workout.name}</h2>
+            <p className="muted small">
+              {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
+              <span className="r7-hero-more"> · Zobacz ćwiczenia ›</span>
+            </p>
+          </button>
           {(() => {
             // dzień z planu (ustawiony przez trenera); „zaległy” tylko gdy od terminu nie było treningu z tego planu
             const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
@@ -644,6 +674,23 @@ function TodayTab({
           <button className="btn btn-primary btn-lg" onClick={() => onStart(nx.workout.id)}>
             <Icon name="play" /> {withTrainer ? 'Start samodzielnie' : 'Start'}
           </button>
+          {peek && (() => {
+            const last = sessions.find((x) => x.planId === plan?.id && x.workoutId === nx.workout.id);
+            return (
+              <WorkoutPreview
+                workout={nx.workout}
+                done={last?.date}
+                session={last}
+                onClose={() => setPeek(false)}
+                onShowDone={last ? () => setShown(last) : undefined}
+                onStart={() => {
+                  setPeek(false);
+                  onStart(nx.workout.id);
+                }}
+              />
+            );
+          })()}
+          {shown && <SessionSheet s={shown} onClose={() => setShown(null)} />}
         </section>
       ) : (
         <section className="acard acard-hero">
@@ -677,10 +724,13 @@ function TodayTab({
 
       {!away && !run && <AbsenceLink client={client} onOpen={onAbsence} />}
 
+      {!run && (isRunner(client, runVolume([...plansOf(db, clientId), ...(extra ? [extra] : [])], sessions, client.run, 8)) || /bieg/i.test(client.sport ?? '')) && <QuickRun client={client} />}
+
       {!client.intake?.completedAt && (
         <section className="acard acard-warn ath-intake">
           <span className="eyebrow">Ankieta startowa</span>
           <h3>Zdrowie, styl życia i cele — ok. 5 minut</h3>
+          {intakeLater && <p className="muted small">Odłożona {fmtDay(intakeLater.slice(0, 10))} — dokończ, kiedy masz chwilę. Zapisane odpowiedzi czekają.</p>}
           <button className="btn btn-primary" onClick={onIntake}>
             Wypełnij ankietę
           </button>
@@ -698,7 +748,7 @@ function TodayTab({
         </section>
       )}
 
-      <section className="acard ath-week" aria-label="Ten tydzień">
+      <section className="acard ath-week" id="ath-week" aria-label="Ten tydzień">
         <ol className="wk-strip">
           {strip.map((d) => (
             <li key={d.date} className={`wk-day ${d.state} ${d.today ? 'is-today' : ''}`} aria-label={`${fmtLong(d.date)}: ${d.state === 'done' ? 'trening zrobiony' : d.state === 'planned' ? 'zaplanowany' : 'odpoczynek'}${d.today ? ' (dziś)' : ''}`}>

@@ -256,6 +256,12 @@ const ICONS: Record<string, ReactNode> = {
   pause: <path d="M8 5v14M16 5v14" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="2" />,
   download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS | string; size?: number }) {

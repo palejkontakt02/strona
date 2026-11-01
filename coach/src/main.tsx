@@ -22,6 +22,11 @@ import './styles/podopieczny.css';
 import './styles/zapis.css';
 import './styles/listy.css';
 import './styles/r7-player.css';
+import './styles/r7-ai.css';
+import './styles/r7-platnosci.css';
+import './styles/r7-klienci.css';
+import './styles/r7-kalpulpit.css';
+import './styles/r7-podopieczny.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

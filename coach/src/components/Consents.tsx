@@ -114,6 +114,9 @@ function ConsentPrompt({
                 <b>Zgadzam się: {CONSENT_TEXT[k].title.toLowerCase()}</b>
                 <span className="muted small">{CONSENT_TEXT[k].short}</span>
                 {k === 'health' && <span className="muted small">Podstawa: Twoja wyraźna zgoda (art. 9 ust. 2 lit. a RODO).</span>}
+                {k === 'health' && only.length > 1 && (
+                  <span className="small consent-why">Bez tej zgody ankieta zdrowotna nie zadziała — trener nie pozna Twoich urazów i chorób. Możesz ją włączyć później w Ustawieniach → Moje dane.</span>
+                )}
               </span>
             </label>
           </li>
@@ -170,13 +173,15 @@ function ConsentSettings({ client, only, readOnly, onMore }: { client: Client; o
         {only.map((k) => {
           const st = consentState(client, k);
           const when = fmtWhen(consentDate(client, k));
+          // „wycofana” tylko, gdy zgoda była kiedyś udzielona; odmowa przy pierwszym pytaniu = „Nie udzielono”
+          const withdrawn = st === 'off' && (!!consentOf(client, k)?.givenAt || !!consentOf(client, k)?.log?.some((x) => x.on) || (k === 'health' && !!client.intake?.consentAt));
           const id = `consent-${k}`;
           return (
             <li key={k} className="consent-row">
               <span className="consent-text">
                 <b id={id}>{CONSENT_TEXT[k].title}</b>
-                <span className={`small ${st === 'on' ? 'ok-text' : st === 'off' ? 'warn-text' : 'muted'}`}>
-                  {st === 'on' ? `Zgoda udzielona ${when}` : st === 'off' ? `Brak zgody${when ? ` — wycofana ${when}` : ''}` : 'Jeszcze nie zdecydowano'}
+                <span className={`small ${st === 'on' ? 'ok-text' : withdrawn ? 'warn-text' : 'muted'}`}>
+                  {st === 'on' ? `Zgoda udzielona ${when}` : withdrawn ? `Brak zgody${when ? ` — wycofana ${when}` : ''}` : 'Nie udzielono'}
                 </span>
                 {st !== 'on' && <span className="muted small">{CONSENT_TEXT[k].needed}</span>}
               </span>

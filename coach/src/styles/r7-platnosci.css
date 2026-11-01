@@ -1,0 +1,227 @@
+/* r7 „platnosci”: arkusz typu płatności, chipy filtrów, termin, przypomnienie, abonamenty hurtem, raport */
+
+/* arkusz „+ Płatność” — lista 56 px */
+.pay-type-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.pay-type-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.pay-type-item:last-child {
+  border-bottom: 0;
+}
+.pay-type-item:hover,
+.pay-type-item:focus-visible {
+  background: var(--color-surface-2);
+}
+.pay-type-item .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pay-type-item > svg {
+  color: var(--color-neutral-400);
+  flex: none;
+}
+
+/* filtry: status i typ w jednym rzędzie chipów, przewijanym poziomo */
+.filters .pay-chips {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.pay-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.pay-chips::-webkit-scrollbar {
+  display: none;
+}
+.pay-chip-group {
+  display: flex;
+  gap: var(--space-2);
+  flex: none;
+}
+.pay-chips .chip {
+  white-space: nowrap;
+  flex: none;
+  min-height: 34px;
+}
+.pay-chip-sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background: var(--color-divider);
+  margin: 0 var(--space-1);
+}
+
+/* komórka „Termin” */
+.pay-due {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.3;
+}
+
+/* przypomnienie */
+.pay-remind-extra {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.pay-remind-extra .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.pay-remind-text {
+  min-height: 190px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.pay-remind-meta {
+  margin: 0 0 var(--space-3);
+}
+
+/* abonamenty hurtem */
+.pay-bulk-list {
+  list-style: none;
+  margin: var(--space-4) 0 var(--space-3);
+  padding: 0;
+  border-top: 1px solid var(--color-divider);
+}
+.pay-bulk-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.pay-bulk-list li.is-issued {
+  color: var(--color-neutral-400);
+}
+.pay-bulk-list .check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  min-width: 0;
+}
+.pay-bulk-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pay-bulk-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.pay-bulk-amount .input {
+  width: 88px;
+  text-align: right;
+}
+
+/* raport */
+.pay-rep-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.pay-rep-month {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pay-rep-title {
+  min-width: 150px;
+  text-align: center;
+  text-transform: capitalize;
+}
+.pay-rep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+.pay-rep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.pay-rep-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.pay-rep-bar {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--color-divider);
+  overflow: hidden;
+}
+.pay-rep-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-text);
+  opacity: 0.7;
+}
+
+/* nagłówek Płatności: przyciski zawijają się zamiast wychodzić poza ekran */
+.page-pay .page-head {
+  flex-wrap: wrap;
+}
+.page-pay .page-head .actions,
+.page-pay .toolbar .actions {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.page-pay .page-head .actions .btn,
+.pay-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (max-width: 600px) {
+  /* 1–2 przyciski („Wystaw abonamenty”, „+ Płatność”) — równe kolumny */
+  .page-pay .page-head .actions {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .page-pay .page-head .actions .btn {
+    justify-content: center;
+  }
+}

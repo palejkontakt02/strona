@@ -60,7 +60,7 @@
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--color-neutral-400);
 }
 .onb-step.is-next .onb-mark {
@@ -141,7 +141,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-5);
+  padding: var(--space-6);
   border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--color-warn) 55%, transparent);
   background: color-mix(in srgb, var(--color-warn) 10%, transparent);
@@ -173,7 +173,7 @@
   padding: var(--space-4);
   border-radius: var(--radius-md);
   background: var(--color-surface-2);
-  font-size: 13px;
+  font-size: var(--fs-xs);
   overflow-wrap: anywhere;
   user-select: all;
 }
@@ -243,7 +243,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 

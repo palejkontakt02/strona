@@ -155,6 +155,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const [layoutOpen, setLayoutOpen] = useState(false);
   // ćwiczenia z rozwiniętym wyborem typu (cardio / na czas / na stronę)
   const [optsOpen, setOptsOpen] = useState<Set<number>>(new Set());
+  // rozwinięta linia meta ćwiczenia (długa wskazówka z planu)
+  const [metaOpen, setMetaOpen] = useState<Set<number>>(new Set());
   const trainer = mode === 'trainer';
   const blocks = runBlocks(run);
   const bi = Math.max(0, blocks.findIndex((b) => b.includes(run.idx)));
@@ -906,11 +908,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           {e.label && <span className="ex-label ex-label-lg">{e.label}</span>} {e.name}
         </h2>
         {(meta || e.notes) && (
-          <p className="ex-meta muted small">
+          // jedna linia meta; długa wskazówka z planu rozwija się po stuknięciu
+          <button type="button" className={`ex-meta muted small ${metaOpen.has(k) ? 'open' : ''}`} aria-expanded={metaOpen.has(k)} onClick={() => setMetaOpen((o) => { const n = new Set(o); if (n.has(k)) n.delete(k); else n.add(k); return n; })}>
             {meta && <span className="ex-meta-k">{meta}</span>}
             {meta && e.notes && ' · '}
             {e.notes}
-          </p>
+          </button>
         )}
         {note && (
           <p className="exnote-text">
@@ -933,8 +936,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               </span>
             )}
             {bare && !e.cardio && (
-              <button type="button" className="btn btn-ghost btn-sm ex-tool ex-kg-on" onClick={() => setKgOn((o) => new Set([...o, k]))}>
-                <Icon name="plus" size={16} /> Ciężar
+              <button type="button" className="btn btn-ghost btn-sm ex-tool ex-kg-on" aria-label={`Dodaj ciężar (kg): ${e.name}`} onClick={() => setKgOn((o) => new Set([...o, k]))}>
+                <Icon name="plus" size={16} /> kg
               </button>
             )}
             {e.video && (
@@ -1006,9 +1009,18 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const single = (k: number) => {
     const e = run.ex[k];
     let n = 0;
+    const s0 = e.sets[0];
+    const g0 = s0 && s0.first && (!s0.warmup || e.cardio) && s0.gdesc ? s0 : null;
     return (
       <>
         {header(k, undefined, e.rest)}
+        {/* nagłówek pierwszej grupy serii („Robocze 4 × 5”) nad etykietami kolumn — etykiety tuż nad polami */}
+        {g0 && (
+          <div className="ghead ghead-top">
+            <b>{g0.gdesc}</b>
+            {g0.rest && <span className="muted small">przerwa {fmtRest(g0.rest)}</span>}
+          </div>
+        )}
         {trainer && !e.cardio && (
           <button className="link small" onClick={() => addWarmup(k)}>
             + seria wstępna
@@ -1038,7 +1050,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           if (!s.warmup && !cool) n++;
           return (
             <div key={i}>
-              {s.first && (!s.warmup || e.cardio) && s.gdesc && (
+              {s.first && (!s.warmup || e.cardio) && s.gdesc && !(i === 0 && g0) && (
                 <div className="ghead">
                   <b>{s.gdesc}</b>
                   {s.rest && <span className="muted small">przerwa {fmtRest(s.rest)}</span>}
@@ -1209,6 +1221,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {/* instrukcja tylko przy pierwszych treningach — potem pod „?” w menu Więcej */}
         {!trainer && doneSets === 0 && showRunHelp(sessionsOf(db, client.id).filter((x) => x.id !== run.editSessionId).length) && <p className="muted small rpe-legend">{helpText}</p>}
       </header>
+      {/* postęp: segmenty i „Ćwiczenie 1 z 5” w jednym rzędzie */}
+      <div className="r7-progress">
       <div className="segs">
         {blocks.map((b, i) => (
           <button
@@ -1220,13 +1234,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           />
         ))}
       </div>
-      {blocks.length > 0 ? (
+      {blocks.length > 0 && (
         <div className="muted small upper">
           {block.length > 1 ? 'Blok' : 'Ćwiczenie'} {bi + 1} z {blocks.length}
         </div>
-      ) : (
-        <p className="muted">Dodaj pierwsze ćwiczenie przyciskiem poniżej.</p>
       )}
+      </div>
+      {blocks.length === 0 && <p className="muted">Dodaj pierwsze ćwiczenie przyciskiem poniżej.</p>}
 
       {block.length > 0 && (
         <section className="acard">

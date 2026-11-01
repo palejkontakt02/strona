@@ -339,9 +339,9 @@
   margin-left: 6px;
   padding: 0 6px;
   border: 1px solid currentColor;
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--radius-pill);
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 500;
   line-height: 1.45;
   vertical-align: 2px;
@@ -350,7 +350,7 @@
 /* szacunek biegu w nagłówku tygodnia */
 .ptab-runsum {
   font-family: var(--font-display);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
 .ptab-runweek {
@@ -361,7 +361,7 @@
   display: block;
   margin-top: 1px;
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 400;
   line-height: 1.3;
   color: var(--color-neutral-400);
@@ -379,7 +379,7 @@
 }
 .ptab-table tbody tr.ptab-runline > td.ptab-no {
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 /* 4+ tygodnie: ciaśniej, żeby zmieściły się na 1366 */
 @media (min-width: 641px) {
@@ -480,7 +480,7 @@
 }
 .pl-sheet-title {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 .pl-sheet-list {

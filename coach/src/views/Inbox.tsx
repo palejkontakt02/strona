@@ -11,6 +11,7 @@ import { chatThread, dayLabel, msgDay, trainerUnread, weekLabel, type ChatMsg } 
 import { todayISO } from '../lib/dates';
 import { REVIEW_LABEL, reviewContext, reviewQueue, withReviewed, type ReviewItem, type ReviewKind } from '../lib/reviewQueue';
 import { useNav } from '../nav';
+import { BroadcastModal } from './Broadcast';
 
 /* Skrzynka trenera: rozmowy pogrupowane po podopiecznym + kolejka „Do przejrzenia”. */
 
@@ -79,6 +80,7 @@ export function Inbox() {
   const today = todayISO();
   const [tab, setTab] = useState<InboxTab>(() => (take(TAB_KEY) === 'Do przejrzenia' ? 'Do przejrzenia' : 'Rozmowy'));
   const [openId, setOpenId] = useState<string | null>(() => take(OPEN_KEY));
+  const [bcast, setBcast] = useState(false);
   const convos = useMemo(() => conversations(db.clients), [db.clients]);
   const queue = useMemo(() => reviewQueue(db.clients, db.sessions, today), [db.clients, db.sessions, today]);
   const unread = convos.reduce((a, x) => a + x.unread, 0);
@@ -107,12 +109,18 @@ export function Inbox() {
             {queue.length} do przejrzenia
           </p>
         </div>
-        {tab === 'Rozmowy' && unread > 0 && (
-          <button className="btn btn-secondary btn-sm" onClick={() => void readAll()}>
-            <Icon name="check" size={14} /> Oznacz wszystkie jako przeczytane
+        <div className="actions inbox-head-actions">
+          {tab === 'Rozmowy' && unread > 0 && (
+            <button className="btn btn-secondary btn-sm" onClick={() => void readAll()}>
+              <Icon name="check" size={14} /> Oznacz wszystkie jako przeczytane
+            </button>
+          )}
+          <button className="btn btn-primary btn-sm" onClick={() => setBcast(true)}>
+            <Icon name="users" size={14} /> Nowa wiadomość do…
           </button>
-        )}
+        </div>
       </div>
+      {bcast && <BroadcastModal onClose={() => setBcast(false)} />}
 
       <div className="inbox-tabs" role="tablist" aria-label="Skrzynka">
         {TABS.map((t) => {

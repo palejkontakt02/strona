@@ -1,0 +1,48 @@
+/* Runda 7 „ai”: odczyt zrzutu z Fitatu przez AI (athlete/Nutrition.tsx). Tylko tokeny. */
+.nu-ocr-opts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
+}
+.nu-ocr-auto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+.nu-ocr-auto input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--color-text);
+}
+.nu-ocr-privacy {
+  margin: 0 0 var(--space-4);
+}
+.nu-ocr-opts .nu-ocr-privacy {
+  margin: 0;
+}
+.nu-ocr-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-4);
+  line-height: 1.4;
+}
+.nu-ocr-note b {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.nu-ocr-ok {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+}
+.warn-box.nu-ocr-note .muted {
+  color: inherit;
+  opacity: 0.85;
+}

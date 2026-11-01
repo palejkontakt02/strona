@@ -25,6 +25,8 @@ export type ModalState =
   | { kind: 'locations' }
   /** Ustawienia → automatyczne wiadomości do podopiecznych (views/AutoMessages.tsx). */
   | { kind: 'autoMessages' }
+  /** Ustawienia → „Mój profil” trenera (views/TrainerProfile.tsx). */
+  | { kind: 'trainerProfile' }
   | { kind: 'location'; location?: Location };
 
 export interface NavValue {

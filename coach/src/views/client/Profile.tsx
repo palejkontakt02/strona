@@ -1,7 +1,7 @@
 import { ComebackSettings } from './ComebackSettings';
 import { ClientHealth, ClientIntakeCard } from './Health';
 import { useEffect, useRef, useState } from 'react';
-import { Card, Empty, Field, IconBtn, Tag } from '../../components/ui';
+import { Card, Empty, Field, IconBtn, Modal, Tag } from '../../components/ui';
 import type { Billing, Client, ClientStatus } from '../../domain';
 import { del, put } from '../../data/db';
 import { sessionsOf } from '../../data/ops';
@@ -13,6 +13,11 @@ import { useNav } from '../../nav';
 import { LocationSelect } from '../../components/location';
 import { AccountStatusCard } from '../../components/accounts';
 import { isEmail, normalizePhone } from '../../lib/onboarding';
+import { endSummary, refundPayment, type EndSummary } from '../../lib/clientEnd';
+import { todayISO } from '../../lib/dates';
+import { fmtDay, fmtWeekday, plural, pln, uid } from '../../format';
+import { cancelByTrainer } from '../../lib/trainerProfile';
+import type { Change } from '../../data/db';
 
 type Draft = Record<string, string>;
 
@@ -158,9 +163,26 @@ export function ClientProfile({ client }: { client: Client }) {
   const { openModal, closeClient } = useNav();
   const [d, setD] = useState<Draft>(() => toDraft(client));
   const [dirty, setDirty] = useState(false);
+  const [ending, setEnding] = useState<EndSummary | null>(null);
   const set = (k: string, v: string) => {
+    // „zakończony”: najpierw okno z przyszłymi wizytami i niewykorzystanym pakietem
+    if (k === 'status' && v === 'zakończony' && client.status !== 'zakończony') return setEnding(endSummary(client, db.sessions, db.appointments, todayISO()));
     setD((x) => ({ ...x, [k]: v }));
     setDirty(true);
+  };
+  const finishEnd = async (cancelIds: string[], refund: boolean) => {
+    if (!ending || !d.name.trim()) return;
+    const today = todayISO();
+    const rp = refund ? refundPayment(ending, today, uid()) : null;
+    const base = fromDraft(client, { ...d, status: 'zakończony' });
+    const next = { ...base, ...(rp ? { payments: [...base.payments, rp] } : {}) };
+    const changes: Change[] = [put('clients', next), ...ending.future.filter((a) => cancelIds.includes(a.id)).map((a) => put('appointments', cancelByTrainer(a)))];
+    const parts = [cancelIds.length && `odwołano ${cancelIds.length} ${plural(cancelIds.length, 'wizytę', 'wizyty', 'wizyt')}`, rp && `zwrot ${pln(-rp.amount)}`].filter(Boolean);
+    if (await apply(changes, `Współpraca zakończona${parts.length ? ` — ${parts.join(', ')}` : ''}.`)) {
+      setD((x) => ({ ...x, status: 'zakończony' }));
+      setDirty(false);
+      setEnding(null);
+    }
   };
 
   const save = async (quiet = false) => {
@@ -275,6 +297,7 @@ export function ClientProfile({ client }: { client: Client }) {
       </Card>
 
       <ComebackSettings client={client} />
+      {ending && <EndClientModal client={client} s={ending} onClose={() => setEnding(null)} onConfirm={finishEnd} />}
 
       <Card className="section-gap" title="Dane osobowe (RODO)">
         <p className="muted small">Eksport wszystkich danych podopiecznego do pliku albo trwałe usunięcie.</p>
@@ -288,5 +311,65 @@ export function ClientProfile({ client }: { client: Client }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+/** Okno przy zmianie statusu na „zakończony”: przyszłe wizyty, niewykorzystany pakiet, tryb tylko do odczytu. */
+function EndClientModal({ client, s, onClose, onConfirm }: { client: Client; s: EndSummary; onClose: () => void; onConfirm: (cancelIds: string[], refund: boolean) => void }) {
+  const [cancel, setCancel] = useState(true);
+  const [refund, setRefund] = useState<'refund' | 'keep'>('keep');
+  const first = client.name.split(' ')[0];
+  const n = s.future.length;
+  return (
+    <Modal title="Zakończyć współpracę?" onClose={onClose} onSubmit={() => onConfirm(cancel ? s.future.map((a) => a.id) : [], refund === 'refund')} submitLabel="Zakończ współpracę">
+      {n > 0 ? (
+        <div className="end-block">
+          <label className="tp-check">
+            <input type="checkbox" checked={cancel} onChange={(e) => setCancel(e.target.checked)} />
+            <span>
+              <b>
+                Odwołać {n} {plural(n, 'przyszłą wizytę', 'przyszłe wizyty', 'przyszłych wizyt')}?
+              </b>
+            </span>
+          </label>
+          <ul className="plain small muted end-list">
+            {s.future.slice(0, 6).map((a) => (
+              <li key={a.id}>
+                {fmtWeekday(a.date)} {fmtDay(a.date)}, {a.time}
+              </li>
+            ))}
+            {n > 6 && <li>… i {n - 6} więcej</li>}
+          </ul>
+        </div>
+      ) : (
+        <p className="small muted">Brak zaplanowanych wizyt.</p>
+      )}
+      {s.unused > 0 && (
+        <div className="end-block">
+          <p>
+            <b>
+              Niewykorzystane sesje z pakietu: {s.unused}
+              {s.value > 0 ? ` (wartość ${pln(s.value)})` : ''}
+            </b>
+          </p>
+          <div className="seg seg-sm" role="radiogroup" aria-label="Niewykorzystane sesje">
+            {(
+              [
+                ['refund', 'Zaznacz jako zwrot'],
+                ['keep', 'Zostaw'],
+              ] as const
+            ).map(([k, l]) => (
+              <button key={k} type="button" role="radio" aria-checked={refund === k} className={refund === k ? 'active' : ''} onClick={() => setRefund(k)}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {refund === 'refund' && <p className="small muted">W płatnościach pojawi się zwrot −{pln(s.value)} (pakiet wyzeruje się).</p>}
+        </div>
+      )}
+      <p className="small coach-note-lite">
+        Konto {first} w aplikacji przejdzie w tryb tylko do odczytu — historia treningów, planów i wiadomości zostaje. Status możesz w każdej chwili zmienić z powrotem.
+      </p>
+    </Modal>
   );
 }

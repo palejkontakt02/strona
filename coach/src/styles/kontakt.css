@@ -102,7 +102,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   opacity: 0.8;
   text-align: left;
@@ -122,7 +122,7 @@ button.chat-ref {
   max-width: 280px;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
@@ -160,7 +160,7 @@ button.chat-ref {
   padding: 0 4px;
   margin: 0 1px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, currentColor 16%, transparent);
   color: inherit;
   font: inherit;
@@ -190,7 +190,7 @@ button.chat-ref {
 .chat-read {
   margin: 2px 4px 0 0;
   text-align: right;
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--ok-fg, var(--color-ok));
 }
@@ -234,7 +234,7 @@ button.chat-ref {
   flex: none;
   min-width: 2.6em;
   font-family: var(--font-display);
-  font-size: 0.9375rem;
+  font-size: var(--fs-body);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -253,7 +253,7 @@ button.chat-ref {
   min-width: 0;
 }
 .trainer-chat-title {
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   margin: 0 0 var(--space-3);
 }
 .chat.chat-full {
@@ -320,7 +320,7 @@ button.chat-ref {
 }
 .visit-time {
   font-family: var(--font-display);
-  font-size: 1.625rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   min-width: 3.2em;
@@ -329,12 +329,12 @@ button.chat-ref {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--ok-fg, var(--color-ok));
 }
 .visit-late {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--warn-fg, var(--color-warn));
 }
@@ -388,7 +388,7 @@ button.chat-ref {
   padding: 0 6px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-2);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -536,7 +536,7 @@ button.chat-ref {
   margin-bottom: var(--space-2);
 }
 .rv-hl-tag {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--color-text);
 }
@@ -547,7 +547,7 @@ button.chat-ref {
   font-variant-numeric: tabular-nums;
 }
 .rv-sets th {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--color-neutral-400);
   text-align: left;
@@ -556,11 +556,11 @@ button.chat-ref {
 .rv-sets td {
   padding: 3px var(--space-2) 3px 0;
   border-top: 1px solid var(--color-divider);
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .rv-sets td.num {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-md);
   white-space: nowrap;
 }
 .rv-sets td.num svg {
@@ -622,7 +622,7 @@ button.chat-ref {
   min-height: 40px;
   padding: 0 var(--space-2);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-variant-numeric: tabular-nums;
   color: var(--color-neutral-400);
   white-space: nowrap;

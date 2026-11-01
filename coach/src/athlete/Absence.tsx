@@ -3,7 +3,9 @@ import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/ui';
 import type { Absence, AbsenceReason, Client } from '../domain';
 import { useStore } from '../data/store';
-import { uid } from '../format';
+import { plural, uid } from '../format';
+import { CANCEL_HOURS, isLateCancel } from '../lib/appts';
+import { upcomingVisits } from './History';
 import { todayISO } from '../lib/dates';
 import { ABSENCE_REASONS, absenceCard, absenceMessage, absenceProblem, defaultAbsenceRange, endEarly, returnMessage, upcomingAbsence } from '../lib/absence';
 
@@ -11,7 +13,7 @@ const dm = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}`;
 
 /** „Wypadam z planu”: od–do (domyślnie dziś + 7 dni), powód i notatka; trener dostaje wiadomość. */
 export function AbsenceSheet({ client, onClose, notify = true }: { client: Client; onClose: () => void; notify?: boolean }) {
-  const { saveClientEntry, sendClientNote, toast } = useStore();
+  const { db, saveClientEntry, sendClientNote, respondAppointment, ask, toast } = useStore();
   const today = todayISO();
   const def = defaultAbsenceRange(today);
   const [from, setFrom] = useState(def.from);
@@ -29,6 +31,23 @@ export function AbsenceSheet({ client, onClose, notify = true }: { client: Clien
     if (!ok) return;
     // wiadomość do trenera (push jak przy każdej wiadomości); w podglądzie trenera — bez wiadomości
     if (notify) void sendClientNote(client.id, absenceMessage(a));
+    // wizyty w czasie nieobecności — od razu propozycja odwołania (z powodem i informacją o późnym odwołaniu)
+    const clash = upcomingVisits(db.appointments, client.id).filter((x) => x.date >= from && x.date <= to);
+    if (clash.length) {
+      const late = clash.filter((x) => isLateCancel(x));
+      const list = clash.map((x) => `${dm(x.date)} ${x.time}`).join(', ');
+      const lateText = late.length
+        ? ` Uwaga: ${late.map((x) => `${dm(x.date)} ${x.time}`).join(', ')} — mniej niż ${CANCEL_HOURS} h do wizyty. Przy późnym odwołaniu trening może przepaść (zostać pobrany z pakietu) — trener zdecyduje.`
+        : '';
+      const n = clash.length;
+      const yes = await ask(`Masz ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} w tym czasie (${list}) — odwołać?${lateText}`, { confirm: n > 1 ? 'Odwołaj wizyty' : 'Odwołaj wizytę', cancel: 'Zostaw', danger: false });
+      if (yes) {
+        const why = `nieobecność: ${ABSENCE_REASONS.find(([k]) => k === reason)?.[1].toLowerCase() ?? 'inne'}`;
+        let done = 0;
+        for (const x of clash) if (await respondAppointment(x.id, 'cancel', why)) done++;
+        if (done) toast(`${done === n ? 'Odwołano' : `Odwołano ${done} z ${n}`} — trener dostał informację.`);
+      }
+    }
     onClose();
   };
   return (

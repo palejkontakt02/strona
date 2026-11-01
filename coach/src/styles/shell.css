@@ -50,7 +50,7 @@
   padding: 0 14px;
   border-radius: var(--radius-md);
   color: var(--color-neutral-400);
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 500;
   transition: background-color 0.15s, color 0.15s;
 }
@@ -78,7 +78,7 @@
   min-height: 44px;
   background: color-mix(in srgb, var(--color-ok) 13%, var(--color-surface));
   border-bottom: 1px solid color-mix(in srgb, var(--color-ok) 28%, transparent);
-  font-size: 15px;
+  font-size: var(--fs-body);
   color: var(--color-text);
 }
 .live-banner button.live-sub {
@@ -91,10 +91,10 @@
 .live-banner .live-go {
   flex: none;
   padding: 3px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-ok);
   color: var(--on-ok);
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 
@@ -114,7 +114,7 @@
     min-height: 56px;
     justify-content: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--fs-2xs);
     font-weight: 500;
     color: var(--color-neutral-400);
     -webkit-tap-highlight-color: transparent;
@@ -123,7 +123,7 @@
   .bottombar > button:not(.fab) svg {
     box-sizing: content-box;
     padding: 4px 18px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     transition: background-color 0.15s;
   }
   .bottombar > button.active {
@@ -139,7 +139,7 @@
     height: 56px;
     min-height: 0;
     gap: 0;
-    border-radius: 18px;
+    border-radius: var(--radius-xl);
     margin-top: -26px;
     background: var(--color-accent);
     color: var(--on-accent);
@@ -158,20 +158,20 @@
 .page-dash .page-head h2,
 .page-pay .page-head h2,
 .page-lib .page-head h2 {
-  font-size: 34px;
+  font-size: var(--fs-2xl);
   line-height: 1.05;
   margin: 0;
 }
 .page-dash .page-head p {
   margin-top: 4px;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .page-dash .card-head h4,
 .page-pay .card-head h4,
 .page-lib .card-head h4 {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -195,13 +195,13 @@
 .page-dash .row-time {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--color-neutral-300);
 }
 .page-dash .rows .small,
 .page-lib .rows .small {
-  font-size: 13px;
+  font-size: var(--fs-xs);
 }
 
 /* =========================================================
@@ -232,7 +232,7 @@
 }
 .kpi-strip .kpi-label {
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -249,7 +249,7 @@
   color: var(--color-text);
 }
 .kpi-strip .kpi-sub {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   color: var(--color-neutral-400);
 }
 .kpi-strip .kpi-danger .kpi-value {
@@ -281,7 +281,7 @@
     padding: 12px 14px 14px;
   }
   .kpi-strip .kpi-value {
-    font-size: 26px;
+    font-size: var(--fs-xl);
   }
 }
 
@@ -340,7 +340,7 @@
   transform: translateY(-50%);
   width: 52px;
   min-width: 0;
-  font-size: 20px;
+  font-size: var(--fs-lg);
   color: var(--color-text);
 }
 /* szyna i węzeł osi */
@@ -402,7 +402,7 @@
   gap: 3px;
 }
 .dash-visit .row-main .link {
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 .dash-today > .btn {
   margin-top: var(--space-3);
@@ -419,7 +419,7 @@
     top: 9px;
     transform: none;
     width: 48px;
-    font-size: 19px;
+    font-size: var(--fs-lg);
     line-height: 24px;
   }
   .dash-visit::before {
@@ -485,7 +485,7 @@
 .dash-due strong.nowrap {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 19px;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 .dash-recent .row .nowrap {
@@ -523,7 +523,7 @@
   flex: none;
 }
 .client-card-top strong {
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 600;
   min-width: 0;
   overflow: hidden;
@@ -539,7 +539,7 @@
   display: none;
 }
 .client-card-body > .small {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
 }
 .client-card-meta {
@@ -601,7 +601,7 @@
 }
 .detail-header h2 {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   line-height: 1.05;
   margin: 0 0 6px;
@@ -610,7 +610,7 @@
   margin-bottom: 4px;
 }
 .detail-header .muted.small {
-  font-size: 13px;
+  font-size: var(--fs-xs);
 }
 .tabs-scroll {
   margin: var(--space-6) 0 var(--space-8);
@@ -641,7 +641,7 @@
   background: none;
   box-shadow: none;
   color: var(--color-neutral-400);
-  font-size: 15px;
+  font-size: var(--fs-body);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -675,7 +675,7 @@
   .detail-header .avatar {
     width: 52px !important;
     height: 52px !important;
-    font-size: 19px !important;
+    font-size: var(--fs-lg) !important;
   }
   .detail-header > .grow {
     flex: 1 1 0;
@@ -716,7 +716,7 @@
 .page-pay td.num {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .page-pay .kpi-strip + .stack,
@@ -751,7 +751,7 @@
 .page-lib .card-head .muted {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .page-lib .row {
@@ -788,7 +788,7 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: 0;
   text-transform: none;
@@ -805,7 +805,7 @@
 .auth-logo span,
 .auth-hero .auth-logo span {
   font-weight: 500;
-  font-size: 1.2rem;
+  font-size: var(--fs-lg);
   color: var(--color-neutral-400);
   margin-left: -2px;
 }
@@ -830,7 +830,7 @@
 }
 .auth-points {
   color: var(--color-neutral-300);
-  font-size: 15px;
+  font-size: var(--fs-body);
   gap: 0;
 }
 .auth-points li {
@@ -840,13 +840,13 @@
 .auth-points b {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 17px;
+  font-size: var(--fs-md);
   letter-spacing: 0;
   color: var(--color-accent);
 }
 .auth-sign {
   order: 3;
-  font-size: 13px;
+  font-size: var(--fs-xs);
   letter-spacing: 0;
   text-transform: none;
   color: var(--color-neutral-500);
@@ -867,7 +867,7 @@
   background: var(--band);
   color: var(--band-fg);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 .auth-sheet-row {
@@ -876,7 +876,7 @@
   align-items: center;
   gap: 10px;
   padding: 9px 16px;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   color: var(--color-neutral-300);
 }
 .auth-sheet-row:nth-child(odd) {
@@ -890,7 +890,7 @@
 .auth-sheet-row b {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 19px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--color-text);
   text-align: right;
@@ -919,7 +919,7 @@
 }
 .auth-h {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -932,10 +932,10 @@
 .auth-split .auth-card > .link.small {
   align-self: flex-start;
   min-height: 44px;
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 .auth-split .field > span {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--color-neutral-300);
 }
@@ -1028,12 +1028,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 .wr-vals b {
   font-family: var(--font-display);
-  font-size: 1.125rem;
+  font-size: var(--fs-md);
 }
 .wr-comment,
 .wr-coach {

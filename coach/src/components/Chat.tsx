@@ -1,3 +1,4 @@
+import { MoveApptBar } from './MoveAppt';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Client, CoachReply, MsgMedia, MsgRef, TrainingSession } from '../domain';
 import { put } from '../data/db';
@@ -440,6 +441,15 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
             Oznacz przeczytane
           </button>
         </div>
+      )}
+      {coachView && (
+        <MoveApptBar
+          client={client}
+          onReply={(t) => {
+            setText(t);
+            requestAnimationFrame(() => areaRef.current?.focus());
+          }}
+        />
       )}
       <div className="chat-log" ref={logRef} role="log" aria-label={coachView ? `Rozmowa z ${first}` : 'Rozmowa z trenerem'} tabIndex={0}>
         {thread.length === 0 ? (

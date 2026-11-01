@@ -75,7 +75,7 @@
   min-width: 0;
 }
 .sess-next-main strong {
-  font-size: 17px;
+  font-size: var(--fs-md);
 }
 .sess-next-actions {
   display: flex;

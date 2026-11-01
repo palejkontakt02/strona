@@ -14,9 +14,9 @@ export interface ReminderTrainer {
 
 const TYPE_TITLE = { pakiet: 'Pakiet', abonament: 'Abonament', pojedyncza: 'Sesja', inna: 'Płatność' } as const;
 
-/** „11.2026” — miesiąc, którego dotyczy płatność (abonament: jego miesiąc; inaczej termin albo data). */
+/** „11.2026” — miesiąc, którego dotyczy płatność (abonament: jego miesiąc; inaczej data wystawienia). */
 export function payPeriod(p: Payment): string {
-  const ym = (p.type === 'abonament' && p.month) || (p.dueDate || p.date || '').slice(0, 7);
+  const ym = (p.type === 'abonament' && p.month) || (p.date || p.dueDate || '').slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(ym)) return '';
   return `${ym.slice(5, 7)}.${ym.slice(0, 4)}`;
 }
@@ -71,7 +71,7 @@ export function reminderText(clientName: string, p: Payment, label: string, t: R
   ];
   const pay: string[] = [];
   if (t.bankAccount?.trim()) {
-    pay.push(`Przelew: ${fmtAccount(t.bankAccount)}${t.bankName?.trim() ? ` (${t.bankName.trim()})` : ''}${t.name?.trim() ? `, odbiorca: ${t.name.trim()}` : ''}`);
+    pay.push(`Przelew: ${fmtAccount(t.bankAccount)}${t.bankName?.trim() ? `, ${t.bankName.trim()}` : ''}${t.name?.trim() ? `, odbiorca: ${t.name.trim()}` : ''}`);
     pay.push(`Tytuł przelewu: ${transferTitle(clientName, p, label)}`);
   }
   if (t.blikPhone?.trim()) pay.push(`BLIK na telefon: ${t.blikPhone.trim()}`);

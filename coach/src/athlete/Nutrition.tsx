@@ -3,10 +3,11 @@ import { Sheet } from '../components/Sheet';
 import { Icon } from '../components/ui';
 import { useFileUrl } from '../components/ProgressPhotos';
 import type { Client, DayLog } from '../domain';
-import { deleteClientFile, fileProblem, isImage, saveClientFile } from '../data/files';
+import { deleteClientFile, fileProblem, fileUrl, isImage, saveClientFile } from '../data/files';
 import { useStore } from '../data/store';
 import { addDays, todayISO } from '../lib/dates';
 import { kcalFromMacros, MACROS, macroStatus, type MacroKey } from '../lib/nutrition';
+import { ocrAuto, ocrAvailable, ocrToText, readScreenshot, setOcrAuto, type OcrResult } from '../lib/nutritionOcr';
 import { numIn } from '../lib/parse';
 
 const nf = new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 1 });
@@ -50,7 +51,10 @@ export function NutritionCard({ client }: { client: Client }) {
   const saved = (client.dayLog ?? []).find((l) => l.date === day);
   const [text, setText] = useState<Record<MacroKey, string>>(() => toText(saved));
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState<'save' | 'shot' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'shot' | 'ocr' | null>(null);
+  const [ocr, setOcr] = useState<(OcrResult & { forDay: string }) | null>(null);
+  const [auto, setAuto] = useState(ocrAuto);
+  const canOcr = ocrAvailable();
   const [justSaved, setJustSaved] = useState(false);
   const [open, setOpen] = useState(false);
   const t = client.targets;
@@ -89,6 +93,7 @@ export function NutritionCard({ client }: { client: Client }) {
     const ok = await saveClientEntry(client.id, 'dayLog', entry);
     if (ok) {
       setDirty(false);
+      if (!('shot' in extra)) setOcr(null);
       setJustSaved(true);
       window.setTimeout(() => setJustSaved(false), 2500);
     }
@@ -101,9 +106,42 @@ export function NutritionCard({ client }: { client: Client }) {
     setBusy(null);
   };
 
+  /** Odczyt AI: wypełnia pola (bez zapisu) — podopieczny sprawdza i zapisuje sam. */
+  const applyOcr = async (read: Promise<OcrResult>) => {
+    setBusy('ocr');
+    try {
+      const r = await read;
+      setText((t) => ({ ...t, ...ocrToText(r) }));
+      setDirty(true);
+      setJustSaved(false);
+      setOcr({ ...r, forDay: day });
+    } catch (e) {
+      setOcr(null);
+      toast(e instanceof Error ? e.message : 'Nie udało się odczytać zrzutu — wpisz liczby ręcznie.');
+    }
+    setBusy(null);
+  };
+
+  const readSaved = () => {
+    const ref = saved?.shot;
+    if (!ref) return;
+    void applyOcr(
+      fileUrl(ref)
+        .then((u) => fetch(u))
+        .then((r) => r.blob())
+        .catch(() => {
+          throw new Error('Nie udało się pobrać zrzutu — sprawdź połączenie.');
+        })
+        .then(readScreenshot),
+    );
+  };
+
   const onShot = async (f: File) => {
     const err = fileProblem(f) ?? (isImage(f.type, f.name) ? null : 'Dodaj zdjęcie (zrzut ekranu: JPG, PNG).');
     if (err) return toast(err);
+    // odczyt startuje od razu (równolegle z wysyłaniem pliku); błąd pokażemy dopiero po zapisie zrzutu
+    const read = canOcr && auto ? readScreenshot(f) : null;
+    read?.catch(() => undefined);
     setBusy('shot');
     try {
       const old = saved?.shot;
@@ -115,6 +153,7 @@ export function NutritionCard({ client }: { client: Client }) {
       toast(e instanceof Error && e.message === 'BUCKET' ? 'Magazyn plików nie jest jeszcze włączony — trener musi go dodać w Supabase.' : 'Nie udało się wysłać zrzutu — sprawdź połączenie.');
     }
     setBusy(null);
+    if (read) await applyOcr(read);
   };
 
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,6 +194,7 @@ export function NutritionCard({ client }: { client: Client }) {
               onClick={() => {
                 if (dirty && d !== day) void write();
                 setDirty(false);
+                setOcr(null);
                 setDay(d);
               }}
             >
@@ -217,6 +257,11 @@ export function NutritionCard({ client }: { client: Client }) {
                 <Icon name="cam" size={16} /> Zmień zrzut
                 <input type="file" accept="image/*" disabled={!!busy} onChange={pick} />
               </label>
+              {canOcr && (
+                <button type="button" className={`btn btn-secondary btn-sm nu-ocr-btn ${busy === 'ocr' ? 'is-busy' : ''}`} disabled={!!busy} onClick={readSaved}>
+                  <Icon name="eye" size={16} /> {busy === 'ocr' ? 'Odczytuję…' : 'Odczytaj z zrzutu'}
+                </button>
+              )}
               <button type="button" className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void removeShot()}>
                 Usuń zrzut
               </button>
@@ -224,11 +269,51 @@ export function NutritionCard({ client }: { client: Client }) {
           </>
         ) : (
           <label className={`btn btn-secondary nu-file nu-add ${busy === 'shot' ? 'is-busy' : ''}`}>
-            <Icon name="image" size={18} /> {busy === 'shot' ? 'Wysyłam…' : 'Dodaj zrzut z Fitatu'}
+            <Icon name="image" size={18} /> {busy === 'shot' ? 'Wysyłam…' : busy === 'ocr' ? 'Odczytuję…' : 'Dodaj zrzut z Fitatu'}
             <input type="file" accept="image/*" aria-label="Dodaj zrzut z Fitatu" disabled={!!busy} onChange={pick} />
           </label>
         )}
       </div>
+
+      {canOcr ? (
+        <div className="nu-ocr-opts">
+          <label className="nu-ocr-auto small">
+            <input
+              type="checkbox"
+              checked={auto}
+              onChange={(e) => {
+                setAuto(e.target.checked);
+                setOcrAuto(e.target.checked);
+              }}
+            />
+            Odczytuj liczby ze zrzutu automatycznie
+          </label>
+          <p className="muted small nu-ocr-privacy">Zrzut jest wysyłany do odczytu przez AI (Anthropic) i nie jest tam zapisywany.</p>
+        </div>
+      ) : (
+        <p className="muted small nu-ocr-privacy">Odczyt liczb ze zrzutu przez AI działa w aplikacji online (po zalogowaniu).</p>
+      )}
+
+      {ocr && ocr.forDay === day && (
+        <div className={ocr.confidence === 'low' || (ocr.date && ocr.date !== day) ? 'warn-box small nu-ocr-note' : 'nu-ocr-note nu-ocr-ok small'} role="status">
+          <b>
+            <Icon name={ocr.confidence === 'low' ? 'alert' : 'eye'} size={16} /> Sprawdź liczby — odczyt automatyczny
+          </b>
+          {ocr.confidence === 'low' && <span>Odczyt niepewny{ocr.note ? ` — ${ocr.note.replace(/[.\s]+$/, '')}` : ''}. Popraw liczby przed zapisem.</span>}
+          {ocr.confidence !== 'low' && ocr.note && <span>{ocr.note}</span>}
+          {ocr.date && ocr.date !== day && <span>Zrzut wygląda na dzień {ocr.date.split('-').reverse().join('.')} — a zapisujesz {dayLabel}.</span>}
+          {MACROS.some(([k]) => ocr[k] == null) && (
+            <span className="muted">
+              Nie odczytano:{' '}
+              {MACROS.filter(([k]) => ocr[k] == null)
+                .map(([, label]) => label.toLowerCase())
+                .join(', ')}{' '}
+              — sprawdź ręcznie.
+            </span>
+          )}
+          <span className="muted">Nic nie jest zapisane, dopóki nie stukniesz „Zapisz jedzenie”.</span>
+        </div>
+      )}
 
       <button type="button" className={`btn btn-block ${justSaved && !dirty ? 'btn-secondary nu-saved' : 'btn-primary'}`} disabled={(!dirty && !justSaved) || !!busy} onClick={() => void onSave()}>
         {busy === 'save' ? (

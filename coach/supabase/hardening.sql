@@ -1881,3 +1881,285 @@ end $$;
 revoke all on function public.ai_quota_take(text, int) from public, anon;
 grant execute on function public.ai_quota_take(text, int) to authenticated;
 notify pgrst, 'reload schema';
+
+-- 29. Profil trenera (Ustawienia → „Mój profil”) i tryb „trener na urlopie”. Można uruchomić ponownie.
+--     a) Tabela trainer_profile: jeden wiersz (id = 'me', data jsonb). Zapis tylko trener, odczyt każdy zalogowany
+--        (podopieczni widzą imię, zdjęcie, telefon, dane do przelewu, godziny odpowiedzi, urlop).
+--     b) Zdjęcie trenera: koszyk „client-files”, folder „trainer/” — odczyt dla każdego zalogowanego.
+--     c) Urlop (data.vacation {from, to, message}): gdy podopieczny napisze w czasie urlopu, add_client_note dopisuje
+--        automatyczną odpowiedź trenera (replies, auto = 'vacation', id 'vac-<dzień>') — najwyżej raz dziennie na podopiecznego.
+--     d) Automatyczne wiadomości (sekcja 25) w czasie urlopu nie wychodzą: warunek w auto_message_deliver
+--        (jedyne miejsce wysyłki, używa go auto_messages_run) — zdarzenia sprzed urlopu nie są później „nadrabiane”.
+create table if not exists public.trainer_profile (
+  id text primary key default 'me' check (id = 'me'),
+  data jsonb not null default '{}'::jsonb check (jsonb_typeof(data) = 'object'),
+  updated_at timestamptz not null default now()
+);
+alter table public.trainer_profile enable row level security;
+drop policy if exists trainer_all on public.trainer_profile;
+create policy trainer_all on public.trainer_profile for all to authenticated using (public.is_trainer()) with check (public.is_trainer());
+drop policy if exists read_all on public.trainer_profile;
+create policy read_all on public.trainer_profile for select to authenticated using (true);
+revoke all on public.trainer_profile from anon, authenticated;
+grant select, insert, update on public.trainer_profile to authenticated;
+
+drop policy if exists client_files_trainer_profile_read on storage.objects;
+create policy client_files_trainer_profile_read on storage.objects for select to authenticated
+  using (bucket_id = 'client-files' and (storage.foldername(name))[1] = 'trainer');
+
+-- Urlop dziś (czas polski)? Zwraca treść automatycznej odpowiedzi albo null.
+create or replace function public.trainer_vacation_text(d date default (now() at time zone 'Europe/Warsaw')::date) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare v jsonb;
+begin
+  select data -> 'vacation' into v from trainer_profile where id = 'me';
+  if jsonb_typeof(v) <> 'object' or coalesce(v ->> 'from', '') !~ '^\d{4}-\d{2}-\d{2}$' or coalesce(v ->> 'to', '') !~ '^\d{4}-\d{2}-\d{2}$' then return null; end if;
+  if d < (v ->> 'from')::date or d > (v ->> 'to')::date then return null; end if;
+  return coalesce(nullif(left(trim(coalesce(v ->> 'message', '')), 500), ''),
+    'Dzięki za wiadomość! Jestem na urlopie do ' || extract(day from (v ->> 'to')::date)::int || '.' || to_char((v ->> 'to')::date, 'MM') || ' — odpiszę po powrocie.');
+end $$;
+revoke all on function public.trainer_vacation_text from public, anon;
+grant execute on function public.trainer_vacation_text to authenticated;
+
+-- Automatyczna odpowiedź w czasie urlopu (raz dziennie na podopiecznego; to samo id co w aplikacji: lib/trainerProfile.ts).
+create or replace function public.trainer_vacation_autoreply(p_client_id text) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  today date := (now() at time zone 'Europe/Warsaw')::date;
+  txt text := trainer_vacation_text(today);
+  rid text := 'vac-' || to_char(today, 'YYYY-MM-DD');
+begin
+  if txt is null then return; end if;
+  perform set_config('fitowa.rpc', '1', true);
+  update clients
+  set data = jsonb_set(data, '{replies}',
+        coalesce((select jsonb_agg(x order by ord) from (
+          select x, ord from jsonb_array_elements(case when jsonb_typeof(data -> 'replies') = 'array' then data -> 'replies' else '[]'::jsonb end)
+            with ordinality t(x, ord) order by ord desc limit 199) s), '[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object('id', rid, 'at', to_jsonb(now()), 'text', txt, 'auto', 'vacation'))),
+      updated_at = now()
+  where id = p_client_id
+    and not exists (select 1 from jsonb_array_elements(case when jsonb_typeof(data -> 'replies') = 'array' then data -> 'replies' else '[]'::jsonb end) r where r ->> 'id' = rid);
+end $$;
+revoke all on function public.trainer_vacation_autoreply from public, anon, authenticated;
+
+-- add_client_note — treść z sekcji 23 + automatyczna odpowiedź w czasie urlopu (na końcu).
+create or replace function public.add_client_note(p_client_id text, p_note jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  txt text := left(coalesce(p_note ->> 'text', ''), 2000);
+  r jsonb := p_note -> 'ref';
+  ref jsonb;
+  med jsonb := '[]'::jsonb;
+  m jsonb;
+  auto boolean := false;
+begin
+  perform set_config('fitowa.rpc', '1', true); -- zapis przez funkcję podopiecznego (patrz guard_client_owned)
+  if not (is_trainer() or p_client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  -- załączniki: zdjęcie / wideo / głos, tylko pliki z folderu tego podopiecznego (albo z pamięci przeglądarki)
+  if jsonb_typeof(p_note -> 'media') = 'array' then
+    if jsonb_array_length(p_note -> 'media') > 4 then raise exception 'Najwyżej 4 załączniki'; end if;
+    for m in select x from jsonb_array_elements(p_note -> 'media') x loop
+      if jsonb_typeof(m) <> 'object' or coalesce(m ->> 'kind', '') not in ('image', 'video', 'audio') then raise exception 'Zły załącznik'; end if;
+      if length(coalesce(m ->> 'ref', '')) > 300 or (m ->> 'ref') like '%..%'
+         or not ((m ->> 'ref') like 'sb:' || p_client_id || '/%' or (m ->> 'ref') like 'idb:%') then raise exception 'Zły plik załącznika'; end if;
+      med := med || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+        'kind', m ->> 'kind', 'ref', m ->> 'ref', 'mime', left(m ->> 'mime', 80),
+        'dur', case when jsonb_typeof(m -> 'dur') = 'number' and (m ->> 'dur')::numeric between 0 and 3600 then round((m ->> 'dur')::numeric, 1) end)));
+    end loop;
+  end if;
+  if length(trim(txt)) = 0 then
+    if jsonb_array_length(med) = 0 then raise exception 'Pusta notatka'; end if;
+    txt := case med -> 0 ->> 'kind' when 'audio' then 'Wiadomość głosowa' when 'video' then 'Nagranie wideo' else 'Zdjęcie' end;
+    auto := true;
+  end if;
+  -- kontekst: trening / ćwiczenie
+  if jsonb_typeof(r) = 'object' then
+    ref := jsonb_strip_nulls(jsonb_build_object(
+      'sessionId', left(r ->> 'sessionId', 40),
+      'exIndex', case when jsonb_typeof(r -> 'exIndex') = 'number' and (r ->> 'exIndex')::numeric between 0 and 200 then (r ->> 'exIndex')::numeric::int end,
+      'exName', left(r ->> 'exName', 120),
+      'workout', left(r ->> 'workout', 120),
+      'date', case when (r ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$' then r ->> 'date' end));
+    if ref = '{}'::jsonb then ref := null; end if;
+  end if;
+  update clients
+  set data = jsonb_set(data, '{inbox}',
+        coalesce((select jsonb_agg(n) from (select n from jsonb_array_elements(coalesce(data -> 'inbox', '[]'::jsonb)) n offset greatest(0, jsonb_array_length(coalesce(data -> 'inbox', '[]'::jsonb)) - 199)) t), '[]'::jsonb)
+        || jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+             'id', left(coalesce(p_note ->> 'id', md5(random()::text)), 40), 'at', now(), 'text', txt,
+             'sessionId', left(coalesce(p_note ->> 'sessionId', ref ->> 'sessionId'), 40),
+             'ref', ref,
+             'media', case when jsonb_array_length(med) > 0 then med end,
+             'textAuto', case when auto then true end)))),
+      updated_at = now()
+  where id = p_client_id;
+  -- sekcja 29: trener na urlopie — automatyczna odpowiedź (raz dziennie)
+  if not is_trainer() then perform trainer_vacation_autoreply(p_client_id); end if;
+end $$;
+
+revoke all on function public.add_client_note from public, anon;
+grant execute on function public.add_client_note to authenticated;
+
+-- auto_message_deliver — treść z sekcji 25 + warunek urlopu.
+create or replace function public.auto_message_deliver(p_client_id text, p_kind text, p_key text, p_text text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare lid bigint; rid text := 'auto-' || p_kind || '-' || substr(md5(p_client_id || '|' || p_kind || '|' || p_key), 1, 12);
+begin
+  if length(trim(coalesce(p_text, ''))) = 0 then return false; end if;
+  -- sekcja 29: w czasie urlopu trenera automatyczne wiadomości nie wychodzą
+  if trainer_vacation_text() is not null then return false; end if;
+  insert into auto_message_log (client_id, kind, key, text, reply_id) values (p_client_id, p_kind, p_key, left(p_text, 2000), rid)
+  on conflict (client_id, kind, key) do nothing returning id into lid;
+  if lid is null then return false; end if;
+  perform set_config('fitowa.rpc', '1', true); -- zapis z bazy: strażnicy profilu przepuszczają
+  update clients
+  set data = jsonb_set(data, '{replies}',
+        coalesce((select jsonb_agg(x order by ord) from (
+          select x, ord from jsonb_array_elements(case when jsonb_typeof(data -> 'replies') = 'array' then data -> 'replies' else '[]'::jsonb end)
+            with ordinality t(x, ord) order by ord desc limit 199) s), '[]'::jsonb)
+        || jsonb_build_array(jsonb_build_object('id', rid, 'at', to_jsonb(now()), 'text', left(p_text, 2000), 'auto', p_kind)))
+        -- znacznik wersji: zapis profilu z nieaktualnej kopii (aplikacja otwarta przed wysyłką) nie skasuje wiadomości
+        || jsonb_build_object('autoMsgRev', rid),
+      updated_at = now()
+  where id = p_client_id;
+  -- trener uruchamia ręcznie → push wysyła wyzwalacz push_clients (sekcja 20); z harmonogramu — tutaj
+  if not is_trainer() then
+    perform push_send('client', p_client_id, 'Wiadomość od trenera', p_text, '/app/', 'reply');
+  end if;
+  return true;
+end $$;
+revoke all on function public.auto_message_deliver from public, anon, authenticated;
+notify pgrst, 'reload schema';
+
+-- 28. Zapowiedź tygodnia: w niedzielę ok. 19:00 (czas polski) powiadomienie push do podopiecznych z włączonymi
+--     powiadomieniami: „Twój tydzień: pn B – góra ciała, śr A – siła, pt wizyta 17:00.” + zdanie trenera na tydzień
+--     (trainer_profile.data.weeklyNote, sekcja 29). Jednostki: aktywny plan z dniem tygodnia (start planu + numer
+--     tygodnia, jak w sekcji 20), treningi zadane na konkretny dzień i zaplanowane wizyty. Plan bez dni tygodnia →
+--     „Masz N treningów w tym tygodniu” (N = treningi w tygodniu z profilu albo jednostki pierwszego tygodnia planu).
+--     Bez powiadomienia: status „zakończony” / „pauza”, nieobecność podopiecznego (dziś albo w poniedziałek),
+--     urlop trenera (dziś albo w poniedziałek), brak czegokolwiek na ten tydzień. Raz na tydzień (push_log).
+--     Kliknięcie otwiera aplikację na Dziś z paskiem tygodnia (/app/?tydzien=1). Wymaga sekcji 20 (pg_net, pg_cron).
+--     Można uruchomić ponownie. Wyłączenie: select cron.unschedule('fitowa-week-preview');
+create or replace function public.week_preview_text(p_client_id text, p_mon date) returns text
+language plpgsql stable security definer set search_path = public as $$
+declare
+  items text;
+  n int;
+  per_week int;
+  dows text[] := array['pn', 'wt', 'śr', 'czw', 'pt', 'sob', 'nd'];
+begin
+  with wk as (
+    select p.data pd, w, wi
+    from plans p,
+         jsonb_array_elements(case when jsonb_typeof(p.data -> 'weeks') = 'array' then p.data -> 'weeks' else '[]'::jsonb end) with ordinality t(w, wi)
+    where p.client_id = p_client_id and coalesce(p.data ->> 'template', '') <> 'true'
+  ), wo as (
+    select wk.pd, wk.wi, k
+    from wk, jsonb_array_elements(case when jsonb_typeof(wk.w -> 'workouts') = 'array' then wk.w -> 'workouts' else '[]'::jsonb end) k
+    where exists (select 1 from jsonb_array_elements(case when jsonb_typeof(k -> 'exercises') = 'array' then k -> 'exercises' else '[]'::jsonb end) e
+                  where length(trim(coalesce(e ->> 'name', ''))) > 0)
+  ), ev as (
+    -- treningi zadane na dzień (data przy jednostce)
+    select (k ->> 'date')::date d, 1 o, coalesce(nullif(trim(k ->> 'name'), ''), 'trening') nm
+    from wo where (k ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$'
+    union all
+    -- aktywny plan: dzień tygodnia jednostki
+    select date_trunc('week', (pd ->> 'startDate')::date)::date + ((wi - 1) * 7 + (k ->> 'day')::int - 1)::int, 1,
+           coalesce(nullif(trim(k ->> 'name'), ''), 'trening')
+    from wo
+    where (pd ->> 'active') = 'true' and coalesce(pd ->> 'extra', '') <> 'true' and coalesce(k ->> 'date', '') = ''
+      and (pd ->> 'startDate') ~ '^\d{4}-\d{2}-\d{2}$' and (k ->> 'day') ~ '^[1-7]$'
+    union all
+    -- wizyty z trenerem
+    select (a.data ->> 'date')::date, 0, 'wizyta ' || coalesce(a.data ->> 'time', '')
+    from appointments a
+    where a.client_id = p_client_id and a.data ->> 'status' = 'planned' and (a.data ->> 'date') ~ '^\d{4}-\d{2}-\d{2}$'
+  )
+  select string_agg(dows[extract(isodow from d)::int] || ' ' || trim(nm), ', ' order by d, o, nm), count(*)
+  into items, n
+  from ev where d between p_mon and p_mon + 6;
+  if n > 0 then return 'Twój tydzień: ' || items || '.'; end if;
+
+  -- plan bez dni tygodnia: sama liczba treningów
+  select coalesce(nullif(c.data ->> 'daysPerWeek', '')::int, 0) into per_week from clients c
+  where c.id = p_client_id and coalesce(c.data ->> 'daysPerWeek', '') ~ '^\d{1,2}$';
+  if exists (select 1 from plans p where p.client_id = p_client_id and (p.data ->> 'active') = 'true' and coalesce(p.data ->> 'extra', '') <> 'true') then
+    if coalesce(per_week, 0) = 0 then
+      select count(*) into per_week
+      from plans p, jsonb_array_elements(case when jsonb_typeof(p.data #> '{weeks,0,workouts}') = 'array' then p.data #> '{weeks,0,workouts}' else '[]'::jsonb end) k
+      where p.client_id = p_client_id and (p.data ->> 'active') = 'true' and coalesce(p.data ->> 'extra', '') <> 'true';
+    end if;
+    if per_week > 0 then
+      return 'Masz ' || per_week || ' ' || case when per_week = 1 then 'trening'
+        when per_week % 10 between 2 and 4 and per_week % 100 not between 12 and 14 then 'treningi' else 'treningów' end || ' w tym tygodniu.';
+    end if;
+  end if;
+  return null;
+end $$;
+revoke all on function public.week_preview_text from public, anon, authenticated;
+
+create or replace function public.push_week_preview(p_force boolean default false) returns int
+language plpgsql security definer set search_path = public as $$
+declare
+  today date := (now() at time zone 'Europe/Warsaw')::date;
+  mon date := today + (8 - extract(isodow from today)::int);
+  prof jsonb := '{}'::jsonb;
+  note text;
+  r record;
+  body text;
+  n int := 0;
+  once text := 'week-' || to_char(today + (8 - extract(isodow from today)::int), 'YYYY-MM-DD');
+begin
+  if to_regclass('public.trainer_profile') is not null then
+    select coalesce(data, '{}'::jsonb) into prof from trainer_profile where id = 'me';
+    prof := coalesce(prof, '{}'::jsonb);
+  end if;
+  -- urlop trenera (dziś albo w poniedziałek) — bez zapowiedzi
+  if jsonb_typeof(prof -> 'vacation') = 'object'
+     and coalesce(prof #>> '{vacation,from}', '') ~ '^\d{4}-\d{2}-\d{2}$' and coalesce(prof #>> '{vacation,to}', '') ~ '^\d{4}-\d{2}-\d{2}$'
+     and (prof #>> '{vacation,from}')::date <= mon and (prof #>> '{vacation,to}')::date >= today then
+    return 0;
+  end if;
+  note := nullif(left(trim(coalesce(prof ->> 'weeklyNote', '')), 160), '');
+  for r in
+    select c.id from clients c
+    where coalesce(c.data ->> 'status', 'aktywny') not in ('zakończony', 'pauza')
+      and exists (select 1 from push_subscriptions s where s.role = 'client' and s.client_id = c.id)
+      and not exists (
+        select 1 from jsonb_array_elements(case when jsonb_typeof(c.data -> 'absences') = 'array' then c.data -> 'absences' else '[]'::jsonb end) a
+        where coalesce(a ->> 'from', '') ~ '^\d{4}-\d{2}-\d{2}$' and coalesce(a ->> 'to', '') ~ '^\d{4}-\d{2}-\d{2}$'
+          and (a ->> 'to') >= (a ->> 'from') and (a ->> 'from')::date <= mon and (a ->> 'to')::date >= today)
+      and (p_force or not exists (select 1 from push_log l where l.key = 'client:' || c.id || ':' || once))
+  loop
+    body := week_preview_text(r.id, mon);
+    continue when body is null;
+    perform push_send('client', r.id, 'Zapowiedź tygodnia', body || coalesce(' ' || note, ''), '/app/?tydzien=1', 'week', once);
+    -- raz na tydzień: wpis w push_log ważny do następnej niedzieli
+    update push_log set at = now() + interval '8 days' where key = 'client:' || r.id || ':' || once;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.push_week_preview from public, anon, authenticated;
+
+-- Harmonogram (pg_cron, w UTC): niedziela 17:00 i 18:00 UTC = 19:00 w Polsce latem / zimą; wysyłka tylko o 19:00 czasu polskiego.
+create or replace function public.push_week_tick() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if extract(isodow from now() at time zone 'Europe/Warsaw') = 7 and extract(hour from now() at time zone 'Europe/Warsaw') = 19 then
+    perform push_week_preview();
+  end if;
+exception when others then
+  raise warning 'push_week_tick: %', sqlerrm;
+end $$;
+revoke all on function public.push_week_tick from public, anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'cron') then
+    perform cron.schedule('fitowa-week-preview', '0 17,18 * * 0', 'select public.push_week_tick()');
+  else
+    raise notice 'pg_cron nie jest włączone — zapowiedź tygodnia nie wychodzi (Database → Extensions → pg_cron, potem uruchom sekcję 28 ponownie).';
+  end if;
+end $$;
+notify pgrst, 'reload schema';

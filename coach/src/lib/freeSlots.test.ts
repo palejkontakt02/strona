@@ -46,7 +46,7 @@ describe('freeSlots', () => {
   it('koniec tygodnia bez okienek — bierze następny tydzień', () => {
     const w = weekSummary([], '2026-11-08', 0, { from: '10:00', to: '12:00', days: [2] });
     expect(w.free[0].date).toBe('2026-11-10');
-    expect(w.label).toBe('Ten tydzień: 0 wizyt, wolne: wt 10–12');
+    expect(w.label).toBe('Ten tydzień: 0 wizyt, wolne w przyszłym tygodniu: wt 10–12');
   });
   it('oś godzin poszerzona o wizyty spoza godzin pracy', () => {
     expect(axisRange([ap('a', MON, '06:15', 45), ap('b', MON, '21:40', 60)], MON)).toEqual({ from: 360, to: 1380 });

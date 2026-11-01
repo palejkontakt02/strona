@@ -130,7 +130,7 @@ export function RemindButton({ client, p, onOpen }: { client: Client; p: Payment
 }
 
 export function ReminderModal({ clientId, paymentId, onClose }: { clientId: string; paymentId: string; onClose: () => void }) {
-  const { db, apply, toast } = useStore();
+  const { db, apply } = useStore();
   const { profile } = useTrainerProfile();
   const client = clientById(db, clientId);
   const p = client?.payments.find((x) => x.id === paymentId);
@@ -315,6 +315,7 @@ export function BulkSubsModal({ onClose, latest }: { onClose: () => void; latest
           })}
         </ul>
       )}
+      {list.length > 0 && skipped === list.length && <p className="small">Wszyscy mają już abonament za {fmtMonth(month)} — wybierz inny miesiąc.</p>}
       <p className="muted small">
         Razem {pln(sum)} · termin {fmtDate(due)}
         {skipped ? ` · pominięto ${skipped} (już ${plural(skipped, 'ma', 'mają', 'ma')} abonament za ten miesiąc)` : ''}

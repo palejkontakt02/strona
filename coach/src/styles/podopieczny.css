@@ -9,7 +9,7 @@
   margin-top: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-warn);
-  border-radius: var(--radius-lg, 14px);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -36,7 +36,7 @@
 }
 .exnote-text {
   margin: 2px 0 var(--space-2);
-  font-size: 13px;
+  font-size: var(--fs-xs);
   line-height: 1.45;
   color: var(--color-neutral-400);
   overflow-wrap: anywhere;
@@ -66,7 +66,7 @@
 }
 .pain-stop-end small {
   font-weight: 400;
-  font-size: 13px;
+  font-size: var(--fs-xs);
   opacity: 0.8;
 }
 .pain-stop-note,
@@ -79,7 +79,7 @@
 }
 .wdone-pain {
   display: inline-block;
-  font-size: 15px;
+  font-size: var(--fs-body);
 }
 
 /* --- koniec przerwy na cały ekran --- */
@@ -115,7 +115,7 @@
   }
 }
 .rest-flash-eyebrow {
-  font-size: 17px;
+  font-size: var(--fs-md);
   font-weight: 600;
   opacity: 0.8;
 }
@@ -129,7 +129,7 @@
   overflow-wrap: anywhere;
 }
 .rest-flash-hint {
-  font-size: 13px;
+  font-size: var(--fs-xs);
   opacity: 0.7;
 }
 /* ogranicz ruch: bez migania — statyczny baner u góry */

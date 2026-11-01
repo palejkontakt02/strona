@@ -119,16 +119,20 @@ export function weekSummary(
   nowMin: number,
   wh?: WorkHours | null,
   off?: { from: ISODate; to: ISODate } | null,
-): { visits: number; free: { date: ISODate; slot: Span }[]; label: string } {
+): { visits: number; free: { date: ISODate; slot: Span }[]; nextWeek: boolean; label: string } {
   const ws = weekStart(today);
   const we = addDays(ws, 6);
   const visits = appts.filter((a) => a.date >= ws && a.date <= we && a.status !== 'cancel').length;
   // pod koniec tygodnia (brak okienek) — najbliższe z następnego tygodnia
   let free = nextFree(appts, today, nowMin, wh, { off });
-  if (!free.length) free = nextFree(appts, addDays(we, 1), 0, wh, { off, until: addDays(we, 7) });
+  let nextWeek = false;
+  if (!free.length) {
+    free = nextFree(appts, addDays(we, 1), 0, wh, { off, until: addDays(we, 7) });
+    nextWeek = free.length > 0;
+  }
   const n = visits === 1 ? 'wizyta' : visits % 10 >= 2 && visits % 10 <= 4 && (visits % 100 < 10 || visits % 100 >= 20) ? 'wizyty' : 'wizyt';
-  const label = `Ten tydzień: ${visits} ${n}${free.length ? `, wolne: ${free.map((f) => slotLabel(f.date, f.slot)).join(', ')}` : ''}`;
-  return { visits, free, label };
+  const label = `Ten tydzień: ${visits} ${n}${free.length ? `, wolne${nextWeek ? ' w przyszłym tygodniu' : ''}: ${free.map((f) => slotLabel(f.date, f.slot)).join(', ')}` : ''}`;
+  return { visits, free, nextWeek, label };
 }
 
 /** Zakres osi godzin widoku Dzień: godziny pracy, poszerzone (do pełnych godzin) o wizyty spoza nich. */

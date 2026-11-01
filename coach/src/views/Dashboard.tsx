@@ -97,6 +97,7 @@ export function Dashboard() {
   const today = todayISO();
   const [showAllAlerts, setShowAllAlerts] = useState(false);
   const [showAllToday, setShowAllToday] = useState(false);
+  const [showAllRenew, setShowAllRenew] = useState(false);
   const active = db.clients.filter((c) => c.status === 'aktywny');
 
   const todayAppts = db.appointments.filter((a) => a.date === today && a.status !== 'cancel').sort((a, b) => a.time.localeCompare(b.time));
@@ -409,24 +410,30 @@ export function Dashboard() {
       badge: renew.some((r) => r.ended) ? `${renew.filter((r) => r.ended).length} zakończ.` : `${renew.length}`,
       tone: renew.some((r) => r.ended) ? 'warn' : undefined,
       body: (
+        <>
         <ul className="rows">
-          {renew.map((r) => (
+          {(showAllRenew ? renew : renew.slice(0, 6)).map((r) => (
             <li key={r.client.id} className="row">
               <div className="grow row-main">
                 <button className="link ellipsis" onClick={() => openClient(r.client.id, 'Plan')}>
                   {r.client.name}
                 </button>
-                <span className="small muted ellipsis">
+                <span className={`small ellipsis ${r.ended ? 'dash-renew-ended' : 'muted'}`}>
                   {r.plan.name} · {r.ended ? `zakończony ${dm(r.end)}` : r.daysLeft === 0 ? 'kończy się dziś' : `do ${dm(r.end)} (za ${r.daysLeft} ${plural(r.daysLeft, 'dzień', 'dni', 'dni')})`}
                 </span>
               </div>
-              {r.ended && <Tag tone="warn">zakończony</Tag>}
               <button className="btn btn-secondary btn-sm" onClick={() => openClient(r.client.id, 'Plan')} title="Karta podopiecznego → Plan: przycisk „Następny blok”">
                 Następny blok ›
               </button>
             </li>
           ))}
         </ul>
+        {renew.length > 6 && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowAllRenew(!showAllRenew)}>
+            {showAllRenew ? 'Pokaż mniej' : `Pokaż wszystkie (${renew.length})`}
+          </button>
+        )}
+        </>
       ),
     });
 

@@ -38,6 +38,8 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
   // dane o zdrowiu (art. 9 RODO): ankieta tylko po aktywnej zgodzie podopiecznego (zgody: components/Consents.tsx)
   const consent = hasConsent(client, 'health');
   const [busy, setBusy] = useState(false);
+  /** Po zapisie z „tak” w PAR-Q: ekran „Skonsultuj się z lekarzem” (pytania z „tak”). */
+  const [parqAlert, setParqAlert] = useState<string[] | null>(null);
   // kroki: sekcje ankiety → zdjęcia i dokumenty → zgoda i zapis
   const steps = INTAKE.length + 2;
   const sec = INTAKE[step];
@@ -83,12 +85,38 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     // nowe „tak” w pytaniach zdrowotnych (PAR-Q) — wprost w wiadomości do trenera
     const newYes = INTAKE_PARQ.filter((k) => clean[k] === 'tak' && client.intake?.answers[k] !== 'tak').map((k) => INTAKE[0].fields.find((f) => f.key === k)?.label ?? k);
     const warn = client.intake?.completedAt && newYes.length ? ` UWAGA — nowe „tak” w pytaniach o zdrowie: ${newYes.join(' · ')}` : '';
+    // pierwsze wypełnienie: każde „tak” w PAR-Q wprost w wiadomości do trenera
+    const firstWarn = !client.intake?.completedAt && newYes.length ? ` UWAGA — PAR-Q: tak przy: ${newYes.join(' · ')}` : '';
     const added = files.filter((f) => !(client.intake?.files ?? []).some((x) => x.id === f.id)).length;
     const filesMsg = added ? ` Dołączone pliki: ${added}.` : '';
-    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}${filesMsg}` : `Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.${filesMsg}`);
+    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}${filesMsg}` : `Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.${firstWarn}${filesMsg}`);
     else toast('Ankieta zapisana.');
+    if (!asTrainer && newYes.length) {
+      setParqAlert(newYes);
+      window.scrollTo(0, 0);
+      return;
+    }
     onClose();
   };
+
+  if (parqAlert)
+    return (
+      <div className="ath-home fade intake">
+        <header className="ath-hello">
+          <span className="eyebrow">Ankieta zapisana</span>
+          <h1>Zanim zaczniesz trenować</h1>
+        </header>
+        <section className="acard acard-warn r7-parq" role="alert">
+          <span className="eyebrow">Ważne — zdrowie</span>
+          <h3>Skonsultuj się z lekarzem przed rozpoczęciem treningów — trener dostał informację.</h3>
+          <p className="small">Zaznaczono „tak” przy: {parqAlert.join(' · ')}.</p>
+          <p className="muted small">Do czasu rozmowy z lekarzem i trenerem nie rób intensywnych treningów samodzielnie. Jeśli lekarz da zgodę, napisz o tym trenerowi.</p>
+          <button className="btn btn-primary btn-block" onClick={onClose}>
+            Rozumiem
+          </button>
+        </section>
+      </div>
+    );
 
   // najpierw zgoda na dane o zdrowiu (krótka forma + „Więcej” = pełna klauzula)
   if (!consent && !asTrainer)

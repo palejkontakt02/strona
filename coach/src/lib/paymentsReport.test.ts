@@ -94,7 +94,7 @@ describe('przypomnienie', () => {
     expect(t).toContain('Cześć Anna!');
     expect(t).toContain('400 zł');
     expect(t).toContain('termin minął 07.11.2026');
-    expect(t).toContain('Przelew: 12 3456 7890 1234 5678 9012 3456 (mBank), odbiorca: Jan Trener');
+    expect(t).toContain('Przelew: 12 3456 7890 1234 5678 9012 3456, mBank, odbiorca: Jan Trener');
     expect(t).toContain('Tytuł przelewu: Anna Kowalska – Abonament – 11.2026');
     expect(t).toContain('BLIK na telefon: 600 100 200');
     expect(t.endsWith('Dziękuję! Jan')).toBe(true);

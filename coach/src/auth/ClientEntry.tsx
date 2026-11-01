@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { AthleteApp } from '../athlete/AthleteApp';
 import { History } from '../athlete/History';
 import { MyData } from '../athlete/MyData';
+import { TrainerAvatar } from '../athlete/TrainerInfo';
+import { useTrainerProfile } from '../data/trainerProfile';
 import { Consents } from '../components/Consents';
 import { OfflineBadge } from '../components/OfflineBadge';
 import { PalettePicker } from '../components/PalettePicker';
@@ -58,10 +60,13 @@ function useAthleteBody() {
 }
 
 function TopBar({ onExit, onSettings }: { onExit: () => void; onSettings?: () => void }) {
+  // u podopiecznego nigdy „FITOWA / coach” — imię trenera z profilu albo „Fitowa”
+  const { profile } = useTrainerProfile();
   return (
     <div className="ath-top">
-      <span className="auth-logo small-logo">
-        FITOWA <span>/ coach</span>
+      <span className="ath-coach">
+        <TrainerAvatar profile={profile} />
+        {profile.name?.trim() || 'Fitowa'}
       </span>
       <span className="row-inline">
         <OfflineBadge />

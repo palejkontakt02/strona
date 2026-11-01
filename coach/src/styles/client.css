@@ -25,11 +25,11 @@
 .loc-filter button {
   min-height: 36px;
   padding: 4px 14px;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   color: var(--color-neutral-300);
   background: transparent;
   border: 1px solid var(--color-divider);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 .loc-filter button:hover {
   background: var(--color-surface);
@@ -40,7 +40,7 @@
   color: var(--color-text);
 }
 .loc-tag {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   gap: 5px;
 }
 
@@ -60,7 +60,7 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-neutral-400);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   line-height: 1.2;
 }
 .day-strip-btn span {
@@ -76,7 +76,7 @@
 }
 .day-strip-btn i {
   min-height: 1.2em;
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--color-accent);
@@ -121,14 +121,14 @@
   min-height: 34px;
   margin: 0 0 var(--space-3);
   padding: 0 0 0 4px;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
   color: var(--color-neutral-400);
 }
 .week-day header > span {
   font-weight: 500;
 }
 .week-day header strong {
-  font-size: 1.0625rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
@@ -151,7 +151,7 @@
 .week-day.is-today header strong {
   flex: none;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-accent);
   color: var(--on-accent);
 }
@@ -162,7 +162,7 @@
   content: 'Nic tego dnia';
   display: block;
   padding: var(--space-4) 4px;
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   color: var(--color-neutral-500);
 }
 
@@ -186,7 +186,7 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--c) 9%, var(--color-surface-2));
   color: var(--color-text);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   line-height: 1.3;
   text-align: left;
   transition: background-color 0.12s ease;
@@ -232,7 +232,7 @@
 }
 .tile-status {
   min-width: 0;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--color-neutral-400);
 }
 /* odbyta: ✓ przy godzinie, spokojniejsze tło */
@@ -282,9 +282,9 @@
 .who-badge {
   margin-left: 4px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.3;
@@ -310,7 +310,7 @@
 .tile-loose .tile-time {
   grid-column: 1 / -1;
   font-family: var(--font-body);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0;
   color: var(--color-accent);
@@ -332,7 +332,7 @@
 }
 .tile.tile-overdue::after {
   grid-column: 1 / -1;
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--color-warn);
 }
@@ -358,18 +358,18 @@
   min-height: 56px;
   padding: 9px 12px;
   align-items: center;
-  font-size: 0.9375rem;
+  font-size: var(--fs-body);
 }
 .week-one .tile-time {
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: start;
-  font-size: 1.3125rem;
+  font-size: var(--fs-lg);
   white-space: normal;
 }
 .week-one .clash-mark {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--fs-sm);
 }
 .week-one .tile-done .tile-time::before {
   font-size: 0.8em;
@@ -385,7 +385,7 @@
   grid-column: 2;
 }
 .week-one .tile-status {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
 }
 .week-one .tile-loose .tile-time,
 .week-one .tile-loose .tile-name,
@@ -394,7 +394,7 @@
   grid-row: auto;
 }
 .week-one .tile-loose .tile-time {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
 }
 
 /* telefon: tydzień jako lista dni — kafelki jak w widoku dnia */
@@ -411,18 +411,18 @@
     min-height: 56px;
     padding: 9px 12px;
     align-items: center;
-    font-size: 0.9375rem;
+    font-size: var(--fs-body);
   }
   .week .tile-time {
     grid-column: 1;
     grid-row: 1 / span 2;
     align-self: start;
-    font-size: 1.3125rem;
+    font-size: var(--fs-lg);
     white-space: normal;
   }
   .week .clash-mark {
     display: block;
-    font-size: 0.875rem;
+    font-size: var(--fs-sm);
   }
   .week .tile-done .tile-time::before {
     font-size: 0.8em;
@@ -438,7 +438,7 @@
     grid-column: 2;
   }
   .week .tile-status {
-    font-size: 0.8125rem;
+    font-size: var(--fs-xs);
   }
   .week .tile-loose .tile-time,
   .week .tile-loose .tile-name,
@@ -447,7 +447,7 @@
     grid-row: auto;
   }
   .week .tile-loose .tile-time {
-    font-size: 0.8125rem;
+    font-size: var(--fs-xs);
   }
 }
 
@@ -459,7 +459,7 @@
 }
 .month-dow {
   padding-bottom: 6px;
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
   color: var(--color-neutral-400);
 }
@@ -490,8 +490,8 @@
   height: 22px;
   padding: 0 5px;
   margin-bottom: 2px;
-  border-radius: 999px;
-  font-size: 0.9375rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-body);
   font-weight: 600;
   line-height: 22px;
   text-align: center;
@@ -511,7 +511,7 @@
   border-left: 2px solid var(--c);
   border-radius: 0 4px 4px 0;
   background: color-mix(in srgb, var(--c) 9%, transparent);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   line-height: 1.35;
   color: var(--color-text);
 }
@@ -540,7 +540,7 @@
 }
 .month-more {
   padding-left: 5px;
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   color: var(--color-neutral-400);
 }
@@ -548,7 +548,7 @@
 .legend-note {
   margin-top: var(--space-6);
   max-width: 72ch;
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   line-height: 1.5;
   color: var(--color-neutral-400);
 }
@@ -621,7 +621,7 @@
   }
   .month-num {
     align-self: center;
-    font-size: 0.875rem;
+    font-size: var(--fs-sm);
     min-width: 22px;
     height: 20px;
     line-height: 20px;
@@ -656,7 +656,7 @@
   .month-more {
     padding: 0;
     text-align: center;
-    font-size: 0.6875rem;
+    font-size: var(--fs-2xs);
   }
 }
 
@@ -683,7 +683,7 @@
 }
 .chart-axis {
   font-family: var(--font-body);
-  font-size: 14.5px;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   fill: var(--color-neutral-400);
 }
@@ -711,7 +711,7 @@
 .chart-fig .legend {
   gap: var(--space-3) var(--space-6);
   margin-top: var(--space-3);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
 }
 .legend-swatch {
   width: 12px;
@@ -721,10 +721,10 @@
 }
 @media (max-width: 900px) {
   .chart-val {
-    font-size: 20px;
+    font-size: var(--fs-lg);
   }
   .chart-axis {
-    font-size: 19px;
+    font-size: var(--fs-lg);
   }
 }
 
@@ -781,7 +781,7 @@
   border-color: var(--color-divider);
 }
 .plan-card:not(.is-active) > .card-head h4 {
-  font-size: 1.125rem;
+  font-size: var(--fs-md);
   color: var(--color-neutral-200);
 }
 .plan-card:not(.is-active) > .card-head + .muted.small {
@@ -799,7 +799,7 @@
   padding-bottom: var(--space-2);
   margin-bottom: var(--space-1);
   border-bottom: 1px solid var(--color-divider);
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -834,10 +834,10 @@
 .habit-rings > div {
   min-width: 72px;
   text-align: center;
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
 }
 .habit-days > div {
-  font-size: 0.6875rem;
+  font-size: var(--fs-2xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -929,7 +929,7 @@
 .imp-preview {
   background: var(--color-surface);
   border: 1px solid var(--color-divider);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: var(--space-4);
 }
 .modal .imp-preview {
@@ -954,12 +954,12 @@
   min-width: 0;
 }
 .imp-kpis dt {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   color: var(--color-neutral-400);
 }
 .imp-kpis dd {
   margin: 0;
-  font-size: 1.625rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   line-height: 1.15;
   white-space: nowrap;
@@ -970,7 +970,7 @@
 .imp-table-wrap {
   max-height: 260px;
   overflow: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .imp-table {
   width: 100%;
