@@ -5200,7 +5200,7 @@ body.athlete-mode .toasts {
     min-width: 28px;
   }
   .ptab-one .ptab-table .ptab-ex {
-    font-size: var(--fs-xs);
+    font-size: var(--fs-2xs);
     min-width: 80px;
     max-width: 104px;
   }
