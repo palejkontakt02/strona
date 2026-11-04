@@ -3,7 +3,7 @@ import { exerciseLabels, exerciseSummary, expandSets, workoutDate } from './plan
 import { planRows } from './sheetImport';
 import { sessionLoad, tonnage } from './load';
 import { fmtClock, runTotals } from './running';
-import { numOrText, type XCell, type XSheet } from './xlsxWrite';
+import { colName, numOrText, type XCell, type XSheet, type XStyle } from './xlsxWrite';
 
 /** Eksport planów i treningów do Excela (.xlsx): układ do ponownego importu, siatka tygodni, treningi seria po serii. */
 
@@ -56,7 +56,7 @@ export function planGridRows(plan: Plan, client?: Pick<Client, 'name'>): XCell[]
   return rows;
 }
 
-/* ---------- wspólny układ: ćwiczenie w wierszu, każda seria w kolumnie „powt. × ciężar”, na końcu RPE, tempo, uwagi ---------- */
+/* ---------- wspólny układ (jak arkusz trenera): PLAN | REALIZACJA — seria po serii KG / REP | RPE | DATA | NOTATKI ---------- */
 
 const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;
 /** Tempo z uwag („tempo 3-1-X-0, kolana na zewnątrz” → tempo „3-1-X-0”, uwagi „kolana na zewnątrz”). */
@@ -67,72 +67,191 @@ export function splitTempo(notes?: string): { tempo: string; notes: string } {
   return { tempo: m[0].replace(/\s/g, '').toUpperCase(), notes: t.replace(/tempo\s*:?\s*/i, '').replace(TEMPO_RE, '').replace(/^[\s,;·-]+|[\s,;·-]+$/g, '') };
 }
 
-const kg = (v: string | number | undefined | null) => {
-  const t = String(v ?? '').trim();
-  if (!t) return '';
-  if (/^-?\d+(?:[.,]\d+)?$/.test(t)) return `${t.replace('.', ',')} kg`;
-  return t.replace(/(\d)\.(\d)/g, '$1,$2'); // „-10%”, „70%”, „BW”
-};
 const joinRpe = (vals: (string | number | undefined | null)[]) => {
   const u = [...new Set(vals.map((v) => String(v ?? '').trim().replace('.', ',')).filter(Boolean))];
   return u.length <= 1 ? (u[0] ?? '') : u.join(' / ');
 };
+const joinSeq = (vals: (string | undefined)[]) => {
+  const v = vals.map((x) => String(x ?? '').trim()).filter(Boolean);
+  return new Set(v).size <= 1 ? (v[0] ?? '') : v.join('-');
+};
+const mmss = (rest?: string) => (rest && /^\d+$/.test(rest.trim()) ? `${Math.floor(Number(rest) / 60)}:${String(Number(rest) % 60).padStart(2, '0')}` : (rest ?? '').trim());
+/** Liczba („62,5” → 62.5) albo tekst bez zmian. */
+const num = (v: string | number | undefined | null): string | number | null => {
+  const r = numOrText(v == null ? null : typeof v === 'number' ? v : String(v));
+  return r === '' ? null : r;
+};
 
+/** Jedna seria: ciężar i powtórzenia osobno; `text` — zapis w jednej komórce (cardio). */
+export interface XSet {
+  kg: string | number | null;
+  rep: string | number | null;
+  warm?: boolean;
+  text?: string;
+}
 export interface ExRow {
   name: string;
-  sets: string[];
-  rpe: string;
-  tempo: string;
+  /** Kolumny planu: serie, powtórzenia, RPE, tempo, przerwa. */
+  plan: { sets: string; reps: string; rpe: string; tempo: string; rest: string };
+  sets: XSet[];
+  /** RPE z realizacji. */
+  rpe: string | number | null;
   notes: string;
 }
 
-/** Blok tabeli: tytuł, nagłówek „Ćwiczenie | Seria 1…N | RPE | Tempo | Uwagi” i ćwiczenia jedno pod drugim. */
-function block(title: string, rows: ExRow[], n: number): XCell[][] {
-  return [
-    [b(title)],
-    [b('Ćwiczenie'), ...Array.from({ length: n }, (_, i) => b(`Seria ${i + 1}`)), b('RPE'), b('Tempo'), b('Uwagi')],
-    ...rows.map((r) => [r.name, ...Array.from({ length: n }, (_, i) => r.sets[i] ?? ''), r.rpe, r.tempo, r.notes] as XCell[]),
-    [],
-  ];
+const C = { black: '000000', dark: '262626', blue: '6D9EEB', kg: 'BFBFBF', rep: 'D9D9D9', warm: 'C9DAF8', note: 'EFEFEF', white: 'FFFFFF' };
+const LEFT = ['Ćwiczenie', 'Serie', 'Powt.', 'RPE', 'Tempo', 'Przerwa'];
+/** Kolumny: lewe (plan) | KG, REP × n | RPE | DATA | NOTATKI. */
+const layout = (n: number) => {
+  const s0 = LEFT.length;
+  const rpe = s0 + 2 * n;
+  return { s0, rpe, date: rpe + 1, note: rpe + 2, cols: rpe + 3 };
+};
+export const tableWidths = (n: number) => [30, 7, 8, 7, 9, 8, ...Array.from({ length: n }, () => [7, 7]).flat(), 7, 12, 42];
+
+type Edge = { l?: boolean; r?: boolean; t?: boolean; b?: boolean };
+function st(fill: string, o: { bold?: boolean; color?: string; size?: number; align?: 'left' | 'center'; fmt?: string; wrap?: boolean; edge?: Edge; dotted?: boolean } = {}): XStyle {
+  const inner = o.dotted ? ('dotted' as const) : ('thin' as const);
+  const e = o.edge ?? {};
+  return {
+    fill,
+    bold: o.bold,
+    color: o.color ?? C.black,
+    size: o.size,
+    align: o.align ?? 'center',
+    valign: 'center',
+    wrap: o.wrap,
+    fmt: o.fmt,
+    border: { l: e.l ? 'medium' : inner, r: e.r ? 'medium' : inner, t: e.t ? 'medium' : inner, b: e.b ? 'medium' : inner },
+  };
 }
-const widths = (n: number) => [28, ...Array.from({ length: n }, () => 13), 8, 10, 40];
+const cell = (v: string | number | null | undefined, s: XStyle): XCell => ({ v, st: s });
+
+/** Arkusz złożony z bloków (jednostka planu / trening) w stylu arkusza trenera. */
+class Grid {
+  rows: XCell[][] = [];
+  merges: string[] = [];
+  heights: Record<number, number> = {};
+  constructor(public n: number) {}
+  private put(r: number, c: number, v: XCell) {
+    while (this.rows.length <= r) this.rows.push([]);
+    const row = this.rows[r];
+    while (row.length < c) row.push(null);
+    row[c] = v;
+  }
+  private merge(r0: number, c0: number, r1: number, c1: number, v: string | number | null | undefined, s: XStyle) {
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) this.put(r, c, cell(r === r0 && c === c0 ? v : null, s));
+    if (r1 > r0 || c1 > c0) this.merges.push(`${colName(c0)}${r0 + 1}:${colName(c1)}${r1 + 1}`);
+  }
+  /** Wiersze informacyjne nad tabelą (dane treningu, nazwa planu). */
+  info(rows: XCell[][]) {
+    for (const r of rows) this.rows.push(r);
+  }
+  block(title: string, date: string, ex: ExRow[]) {
+    const L = layout(this.n);
+    const top = this.rows.length;
+    const hd = (_: string, edge: Edge, size = 9) => st(C.dark, { bold: true, color: C.white, size, edge });
+    const bl = (edge: Edge) => st(C.blue, { bold: true, color: '000000', edge });
+    // wiersz 1: tytuł bloku | REALIZACJA | DATA: | NOTATKI
+    this.merge(top, 0, top, L.s0 - 1, title, { ...hd('', { l: true, t: true, r: true }, 10), align: 'left' });
+    this.merge(top, L.s0, top, L.rpe, 'REALIZACJA', hd('', { l: true, t: true, r: true }));
+    this.merge(top, L.date, top, L.date, 'DATA:', hd('', { t: true }));
+    this.merge(top, L.note, top + 2, L.note, 'NOTATKI', { ...hd('', { t: true, r: true }, 14), bold: true });
+    // wiersze 2–3: nagłówki planu, „Seria N” nad KG | REP, RPE, data
+    LEFT.forEach((h, i) => this.merge(top + 1, i, top + 2, i, h, bl({ l: i === 0, r: i === LEFT.length - 1 })));
+    for (let i = 0; i < this.n; i++) {
+      const c = L.s0 + 2 * i;
+      this.merge(top + 1, c, top + 1, c + 1, `Seria ${i + 1}`, bl({ l: i === 0 }));
+      this.put(top + 2, c, cell('KG', bl({ l: i === 0 })));
+      this.put(top + 2, c + 1, cell('REP', bl({})));
+    }
+    this.merge(top + 1, L.rpe, top + 2, L.rpe, 'RPE', bl({ r: true }));
+    this.merge(top + 1, L.date, top + 2, L.date, date, st(C.white, { bold: true }));
+    this.heights[top] = 16;
+    // ćwiczenia jedno pod drugim
+    const list = ex.length ? ex : [{ name: '', plan: { sets: '', reps: '', rpe: '', tempo: '', rest: '' }, sets: [], rpe: null, notes: '' }];
+    list.forEach((e, k) => {
+      const r = top + 3 + k;
+      this.heights[r] = 18;
+      const last = k === list.length - 1;
+      const ed = (o: Edge = {}): Edge => ({ ...o, b: last });
+      const p = e.plan;
+      [e.name, p.sets, p.reps, p.rpe, p.tempo, p.rest].forEach((v, i) =>
+        this.put(r, i, cell(i === 0 ? v : num(v), st(C.white, { dotted: true, align: i === 0 ? 'left' : 'center', bold: i === 0, wrap: i === 0, edge: ed({ l: i === 0, r: i === LEFT.length - 1 }) }))),
+      );
+      for (let i = 0; i < this.n; i++) {
+        const c = L.s0 + 2 * i;
+        const x = e.sets[i];
+        const fk = x?.warm ? C.warm : C.kg;
+        const fr = x?.warm ? C.warm : C.rep;
+        if (x?.text) this.merge(r, c, r, c + 1, x.text, st(fk, { dotted: true, size: 9, edge: ed({ l: i === 0 }) }));
+        else {
+          this.put(r, c, cell(x?.kg ?? null, st(fk, { dotted: true, bold: true, fmt: '0.0', edge: ed({ l: i === 0 }) })));
+          this.put(r, c + 1, cell(x?.rep ?? null, st(fr, { dotted: true, edge: ed() })));
+        }
+      }
+      this.put(r, L.rpe, cell(num(e.rpe), st(C.kg, { dotted: true, bold: true, edge: ed({ r: true }) })));
+      this.merge(r, L.date, r, L.note, e.notes, st(C.note, { dotted: true, align: 'left', wrap: true, size: 10, edge: ed({ r: true }) }));
+    });
+    this.rows.push([]);
+  }
+  sheet(name: string, extraWidths?: number[]): XSheet {
+    const w = tableWidths(this.n);
+    return { name, rows: this.rows, merges: this.merges, heights: this.heights, widths: extraWidths ?? w, noGrid: true, landscape: true };
+  }
+}
+const seriesCount = (blocks: { rows: ExRow[] }[]) => Math.min(20, Math.max(3, ...blocks.flatMap((x) => x.rows.map((r) => r.sets.length))));
 
 /* ---------- plan ---------- */
 
-/** Ćwiczenia jednostki planu w układzie tabeli (seria po serii). */
+/** Ćwiczenia jednostki planu w układzie tabeli: plan po lewej, w seriach ciężar do wykonania (powtórzenia do wpisania). */
 export function planExRows(k: PlanWorkout): ExRow[] {
   const labels = exerciseLabels(k.exercises);
   return k.exercises
     .map((e, i) => ({ e, label: labels[i] }))
     .filter(({ e }) => e.name.trim())
     .map(({ e, label }) => {
-      const sets = expandSets(e.groups).map((g) => {
-        const warm = g.type === 'Rozgrzewka' ? 'R ' : '';
-        if (e.cardio) return [g.reps && `${g.reps}${/\d$/.test(g.reps) ? ' min' : ''}`, g.load && `${g.load.replace('.', ',')}${/\d$/.test(g.load) ? ' km' : ''}`, g.pace].filter(Boolean).join(' · ');
-        const reps = g.reps ? `${g.reps}${e.perSide && !/str\./.test(g.reps) ? '/str.' : ''}` : '';
-        const load = kg(g.load);
-        return `${warm}${[reps, load].filter(Boolean).join(' × ')}`.trim();
+      const all = expandSets(e.groups);
+      const work = all.filter((g) => g.type !== 'Rozgrzewka');
+      const warmN = all.length - work.length;
+      const sets: XSet[] = all.map((g) => {
+        const warm = g.type === 'Rozgrzewka';
+        if (e.cardio) return { kg: null, rep: null, warm, text: [g.reps && `${g.reps}${/\d$/.test(g.reps) ? ' min' : ''}`, g.load && `${g.load.replace('.', ',')}${/\d$/.test(g.load) ? ' km' : ''}`, g.pace].filter(Boolean).join(' · ') };
+        return { kg: num(g.load), rep: null, warm };
       });
+      const reps = joinSeq(work.map((g) => g.reps));
       const t = splitTempo(e.notes);
-      const rest = e.rest && /^\d+$/.test(e.rest.trim()) ? `${Math.floor(Number(e.rest) / 60)}:${String(Number(e.rest) % 60).padStart(2, '0')}` : e.rest;
-      const extra = [rest ? `przerwa ${rest}` : '', ...e.groups.filter((g) => g.type && g.type !== 'Robocze' && g.type !== 'Rozgrzewka').map((g) => g.type)];
-      return { name: label && /\d/.test(label) ? `${label} ${e.name}` : e.name, sets, rpe: joinRpe(e.groups.filter((g) => g.type !== 'Rozgrzewka').map((g) => g.rpe)), tempo: t.tempo, notes: [t.notes, ...new Set(extra.filter(Boolean))].filter(Boolean).join(' · ') };
+      const extra = [warmN ? `rozgrzewka: ${warmN === 1 ? 'seria 1' : `serie 1–${warmN}`}` : '', ...e.groups.filter((g) => g.type && g.type !== 'Robocze' && g.type !== 'Rozgrzewka').map((g) => g.type)];
+      return {
+        name: label && /\d/.test(label) ? `${label} ${e.name}` : e.name,
+        plan: {
+          sets: work.length ? String(work.length) : '',
+          reps: e.cardio ? '' : reps ? `${reps}${e.perSide && !/str\./.test(reps) ? '/str.' : ''}${e.timed && /^\d+$/.test(reps) ? ' s' : ''}` : '',
+          rpe: joinRpe(work.map((g) => g.rpe)),
+          tempo: t.tempo,
+          rest: mmss(e.rest),
+        },
+        sets,
+        rpe: null,
+        notes: [...new Set(extra.filter(Boolean)), t.notes].filter(Boolean).join(' · '),
+      };
     });
 }
 
-/** Arkusz „Plan”: dla każdego tygodnia i jednostki tabela ćwiczeń (seria po serii). */
-export function planTableRows(plan: Plan, client?: Pick<Client, 'name'>): { rows: XCell[][]; n: number } {
+/** Arkusz „Plan”: dla każdego tygodnia i jednostki tabela w stylu arkusza trenera. */
+export function planTableSheet(plan: Plan, client?: Pick<Client, 'name'>): XSheet {
   const blocks = plan.weeks.flatMap((w, wi) =>
     w.workouts
       .filter((k) => k.exercises.some((e) => e.name.trim()))
       .map((k) => {
         const d = workoutDate(plan, wi, k);
-        return { title: [w.name, k.name, d ? dmy(d) : ''].filter(Boolean).join(' · '), rows: planExRows(k) };
+        return { title: [w.name, k.name].filter(Boolean).join(' · ').toUpperCase(), date: d ? dmy(d) : '', rows: planExRows(k) };
       }),
   );
-  const n = Math.max(1, ...blocks.flatMap((x) => x.rows.map((r) => r.sets.length)));
-  const head: XCell[][] = [[b(plan.name)], ...(client ? [['Podopieczny', client.name]] : []), ...(plan.startDate ? [['Start', dmy(plan.startDate)]] : []), []];
-  return { rows: [...head, ...blocks.flatMap((x) => block(x.title, x.rows, n))], n };
+  const g = new Grid(seriesCount(blocks));
+  g.info([[b(plan.name)], ...(client ? [['Podopieczny', client.name]] : []), ...(plan.startDate ? [['Start', dmy(plan.startDate)]] : []), []]);
+  for (const x of blocks) g.block(x.title, x.date, x.rows);
+  return g.sheet('Plan');
 }
 
 /** Skoroszyt planu: „Plan” (tabela seria po serii), „Tygodnie” (siatka) i „Do importu” (wczytasz go z powrotem). */
@@ -140,43 +259,40 @@ export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>): XSheet[
   const rows = planRows(plan);
   const restCol = rows[0].indexOf('Przerwa');
   // przerwa „90” (sekundy) → „1:30”, żeby w arkuszu było jednolicie m:ss
-  const rest = (c: string) => (/^\d+$/.test(c.trim()) ? `${Math.floor(Number(c) / 60)}:${String(Number(c) % 60).padStart(2, '0')}` : c);
-  const flat = rows.map((r, i) => (i === 0 ? r : r.map((c, ci) => (ci === restCol ? rest(c) : numOrText(c)))));
-  const t = planTableRows(plan, client);
-  return [
-    { name: 'Plan', rows: t.rows, widths: widths(t.n) },
-    { name: 'Tygodnie', rows: planGridRows(plan, client) },
-    { name: 'Do importu', rows: flat, header: true },
-  ];
+  const flat = rows.map((r, i) => (i === 0 ? r : r.map((c, ci) => (ci === restCol ? mmss(c) : numOrText(c)))));
+  return [planTableSheet(plan, client), { name: 'Tygodnie', rows: planGridRows(plan, client) }, { name: 'Do importu', rows: flat, header: true }];
 }
 
 /* ---------- treningi ---------- */
 
-function setText(e: SessionExercise, x: SetLog): string {
-  const warm = x.warmup ? 'R ' : '';
-  if (e.cardio) return [x.reps != null ? fmtClock(x.reps) : '', x.dist ? `${String(x.dist).replace('.', ',')} km` : '', x.hr ? `${x.hr} ud/min` : ''].filter(Boolean).join(' · ');
-  let reps = x.reps != null ? String(x.reps) : '';
-  if (x.unit === 's' && x.reps != null) reps = `${x.reps} s`;
-  else if (x.unit === 'min' && x.reps != null) reps = `${String(x.reps).replace('.', ',')} min`;
-  else if (x.complex) reps = x.complex;
-  if (x.repsR != null) reps = `${reps}/${x.repsR}${x.unit === 's' ? ' s' : ''}`.replace(' s/', '/');
-  return `${warm}${[reps, x.load != null ? kg(x.load) : ''].filter(Boolean).join(' × ')}`.trim();
+function setCell(e: SessionExercise, x: SetLog): XSet {
+  const warm = !!x.warmup;
+  if (e.cardio) return { kg: null, rep: null, warm, text: [x.reps != null ? fmtClock(x.reps) : '', x.dist ? `${String(x.dist).replace('.', ',')} km` : '', x.hr ? `${x.hr} ud/min` : ''].filter(Boolean).join(' · ') };
+  let rep: string | number | null = x.reps ?? null;
+  if (x.unit === 's' && x.reps != null) rep = `${x.reps} s`;
+  else if (x.unit === 'min' && x.reps != null) rep = `${String(x.reps).replace('.', ',')} min`;
+  else if (x.complex) rep = x.complex;
+  if (x.repsR != null) rep = `${String(rep ?? '').replace(/ s$/, '')}/${x.repsR}${x.unit === 's' ? ' s' : ''}`;
+  return { kg: x.load ?? null, rep, warm };
 }
 
-/** Ćwiczenia zapisanego treningu w układzie tabeli (seria po serii). */
+/** Ćwiczenia zapisanego treningu w układzie tabeli (seria po serii: KG i REP). */
 export function sessionExRows(s: TrainingSession): ExRow[] {
   return s.exercises
     .filter((e) => e.name.trim())
     .map((e) => {
       const logs = e.setsLog ?? [];
       const t = splitTempo(e.notes);
+      const warmN = logs.filter((x) => x.warmup).length;
+      const base = { name: e.label && /\d/.test(e.label) ? `${e.label} ${e.name}` : e.name, notes: [warmN ? `rozgrzewka: ${warmN === 1 ? '1 seria' : `${warmN} serie`}` : '', t.notes].filter(Boolean).join(' · ') };
+      const plan = { sets: e.sets ?? '', reps: e.reps ? `${e.reps}${e.perSide && !/str\./.test(e.reps) ? '/str.' : ''}` : '', rpe: e.rpe ?? '', tempo: t.tempo, rest: mmss(e.rest) };
       if (!logs.length) {
         // zapis skrócony („3 × 8 · 60 kg”) — rozpisany na serie
         const n = Math.min(20, Math.max(1, Number(e.sets) || 1));
-        const cell = [e.reps ?? '', kg(e.load)].filter(Boolean).join(' × ');
-        return { name: e.name, sets: Array.from({ length: n }, () => cell), rpe: joinRpe([e.rpe]), tempo: t.tempo, notes: t.notes };
+        return { ...base, plan, sets: Array.from({ length: n }, () => ({ kg: num(e.load), rep: num(e.reps) })), rpe: num(e.rpe) };
       }
-      return { name: e.name, sets: logs.map((x) => setText(e, x)), rpe: joinRpe(logs.filter((x) => !x.warmup).map((x) => x.rpe)), tempo: t.tempo, notes: t.notes };
+      const rpe = joinRpe(logs.filter((x) => !x.warmup).map((x) => x.rpe));
+      return { ...base, plan: { ...plan, sets: plan.sets || String(logs.length - warmN) }, sets: logs.map((x) => setCell(e, x)), rpe };
     });
 }
 
@@ -203,8 +319,10 @@ function sessionInfo(s: TrainingSession, client?: Pick<Client, 'name'>, withTrai
 /** Skoroszyt jednego treningu: dane treningu i tabela ćwiczeń (seria po serii). */
 export function sessionWorkbook(s: TrainingSession, client?: Pick<Client, 'name'>, withTrainer?: boolean): XSheet[] {
   const rows = sessionExRows(s);
-  const n = Math.max(1, ...rows.map((r) => r.sets.length));
-  return [{ name: 'Trening', rows: [...sessionInfo(s, client, withTrainer), ...block('Ćwiczenia', rows, n)], widths: widths(n) }];
+  const g = new Grid(seriesCount([{ rows }]));
+  g.info(sessionInfo(s, client, withTrainer));
+  g.block((s.workoutName || 'Trening').toUpperCase(), dmy(s.date), rows);
+  return [g.sheet('Trening')];
 }
 
 /** Wszystkie treningi klienta: „Treningi” (wiersz na trening) i „Serie” (każdy trening jako tabela seria po serii). */
@@ -228,10 +346,8 @@ export function sessionsWorkbook(sessions: TrainingSession[], withTrainer?: (s: 
       s.notes ?? '',
     ]);
   }
-  const blocks = sorted.map((s) => ({ title: [dmy(s.date), s.workoutName || 'Trening'].join(' · '), rows: sessionExRows(s) })).filter((x) => x.rows.length);
-  const n = Math.max(1, ...blocks.flatMap((x) => x.rows.map((r) => r.sets.length)));
-  return [
-    { name: 'Treningi', rows: list, header: true },
-    { name: 'Serie', rows: blocks.flatMap((x) => block(x.title, x.rows, n)), widths: widths(n) },
-  ];
+  const blocks = sorted.map((s) => ({ title: (s.workoutName || 'Trening').toUpperCase(), date: dmy(s.date), rows: sessionExRows(s) })).filter((x) => x.rows.length);
+  const g = new Grid(seriesCount(blocks));
+  for (const x of blocks) g.block(x.title, x.date, x.rows);
+  return [{ name: 'Treningi', rows: list, header: true }, g.sheet('Serie')];
 }

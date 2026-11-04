@@ -3,7 +3,23 @@
  * zamrożony pierwszy wiersz. ZIP bez kompresji (metoda „store”) — Excel, Arkusze Google i Numbers otwierają go bez problemu.
  */
 
-export type XCell = string | number | null | undefined | { v: string | number | null | undefined; bold?: boolean };
+export type XBorder = 'thin' | 'medium' | 'dotted' | 'hair';
+/** Wygląd komórki: czcionka, wypełnienie, ramki, wyrównanie, format liczby. */
+export interface XStyle {
+  bold?: boolean;
+  /** Kolor czcionki / wypełnienia jako „RRGGBB”. */
+  color?: string;
+  fill?: string;
+  size?: number;
+  align?: 'left' | 'center' | 'right';
+  valign?: 'top' | 'center' | 'bottom';
+  wrap?: boolean;
+  /** Format liczby, np. „0.0”. */
+  fmt?: string;
+  border?: { l?: XBorder; r?: XBorder; t?: XBorder; b?: XBorder };
+}
+
+export type XCell = string | number | null | undefined | { v: string | number | null | undefined; bold?: boolean; st?: XStyle };
 
 export interface XSheet {
   name: string;
@@ -12,13 +28,21 @@ export interface XSheet {
   widths?: number[];
   /** Pierwszy wiersz to nagłówek: pogrubiony i zamrożony. */
   header?: boolean;
+  /** Scalone komórki, np. „B2:C2”. */
+  merges?: string[];
+  /** Wysokości wierszy (punkty) wg indeksu wiersza. */
+  heights?: Record<number, number>;
+  /** Bez linii siatki (gdy arkusz ma własne ramki). */
+  noGrid?: boolean;
+  /** Wydruk poziomo, dopasowany do szerokości strony. */
+  landscape?: boolean;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // XML 1.0 nie dopuszcza znaków sterujących (poza tab / nowa linia)
 const clean = (s: string) => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 
-function colName(i: number): string {
+export function colName(i: number): string {
   let s = '';
   for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
   return s;
@@ -34,7 +58,43 @@ export function sheetName(name: string, taken: string[] = []): string {
   return out;
 }
 
-function sheetXml(sh: XSheet): string {
+class Styles {
+  fonts = ['<font><sz val="11"/><name val="Calibri"/></font>', '<font><b/><sz val="11"/><name val="Calibri"/></font>'];
+  fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
+  borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
+  fmts: string[] = [];
+  xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>', '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'];
+  private keys = new Map<string, number>();
+  private idx(list: string[], x: string) {
+    const i = list.indexOf(x);
+    if (i >= 0) return i;
+    list.push(x);
+    return list.length - 1;
+  }
+  get(st: XStyle): number {
+    const key = JSON.stringify(st);
+    const hit = this.keys.get(key);
+    if (hit != null) return hit;
+    const font = this.idx(this.fonts, `<font>${st.bold ? '<b/>' : ''}<sz val="${st.size ?? 11}"/>${st.color ? `<color rgb="FF${st.color}"/>` : ''}<name val="Calibri"/></font>`);
+    const fill = st.fill ? this.idx(this.fills, `<fill><patternFill patternType="solid"><fgColor rgb="FF${st.fill}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
+    const side = (n: string, v?: XBorder) => (v ? `<${n} style="${v}"><color rgb="FF000000"/></${n}>` : `<${n}/>`);
+    const bd = st.border;
+    const border = bd ? this.idx(this.borders, `<border>${side('left', bd.l)}${side('right', bd.r)}${side('top', bd.t)}${side('bottom', bd.b)}<diagonal/></border>`) : 0;
+    const fmt = st.fmt ? 164 + this.idx(this.fmts, st.fmt) : 0;
+    const al = st.align || st.valign || st.wrap ? `<alignment${st.align ? ` horizontal="${st.align}"` : ''} vertical="${st.valign ?? 'center'}"${st.wrap ? ' wrapText="1"' : ''}/>` : '';
+    this.xfs.push(
+      `<xf numFmtId="${fmt}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyFont="1"${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''}${fmt ? ' applyNumberFormat="1"' : ''}${al ? ' applyAlignment="1">' + al + '</xf>' : '/>'}`,
+    );
+    this.keys.set(key, this.xfs.length - 1);
+    return this.xfs.length - 1;
+  }
+  xml(): string {
+    const nf = this.fmts.length ? `<numFmts count="${this.fmts.length}">${this.fmts.map((f, i) => `<numFmt numFmtId="${164 + i}" formatCode="${esc(f)}"/>`).join('')}</numFmts>` : '';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${nf}<fonts count="${this.fonts.length}">${this.fonts.join('')}</fonts><fills count="${this.fills.length}">${this.fills.join('')}</fills><borders count="${this.borders.length}">${this.borders.join('')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${this.xfs.length}">${this.xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  }
+}
+
+function sheetXml(sh: XSheet, styles: Styles): string {
   const ncol = Math.max(1, ...sh.rows.map((r) => r.length));
   const widths =
     sh.widths ??
@@ -42,28 +102,37 @@ function sheetXml(sh: XSheet): string {
       Math.min(60, Math.max(6, ...sh.rows.map((r) => String(val(r[ci]) ?? '').split('\n').reduce((a, l) => Math.max(a, l.length), 0) + 2))),
     );
   const cols = `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`;
-  const pane = sh.header && sh.rows.length > 1 ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' : '';
+  const grid = sh.noGrid ? ' showGridLines="0"' : '';
+  const pane =
+    sh.header && sh.rows.length > 1
+      ? `<sheetViews><sheetView${grid} workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+      : grid
+        ? `<sheetViews><sheetView${grid} workbookViewId="0"/></sheetViews>`
+        : '';
   const rows = sh.rows
     .map((r, ri) => {
       const cells = r
         .map((c, ci) => {
           const v = val(c);
-          if (v == null || v === '') return '';
+          const st = c != null && typeof c === 'object' ? c.st : undefined;
+          if ((v == null || v === '') && !st) return '';
           const bold = (sh.header && ri === 0) || (c != null && typeof c === 'object' && c.bold);
           const ref = `${colName(ci)}${ri + 1}`;
-          const s = bold ? ' s="1"' : '';
+          const s = st ? ` s="${styles.get(bold ? { ...st, bold: true } : st)}"` : bold ? ' s="1"' : '';
+          if (v == null || v === '') return `<c r="${ref}"${s}/>`;
           if (typeof v === 'number' && Number.isFinite(v)) return `<c r="${ref}"${s}><v>${v}</v></c>`;
           const t = clean(String(v));
           return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
         })
         .join('');
-      return `<row r="${ri + 1}">${cells}</row>`;
+      const h = sh.heights?.[ri];
+      return `<row r="${ri + 1}"${h ? ` ht="${h}" customHeight="1"` : ''}>${cells}</row>`;
     })
     .join('');
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pane}${cols}<sheetData>${rows}</sheetData></worksheet>`;
+  const pr = sh.landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
+  const page = sh.landscape ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pr}${pane}${cols}<sheetData>${rows}</sheetData>${sh.merges?.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}${page}</worksheet>`;
 }
-
-const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
 /* ---------- ZIP (metoda store) ---------- */
 const CRC = (() => {
@@ -147,6 +216,8 @@ export function xlsx(sheets: XSheet[]): Uint8Array {
     taken.push(n);
     return { ...s, name: n };
   });
+  const styles = new Styles();
+  const sheetXmls = named.map((s) => sheetXml(s, styles));
   const files = [
     {
       name: '[Content_Types].xml',
@@ -164,8 +235,8 @@ export function xlsx(sheets: XSheet[]): Uint8Array {
       name: 'xl/_rels/workbook.xml.rels',
       xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${named.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${named.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     },
-    { name: 'xl/styles.xml', xml: STYLES },
-    ...named.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, xml: sheetXml(s) })),
+    { name: 'xl/styles.xml', xml: styles.xml() },
+    ...sheetXmls.map((xml, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, xml })),
   ];
   return zip(files.map((f) => ({ name: f.name, data: enc.encode(f.xml) })));
 }
