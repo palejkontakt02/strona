@@ -58,14 +58,16 @@ const colIdx = (ref: string) => {
   return [...letters].reduce((a, c) => a * 26 + c.charCodeAt(0) - 64, 0) - 1;
 };
 
-/** Wiersze pierwszego arkusza skoroszytu. */
+/** Wiersze pierwszego arkusza skoroszytu (albo arkusza „Do importu”, gdy jest — eksport z Fitowej). */
 export async function readXlsx(buf: ArrayBuffer | Uint8Array): Promise<string[][]> {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   const files = await unzip(bytes, (n) => n === 'xl/sharedStrings.xml' || n === 'xl/workbook.xml' || n === 'xl/_rels/workbook.xml.rels' || /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
   const shared = [...(files.get('xl/sharedStrings.xml') ?? '').matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => texts(m[1]));
   // pierwszy arkusz wg kolejności w skoroszycie
   let sheet: string | undefined;
-  const rid = files.get('xl/workbook.xml')?.match(/<sheet\b[^>]*r:id="([^"]+)"/)?.[1];
+  // plik z Fitowej: arkusz „Do importu” (płaska tabela) ma pierwszeństwo przed czytelnym arkuszem „Plan”
+  const wb = files.get('xl/workbook.xml') ?? '';
+  const rid = wb.match(/<sheet\b[^>]*name="Do importu"[^>]*r:id="([^"]+)"/)?.[1] ?? wb.match(/<sheet\b[^>]*r:id="([^"]+)"/)?.[1];
   const target = rid && files.get('xl/_rels/workbook.xml.rels')?.match(new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`))?.[1];
   if (target) sheet = files.get(`xl/${target.replace(/^\/?xl\//, '')}`);
   sheet ??= [...files.entries()].filter(([n]) => n.startsWith('xl/worksheets/')).sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))[0]?.[1];

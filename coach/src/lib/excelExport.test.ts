@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../data/seed';
-import { planWorkbook, sessionWorkbook, sessionsWorkbook, xlsxName } from './excelExport';
+import { planExRows, planWorkbook, sessionExRows, sessionWorkbook, sessionsWorkbook, splitTempo, xlsxName } from './excelExport';
 import { detectColumns, parseTable, planToCsv, sheetToPlan } from './sheetImport';
 import { readXlsx } from './xlsxRead';
 import { sheetName, xlsx } from './xlsxWrite';
@@ -50,18 +50,39 @@ describe('plan do Excela', () => {
   });
 });
 
-describe('treningi do Excela', () => {
-  it('jeden trening: dane i serie', () => {
+describe('układ tabeli: ćwiczenie w wierszu, seria w kolumnie, na końcu RPE / tempo / uwagi', () => {
+  it('plan: nagłówek „Ćwiczenie | Seria 1…N | RPE | Tempo | Uwagi” i ćwiczenia jedno pod drugim', () => {
+    const rows = planWorkbook(plan)[0].rows.map((r) => r.map((c) => (c != null && typeof c === 'object' ? c.v : c)));
+    const hi = rows.findIndex((r) => r[0] === 'Ćwiczenie');
+    const head = rows[hi];
+    expect(head[1]).toBe('Seria 1');
+    expect(head.slice(-3)).toEqual(['RPE', 'Tempo', 'Uwagi']);
+    const k = plan.weeks[0].workouts.find((w) => w.exercises.some((e) => e.name.trim()))!;
+    const first = k.exercises.find((e) => e.name.trim())!;
+    expect(String(rows[hi + 1][0])).toContain(first.name);
+  });
+  it('seria jako „powt. × ciężar”, tempo wyciągnięte z uwag', () => {
+    const r = planExRows({ id: 'w', name: 'A', exercises: [{ id: 'e', name: 'Przysiad', notes: 'tempo 3-1-X-0, kolana na zewnątrz', groups: [{ type: 'Rozgrzewka', sets: '1', reps: '5', load: '40', rpe: '' }, { type: 'Robocze', sets: '3', reps: '8', load: '62.5', rpe: '8' }] }] } as never)[0];
+    expect(r.sets).toEqual(['R 5 × 40 kg', '8 × 62,5 kg', '8 × 62,5 kg', '8 × 62,5 kg']);
+    expect(r.rpe).toBe('8');
+    expect(r.tempo).toBe('3-1-X-0');
+    expect(r.notes).toBe('kolana na zewnątrz');
+    expect(splitTempo('bez tempa').tempo).toBe('');
+  });
+  it('trening: jeden wiersz na ćwiczenie, serie w kolumnach', () => {
     const rows = sessionWorkbook(sess, { name: 'Jan' }, true)[0].rows.map((r) => r.map((c) => (c != null && typeof c === 'object' ? c.v : c)));
     expect(rows[0][1]).toBe(sess.workoutName || 'Trening');
-    const head = rows.findIndex((r) => r[0] === 'Ćwiczenie');
-    const setCount = sess.exercises.filter((e) => e.name.trim()).reduce((a, e) => a + Math.max(1, e.setsLog?.length ?? 0), 0);
-    expect(rows.length - head - 1).toBe(setCount);
+    const hi = rows.findIndex((r) => r[0] === 'Ćwiczenie');
+    const n = sess.exercises.filter((e) => e.name.trim()).length;
+    expect(rows.slice(hi + 1).filter((r) => r.length && r[0]).length).toBe(n);
+    const sx = sessionExRows({ ...sess, exercises: [{ name: 'Wiosłowanie', setsLog: [{ reps: 10, load: 30, rpe: 7 }, { reps: 8, load: 32.5, rpe: 8 }] }] });
+    expect(sx[0].sets).toEqual(['10 × 30 kg', '8 × 32,5 kg']);
+    expect(sx[0].rpe).toBe('7 / 8');
   });
-  it('wszystkie treningi: wiersz na trening i na serię', () => {
+  it('wszystkie treningi: lista i tabela każdego treningu', () => {
     const ss = db.sessions.filter((s) => s.clientId === sess.clientId);
     const [list, sets] = sessionsWorkbook(ss, () => true);
     expect(list.rows.length).toBe(ss.length + 1);
-    expect(sets.rows.length).toBeGreaterThan(ss.length);
+    expect(sets.rows.filter((r) => r[0] != null && typeof r[0] === 'object' && r[0].v === 'Ćwiczenie').length).toBe(ss.filter((s) => s.exercises.some((e) => e.name.trim())).length);
   });
 });

@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../lib/xlsxWrite';
+import { planWorkbook, xlsxName } from '../lib/excelExport';
 import { liveMarkActive, markNeedsUpdate, wantedMark } from '../lib/liveMark';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LineChart, WeightTrendChart } from '../components/charts';
@@ -1336,6 +1338,11 @@ function Workouts({
           plan && <span className="muted small">{plan.name}</span>
         )}
       </div>
+      {plan && (
+        <button type="button" className="btn btn-ghost btn-sm ath-plan-xlsx" onClick={() => void downloadXlsx(xlsxName('plan', plan.name), planWorkbook(plan))} title="Plan do Excela: ćwiczenia jedno pod drugim, serie w kolumnach">
+          <Icon name="download" size={16} /> Pobierz plan (Excel)
+        </button>
+      )}
       {plan && open > 0 && (
         <button type="button" className="wk-past-toggle" aria-expanded={past} onClick={() => setPast(!past)}>
           <span>
