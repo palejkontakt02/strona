@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../../lib/xlsxWrite';
+import { planWorkbook, xlsxName } from '../../lib/excelExport';
 import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
@@ -210,6 +212,9 @@ export function ClientPlans({ client }: { client: Client }) {
                         <Icon name="print" size={16} /> Następny tydzień
                       </button>
                     )}
+                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client))} title="Plik Excel (.xlsx): arkusz „Plan” (da się go wczytać z powrotem) i „Tygodnie” (siatka jak w aplikacji)">
+                      <Icon name="download" size={16} /> Excel
+                    </button>
                     <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
                       <Icon name="download" size={16} /> CSV
                     </button>
@@ -273,6 +278,7 @@ export function ClientPlans({ client }: { client: Client }) {
               { icon: 'lib', text: 'Zapisz jako szablon', run: () => saveTemplate(menuPlan) },
               { icon: 'print', text: 'Drukuj', run: () => printPlan(menuPlan, client, sessions) },
               ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
+              { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client)) },
               { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
               { icon: 'download', text: 'Import z arkusza', run: () => setImporting(true) },
               { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(menuPlan), danger: true },

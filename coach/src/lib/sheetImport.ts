@@ -505,6 +505,11 @@ function exportDist(load: string): string {
  * ma dodatkowe kolumny „Dystans” i „Cel” (strefa / tempo); czas ≥ 60 min jako h:mm:ss. Na stronę — „8/str.”.
  */
 export function planToCsv(plan: Plan): string {
+  return `\uFEFF${planRows(plan).map((l) => l.map(csvCell).join(';')).join('\r\n')}\r\n`;
+}
+
+/** Wiersze planu (nagłówek + ćwiczenia) — wspólne dla CSV i Excela; wczytasz je z powrotem przez import. */
+export function planRows(plan: Plan): string[][] {
   const anyCardio = plan.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name.trim() && isCardioEx(e))));
   const cols = anyCardio ? EXPORT_COLS : BASE_COLS;
   const lines: string[][] = [cols.map((f) => FIELD_LABEL[f])];
@@ -537,7 +542,7 @@ export function planToCsv(plan: Plan): string {
         });
       });
     }
-  return `\uFEFF${lines.map((l) => l.map(csvCell).join(';')).join('\r\n')}\r\n`;
+  return lines;
 }
 
 /** Nazwa pliku: „plan-s-c-sila-i-moc.csv”. */

@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../lib/xlsxWrite';
+import { sessionWorkbook, xlsxName } from '../lib/excelExport';
 import { useEffect, useRef, useState } from 'react';
 import { Icon, Modal } from '../components/ui';
 import { RefThread } from '../components/RefComment';
@@ -163,9 +165,14 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
       submitLabel={hasVids && !s.reviewedAt ? 'Obejrzane ✓' : 'Zapisz komentarz'}
       wide
       extraActions={
-        <button type="button" className="btn btn-ghost" onClick={() => openModal({ kind: 'session', session: s })}>
-          <Icon name="edit" size={16} /> Edytuj trening
-        </button>
+        <>
+          <button type="button" className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('trening', client?.name, s.date), sessionWorkbook(s, client, !isSolo(db, s)))} title="Ten trening do Excela — seria po serii">
+            <Icon name="download" size={16} /> Excel
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => openModal({ kind: 'session', session: s })}>
+            <Icon name="edit" size={16} /> Edytuj trening
+          </button>
+        </>
       }
     >
       <div className="rv-head">

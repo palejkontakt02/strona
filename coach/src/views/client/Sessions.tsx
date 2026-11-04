@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../../lib/xlsxWrite';
+import { sessionsWorkbook, xlsxName } from '../../lib/excelExport';
 import { useMemo, useState } from 'react';
 import { SessionSheet } from '../../athlete/History';
 import type { Client, Plan, PlanWorkout, TrainingSession } from '../../domain';
@@ -186,6 +188,11 @@ export function ClientSessions({ client }: { client: Client }) {
       <div className="toolbar">
         <h3>Zapisane treningi ({sessions.length})</h3>
         <div className="actions">
+          {sessions.length > 0 && (
+            <button className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('treningi', client.name), sessionsWorkbook(sessions, (s) => !isSolo(db, s)))} title="Wszystkie treningi do Excela: arkusz „Treningi” i „Serie”">
+              <Icon name="download" size={16} /> Excel
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
             <Icon name="clipboard" size={16} /> Wklej z notatki
           </button>

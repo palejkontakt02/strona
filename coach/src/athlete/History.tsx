@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../lib/xlsxWrite';
+import { sessionWorkbook, xlsxName } from '../lib/excelExport';
 import { LOAD_PER_TEXT } from '../lib/run';
 import { VideoChip } from '../components/SetVideo';
 import { needsReview, sessionVideos } from '../data/videos';
@@ -185,9 +187,14 @@ export function SessionSheet({
             <span className="eyebrow first-cap">{fmtLong(s.date)}</span>
             <h2>{s.workoutName || 'Trening'}</h2>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={onClose}>
-            Zamknij
-          </button>
+          <span className="actions">
+            <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('trening', s.workoutName, s.date), sessionWorkbook(s))} title="Ten trening do Excela — seria po serii">
+              <Icon name="download" size={16} /> Excel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={onClose}>
+              Zamknij
+            </button>
+          </span>
         </div>
         {s.stoppedForPain && (
           <div className="sb-stop-box" role="note">

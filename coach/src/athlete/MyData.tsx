@@ -1,3 +1,5 @@
+import { downloadXlsx } from '../lib/xlsxWrite';
+import { sessionsWorkbook, xlsxName } from '../lib/excelExport';
 import { useState } from 'react';
 import type { Client } from '../domain';
 import { useStore } from '../data/store';
@@ -35,6 +37,10 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
     if (!data) return;
     download(exportFileName(client.name, 'json', todayISO()), JSON.stringify(data, null, 2), 'application/json');
     toast('Plik z Twoimi danymi zapisany na urządzeniu.');
+  };
+  const getXlsx = () => {
+    void downloadXlsx(xlsxName('treningi', client.name, todayISO()), sessionsWorkbook(sessionsOf(db, client.id)));
+    toast('Treningi zapisane jako plik Excel.');
   };
   const getCsv = () => {
     download(exportFileName(client.name, 'csv', todayISO()), sessionsCsv(sessionsOf(db, client.id)), 'text/csv;charset=utf-8');
@@ -78,6 +84,9 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
       <div className="mydata-actions">
         <button type="button" className="btn btn-secondary" onClick={getJson}>
           Pobierz dane (JSON)
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={getXlsx} disabled={!nSessions}>
+          Treningi (Excel)
         </button>
         <button type="button" className="btn btn-ghost" onClick={getCsv} disabled={!nSessions}>
           Treningi (CSV)
