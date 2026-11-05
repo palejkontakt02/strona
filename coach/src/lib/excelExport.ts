@@ -24,7 +24,7 @@ export function xlsxName(kind: 'plan' | 'trening' | 'treningi', ...parts: (strin
 
 /* ---------- styl (czytelny na ekranie, na telefonie i w druku czarno-białym) ---------- */
 
-const C = { black: '000000', dark: '262626', blue: '9FC5E8', kg: 'E8E8E8', white: 'FFFFFF', note: 'F5F5F5', line: '8C8C8C', hint: '595959', faint: 'BFBFBF' };
+const C = { black: '000000', dark: '404040', blue: '9FC5E8', kg: 'E8E8E8', white: 'FFFFFF', note: 'F5F5F5', none: 'F7F7F7', line: '8C8C8C', hint: '595959', faint: 'BFBFBF' };
 type Edge = { l?: boolean; r?: boolean; t?: boolean; b?: boolean };
 interface StO {
   bold?: boolean;
@@ -37,6 +37,7 @@ interface StO {
   edge?: Edge;
   /** Bez wewnętrznych ramek (puste pole poza liczbą serii). */
   bare?: boolean;
+  valign?: 'center';
 }
 function st(fill: string | undefined, o: StO = {}): XStyle {
   const e = o.edge ?? {};
@@ -65,18 +66,29 @@ const num = (v: string | number | undefined | null): string | number | null => {
 const kgText = (v: string | number | undefined | null) => {
   const t = String(v ?? '').trim();
   if (!t) return '';
-  return /^-?\d+(?:[.,]\d+)?$/.test(t) ? `${t.replace('.', ',')} kg` : t.replace(/(\d)\.(\d)/g, '$1,$2');
+  return /^-?\d+(?:[.,]\d+)?$/.test(t) ? `${t.replace('.', ',')} kg` : minus(t.replace(/(\d)\.(\d)/g, '$1,$2'));
 };
+/** Prawdziwy minus w „-10%” (czytelniejszy niż łącznik). */
+const minus = (t: string) => t.replace(/(^|\s)-(\d)/g, '$1−$2');
 const mmss = (rest?: string) => (rest && /^\d+$/.test(rest.trim()) ? `${Math.floor(Number(rest) / 60)}:${String(Number(rest) % 60).padStart(2, '0')}` : (rest ?? '').trim());
-const TYPE_PL: Record<string, string> = { 'Top set': 'seria szczytowa', 'Back-off': 'serie zjazdowe (back-off)', 'Drop set': 'drop set', AMRAP: 'AMRAP — ostatnia seria do maks. powtórzeń', Schłodzenie: 'schłodzenie' };
+const TYPE_PL: Record<string, string> = { 'Top set': 'seria 1 = główna', 'Back-off': 'kolejne lżej o podany %', 'Drop set': 'drop set: od razu lżej, bez przerwy', AMRAP: 'max = do maks. powtórzeń', Schłodzenie: 'schłodzenie' };
 
 /* ---------- plan: siatka tygodni ---------- */
 
+/** Zapis grup serii jak w planie: „1×5 @8 + 3×5 −10% @7” (rozgrzewka pominięta). */
 function groupText(groups: Parameters<typeof exerciseSummary>[0], perSide?: boolean): string {
-  const s = exerciseSummary(groups);
-  if (!s.sets && !s.reps && !s.load) return '';
-  const reps = s.reps ? `${s.reps}${perSide && !/str\./.test(s.reps) ? '/str.' : ''}` : '';
-  return [s.sets && reps ? `${s.sets} × ${reps}` : s.sets || reps, s.load && kgText(s.load), s.rpe && `RPE ${s.rpe.replace('.', ',')}`].filter(Boolean).join(' · ');
+  const work = groups.filter((g) => g.type !== 'Rozgrzewka' && g.type !== 'Schłodzenie' && g.type !== 'Przerwa' && (g.reps || g.load || g.sets));
+  if (!work.length) return '';
+  // sąsiednie identyczne grupy łączone (3 × „1×5 60”) → „3×5 60 kg”
+  const parts: { n: number; reps: string; load: string; rpe: string }[] = [];
+  for (const g of work) {
+    const n = Math.max(1, Number(g.sets) || 1);
+    const reps = g.reps ? `${g.reps}${perSide && !/str\./.test(g.reps) ? '/str.' : ''}` : '';
+    const last = parts[parts.length - 1];
+    if (last && last.reps === reps && last.load === g.load && last.rpe === g.rpe) last.n += n;
+    else parts.push({ n, reps, load: g.load, rpe: g.rpe });
+  }
+  return parts.map((x) => [x.reps ? `${x.n}×${x.reps}` : `${x.n} s.`, x.load && kgText(x.load), x.rpe && `@${x.rpe.replace('.', ',')}`].filter(Boolean).join(' ')).join(' + ');
 }
 
 /** Siatka „ćwiczenia × tygodnie” dla każdej jednostki planu (jak tabela w aplikacji) — progresja z tygodnia na tydzień. */
@@ -132,7 +144,7 @@ export function planGridSheet(plan: Plan, client?: Pick<Client, 'name'>): XSheet
     landscape: maxW > 4,
     fitWidth: true,
     freezeCols: 1,
-    pageFooter: `&L${plan.name}&RStrona &P z &N`,
+    pageFooter: `&L${plan.name.replace(/&/g, '&&')}&RStrona &P z &N`,
   };
 }
 
@@ -182,7 +194,7 @@ const LEFT: { key: PlanKey; head: string; w: number; always?: boolean }[] = [
   { key: 'reps', head: 'Powt.', w: 8, always: true },
   { key: 'rpe', head: 'RPE', w: 6 },
   { key: 'tempo', head: 'Tempo', w: 8 },
-  { key: 'rest', head: 'Przerwa', w: 8 },
+  { key: 'rest', head: 'Przerwa', w: 9 },
 ];
 const NAME_W = 26;
 const KG_W = 7;
@@ -191,7 +203,7 @@ const NOTE_W = 30;
 const DATE_W = 11;
 
 /** Wysokość wiersza: tyle linii, ile zajmie najdłuższy zawijany tekst. */
-const linesOf = (t: string, width: number) => Math.max(1, Math.ceil(t.length / Math.max(4, width * 1.15)));
+const linesOf = (t: string, width: number) => Math.max(1, Math.ceil(t.length / Math.max(4, width)));
 
 /** Arkusz złożony z bloków (jednostka planu / trening) w stylu arkusza trenera, z podziałem stron między blokami. */
 class Grid {
@@ -201,6 +213,8 @@ class Grid {
   breaks: number[] = [];
   left: typeof LEFT;
   private used = 0;
+  /** Bloki na bieżącej stronie (nagłówek pliku nie wymusza nowej strony). */
+  private onPage = 0;
   private pageH: number;
   constructor(
     public n: number,
@@ -235,32 +249,52 @@ class Grid {
     return this.heights[r] ?? 13;
   }
   /** Wiersze informacyjne nad tabelą: etykieta pogrubiona, wartość jako tekst (nie ucina się). */
-  info(lines: [string, string][], title?: string) {
+  info(lines: [string, string][], title?: string, legend?: string) {
     if (title) {
       this.heights[this.rows.length] = 22;
       this.rows.push([cell(title, { bold: true, size: 14, align: 'left' })]);
     }
     for (const [k, v] of lines) this.rows.push([cell(k, { bold: true, align: 'left' }), cell(v, { align: 'left' })]);
+    if (legend) {
+      // legenda zawijana w scalonej komórce na całą szerokość (na telefonie nie ucieka w bok)
+      const r = this.rows.length;
+      const last = this.widths().length - 1;
+      this.merge(r, 0, r, last, legend, { align: 'left', valign: 'center', wrap: true, size: 9, italic: true, color: C.hint });
+      this.heights[r] = 26;
+    }
     this.rows.push([]);
     for (let r = 0; r < this.rows.length; r++) this.used += this.h(r);
+  }
+  private rowHeights(list: ExRow[]) {
+    return list.map((e) => Math.max(21, Math.max(12 * linesOf(e.name, NAME_W * 0.95), 11 * linesOf(e.notes, (NOTE_W + DATE_W) * 0.95)) + 8));
+  }
+  /** Wysokość bloku (punkty) — do podziału stron. */
+  heightOf(ex: ExRow[]) {
+    return 20 + 18 + 16 + this.rowHeights(ex.length ? ex : [{ name: '', notes: '' } as ExRow]).reduce((a, x) => a + x, 0) + 12;
+  }
+  /** Nowa strona, gdy `h` punktów nie zmieści się na bieżącej (np. cały tydzień planu na jednej kartce). */
+  ensure(h: number) {
+    if (this.onPage > 0 && this.used + h > this.pageH) {
+      this.breaks.push(this.rows.length); // numer (od 1) ostatniego wiersza poprzedniej strony
+      this.used = 0;
+      this.onPage = 0;
+    }
   }
   block(title: string, date: string, ex: ExRow[], dateLabel = 'DATA:') {
     const L = { s0: this.s0, rpe: this.rpe, date: this.rpe + 1, note: this.rpe + 2 };
     const list = ex.length ? ex : [{ name: '', plan: { sets: '', reps: '', rpe: '', tempo: '', rest: '' }, sets: [], rpe: null, notes: '' } as ExRow];
     // wysokości wierszy ćwiczeń (miejsce na wpis długopisem, zawijane nazwy i uwagi)
-    const hs = list.map((e) => Math.max(22, 12 * Math.max(linesOf(e.name, NAME_W), linesOf(e.notes, NOTE_W + DATE_W) * 0.9) + 8));
-    const blockH = 20 + 18 + 16 + hs.reduce((a, x) => a + x, 0) + 12;
+    const hs = this.rowHeights(list);
+    const blockH = this.heightOf(list);
+    this.ensure(blockH);
     const top0 = this.rows.length;
-    if (this.used > 0 && this.used + blockH > this.pageH) {
-      this.breaks.push(top0); // ostatni wiersz poprzedniej strony (numeracja od 1) = top0
-      this.used = 0;
-    }
     this.used += blockH;
+    this.onPage++;
     const top = top0;
     const dark = (edge: Edge, size = 9, align: 'left' | 'center' = 'center') => st(C.dark, { bold: true, color: C.white, size, edge, align, indent: align === 'left' ? 1 : undefined });
     const bl = (edge: Edge) => st(C.blue, { bold: true, edge });
     // wiersz 1: tytuł | REALIZACJA | DATA: | NOTATKI
-    this.merge(top, 0, top, L.s0 - 1, title, dark({ l: true, t: true, r: true }, 12, 'left'));
+    this.merge(top, 0, top, L.s0 - 1, title, dark({ l: true, t: true, r: true }, title.length > 52 ? 10 : 12, 'left'));
     this.merge(top, L.s0, top, L.rpe, 'REALIZACJA', dark({ l: true, t: true, r: true }));
     this.merge(top, L.date, top, L.date, dateLabel, dark({ t: true }));
     this.merge(top, L.note, top + 2, L.note, 'NOTATKI', dark({ t: true, r: true }, 10));
@@ -290,12 +324,12 @@ class Grid {
         const c = L.s0 + 2 * i;
         const x = e.sets[i];
         if (!x) {
-          // poza liczbą serii — puste, bez ramek: od razu widać, ile serii zrobić
-          this.put(r, c, cell(null, st(undefined, { bare: true, edge: ed({ l: i === 0 }) })));
-          this.put(r, c + 1, cell(null, st(undefined, { bare: true, edge: ed() })));
+          // poza liczbą serii — „—” na jasnym tle: od razu widać, ile serii zrobić
+          this.put(r, c, cell('—', st(C.none, { color: C.faint, edge: ed({ l: i === 0 }) })));
+          this.put(r, c + 1, cell('—', st(C.none, { color: C.faint, edge: ed() })));
         } else if (x.text) this.merge(r, c, r, c + 1, x.text, st(C.kg, { size: 8, wrap: true, italic: e.target, edge: ed({ l: i === 0 }) }));
         else {
-          this.put(r, c, cell(x.kg, st(C.kg, { bold: !e.target, italic: e.target, color: e.target ? C.hint : C.black, edge: ed({ l: i === 0 }) })));
+          this.put(r, c, cell(typeof x.kg === 'string' ? minus(x.kg) : x.kg, st(x.kg == null && !e.target ? C.white : C.kg, { bold: !e.target, italic: e.target, color: e.target ? C.hint : C.black, edge: ed({ l: i === 0 }) })));
           this.put(r, c + 1, cell(x.rep ?? x.hint ?? null, st(C.white, { italic: x.rep == null && !!x.hint, color: x.rep == null && x.hint ? C.hint : C.black, size: x.rep == null && x.hint ? 8 : undefined, edge: ed() })));
         }
       }
@@ -362,25 +396,29 @@ export function planExRows(k: PlanWorkout): ExRow[] {
 
 /** Arkusz „Plan”: dla każdego tygodnia i jednostki tabela w stylu arkusza trenera (tydzień po tygodniu, bez rozrywania na stronach). */
 export function planTableSheet(plan: Plan, client?: Pick<Client, 'name'>): XSheet {
-  const blocks = plan.weeks.flatMap((w, wi) =>
+  const DOW = ['nd', 'pn', 'wt', 'śr', 'cz', 'pt', 'sb'];
+  const weeks = plan.weeks.map((w, wi) =>
     w.workouts
       .filter((k) => k.exercises.some((e) => e.name.trim()))
       .map((k) => {
         const d = workoutDate(plan, wi, k);
-        return { title: `${[w.name, k.name].filter(Boolean).join(' · ').toUpperCase()}${d ? `   (plan: ${dmy(d)})` : ''}`, rows: planExRows(k) };
+        const day = d ? `${DOW[new Date(`${d}T12:00:00`).getDay()]} ${dmy(d).slice(0, 5)}  ·  ` : '';
+        return { title: `${day}${[w.name, k.name].filter(Boolean).join(' · ').toUpperCase()}`, rows: planExRows(k) };
       }),
   );
-  const all = blocks.flatMap((x) => x.rows);
+  const all = weeks.flat().flatMap((x) => x.rows);
   const g = new Grid(seriesCount(all), all);
   g.info(
-    [
-      ...(client ? ([['Podopieczny', client.name]] as [string, string][]) : []),
-      ...(plan.startDate ? ([['Start', dmy(plan.startDate)]] as [string, string][]) : []),
-      ['Jak czytać', 'KG — ciężar z planu (kursywą), wpisz wykonany ciężar i powtórzenia (REP); RPE — odczuty wysiłek 1–10.'],
-    ],
+    [...(client ? ([['Podopieczny', client.name]] as [string, string][]) : []), ...(plan.startDate ? ([['Start', dmy(plan.startDate)]] as [string, string][]) : [])],
     plan.name,
+    'Jak czytać: KG (szare pole) — ciężar z planu, wpisz ten, który zrobiłeś; −10% = o 10% lżej niż seria główna; REP — wpisz powtórzenia; RPE — wysiłek 1–10 (10 = nie dało się więcej); — = brak tej serii.',
   );
-  for (const x of blocks) g.block(x.title, '', x.rows);
+  for (const blocks of weeks) {
+    // cały tydzień na jednej kartce, jeśli się mieści
+    const wh = blocks.reduce((a, x) => a + g.heightOf(x.rows), 0);
+    g.ensure(wh);
+    for (const x of blocks) g.block(x.title, '', x.rows);
+  }
   return g.sheet('Plan', [plan.name, client?.name].filter(Boolean).join(' · '));
 }
 
@@ -390,7 +428,14 @@ export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>): XSheet[
   const restCol = rows[0].indexOf('Przerwa');
   // przerwa „90” (sekundy) → „1:30”, żeby w arkuszu było jednolicie m:ss
   const flat = rows.map((r, i) => (i === 0 ? r : r.map((c, ci) => (ci === restCol ? mmss(c) : numOrText(c)))));
-  return [planTableSheet(plan, client), planGridSheet(plan, client), { name: 'Do importu', rows: flat, header: true, fitWidth: true, landscape: true }];
+  const imp: XCell[][] = flat.map((r, ri) =>
+    r.map((c) => cell(c as string | number | null, st(ri === 0 ? C.blue : ri % 2 ? undefined : C.note, { bold: ri === 0, align: 'left', indent: 1 }))),
+  );
+  return [
+    planTableSheet(plan, client),
+    planGridSheet(plan, client),
+    { name: 'Do importu', rows: imp, header: true, noGrid: true, fitWidth: true, landscape: true, printTitleRows: '$1:$1', pageFooter: '&LArkusz do ponownego wczytania w aplikacji — nie zmieniaj nagłówków&RStrona &P z &N' },
+  ];
 }
 
 /* ---------- treningi ---------- */
@@ -439,9 +484,10 @@ function sessionInfo(s: TrainingSession, client?: Pick<Client, 'name'>, withTrai
   ].filter(Boolean);
   return [
     ['Data', dmy(s.date)],
-    ...(client ? ([['Podopieczny', `${client.name}${withTrainer != null ? ` · ${withTrainer ? 'z trenerem' : 'samodzielnie'}` : ''}`]] as [string, string][]) : withTrainer != null ? ([['Rodzaj', withTrainer ? 'z trenerem' : 'samodzielnie']] as [string, string][]) : []),
+    ...(client ? ([['Podopieczny', client.name]] as [string, string][]) : []),
+    ...(withTrainer != null ? ([['Rodzaj', withTrainer ? 'z trenerem' : 'samodzielnie']] as [string, string][]) : []),
     ...(stats.length ? ([['Podsumowanie', stats.join(' · ')]] as [string, string][]) : []),
-    ...(s.pain != null || s.stoppedForPain ? ([['Ból', `${s.pain != null ? `${s.pain}/10` : ''}${s.stoppedForPain ? ' · przerwany z powodu bólu' : ''}`.replace(/^ · /, '')]] as [string, string][]) : []),
+    ...(s.pain != null || s.stoppedForPain ? ([['Ból (0–10)', `${s.pain != null ? `${s.pain}` : ''}${s.stoppedForPain ? ' · przerwany z powodu bólu' : ''}`.replace(/^ · /, '')]] as [string, string][]) : []),
     ...(s.notes ? ([['Notatki', s.notes]] as [string, string][]) : []),
   ];
 }
@@ -456,7 +502,7 @@ export function sessionWorkbook(s: TrainingSession, client?: Pick<Client, 'name'
 }
 
 /** Wszystkie treningi klienta: „Treningi” (wiersz na trening) i „Serie” (każdy trening jako tabela seria po serii). */
-export function sessionsWorkbook(sessions: TrainingSession[], withTrainer?: (s: TrainingSession) => boolean): XSheet[] {
+export function sessionsWorkbook(sessions: TrainingSession[], withTrainer?: (s: TrainingSession) => boolean, client?: Pick<Client, 'name'>): XSheet[] {
   const sorted = [...sessions].sort((a, z) => (a.date + (a.createdAt ?? '')).localeCompare(z.date + (z.createdAt ?? '')));
   const cols: { head: string; get: (s: TrainingSession) => string | number | null; w: number }[] = [
     { head: 'Data', get: (s) => dmy(s.date), w: 11 },
@@ -478,12 +524,14 @@ export function sessionsWorkbook(sessions: TrainingSession[], withTrainer?: (s: 
     used.map((c) => cell(c.head, head)),
     ...sorted.map((s, ri) => used.map((c, ci) => cell(c.get(s), st(ri % 2 ? C.note : undefined, { align: ci === 1 || c.head === 'Notatki' ? 'left' : 'center', wrap: c.head === 'Notatki', indent: ci === 1 ? 1 : undefined })))),
   ];
+  const span = sorted.length ? `${dmy(sorted[0].date)} – ${dmy(sorted[sorted.length - 1].date)}` : '';
+  const who = ['Treningi', client?.name, span].filter(Boolean).join(' · ');
   const blocks = sorted.map((s) => ({ title: `${dmy(s.date)}  ·  ${(s.workoutName || 'Trening').toUpperCase()}`, date: dmy(s.date), rows: sessionExRows(s) })).filter((x) => x.rows.length);
   const all = blocks.flatMap((x) => x.rows);
   const g = new Grid(seriesCount(all), all);
   for (const x of blocks) g.block(x.title, x.date, x.rows);
   return [
-    { name: 'Treningi', rows: list, header: true, widths: used.map((c) => c.w), heights: { 0: 28 }, noGrid: true, fitWidth: true, landscape: used.length > 7, pageFooter: '&RStrona &P z &N' },
-    g.sheet('Serie', 'Treningi — seria po serii'),
+    { name: 'Treningi', rows: list, header: true, widths: used.map((c) => c.w), heights: { 0: 28 }, noGrid: true, fitWidth: true, landscape: used.length > 7, printTitleRows: '$1:$1', pageFooter: `&L${who.replace(/&/g, '&&')}&RStrona &P z &N` },
+    g.sheet('Serie', who),
   ];
 }

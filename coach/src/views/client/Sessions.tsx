@@ -189,7 +189,7 @@ export function ClientSessions({ client }: { client: Client }) {
         <h3>Zapisane treningi ({sessions.length})</h3>
         <div className="actions">
           {sessions.length > 0 && (
-            <button className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('treningi', client.name), sessionsWorkbook(sessions, (s) => !isSolo(db, s)))} title="Wszystkie treningi do Excela: arkusz „Treningi” i „Serie”">
+            <button className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('treningi', client.name), sessionsWorkbook(sessions, (s) => !isSolo(db, s), client))} title="Wszystkie treningi do Excela: arkusz „Treningi” i „Serie”">
               <Icon name="download" size={16} /> Excel
             </button>
           )}

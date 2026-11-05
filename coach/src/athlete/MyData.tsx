@@ -39,7 +39,7 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
     toast('Plik z Twoimi danymi zapisany na urządzeniu.');
   };
   const getXlsx = () => {
-    void downloadXlsx(xlsxName('treningi', client.name, todayISO()), sessionsWorkbook(sessionsOf(db, client.id)));
+    void downloadXlsx(xlsxName('treningi', client.name, todayISO()), sessionsWorkbook(sessionsOf(db, client.id), undefined, client));
     toast('Treningi zapisane jako plik Excel.');
   };
   const getCsv = () => {

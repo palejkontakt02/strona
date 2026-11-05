@@ -50,6 +50,8 @@ export interface XSheet {
   /** Nagłówek / stopka wydruku (kody Excela: &P strona, &N liczba stron, &L/&C/&R sekcje). */
   pageHeader?: string;
   pageFooter?: string;
+  /** Wiersze powtarzane na każdej drukowanej stronie, np. „$1:$1”. */
+  printTitleRows?: string;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -66,7 +68,7 @@ const val = (c: XCell) => (c != null && typeof c === 'object' ? c.v : c);
 
 /** Nazwa arkusza: maks. 31 znaków, bez []:*?/\ . */
 export function sheetName(name: string, taken: string[] = []): string {
-  const base = (name.replace(/[[\]:*?/\\]/g, ' ').replace(/\s+/g, ' ').trim() || 'Arkusz').slice(0, 31);
+  const base = (name.replace(/[[\]:*?/\\]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^'+|'+$/g, '').replace(/^history$/i, 'History 2') || 'Arkusz').slice(0, 31);
   let out = base;
   for (let n = 2; taken.some((t) => t.toLowerCase() === out.toLowerCase()); n++) out = `${base.slice(0, 31 - String(n).length - 1)} ${n}`;
   return out;
@@ -168,7 +170,7 @@ function sheetXml(sh: XSheet, styles: Styles, strings: Strings): string {
   const pr = fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
   const hf =
     sh.pageHeader || sh.pageFooter
-      ? `<headerFooter>${sh.pageHeader ? `<oddHeader>${esc(sh.pageHeader)}</oddHeader>` : ''}${sh.pageFooter ? `<oddFooter>${esc(sh.pageFooter)}</oddFooter>` : ''}</headerFooter>`
+      ? `<headerFooter>${sh.pageHeader ? `<oddHeader>${esc(sh.pageHeader.slice(0, 250))}</oddHeader>` : ''}${sh.pageFooter ? `<oddFooter>${esc(sh.pageFooter.slice(0, 250))}</oddFooter>` : ''}</headerFooter>`
       : '';
   const br = sh.rowBreaks?.length ? `<rowBreaks count="${sh.rowBreaks.length}" manualBreakCount="${sh.rowBreaks.length}">${sh.rowBreaks.map((r) => `<brk id="${r}" max="16383" man="1"/>`).join('')}</rowBreaks>` : '';
   const page = fit
@@ -275,7 +277,7 @@ export function xlsx(sheets: XSheet[]): Uint8Array {
     },
     {
       name: 'xl/workbook.xml',
-      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${named.map((s, i) => `<sheet name="${esc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`,
+      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${named.map((s, i) => `<sheet name="${esc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${named.some((s) => s.printTitleRows) ? `<definedNames>${named.map((s, i) => (s.printTitleRows ? `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">'${esc(s.name.replace(/'/g, "''"))}'!${s.printTitleRows}</definedName>` : '')).join('')}</definedNames>` : ''}</workbook>`,
     },
     {
       name: 'xl/_rels/workbook.xml.rels',
