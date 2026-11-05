@@ -447,6 +447,8 @@ export interface Plan {
   template?: boolean;
   notes?: string;
   updatedAt?: string;
+  /** Połączony arkusz Google (Arkusze Google ↔ plan): id pliku i czas ostatniej wysyłki / pobrania. */
+  gsheet?: { id: string; at?: string };
   weeks: PlanWeek[];
 }
 

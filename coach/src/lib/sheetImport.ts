@@ -262,6 +262,9 @@ const mss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 
 /** Przerwa do m:ss: „2'” → „2:00”, „90s” → „1:30”, „1'30''” → „1:30”, „2 min trucht” → „2:00 trucht”; inny zapis bez zmian. */
 export function normRest(v: string): string {
   const t = v.trim();
+  // „1:30” wpisane w Arkuszach Google / Excelu zamienia się w godzinę „1:30:00” — w kolumnie przerwy to minuty i sekundy
+  const hm = t.match(/^(\d{1,2}):([0-5]\d):00$/);
+  if (hm && +hm[1] < 10) return `${+hm[1]}:${hm[2]}`;
   let m = t.match(/^(\d+)\s*'\s*(\d{1,2})\s*(?:''|"|s)?(?=\s|$)(.*)$/i);
   if (m && +m[2] < 60) return `${m[1]}:${m[2].padStart(2, '0')}${m[3]}`;
   m = t.match(/^(\d+(?:[.,]\d+)?)\s*(?:'|min\.?|minut[ay]?|m)(?=\s|$)(.*)$/i);

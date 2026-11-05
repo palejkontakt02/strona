@@ -14,10 +14,10 @@ const SAMPLE = 'Tydzień\tDzień\tTrening\tĆwiczenie\tSerie\tPowt.\tCiężar\tR
  * Import planu z arkusza: wklejony zakres (Excel / Google Sheets) albo plik .csv / .xlsx →
  * przypisanie kolumn z podglądem → nowy plan w edytorze (do poprawy przed zapisem).
  */
-export function PlanImport({ clientId, active, onClose, onDone, target }: { clientId: string; active: boolean; onClose: () => void; onDone: (plan: Plan) => void; target?: Plan }) {
+export function PlanImport({ clientId, active, onClose, onDone, target, initialRows, source }: { clientId: string; active: boolean; onClose: () => void; onDone: (plan: Plan) => void; target?: Plan; initialRows?: string[][]; source?: string }) {
   const [text, setText] = useState('');
-  const [fileRows, setFileRows] = useState<string[][] | null>(null);
-  const [fileName, setFileName] = useState('');
+  const [fileRows, setFileRows] = useState<string[][] | null>(initialRows ?? null);
+  const [fileName, setFileName] = useState(source ?? '');
   const [err, setErr] = useState('');
   const [map, setMap] = useState<SheetField[] | null>(null);
   const [header, setHeader] = useState<number | null>(null);
@@ -72,14 +72,17 @@ export function PlanImport({ clientId, active, onClose, onDone, target }: { clie
         onDone({ ...result.plan, active: makeActive });
       }}
     >
-      {target && (
+      {target && !initialRows && (
         <p className="small">
           Wybierz plik pobrany przyciskiem „Excel” (albo CSV) po zmianach w Excelu / Arkuszach Google. Plan zostanie ten sam: wykonane treningi, komentarze i notatki podopiecznego zostają, zmieniają się ćwiczenia, serie, ciężary, przerwy i uwagi.
         </p>
       )}
-      <p className="muted small">
+      {!initialRows && <p className="muted small">
         Skopiuj zakres w Excelu albo Arkuszach Google (z nagłówkami) i wklej poniżej, albo wybierz plik CSV / XLSX. Kolumny: Tydzień, Dzień, Trening, Ćwiczenie, Serie, Powt., Ciężar, RPE, Przerwa, Uwagi — w dowolnej kolejności. Wystarczy też jedna kolumna z zapisem „Przysiad 4x6 @RPE8 100kg”.
-      </p>
+      </p>}
+      {initialRows ? (
+        <p className="muted small">Źródło: {source}</p>
+      ) : (
       <div className="pi-src">
         <Field label="Wklej zakres z arkusza" wide>
           <textarea
@@ -101,9 +104,10 @@ export function PlanImport({ clientId, active, onClose, onDone, target }: { clie
         </label>
         {fileName && <span className="muted small">Plik: {fileName}</span>}
       </div>
+      )}
       {err && <p className="pi-error small" role="alert">{err}</p>}
 
-      {rows && rows.length > 0 && (
+      {rows && rows.length > 0 && !target && (
         <>
           <div className="pi-head-row">
             <strong>Przypisanie kolumn</strong>
@@ -190,6 +194,65 @@ export function PlanImport({ clientId, active, onClose, onDone, target }: { clie
         </div>
       )}
 
+      {rows && rows.length > 0 && target && (
+        <details className="pi-adv" open={!cols.includes('exercise')}>
+          <summary className="small">Przypisanie kolumn (gdy coś się nie zgadza)</summary>
+          <div className="pi-head-row">
+            <strong>Przypisanie kolumn</strong>
+            <label className="pi-header-pick small">
+              Nagłówki w wierszu{' '}
+              <select className="input input-sm" value={headerRow} onChange={(e) => setHeader(Number(e.target.value))}>
+                <option value={-1}>brak</option>
+                {rows.slice(0, 10).map((_, i) => (
+                  <option key={i} value={i}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="pi-scroll">
+            <table className="pi-table">
+              <thead>
+                <tr>
+                  {cols.map((f, j) => (
+                    <th key={j}>
+                      <select
+                        className={`input input-sm ${f === 'skip' ? 'is-skip' : ''}`}
+                        aria-label={`Kolumna ${j + 1}`}
+                        value={f}
+                        onChange={(e) => {
+                          const v = e.target.value as SheetField;
+                          // jedno pole = jedna kolumna: poprzednia kolumna z tym polem → pomiń
+                          setMap(cols.map((x, i) => (i === j ? v : x === v && v !== 'skip' ? 'skip' : x)));
+                        }}
+                      >
+                        {SHEET_FIELDS.map((x) => (
+                          <option key={x} value={x}>
+                            {FIELD_LABEL[x]}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((r, i) => (
+                  <tr key={i} className={i === 0 && headerRow >= 0 ? 'pi-hdr' : ''}>
+                    {cols.map((f, j) => (
+                      <td key={j} className={f === 'skip' ? 'is-skip' : ''}>
+                        {r[j]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!cols.includes('exercise') && <p className="warn-box small">Wskaż kolumnę „Ćwiczenie”.</p>}
+        </details>
+      )}
       {result && !target && (
         <>
           <div className="form-grid form-grid-2 pi-meta">

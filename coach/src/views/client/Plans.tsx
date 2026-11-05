@@ -17,6 +17,8 @@ import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
 import { AbsenceNotice, LoadSuggestPanel, QuickShift, ShiftPanel } from '../../components/PlanTools';
 import { PlanImport } from '../../components/PlanImport';
+import { PlanSheetSync } from '../../components/PlanSheetSync';
+import { gsheetsEnabled } from '../../lib/gsheets';
 import { nextBlock, nextBlockName, planDates, shiftPlanFrom } from '../../lib/planShift';
 import { csvFileName, planToCsv } from '../../lib/sheetImport';
 
@@ -60,6 +62,9 @@ export function ClientPlans({ client }: { client: Client }) {
   const [importing, setImporting] = useState(false);
   /** Plan, do którego wczytujemy zmiany z arkusza. */
   const [syncing, setSyncing] = useState<Plan | null>(null);
+  /** Plan w oknie „Arkusz Google”. */
+  const [gsPlan, setGsPlan] = useState<string | null>(null);
+  const gs = gsheetsEnabled();
   const doneDated = extraWorkouts.filter((k) => states.get(k.id)!.state === 'done');
   const visibleExtra = extraWorkouts
     .filter((k) => showDone || states.get(k.id)!.state !== 'done')
@@ -217,6 +222,11 @@ export function ClientPlans({ client }: { client: Client }) {
                     <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client))} title="Plik Excel (.xlsx): arkusz „Plan” (da się go wczytać z powrotem) i „Tygodnie” (siatka jak w aplikacji)">
                       <Icon name="download" size={16} /> Excel
                     </button>
+                    {gs && (
+                      <button className="btn btn-ghost btn-sm" onClick={() => setGsPlan(p.id)} title="Plan w Arkuszach Google: utwórz arkusz, pobierz zmiany z arkusza albo wyślij plan do arkusza">
+                        <Icon name="link" size={16} /> {p.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google'}
+                      </button>
+                    )}
                     <button className="btn btn-ghost btn-sm" onClick={() => setSyncing(p)} title="Wczytaj plik Excel / CSV tego planu po zmianach — aktualizuje ten sam plan (z podglądem zmian)">
                       <Icon name="up" size={16} /> Wczytaj zmiany
                     </button>
@@ -285,6 +295,7 @@ export function ClientPlans({ client }: { client: Client }) {
               ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
               { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client)) },
               { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
+              ...(gs ? [{ icon: 'link', text: menuPlan.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(menuPlan.id) }] : []),
               { icon: 'up', text: 'Wczytaj zmiany z arkusza', run: () => setSyncing(menuPlan) },
               { icon: 'download', text: 'Import z arkusza', run: () => setImporting(true) },
               { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(menuPlan), danger: true },
@@ -304,6 +315,7 @@ export function ClientPlans({ client }: { client: Client }) {
           </div>
         </Sheet>
       )}
+      {gsPlan && plans.some((x) => x.id === gsPlan) && <PlanSheetSync plan={plans.find((x) => x.id === gsPlan)!} client={client} onClose={() => setGsPlan(null)} />}
       {syncing && (
         <PlanImport
           clientId={client.id}

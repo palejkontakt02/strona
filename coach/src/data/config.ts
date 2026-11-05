@@ -31,3 +31,9 @@ export const VAPID_PUBLIC_KEY = 'BK9HmOcEHVlUor9l9Bdh_fJAZULa-tgxz3Ux-RCbXvZ6jbC
  * podopieczny wpisuje liczby ręcznie, zrzut dalej się dołącza. Włączenie: `true` po wdrożeniu funkcji i klucza.
  */
 export const AI_OCR_ENABLED = false;
+
+/**
+ * Arkusze Google ↔ plan (lib/gsheets.ts): identyfikator klienta OAuth (typ „Aplikacja internetowa”) z Google Cloud —
+ * jawny z założenia, to nie jest sekret. Pusty = funkcja ukryta. Instrukcja: supabase/GOOGLE.md.
+ */
+export const GOOGLE_CLIENT_ID: string = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || '';
