@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { Client, CoachReply, MsgMedia, MsgRef, TrainingSession } from '../domain';
 import { put } from '../data/db';
 import { chatMediaUrl, deleteChatMedia, saveChatMedia } from '../data/chatMedia';
+import { pushStatus } from '../data/push';
 import { useStore } from '../data/store';
 import { fmtDay, uid } from '../format';
 import { todayISO } from '../lib/dates';
@@ -287,8 +288,18 @@ export function useSendMessage(client: Client, asCoach: boolean) {
  * - `full` — rozmowa na całą wysokość (zakładka „Trener”): przewija się strona, pole wpisywania przyklejone na dole.
  */
 export function Chat({ client, side, asTrainer, onOpenSession, full }: { client: Client; side: 'client' | 'coach'; asTrainer?: boolean; onOpenSession?: (sessionId: string, exIndex?: number) => void; full?: boolean }) {
-  const { db, apply, ask, toast } = useStore();
+  const { db, apply, ask, toast, cloud } = useStore();
   const [text, setText] = useState('');
+  // trener: czy podopieczny ma włączone powiadomienia na telefonie (null — nie wiadomo)
+  const [push, setPush] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (side !== 'coach' || !cloud) return;
+    let live = true;
+    void pushStatus().then((m) => live && setPush(m ? m.has(client.id) : null));
+    return () => {
+      live = false;
+    };
+  }, [side, cloud, client.id]);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [reply, setReply] = useState<ChatMsg | null>(null);
@@ -534,6 +545,11 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
               <Icon name="x" size={16} />
             </button>
           </div>
+        )}
+        {coachView && push === false && (
+          <p className="chat-push-off small muted">
+            <Icon name="alert" size={14} /> {first} nie ma włączonych powiadomień — zobaczy wiadomość dopiero po otwarciu aplikacji. Poproś: Ustawienia → „Powiadomienia na tym telefonie”.
+          </p>
         )}
         {draft && <DraftPreview d={draft} onRemove={() => setDraftSafe(null)} />}
         {recording ? (

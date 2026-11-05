@@ -2163,3 +2163,45 @@ begin
   end if;
 end $$;
 notify pgrst, 'reload schema';
+
+-- ============================================================================================================
+-- 31. Powiadomienia: kiedy telefon ostatnio potwierdził subskrypcję (seen_at — aplikacja odnawia ją przy każdym
+--     otwarciu) i lista dla trenera „kto ma włączone powiadomienia” (w rozmowie: „… nie ma włączonych powiadomień”).
+--     Wymaga sekcji 20. Można uruchomić ponownie.
+-- ============================================================================================================
+alter table public.push_subscriptions add column if not exists seen_at timestamptz not null default now();
+
+create or replace function public.save_push_subscription(p_endpoint text, p_keys jsonb) returns text
+language plpgsql security definer set search_path = public as $$
+declare r text; cid text;
+begin
+  if auth.uid() is null then raise exception 'Brak dostępu'; end if;
+  if coalesce(p_endpoint, '') !~ '^https://' or length(p_endpoint) > 1000
+     or jsonb_typeof(p_keys -> 'p256dh') <> 'string' or jsonb_typeof(p_keys -> 'auth') <> 'string'
+     or length(p_keys ->> 'p256dh') > 200 or length(p_keys ->> 'auth') > 100 then raise exception 'Zła subskrypcja'; end if;
+  if is_trainer() then r := 'trainer';
+  else
+    select id into cid from my_client_ids() id limit 1;
+    if cid is null then raise exception 'Brak dostępu'; end if;
+    r := 'client';
+  end if;
+  insert into push_subscriptions (user_id, endpoint, keys, role, client_id, seen_at)
+  values (auth.uid(), p_endpoint, jsonb_build_object('p256dh', p_keys ->> 'p256dh', 'auth', p_keys ->> 'auth'), r, cid, now())
+  on conflict (endpoint) do update set user_id = excluded.user_id, keys = excluded.keys, role = excluded.role,
+    client_id = excluded.client_id, seen_at = now();
+  return r;
+end $$;
+revoke all on function public.save_push_subscription from public, anon;
+grant execute on function public.save_push_subscription to authenticated;
+
+-- Trener: podopieczni z co najmniej jednym telefonem z włączonymi powiadomieniami (bez adresów urządzeń).
+create or replace function public.push_clients_status() returns table (client_id text, devices int, seen_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not is_trainer() then raise exception 'Brak dostępu'; end if;
+  return query select s.client_id, count(*)::int, max(s.seen_at) from push_subscriptions s
+    where s.role = 'client' and s.client_id is not null group by s.client_id;
+end $$;
+revoke all on function public.push_clients_status from public, anon;
+grant execute on function public.push_clients_status to authenticated;
+notify pgrst, 'reload schema';

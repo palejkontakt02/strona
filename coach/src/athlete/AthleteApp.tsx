@@ -8,6 +8,7 @@ import { Icon } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { PalettePicker } from '../components/PalettePicker';
 import { PushSettings } from '../components/PushSettings';
+import { refreshPush } from '../data/push';
 import { OfflineBadge } from '../components/OfflineBadge';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
@@ -161,7 +162,11 @@ export function AthleteApp({
     storeRun(clientId, run);
   }, [clientId, run]);
   // trening w toku na telefonie podopiecznego — znacznik w bazie, żeby trener nie poprowadził go drugi raz u siebie
-  const { setAthleteLive } = useStore();
+  const { setAthleteLive, cloud } = useStore();
+  // powiadomienia: odnowienie subskrypcji przy otwarciu (zgubiona przez telefon / usunięta jako wygasła)
+  useEffect(() => {
+    if (mode === 'client' && cloud) void refreshPush();
+  }, [mode, cloud]);
   const runKey = run && !run.editSessionId ? `${run.workoutId}|${run.name}` : '';
   const athleteLive = client?.athleteLive;
   useEffect(() => {

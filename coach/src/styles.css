@@ -5619,3 +5619,7 @@ button.mini-day {
 .assign-loads input {
   margin-top: 2px;
 }
+
+/* trener: podopieczny bez powiadomień na telefonie */
+.chat-push-off { display: flex; gap: 6px; align-items: flex-start; margin: 0 0 6px; line-height: 1.35; }
+.chat-push-off svg { flex: none; margin-top: 2px; }

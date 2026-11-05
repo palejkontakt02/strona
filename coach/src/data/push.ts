@@ -76,3 +76,30 @@ export async function disablePush(): Promise<void> {
   await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
   await sub.unsubscribe().catch(() => undefined);
 }
+
+/**
+ * Po cichu odnawia subskrypcję przy każdym otwarciu aplikacji, gdy zgoda jest już udzielona:
+ * telefon (zwłaszcza iPhone) potrafi zgubić subskrypcję, baza usuwa wygasłe — bez tego powiadomienia
+ * przestają przychodzić, a przełącznik w Ustawieniach nadal wygląda na włączony. Nigdy nie pyta o zgodę.
+ */
+export async function refreshPush(): Promise<void> {
+  try {
+    if (pushSupport() !== 'ok' || Notification.permission !== 'granted') return;
+    await enablePush();
+  } catch {
+    /* bez powiadomień — aplikacja działa normalnie */
+  }
+}
+
+/** Trener: którzy podopieczni mają włączone powiadomienia (sekcja 31). `null` — baza bez tej funkcji / tryb lokalny. */
+let statusCache: { at: number; p: Promise<Map<string, string> | null> } | null = null;
+export function pushStatus(force = false): Promise<Map<string, string> | null> {
+  if (!force && statusCache && Date.now() - statusCache.at < 60_000) return statusCache.p;
+  const p = (async () => {
+    const { data, error } = await supabase.rpc('push_clients_status');
+    if (error || !Array.isArray(data)) return null;
+    return new Map((data as { client_id: string; seen_at: string | null }[]).map((r) => [r.client_id, r.seen_at ?? '']));
+  })().catch(() => null);
+  statusCache = { at: Date.now(), p };
+  return p;
+}
