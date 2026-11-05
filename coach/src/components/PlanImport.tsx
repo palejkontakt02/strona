@@ -5,6 +5,7 @@ import { todayISO } from '../lib/dates';
 import { nextMonday } from '../lib/analytics';
 import { detectColumns, FIELD_LABEL, parseTable, SHEET_FIELDS, sheetToPlan, type SheetField } from '../lib/sheetImport';
 import { readXlsx } from '../lib/xlsxRead';
+import { mergePlan } from '../lib/planMerge';
 import { Field, Modal } from './ui';
 
 const SAMPLE = 'Tydzień\tDzień\tTrening\tĆwiczenie\tSerie\tPowt.\tCiężar\tRPE\n1\tpon\tA\tPrzysiad\t4\t6\t100\t8';
@@ -13,7 +14,7 @@ const SAMPLE = 'Tydzień\tDzień\tTrening\tĆwiczenie\tSerie\tPowt.\tCiężar\tR
  * Import planu z arkusza: wklejony zakres (Excel / Google Sheets) albo plik .csv / .xlsx →
  * przypisanie kolumn z podglądem → nowy plan w edytorze (do poprawy przed zapisem).
  */
-export function PlanImport({ clientId, active, onClose, onDone }: { clientId: string; active: boolean; onClose: () => void; onDone: (plan: Plan) => void }) {
+export function PlanImport({ clientId, active, onClose, onDone, target }: { clientId: string; active: boolean; onClose: () => void; onDone: (plan: Plan) => void; target?: Plan }) {
   const [text, setText] = useState('');
   const [fileRows, setFileRows] = useState<string[][] | null>(null);
   const [fileName, setFileName] = useState('');
@@ -30,6 +31,8 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
   const cols = map ?? guess?.map ?? [];
   const headerRow = header ?? guess?.headerRow ?? -1;
   const result = useMemo(() => (rows && cols.includes('exercise') ? sheetToPlan(rows, cols, headerRow, { clientId, name: name || undefined, startDate: start, today: todayISO() }) : null), [rows, cols, headerRow, clientId, name, start]);
+  // tryb „wczytaj zmiany do tego planu”: ten sam plan (id, nazwa, start), dopasowane ćwiczenia zachowują id
+  const merged = useMemo(() => (target && result && result.stats.exercises ? mergePlan(target, result.plan) : null), [target, result]);
   const reset = () => {
     setMap(null);
     setHeader(null);
@@ -57,14 +60,23 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
   return (
     <Modal
       wide
-      title="Import planu z arkusza"
+      title={target ? `Wczytaj zmiany z arkusza — ${target.name}` : 'Import planu z arkusza'}
       onClose={onClose}
-      submitLabel="Otwórz w edytorze"
+      submitLabel={target ? 'Zapisz zmiany w planie' : 'Otwórz w edytorze'}
       onSubmit={() => {
         if (!result || !result.stats.exercises) return setErr('Nie rozpoznano żadnego ćwiczenia — sprawdź przypisanie kolumny „Ćwiczenie”.');
+        if (merged) {
+          if (!merged.diff.lines.length) return setErr('Arkusz nie różni się od planu — nie ma czego zapisać.');
+          return onDone(merged.plan);
+        }
         onDone({ ...result.plan, active: makeActive });
       }}
     >
+      {target && (
+        <p className="small">
+          Wybierz plik pobrany przyciskiem „Excel” (albo CSV) po zmianach w Excelu / Arkuszach Google. Plan zostanie ten sam: wykonane treningi, komentarze i notatki podopiecznego zostają, zmieniają się ćwiczenia, serie, ciężary, przerwy i uwagi.
+        </p>
+      )}
       <p className="muted small">
         Skopiuj zakres w Excelu albo Arkuszach Google (z nagłówkami) i wklej poniżej, albo wybierz plik CSV / XLSX. Kolumny: Tydzień, Dzień, Trening, Ćwiczenie, Serie, Powt., Ciężar, RPE, Przerwa, Uwagi — w dowolnej kolejności. Wystarczy też jedna kolumna z zapisem „Przysiad 4x6 @RPE8 100kg”.
       </p>
@@ -150,7 +162,35 @@ export function PlanImport({ clientId, active, onClose, onDone }: { clientId: st
         </>
       )}
 
-      {result && (
+      {merged && (
+        <div className="pi-diff">
+          <p className="pi-stats">
+            {merged.diff.lines.length ? (
+              <>
+                Zmiany: <span className="pt-num">{merged.diff.changed}</span> zmienione · <span className="pt-num">{merged.diff.added}</span> dodane · <span className="pt-num">{merged.diff.removed}</span> usunięte
+              </>
+            ) : (
+              'Bez zmian — arkusz jest taki sam jak plan.'
+            )}
+          </p>
+          {merged.diff.lines.length > 0 && (
+            <ul className="pi-diff-list small">
+              {merged.diff.lines.slice(0, 40).map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+              {merged.diff.lines.length > 40 && <li className="muted">i {merged.diff.lines.length - 40} więcej</li>}
+            </ul>
+          )}
+          {merged.diff.removed > 0 && <p className="warn-box small">Usunięte ćwiczenia znikną z planu (zapisane treningi zostają). Jeśli to pomyłka — popraw arkusz i wczytaj ponownie.</p>}
+          {result!.warnings.map((w) => (
+            <p key={w} className="warn-box small pi-warn">
+              {w}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {result && !target && (
         <>
           <div className="form-grid form-grid-2 pi-meta">
             <Field label="Nazwa planu">

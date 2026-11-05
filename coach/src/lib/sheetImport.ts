@@ -315,6 +315,8 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
   let lastEx: PlanExercise | null = null;
   let lastWorkout: PlanWorkout | null = null;
   let lastLabel: { letter: string } | null = null;
+  /** Pełne oznaczenie ostatniego ćwiczenia („C1”) — kolejny wiersz „C1 Hip thrust” to dalsze serie, nie nowe ćwiczenie. */
+  let lastExTag = '';
   let dataRows = 0;
   const odd: string[] = [];
   const hasWorkoutCol = col('workout') >= 0;
@@ -418,7 +420,8 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
       : Array.from({ length: n }, () => ({ type, sets: /[-–]/.test(sets) ? sets.replace('-', '–') : '1', reps, load: load!, rpe }));
 
     // bez nazwy albo ta sama nazwa co w wierszu wyżej — kolejne serie tego samego ćwiczenia
-    let ex: PlanExercise | null = !inline.name || (lastEx && fold(lastEx.name) === fold(inline.name) && !label) ? lastEx : null;
+    const tag = label ? `${label.letter}${label.n ?? ''}` : '';
+    let ex: PlanExercise | null = !inline.name || (lastEx && fold(lastEx.name) === fold(inline.name) && (!label || tag === lastExTag)) ? lastEx : null;
     if (!ex) {
       if (!inline.name) {
         warnings.push(`Wiersz ${ri + 1}: brak nazwy ćwiczenia — pominięty.`);
@@ -435,6 +438,7 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     if (rest && !ex.rest && !isCardio) ex.rest = rest;
     for (const nt of [notes, extraNote]) if (nt && !(ex.notes ?? '').split(' · ').includes(nt)) ex.notes = ex.notes ? `${ex.notes} · ${nt}` : nt;
     lastEx = ex;
+    lastExTag = tag;
   });
 
   // nazwy i dni treningów

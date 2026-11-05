@@ -67,9 +67,13 @@ export async function readXlsx(buf: ArrayBuffer | Uint8Array): Promise<string[][
   let sheet: string | undefined;
   // plik z Fitowej: arkusz „Do importu” (płaska tabela) ma pierwszeństwo przed czytelnym arkuszem „Plan”
   const wb = files.get('xl/workbook.xml') ?? '';
-  const rid = wb.match(/<sheet\b[^>]*name="Do importu"[^>]*r:id="([^"]+)"/)?.[1] ?? wb.match(/<sheet\b[^>]*r:id="([^"]+)"/)?.[1];
-  const target = rid && files.get('xl/_rels/workbook.xml.rels')?.match(new RegExp(`<Relationship\\b[^>]*Id="${rid}"[^>]*Target="([^"]+)"`))?.[1];
-  if (target) sheet = files.get(`xl/${target.replace(/^\/?xl\//, '')}`);
+  // atrybuty w dowolnej kolejności (Excel, Arkusze Google, Numbers, LibreOffice zapisują je różnie)
+  const attr = (tag: string, name: string) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+  const sheets = [...wb.matchAll(/<sheet\b[^>]*>/g)].map((m) => ({ name: attr(m[0], 'name'), rid: attr(m[0], 'r:id') ?? attr(m[0], '[\\w]+:id') }));
+  const rid = (sheets.find((x) => x.name === 'Do importu') ?? sheets[0])?.rid;
+  const rel = rid ? [...(files.get('xl/_rels/workbook.xml.rels') ?? '').matchAll(/<Relationship\b[^>]*>/g)].map((m) => m[0]).find((t) => attr(t, 'Id') === rid) : undefined;
+  const target = rel ? attr(rel, 'Target') : undefined;
+  if (target) sheet = files.get(target.startsWith('/') ? target.slice(1) : `xl/${target.replace(/^xl\//, '')}`);
   sheet ??= [...files.entries()].filter(([n]) => n.startsWith('xl/worksheets/')).sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))[0]?.[1];
   if (!sheet) throw new Error('Brak arkusza w pliku');
   const rows: string[][] = [];

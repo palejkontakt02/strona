@@ -58,6 +58,8 @@ export function ClientPlans({ client }: { client: Client }) {
   // „Przesuń plan” (id planu + ewentualnie gotowe ustawienia z nieobecności) i import z arkusza
   const [shift, setShift] = useState<{ planId: string; preset?: { from: string; days: number } } | null>(null);
   const [importing, setImporting] = useState(false);
+  /** Plan, do którego wczytujemy zmiany z arkusza. */
+  const [syncing, setSyncing] = useState<Plan | null>(null);
   const doneDated = extraWorkouts.filter((k) => states.get(k.id)!.state === 'done');
   const visibleExtra = extraWorkouts
     .filter((k) => showDone || states.get(k.id)!.state !== 'done')
@@ -215,6 +217,9 @@ export function ClientPlans({ client }: { client: Client }) {
                     <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client))} title="Plik Excel (.xlsx): arkusz „Plan” (da się go wczytać z powrotem) i „Tygodnie” (siatka jak w aplikacji)">
                       <Icon name="download" size={16} /> Excel
                     </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setSyncing(p)} title="Wczytaj plik Excel / CSV tego planu po zmianach — aktualizuje ten sam plan (z podglądem zmian)">
+                      <Icon name="up" size={16} /> Wczytaj zmiany
+                    </button>
                     <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
                       <Icon name="download" size={16} /> CSV
                     </button>
@@ -280,6 +285,7 @@ export function ClientPlans({ client }: { client: Client }) {
               ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
               { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client)) },
               { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
+              { icon: 'up', text: 'Wczytaj zmiany z arkusza', run: () => setSyncing(menuPlan) },
               { icon: 'download', text: 'Import z arkusza', run: () => setImporting(true) },
               { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(menuPlan), danger: true },
             ].map((a) => (
@@ -297,6 +303,18 @@ export function ClientPlans({ client }: { client: Client }) {
             ))}
           </div>
         </Sheet>
+      )}
+      {syncing && (
+        <PlanImport
+          clientId={client.id}
+          active={syncing.active}
+          target={syncing}
+          onClose={() => setSyncing(null)}
+          onDone={(plan) => {
+            setSyncing(null);
+            void apply([put('plans', plan)], `Zaktualizowano „${plan.name}” z arkusza.`);
+          }}
+        />
       )}
       {importing && (
         <PlanImport
