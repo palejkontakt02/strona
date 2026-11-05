@@ -4,7 +4,7 @@
  * sprawdzamy jeszcze raz tutaj — liczby trafiają tylko do pól formularza, podopieczny je poprawia i zapisuje.
  * Czyste funkcje (parsowanie, walidacja, wymiary) mają testy: nutritionOcr.test.ts.
  */
-import { cloudMode } from '../data/config';
+import { AI_OCR_ENABLED, cloudMode } from '../data/config';
 import { MACROS, type MacroKey } from './nutrition';
 
 export const OCR_MAX_SIDE = 1200;
@@ -35,7 +35,7 @@ export function ocrAvailable(): boolean {
   } catch {
     // brak localStorage
   }
-  return cloudMode();
+  return AI_OCR_ENABLED && cloudMode();
 }
 
 const AUTO_KEY = 'fitowa-ocr-auto';

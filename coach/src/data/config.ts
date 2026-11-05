@@ -25,3 +25,9 @@ export function cloudMode(): boolean {
  * Pusty klucz = powiadomienia wyłączone (przełącznik w ustawieniach się nie pokazuje).
  */
 export const VAPID_PUBLIC_KEY = 'BK9HmOcEHVlUor9l9Bdh_fJAZULa-tgxz3Ux-RCbXvZ6jbC3dyQ8b9GFy-kFLrqni_wiFWambuc4d92O7TPlm6I';
+
+/**
+ * Odczyt zrzutu z Fitatu przez AI (funkcja Edge „read-screenshot”, supabase/AI.md). Na razie wyłączony —
+ * podopieczny wpisuje liczby ręcznie, zrzut dalej się dołącza. Włączenie: `true` po wdrożeniu funkcji i klucza.
+ */
+export const AI_OCR_ENABLED = false;
