@@ -58,30 +58,32 @@ describe('układ arkusza trenera: PLAN | REALIZACJA (KG / REP w każdej serii) |
     const top = rows.findIndex((r) => r.includes('REALIZACJA'));
     expect(rows[top]).toContain('DATA:');
     expect(rows[top]).toContain('NOTATKI');
-    expect(rows[top + 1].slice(0, 6)).toEqual(['Ćwiczenie', 'Serie', 'Powt.', 'RPE', 'Tempo', 'Przerwa']);
-    expect(rows[top + 1][6]).toBe('Seria 1');
-    expect(rows[top + 2].slice(6, 8)).toEqual(['KG', 'REP']);
-    expect(sh.merges).toContain(`G${top + 2}:H${top + 2}`);
+    const head = rows[top + 1];
+    expect(head.slice(0, 3)).toEqual(['Ćwiczenie', 'Serie', 'Powt.']);
+    const s1 = head.indexOf('Seria 1');
+    expect(s1).toBeGreaterThan(2);
+    expect(rows[top + 2].slice(s1, s1 + 2)).toEqual(['KG', 'REP']);
+    expect(sh.rowBreaks?.length).toBeGreaterThan(0);
     const k = plan.weeks[0].workouts.find((w) => w.exercises.some((e) => e.name.trim()))!;
     const first = k.exercises.find((e) => e.name.trim())!;
     expect(String(rows[top + 3][0])).toContain(first.name);
   });
   it('seria planu: ciężar w KG (liczba), powtórzenia do wpisania; tempo i przerwa w kolumnach planu', () => {
     const r = planExRows({ id: 'w', name: 'A', exercises: [{ id: 'e', name: 'Przysiad', rest: '90', notes: 'tempo 3-1-X-0, kolana na zewnątrz', groups: [{ type: 'Rozgrzewka', sets: '1', reps: '5', load: '40', rpe: '' }, { type: 'Robocze', sets: '3', reps: '8', load: '62.5', rpe: '8' }] }] } as never)[0];
-    expect(r.sets.map((x) => x.kg)).toEqual([40, 62.5, 62.5, 62.5]);
-    expect(r.sets[0].warm).toBe(true);
+    expect(r.sets.map((x) => x.kg)).toEqual([62.5, 62.5, 62.5]);
+    expect(r.target).toBe(true);
     expect(r.plan).toEqual({ sets: '3', reps: '8', rpe: '8', tempo: '3-1-X-0', rest: '1:30' });
-    expect(r.notes).toBe('rozgrzewka: seria 1 · kolana na zewnątrz');
+    expect(r.notes).toBe('Rozgrzewka: 5 × 40 kg · kolana na zewnątrz');
     expect(splitTempo('bez tempa').tempo).toBe('');
   });
   it('trening: jeden wiersz na ćwiczenie, KG i REP z zapisu', () => {
     const rows = flat(sessionWorkbook(sess, { name: 'Jan' }, true)[0].rows);
-    expect(rows[0][1]).toBe(sess.workoutName || 'Trening');
+    expect(rows[0][0]).toBe(sess.workoutName || 'Trening');
     const hi = rows.findIndex((r) => r[0] === 'Ćwiczenie');
     const n = sess.exercises.filter((e) => e.name.trim()).length;
     expect(rows.slice(hi + 2).filter((r) => r.length && r[0]).length).toBe(n);
     const sx = sessionExRows({ ...sess, exercises: [{ name: 'Wiosłowanie', setsLog: [{ reps: 10, load: 30, rpe: 7 }, { reps: 8, load: 32.5, rpe: 8 }] }] });
-    expect(sx[0].sets).toEqual([{ kg: 30, rep: 10, warm: false }, { kg: 32.5, rep: 8, warm: false }]);
+    expect(sx[0].sets).toEqual([{ kg: 30, rep: 10 }, { kg: 32.5, rep: 8 }]);
     expect(sx[0].rpe).toBe('7 / 8');
   });
   it('wszystkie treningi: lista i tabela każdego treningu', async () => {

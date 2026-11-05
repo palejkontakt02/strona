@@ -7,6 +7,11 @@ export type XBorder = 'thin' | 'medium' | 'dotted' | 'hair';
 /** Wygląd komórki: czcionka, wypełnienie, ramki, wyrównanie, format liczby. */
 export interface XStyle {
   bold?: boolean;
+  italic?: boolean;
+  /** Wcięcie tekstu (poziomy). */
+  indent?: number;
+  /** Kolor cienkich ramek (grube zawsze czarne). */
+  bc?: string;
   /** Kolor czcionki / wypełnienia jako „RRGGBB”. */
   color?: string;
   fill?: string;
@@ -36,6 +41,15 @@ export interface XSheet {
   noGrid?: boolean;
   /** Wydruk poziomo, dopasowany do szerokości strony. */
   landscape?: boolean;
+  /** Wydruk dopasowany do szerokości strony (pionowo, gdy bez `landscape`). */
+  fitWidth?: boolean;
+  /** Zamrożone kolumny z lewej (np. 1 — nazwa ćwiczenia widoczna przy przewijaniu w bok). */
+  freezeCols?: number;
+  /** Ręczne podziały stron: numer (od 1) ostatniego wiersza na stronie. */
+  rowBreaks?: number[];
+  /** Nagłówek / stopka wydruku (kody Excela: &P strona, &N liczba stron, &L/&C/&R sekcje). */
+  pageHeader?: string;
+  pageFooter?: string;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -59,7 +73,7 @@ export function sheetName(name: string, taken: string[] = []): string {
 }
 
 class Styles {
-  fonts = ['<font><sz val="11"/><name val="Calibri"/></font>', '<font><b/><sz val="11"/><name val="Calibri"/></font>'];
+  fonts = ['<font><sz val="10"/><name val="Arial"/></font>', '<font><b/><sz val="10"/><name val="Arial"/></font>'];
   fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
   borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
   fmts: string[] = [];
@@ -75,13 +89,13 @@ class Styles {
     const key = JSON.stringify(st);
     const hit = this.keys.get(key);
     if (hit != null) return hit;
-    const font = this.idx(this.fonts, `<font>${st.bold ? '<b/>' : ''}<sz val="${st.size ?? 11}"/>${st.color ? `<color rgb="FF${st.color}"/>` : ''}<name val="Calibri"/></font>`);
+    const font = this.idx(this.fonts, `<font>${st.bold ? '<b/>' : ''}${st.italic ? '<i/>' : ''}<sz val="${st.size ?? 10}"/>${st.color ? `<color rgb="FF${st.color}"/>` : ''}<name val="Arial"/></font>`);
     const fill = st.fill ? this.idx(this.fills, `<fill><patternFill patternType="solid"><fgColor rgb="FF${st.fill}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
-    const side = (n: string, v?: XBorder) => (v ? `<${n} style="${v}"><color rgb="FF000000"/></${n}>` : `<${n}/>`);
+    const side = (n: string, v?: XBorder) => (v ? `<${n} style="${v}"><color rgb="FF${v === 'medium' ? '000000' : (st.bc ?? '000000')}"/></${n}>` : `<${n}/>`);
     const bd = st.border;
     const border = bd ? this.idx(this.borders, `<border>${side('left', bd.l)}${side('right', bd.r)}${side('top', bd.t)}${side('bottom', bd.b)}<diagonal/></border>`) : 0;
     const fmt = st.fmt ? 164 + this.idx(this.fmts, st.fmt) : 0;
-    const al = st.align || st.valign || st.wrap ? `<alignment${st.align ? ` horizontal="${st.align}"` : ''} vertical="${st.valign ?? 'center'}"${st.wrap ? ' wrapText="1"' : ''}/>` : '';
+    const al = st.align || st.valign || st.wrap || st.indent ? `<alignment${st.align ? ` horizontal="${st.align}"` : ''} vertical="${st.valign ?? 'center'}"${st.wrap ? ' wrapText="1"' : ''}${st.indent ? ` indent="${st.indent}"` : ''}/>` : '';
     this.xfs.push(
       `<xf numFmtId="${fmt}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyFont="1"${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''}${fmt ? ' applyNumberFormat="1"' : ''}${al ? ' applyAlignment="1">' + al + '</xf>' : '/>'}`,
     );
@@ -94,7 +108,25 @@ class Styles {
   }
 }
 
-function sheetXml(sh: XSheet, styles: Styles): string {
+/** Wspólna tabela tekstów (czytają ją wszystkie programy, także podgląd na iPhonie). */
+class Strings {
+  list: string[] = [];
+  private map = new Map<string, number>();
+  count = 0;
+  get(t: string): number {
+    this.count++;
+    const hit = this.map.get(t);
+    if (hit != null) return hit;
+    this.list.push(t);
+    this.map.set(t, this.list.length - 1);
+    return this.list.length - 1;
+  }
+  xml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${this.count}" uniqueCount="${this.list.length}">${this.list.map((t) => `<si><t xml:space="preserve">${esc(t)}</t></si>`).join('')}</sst>`;
+  }
+}
+
+function sheetXml(sh: XSheet, styles: Styles, strings: Strings): string {
   const ncol = Math.max(1, ...sh.rows.map((r) => r.length));
   const widths =
     sh.widths ??
@@ -103,12 +135,15 @@ function sheetXml(sh: XSheet, styles: Styles): string {
     );
   const cols = `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`;
   const grid = sh.noGrid ? ' showGridLines="0"' : '';
+  const fc = sh.freezeCols ?? 0;
   const pane =
     sh.header && sh.rows.length > 1
       ? `<sheetViews><sheetView${grid} workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
-      : grid
-        ? `<sheetViews><sheetView${grid} workbookViewId="0"/></sheetViews>`
-        : '';
+      : fc
+        ? `<sheetViews><sheetView${grid} workbookViewId="0"><pane xSplit="${fc}" topLeftCell="${colName(fc)}1" activePane="topRight" state="frozen"/></sheetView></sheetViews>`
+        : grid
+          ? `<sheetViews><sheetView${grid} workbookViewId="0"/></sheetViews>`
+          : '';
   const rows = sh.rows
     .map((r, ri) => {
       const cells = r
@@ -122,15 +157,25 @@ function sheetXml(sh: XSheet, styles: Styles): string {
           if (v == null || v === '') return `<c r="${ref}"${s}/>`;
           if (typeof v === 'number' && Number.isFinite(v)) return `<c r="${ref}"${s}><v>${v}</v></c>`;
           const t = clean(String(v));
-          return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
+          return `<c r="${ref}"${s} t="s"><v>${strings.get(t)}</v></c>`;
         })
         .join('');
       const h = sh.heights?.[ri];
       return `<row r="${ri + 1}"${h ? ` ht="${h}" customHeight="1"` : ''}>${cells}</row>`;
     })
     .join('');
-  const pr = sh.landscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
-  const page = sh.landscape ? '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '';
+  const fit = sh.landscape || sh.fitWidth;
+  const pr = fit ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '';
+  const hf =
+    sh.pageHeader || sh.pageFooter
+      ? `<headerFooter>${sh.pageHeader ? `<oddHeader>${esc(sh.pageHeader)}</oddHeader>` : ''}${sh.pageFooter ? `<oddFooter>${esc(sh.pageFooter)}</oddFooter>` : ''}</headerFooter>`
+      : '';
+  const br = sh.rowBreaks?.length ? `<rowBreaks count="${sh.rowBreaks.length}" manualBreakCount="${sh.rowBreaks.length}">${sh.rowBreaks.map((r) => `<brk id="${r}" max="16383" man="1"/>`).join('')}</rowBreaks>` : '';
+  const page = fit
+    ? `<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.25" footer="0.25"/><pageSetup paperSize="9" orientation="${sh.landscape ? 'landscape' : 'portrait'}" fitToWidth="1" fitToHeight="0"/>${hf}${br}`
+    : hf || br
+      ? `<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.25" footer="0.25"/>${hf}${br}`
+      : '';
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${pr}${pane}${cols}<sheetData>${rows}</sheetData>${sh.merges?.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}${page}</worksheet>`;
 }
 
@@ -217,11 +262,12 @@ export function xlsx(sheets: XSheet[]): Uint8Array {
     return { ...s, name: n };
   });
   const styles = new Styles();
-  const sheetXmls = named.map((s) => sheetXml(s, styles));
+  const strings = new Strings();
+  const sheetXmls = named.map((s) => sheetXml(s, styles, strings));
   const files = [
     {
       name: '[Content_Types].xml',
-      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${named.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`,
+      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>${named.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`,
     },
     {
       name: '_rels/.rels',
@@ -233,9 +279,10 @@ export function xlsx(sheets: XSheet[]): Uint8Array {
     },
     {
       name: 'xl/_rels/workbook.xml.rels',
-      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${named.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${named.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+      xml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${named.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${named.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId${named.length + 2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>`,
     },
     { name: 'xl/styles.xml', xml: styles.xml() },
+    { name: 'xl/sharedStrings.xml', xml: strings.xml() },
     ...sheetXmls.map((xml, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, xml })),
   ];
   return zip(files.map((f) => ({ name: f.name, data: enc.encode(f.xml) })));
