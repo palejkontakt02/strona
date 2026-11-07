@@ -123,6 +123,10 @@ export function nextBlock(plan: Plan, today: ISODate = todayISO()): Plan {
     id: uid(),
     name: nextBlockName(plan.name),
     active: false,
+    // włączy się sam w dniu startu; nowe przejście i połączony arkusz należą do oryginału
+    autoStart: true,
+    passFrom: undefined,
+    gsheet: undefined,
     startDate: start ?? plan.startDate,
     updatedAt: new Date().toISOString(),
     weeks: plan.weeks.map((w) => ({

@@ -447,6 +447,8 @@ export interface Plan {
   template?: boolean;
   notes?: string;
   updatedAt?: string;
+  /** Przygotowany kolejny blok: włącza się sam w dniu startu (nieaktywny do tego dnia). */
+  autoStart?: boolean;
   /** „Ustaw daty od nowa”: nowe przejście planu od tego dnia — wcześniejsze treningi zostają w historii, ale nie odhaczają jednostek. */
   passFrom?: ISODate;
   /** Połączony arkusz Google (Arkusze Google ↔ plan): id pliku i czas ostatniej wysyłki / pobrania. */

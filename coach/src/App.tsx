@@ -11,6 +11,10 @@ import { LiveSession, PairLive } from './athlete/LiveSession';
 import { groupOf } from './data/ops';
 import { useStore } from './data/store';
 import { put } from './data/db';
+import { savePlan } from './data/ops';
+import { dueBlock } from './lib/plan';
+import { todayISO } from './lib/dates';
+import type { Plan } from './domain';
 import { markNeedsUpdate, wantedMark } from './lib/liveMark';
 import { CalendarView } from './views/CalendarView';
 import { ClientsView } from './views/ClientsView';
@@ -55,6 +59,26 @@ export function App() {
   const dbRef = useRef(db);
   dbRef.current = db;
   const syncing = useRef(false);
+  // przygotowany kolejny blok („Duplikuj plan”) włącza się sam w dniu startu — zapis w danych (stary plan nieaktywny)
+  const activating = useRef(false);
+  useEffect(() => {
+    if (activating.current) return;
+    const today = todayISO();
+    const due = [...new Set(db.plans.filter((p) => p.autoStart && !p.active).map((p) => p.clientId))]
+      .map((cid) => dueBlock(db.plans.filter((p) => p.clientId === cid), today))
+      .filter((b): b is Plan => !!b);
+    if (!due.length) return;
+    activating.current = true;
+    let cur = db;
+    const changes = due.flatMap((b) => {
+      const ch = savePlan(cur, { ...b, active: true });
+      cur = { ...cur, plans: cur.plans.map((p) => (p.clientId === b.clientId && !p.extra ? (p.id === b.id ? { ...b, active: true } : { ...p, active: false }) : p)) };
+      return ch;
+    });
+    void apply(changes, due.length === 1 ? `Włączono „${due[0].name}” — dziś zaczyna się ten blok.` : `Włączono ${due.length} przygotowane bloki — dziś ich start.`).finally(() => {
+      activating.current = false;
+    });
+  }, [db, apply]);
   useEffect(() => {
     const sync = async () => {
       if (syncing.current || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;

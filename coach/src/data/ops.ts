@@ -374,7 +374,8 @@ export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolea
 
 /** Zapis planu; aktywny może być tylko jeden plan klienta. */
 export function savePlan(db: Db, plan: Plan): Change[] {
-  const changes: Change[] = [put('plans', { ...plan, updatedAt: new Date().toISOString() })];
+  // włączony ręcznie albo w dniu startu — dalej zwykły aktywny plan
+  const changes: Change[] = [put('plans', { ...plan, ...(plan.active ? { autoStart: undefined } : {}), updatedAt: new Date().toISOString() })];
   if (plan.active && !plan.extra) {
     for (const o of db.plans.filter((p) => p.clientId === plan.clientId && p.id !== plan.id && p.active && !p.extra)) {
       changes.push(put('plans', { ...o, active: false }));
@@ -389,6 +390,8 @@ export function clonePlan(plan: Plan, name: string): Plan {
     ...plan,
     id: uid(),
     name,
+    passFrom: undefined,
+    gsheet: undefined,
     active: false,
     updatedAt: new Date().toISOString(),
     weeks: plan.weeks.map((w) => cloneWeek(w, w.name)),

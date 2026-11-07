@@ -1,4 +1,4 @@
-import { addDays, daysBetween, weekStart } from './dates';
+import { addDays, daysBetween, todayISO, weekStart } from './dates';
 import type { Plan, PlanWeek, PlanWorkout, SetGroup, TrainingSession } from '../domain';
 import { repsN } from './parse';
 
@@ -45,13 +45,22 @@ export function planSequence(plan: Plan): PlanStep[] {
   return out;
 }
 
-/** Plan zawodnika: aktywny, w przeciwnym razie najnowszy. */
-export function currentPlan(plans: Plan[]): Plan | null {
+/** Przygotowany blok (`autoStart`), którego dzień startu już nadszedł i który zaczyna się później niż aktywny plan. */
+export function dueBlock(plans: Plan[], today: string = todayISO()): Plan | null {
+  const act = plans.find((p) => p.active && !p.extra);
   return (
-    plans.find((p) => p.active) ||
-    [...plans].sort((a, b) => (b.updatedAt || b.startDate || '').localeCompare(a.updatedAt || a.startDate || ''))[0] ||
-    null
+    plans
+      .filter((p) => !p.active && p.autoStart && !p.extra && !p.template && p.startDate && p.startDate <= today && (!act || (act.startDate ?? '') < p.startDate))
+      .sort((a, b) => b.startDate!.localeCompare(a.startDate!))[0] ?? null
   );
+}
+
+/**
+ * Plan zawodnika: przygotowany blok, gdy nadszedł jego start (włącza się sam), inaczej aktywny.
+ * Bez aktywnego planu — brak planu (nie pokazujemy po cichu nieaktywnego bloku); wyjątek: stare plany bez znacznika `active`.
+ */
+export function currentPlan(plans: Plan[], today: string = todayISO()): Plan | null {
+  return dueBlock(plans, today) || plans.find((p) => p.active) || plans.find((p) => p.active === undefined && !p.extra && !p.template) || null;
 }
 
 /** Trening przerwany z powodu bólu nie zalicza jednostki planu (trener decyduje, co dalej). */
@@ -79,13 +88,29 @@ export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (Pl
   return { ...nx, total: seq.length };
 }
 
+/** Ostatnio zapisana jednostka planu to jego ostatni trening (plan przerobiony do końca, nowe przejście jeszcze nie ruszyło). */
+export function planCompleted(plan: Plan | null, sessions: TrainingSession[]): boolean {
+  if (!plan) return false;
+  const seq = planSequence(plan).map((x) => x.workout.id);
+  if (seq.length < 2) return false;
+  let last: { date: string; i: number } | null = null;
+  for (const s of sessions) {
+    if (s.planId !== plan.id || !s.workoutId || !counts(s) || !inPlanPass(plan, s)) continue;
+    const i = seq.indexOf(s.workoutId);
+    if (i < 0) continue;
+    if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
+  }
+  return !!last && last.i === seq.length - 1;
+}
+
 /** Jednostki zrobione w bieżącym przejściu planu (przed „następną”) — dalsze to poprzednie przejście. */
 export function doneInPass(plan: Plan | null, sessions: TrainingSession[]): Set<string> {
   const out = new Set<string>();
   if (!plan) return out;
   const nx = nextWorkout(plan, sessions);
   const seq = planSequence(plan).map((x) => x.workout.id);
-  const ni = nx ? seq.indexOf(nx.workout.id) : -1;
+  // plan ukończony (ostatnia jednostka zrobiona) — wszystkie ✓ zostają, nowe przejście dopiero od pierwszego treningu
+  const ni = planCompleted(plan, sessions) ? -1 : nx ? seq.indexOf(nx.workout.id) : -1;
   for (const s of sessions) {
     if (s.planId !== plan.id || !s.workoutId || !counts(s) || !inPlanPass(plan, s)) continue;
     const i = seq.indexOf(s.workoutId);

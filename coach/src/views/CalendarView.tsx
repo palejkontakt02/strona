@@ -21,7 +21,7 @@ import { fmtMonth, fmtShort, fmtWeekday } from "../format";
 import { clashes, clientHue } from "../lib/calendar";
 import { addDays, todayISO, weekStart } from "../lib/dates";
 import { useNav } from "../nav";
-import { workoutDate } from "../lib/plan";
+import { doneInPass, nextDate, nextWorkout, planSequence, workoutDate } from "../lib/plan";
 import { LocationTag, locStyle } from "../components/location";
 import { put } from "../data/db";
 import { canMove, moveVisit } from "../lib/calendarMove";
@@ -183,16 +183,21 @@ export function CalendarView() {
           c.id === x.clientId && c.status === "aktywny" && inLoc(c.locationId),
       ),
   )) {
-    const done = new Set(
-      db.sessions
-        .filter((x) => x.planId === p.id && x.workoutId)
-        .map((x) => x.workoutId),
-    );
+    // jak w zakładce Plan: liczy się bieżące przejście planu; następny trening na jego najbliższej dacie
+    // (zaległy termin przechodzi na najbliższy dzień tygodnia), jednostki przed następnym i inne minione daty — pomijane
+    const ss = db.sessions.filter((x) => x.clientId === p.clientId);
+    const done = doneInPass(p, ss);
+    const nx = nextWorkout(p, ss);
+    const seqIds = planSequence(p).map((x) => x.workout.id);
+    const ni = nx ? seqIds.indexOf(nx.workout.id) : 0;
     p.weeks.forEach((w, wi) =>
       w.workouts.forEach((k) => {
-        const d = workoutDate(p, wi, k);
+        const planned = workoutDate(p, wi, k);
+        const isNext = nx?.workout.id === k.id;
+        const d = isNext ? nextDate(p, nx, today) ?? planned : planned;
         if (!d || done.has(k.id) || !k.exercises.some((e) => e.name.trim()))
           return;
+        if (!isNext && (seqIds.indexOf(k.id) < ni || d < today)) return;
         if (
           db.appointments.some(
             (a) =>
@@ -205,7 +210,7 @@ export function CalendarView() {
         assigned.push({
           plan: p,
           workout: { ...k, date: d },
-          state: d < today ? "overdue" : "due",
+          state: isNext && planned && planned < today ? "overdue" : "due",
           fromPlan: true,
         });
       }),

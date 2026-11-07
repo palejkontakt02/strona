@@ -18,7 +18,7 @@ import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, numIn, repsN } from '../lib/parse';
-import { currentPlan, nextWorkout, planSequence, workoutDate } from '../lib/plan';
+import { currentPlan, nextWorkout, planCompleted, planSequence, workoutDate } from '../lib/plan';
 import { fmtWeekdayDate } from '../lib/planGrid';
 import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { fmtDur, fmtKm, planRunTotals, runVolume } from '../lib/running';
@@ -551,7 +551,9 @@ function TodayTab({
     [...planned.keys()],
   );
   const thisWeek = sessions.filter((s) => s.date >= weekStart(today)).length;
-  const goal = client.daysPerWeek || 2;
+  // cel tygodnia: tyle treningów, ile ma tydzień planu (następnej jednostki), inaczej z profilu
+  const planWeek = nx ? nx.week.workouts.filter((k) => k.exercises.some((e) => e.name.trim())).length : 0;
+  const goal = planWeek || client.daysPerWeek || 2;
   // seria tygodni: tydzień w całości na zgłoszonej nieobecności jej nie przerywa
   const st = streakWithAbsences(sessions, today, client.absences);
   const away = activeAbsence(client.absences, today);
@@ -1324,7 +1326,8 @@ function Workouts({
   const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id && (planId !== plan?.id || !plan?.passFrom || s.date >= plan.passFrom))?.date;
   // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
   const seqIds = plan ? planSequence(plan).map((x) => x.workout.id) : [];
-  const nextIdx = nextId ? seqIds.indexOf(nextId) : -1;
+  // plan przerobiony do końca — wszystkie ✓ zostają (nowe przejście ruszy od pierwszego treningu)
+  const nextIdx = plan && planCompleted(plan, sessions) ? -1 : nextId ? seqIds.indexOf(nextId) : -1;
   // minione tygodnie (przed tygodniem następnej jednostki) — zwinięte
   const open = plan ? firstOpenWeek(plan.weeks, nextId) : 0;
   const item = (k: PlanWorkout, planId: string, isNext: boolean) => {

@@ -10,7 +10,7 @@ import { useStore } from '../../data/store';
 import { fmtDate, fmtShort, plural, uid } from '../../format';
 import { daysBetween, todayISO, weekStart } from '../../lib/dates';
 import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf } from '../../lib/analytics';
-import { doneInPass, nextDate, nextWorkout, planStatus } from '../../lib/plan';
+import { doneInPass, nextDate, nextWorkout, planCompleted, planStatus } from '../../lib/plan';
 import { Sheet } from '../../components/Sheet';
 import { fmtWeekdayDate } from '../../lib/planGrid';
 import { useNav } from '../../nav';
@@ -82,7 +82,7 @@ export function ClientPlans({ client }: { client: Client }) {
   // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
   const dupPlan = (p: Plan) => {
     const b = nextBlock(p);
-    void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Plan jest nieaktywny — „Ustaw aktywny”, gdy zacznie się blok.`);
+    void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — włączy się sam ${fmtDate(b.startDate)} (wcześniej: „Ustaw aktywny”)` : ''}.`);
   };
   const saveTemplate = (p: Plan) => {
     const taken = templatesOf(db.plans).some((t) => t.name === p.name);
@@ -246,19 +246,30 @@ export function ClientPlans({ client }: { client: Client }) {
               <p className="muted small">
                 {p.startDate && `Start ${fmtDate(p.startDate)} · `}
                 {p.weeks.length} tyg. · {(() => { const n = p.weeks.reduce((a, w) => a + w.workouts.length, 0); return `${n} ${plural(n, 'jednostka', 'jednostki', 'jednostek')}`; })()}
-                {nx && p.active && ` · następny: ${nx.workout.name} (${nx.week.name})${nd ? ` · ${fmtWeekdayDate(nd)}` : ''}`}
+                {nx && p.active && (planCompleted(p, sessions) ? ' · plan ukończony — wszystkie jednostki zrobione (kolejny trening: od początku albo nowy blok)' : ` · następny: ${nx.workout.name} (${nx.week.name})${nd ? ` · ${fmtWeekdayDate(nd)}` : ''}`)}
+                {!p.active && p.autoStart && p.startDate && ` · włączy się sam ${fmtDate(p.startDate)}`}
               </p>
               {st?.ended && st.endDate && (
                 <div className="warn-box pl-ended" role="status">
                   <Icon name="alert" size={16} />
                   <span className="pl-ended-text">
                     Plan zakończył się {fmtShort(st.endDate)} — zaplanuj kolejny blok.
-                    {st.cycle > 1 && <span className="muted small"> Podopieczny robi go teraz od nowa (przejście {st.cycle}).</span>}
+                    {nx && <span className="muted small"> Podopieczny robi go dalej po kolei — następny: {nx.workout.name} ({nx.week.name}).</span>}
                   </span>
                   <span className="pl-ended-actions">
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku — od razu aktywna">
-                      Następny blok
-                    </button>
+                    {(() => {
+                      // przygotowany już kolejny blok — włączamy jego, zamiast robić drugą kopię
+                      const prepared = plans.filter((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')).sort((a, b) => a.startDate!.localeCompare(b.startDate!))[0];
+                      return prepared ? (
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void apply(savePlan(db, { ...prepared, active: true }), `„${prepared.name}” jest teraz aktywny.`)} title={`Przygotowany blok „${prepared.name}” (start ${fmtDate(prepared.startDate!)})`}>
+                          Włącz „{prepared.name}”
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku — od razu aktywna">
+                          Następny blok
+                        </button>
+                      );
+                    })()}
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restartDates(p)} title="Ten sam plan jeszcze raz od tygodnia 1, od najbliższego poniedziałku (z cofnięciem)">
                       Ustaw daty od nowa
                     </button>
