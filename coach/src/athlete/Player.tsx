@@ -554,7 +554,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     }
     const total = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup).length, 0);
     const done = run.ex.reduce((a, e) => a + e.sets.filter((x) => !x.warmup && x.done).length, 0) + added;
-    if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii roboczych. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane.`, { confirm: 'Zakończ' }))) return;
+    if (!editing && total > 2 && done < total / 2 && !(await ask(`Zaliczono ${done} z ${total} serii roboczych. Zakończyć trening teraz? Niezaliczone serie nie zostaną zapisane${run.workoutId ? ', a trening z planu będzie zaliczony i plan przejdzie do następnego' : ''}.`, { confirm: 'Zakończ' }))) return;
     showFinish();
   };
   const showFinish = (ps = painStop) => {

@@ -18,7 +18,7 @@ import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
 import { addDays, todayISO, weekStart } from '../lib/dates';
 import { num, numIn, repsN } from '../lib/parse';
-import { currentPlan, nextWorkout, planCompleted, planSequence, workoutDate } from '../lib/plan';
+import { currentPlan, doneInPass, nextDate, nextWorkout, planCompleted, planSequence, planStatus, workoutDate } from '../lib/plan';
 import { fmtWeekdayDate } from '../lib/planGrid';
 import { cardioByName, emptyRun, sessionToRun, type Run } from '../lib/run';
 import { fmtDur, fmtKm, planRunTotals, runVolume } from '../lib/running';
@@ -161,6 +161,10 @@ export function AthleteApp({
   useEffect(() => {
     storeRun(clientId, run);
   }, [clientId, run]);
+  // pusty „Trening własny” (otwarty i zostawiony bez ćwiczeń) nie wisi na „Dziś” zamiast planu
+  useEffect(() => {
+    if (run && !run.editSessionId && run.ex.length === 0 && screen !== 'run') setRun(null);
+  }, [run, screen]);
   // trening w toku na telefonie podopiecznego — znacznik w bazie, żeby trener nie poprowadził go drugi raz u siebie
   const { setAthleteLive, cloud } = useStore();
   // powiadomienia: odnowienie subskrypcji przy otwarciu (zgubiona przez telefon / usunięta jako wygasła)
@@ -676,7 +680,7 @@ function TodayTab({
           <button type="button" className="r7-hero-open" onClick={() => setPeek(true)} aria-label={`Zobacz ćwiczenia: ${nx.workout.name}`}>
             <h2>{nx.workout.name}</h2>
             <p className="muted small">
-              {nx.week.name.replace(/\s*\(deload\)/i, ' (lżejszy)')} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
+              {nx.week.name} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
               <span className="r7-hero-more"> · Zobacz ćwiczenia ›</span>
             </p>
           </button>
@@ -684,8 +688,20 @@ function TodayTab({
             // dzień z planu (ustawiony przez trenera); „zaległy” tylko gdy od terminu nie było treningu z tego planu
             const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
             const due = planDue(d, today, sessions, plan?.id);
-            if (!d || !due) return null;
-            return <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>;
+            // plan przerobiony / po dacie końca: podopieczny wie, co się dzieje (trener widzi to samo w swoim panelu)
+            const st = plan ? planStatus(plan, today) : null;
+            const ended = !!plan && (planCompleted(plan, sessions) || !!st?.ended);
+            const soon = !due && plan ? nextDate(plan, nx, today) : undefined;
+            return (
+              <>
+                {ended && <p className="small muted">Plan {st?.endDate && st.ended ? `skończył się ${fmtDay(st.endDate)}` : 'jest przerobiony do końca'} — trener przygotuje kolejny blok. Do tego czasu robisz go od nowa.</p>}
+                {d && due ? (
+                  <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>
+                ) : soon ? (
+                  <p className="small muted">Najbliższy termin: {dayWord(soon, today)}</p>
+                ) : null}
+              </>
+            );
           })()}
           {visitInHero && (
             <p className="small ath-hero-visit">
@@ -982,12 +998,21 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
   const out = new Map<string, DayItem[]>();
   const add = (d: string, it: DayItem) => out.set(d, [...(out.get(d) ?? []), it]);
   if (plan) {
-    const done = new Set(sessions.filter((x) => x.planId === plan.id && x.workoutId).map((x) => x.workoutId));
+    // jak u trenera (zakładka Plan, kalendarz): bieżące przejście planu, następny trening na najbliższej dacie,
+    // jednostki przed następnym i inne minione daty pominięte; dni nieobecności („Wypadam z planu”) bez treningów
+    const done = doneInPass(plan, sessions);
+    const nx = nextWorkout(plan, sessions);
+    const seq = planSequence(plan).map((x) => x.workout.id);
+    const ni = nx ? seq.indexOf(nx.workout.id) : 0;
+    const absences = clientById(db, clientId)?.absences ?? [];
+    const away = (d: string) => absences.some((a) => a.from && a.to && d >= a.from && d <= a.to);
     plan.weeks.forEach((w, wi) =>
       w.workouts.forEach((k) => {
-        const d = workoutDate(plan, wi, k);
-        // minione terminy pomijamy, gdy podopieczny od tego czasu trenował z planu (idzie po kolei — nie „zaległy”)
-        if (d && !done.has(k.id) && k.exercises.some((e) => e.name) && planDue(d, today, sessions, plan.id)) add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
+        const isNext = nx?.workout.id === k.id;
+        const d = isNext ? nextDate(plan, nx, today) : workoutDate(plan, wi, k);
+        if (!d || done.has(k.id) || !k.exercises.some((e) => e.name) || away(d)) return;
+        if (!isNext && (seq.indexOf(k.id) < ni || d < today)) return;
+        add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
       }),
     );
   }
