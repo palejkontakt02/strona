@@ -690,7 +690,9 @@ function TodayTab({
             const due = planDue(d, today, sessions, plan?.id);
             // plan przerobiony / po dacie końca: podopieczny wie, co się dzieje (trener widzi to samo w swoim panelu)
             const st = plan ? planStatus(plan, today) : null;
-            const ended = !!plan && (planCompleted(plan, sessions) || !!st?.ended);
+            // „robisz go od nowa” tylko, gdy plan faktycznie przerobiony albo po dacie końca następny jest znów pierwszy
+            // (po dacie końca, ale z zaległymi treningami — np. po urlopie — podopieczny po prostu robi resztę)
+            const ended = !!plan && (planCompleted(plan, sessions) || (!!st?.ended && nx.index === 0));
             const soon = !due && plan ? nextDate(plan, nx, today) : undefined;
             return (
               <>
@@ -1010,7 +1012,8 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
       w.workouts.forEach((k) => {
         const isNext = nx?.workout.id === k.id;
         const d = isNext ? nextDate(plan, nx, today) : workoutDate(plan, wi, k);
-        if (!d || done.has(k.id) || !k.exercises.some((e) => e.name) || away(d)) return;
+        // następny liczy się zawsze (po przerobieniu planu jest „zrobiony” z poprzedniego przejścia)
+        if (!d || (!isNext && done.has(k.id)) || !k.exercises.some((e) => e.name) || away(d)) return;
         if (!isNext && (seq.indexOf(k.id) < ni || d < today)) return;
         add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
       }),
@@ -1360,7 +1363,10 @@ function Workouts({
     const dn = done(planId, k.id);
     const idx = planId === plan?.id ? seqIds.indexOf(k.id) : -1;
     const doneNow = !!dn && !isNext && (planId !== plan?.id || nextIdx < 0 || idx < nextIdx);
-    const planned = planId === plan?.id && plan ? workoutDate(plan, plan.weeks.findIndex((w) => w.workouts.some((x) => x.id === k.id)), k) : undefined;
+    const wk = plan?.weeks.find((w) => w.workouts.some((x) => x.id === k.id));
+    const raw = planId === plan?.id && plan && wk ? workoutDate(plan, plan.weeks.indexOf(wk), k) : undefined;
+    // następny: najbliższy realny termin (jak na „Dziś”); dalsze: data planu, o ile nie minęła (stare daty z poprzedniego przejścia — bez daty)
+    const planned = isNext && plan && wk ? nextDate(plan, { week: wk, workout: k }, todayISO()) : raw && (doneNow || raw >= todayISO()) ? raw : undefined;
     return (
       <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${doneNow ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
         <span className="wo-st">{isNext ? '▶' : doneNow ? '✓' : ''}</span>

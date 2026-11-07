@@ -195,7 +195,7 @@ export function CalendarView() {
         const planned = workoutDate(p, wi, k);
         const isNext = nx?.workout.id === k.id;
         const d = isNext ? nextDate(p, nx, today) ?? planned : planned;
-        if (!d || done.has(k.id) || !k.exercises.some((e) => e.name.trim()))
+        if (!d || (!isNext && done.has(k.id)) || !k.exercises.some((e) => e.name.trim()))
           return;
         if (!isNext && (seqIds.indexOf(k.id) < ni || d < today)) return;
         if (
