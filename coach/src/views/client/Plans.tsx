@@ -103,13 +103,15 @@ export function ClientPlans({ client }: { client: Client }) {
   // ten sam plan od nowa: cały plan przesunięty o pełne tygodnie na najbliższy poniedziałek (z cofnięciem)
   const restartDates = async (p: Plan) => {
     const first = planDates(p).map((x) => x.date).sort()[0];
-    const days = p.startDate ? daysBetween(weekStart(p.startDate), nextMonday(today)) : 0;
+    // w poniedziałek — od dziś, inaczej od najbliższego poniedziałku
+    const target = weekStart(today) === today ? today : nextMonday(today);
+    const days = p.startDate ? daysBetween(weekStart(p.startDate), target) : 0;
     if (!first || days <= 0) return openModal({ kind: 'plan', plan: p });
     const moved = { ...shiftPlanFrom(p, first, days), passFrom: today };
     const firstK = p.weeks[0]?.workouts[0];
-    if (!(await ask(`Plan „${p.name}” od nowa: ${p.weeks[0]?.name ?? 'Tydzień 1'}${firstK ? ` · ${firstK.name}` : ''} od ${fmtDate(moved.startDate ?? nextMonday(today))}, kolejne tygodnie co 7 dni. Dotychczasowe treningi zostają w historii, ale nie odhaczają jednostek nowego przejścia.`, { confirm: 'Zacznij od nowa', danger: false }))) return;
+    if (!(await ask(`Plan „${p.name}” od nowa: ${p.weeks[0]?.name ?? 'Tydzień 1'}${firstK ? ` · ${firstK.name}` : ''} od ${fmtDate(moved.startDate ?? target)}, kolejne tygodnie co 7 dni. Dotychczasowe treningi zostają w historii, ale nie odhaczają jednostek nowego przejścia.`, { confirm: 'Zacznij od nowa', danger: false }))) return;
     if (!(await apply(savePlan(db, moved)))) return;
-    toast(`Plan „${p.name}” zaczyna się od nowa ${fmtDate(moved.startDate ?? nextMonday(today))}.`, {
+    toast(`Plan „${p.name}” zaczyna się od nowa ${fmtDate(moved.startDate ?? target)}.`, {
       label: 'Cofnij',
       run: () => void apply([put('plans', p)], 'Cofnięto zmianę dat.'),
     });
