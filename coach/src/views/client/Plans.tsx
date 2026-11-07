@@ -10,7 +10,7 @@ import { useStore } from '../../data/store';
 import { fmtDate, fmtShort, plural, uid } from '../../format';
 import { daysBetween, todayISO, weekStart } from '../../lib/dates';
 import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf } from '../../lib/analytics';
-import { doneInPass, nextDate, nextWorkout, planCompleted, planStatus } from '../../lib/plan';
+import { doneInPass, nextDate, nextWorkout, planCompleted, planStatus, workoutDate } from '../../lib/plan';
 import { Sheet } from '../../components/Sheet';
 import { fmtWeekdayDate } from '../../lib/planGrid';
 import { useNav } from '../../nav';
@@ -248,14 +248,19 @@ export function ClientPlans({ client }: { client: Client }) {
               <p className="muted small">
                 {p.startDate && `Start ${fmtDate(p.startDate)} · `}
                 {p.weeks.length} tyg. · {(() => { const n = p.weeks.reduce((a, w) => a + w.workouts.length, 0); return `${n} ${plural(n, 'jednostka', 'jednostki', 'jednostek')}`; })()}
-                {nx && p.active && (planCompleted(p, sessions) ? ' · plan ukończony — wszystkie jednostki zrobione (kolejny trening: od początku albo nowy blok)' : ` · następny: ${nx.workout.name} (${nx.week.name})${nd ? ` · ${fmtWeekdayDate(nd)}` : ''}`)}
+                {nx && p.active && (planCompleted(p, sessions) ? ' · plan ukończony — wszystkie jednostki zrobione (kolejny trening: od początku albo nowy blok)' : (() => {
+                  // ten sam opis co u podopiecznego: zaległy termin z planu i najbliższy dzień, kiedy go zrobić
+                  const orig = workoutDate(p, p.weeks.indexOf(nx.week), nx.workout);
+                  const late = orig && orig < today && (!p.startDate || orig >= p.startDate) && !sessions.some((s) => s.planId === p.id && s.date >= orig);
+                  return ` · następny: ${nx.workout.name} (${nx.week.name})${late ? ` · zaległy z ${fmtShort(orig)}` : ''}${nd ? ` · ${late ? 'najbliżej ' : ''}${fmtWeekdayDate(nd)}` : ''}`;
+                })())}
                 {!p.active && p.autoStart && p.startDate && ` · włączy się sam ${fmtDate(p.startDate)}`}
               </p>
               {st?.ended && st.endDate && (
                 <div className="warn-box pl-ended" role="status">
                   <Icon name="alert" size={16} />
                   <span className="pl-ended-text">
-                    Plan zakończył się {fmtShort(st.endDate)} — zaplanuj kolejny blok.
+                    Plan zakończył się {fmtShort(st.endDate)} — {plans.some((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')) ? 'kolejny blok jest przygotowany.' : 'zaplanuj kolejny blok.'}
                     {nx && <span className="muted small"> Podopieczny robi go dalej po kolei — następny: {nx.workout.name} ({nx.week.name}).</span>}
                   </span>
                   <span className="pl-ended-actions">

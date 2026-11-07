@@ -699,7 +699,7 @@ function TodayTab({
               <>
                 {ended && <p className="small muted">Plan {st?.endDate && st.ended ? `skończył się ${fmtDay(st.endDate)}` : 'jest przerobiony do końca'} — trener przygotuje kolejny blok. Do tego czasu robisz go od nowa.</p>}
                 {d && due ? (
-                  <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy` : `Zaplanowany na ${dayWord(d, today)}`}</p>
+                  <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy${plan && nextDate(plan, nx, today) ? ` · najbliżej: ${dayWord(nextDate(plan, nx, today)!, today)}` : ''}` : `Zaplanowany na ${dayWord(d, today)}`}</p>
                 ) : soon ? (
                   <p className="small muted">Najbliższy termin: {dayWord(soon, today)}</p>
                 ) : null}
@@ -1007,6 +1007,7 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
     const nx = nextWorkout(plan, sessions);
     const seq = planSequence(plan).map((x) => x.workout.id);
     const ni = nx ? seq.indexOf(nx.workout.id) : 0;
+    const nxD = nx ? nextDate(plan, nx, today) : undefined;
     const absences = clientById(db, clientId)?.absences ?? [];
     const away = (d: string) => absences.some((a) => a.from && a.to && d >= a.from && d <= a.to);
     plan.weeks.forEach((w, wi) =>
@@ -1015,7 +1016,8 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
         const d = isNext ? nextDate(plan, nx, today) : workoutDate(plan, wi, k);
         // następny liczy się zawsze (po przerobieniu planu jest „zrobiony” z poprzedniego przejścia)
         if (!d || (!isNext && done.has(k.id)) || !k.exercises.some((e) => e.name) || away(d)) return;
-        if (!isNext && (seq.indexOf(k.id) < ni || d < today)) return;
+        // dalsze jednostki dopiero po terminie następnej (zaległa przeniesiona na najbliższy dzień nie dubluje się z kolejną)
+        if (!isNext && (seq.indexOf(k.id) < ni || d < today || (nxD && d <= nxD))) return;
         add(d, { kind: 'plan', text: `${k.name} (${w.name})`, run: isRunWorkout(k) });
       }),
     );

@@ -190,6 +190,7 @@ export function CalendarView() {
     const nx = nextWorkout(p, ss);
     const seqIds = planSequence(p).map((x) => x.workout.id);
     const ni = nx ? seqIds.indexOf(nx.workout.id) : 0;
+    const nxD = nx ? nextDate(p, nx, today) : undefined;
     p.weeks.forEach((w, wi) =>
       w.workouts.forEach((k) => {
         const planned = workoutDate(p, wi, k);
@@ -197,7 +198,7 @@ export function CalendarView() {
         const d = isNext ? nextDate(p, nx, today) ?? planned : planned;
         if (!d || (!isNext && done.has(k.id)) || !k.exercises.some((e) => e.name.trim()))
           return;
-        if (!isNext && (seqIds.indexOf(k.id) < ni || d < today)) return;
+        if (!isNext && (seqIds.indexOf(k.id) < ni || d < today || (nxD && d <= nxD))) return;
         if (
           db.appointments.some(
             (a) =>
@@ -210,7 +211,7 @@ export function CalendarView() {
         assigned.push({
           plan: p,
           workout: { ...k, date: d },
-          state: isNext && planned && planned < today ? "overdue" : "due",
+          state: d < today ? "overdue" : "due",
           fromPlan: true,
         });
       }),
