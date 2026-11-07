@@ -408,6 +408,8 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
       const rl = resolveLoad(spec, e1, nxt.reps, nxt.tRpe, prev, { round: rounderFor(ex.name, loadPerOf(ex)) });
       nxt.load = String(rl.load);
       nxt.sug = `${rl.why} (${String(prev).replace('.', ',')} kg)`;
+      // pozostałe serie tej samej grupy (np. 3 × back-off −10%) od razu z tym samym ciężarem — nie dopiero po kolejnym ✓
+      for (const x of sets.slice(j + 1)) if (x.gi === nxt.gi && !x.done && !x.edited && !x.warmup) x.load = nxt.load;
     } else if (spec && (num(spec) != null || /%/.test(spec))) {
       // stały ciężar z planu — bez zmian
     } else if (e1) {

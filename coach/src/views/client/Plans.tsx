@@ -252,7 +252,8 @@ export function ClientPlans({ client }: { client: Client }) {
                   // ten sam opis co u podopiecznego: zaległy termin z planu i najbliższy dzień, kiedy go zrobić
                   const orig = workoutDate(p, p.weeks.indexOf(nx.week), nx.workout);
                   const late = orig && orig < today && (!p.startDate || orig >= p.startDate) && !sessions.some((s) => s.planId === p.id && s.date >= orig);
-                  return ` · następny: ${nx.workout.name} (${nx.week.name})${late ? ` · zaległy z ${fmtShort(orig)}` : ''}${nd ? ` · ${late ? 'najbliżej ' : ''}${fmtWeekdayDate(nd)}` : ''}`;
+                  const mv = nx.workout.moved?.by === 'client' ? ` (przeniósł podopieczny${nx.workout.moved.from ? ` z ${fmtShort(nx.workout.moved.from)}` : ''})` : '';
+                  return ` · następny: ${nx.workout.name} (${nx.week.name})${late ? ` · zaległy z ${fmtShort(orig)}` : ''}${nd ? ` · ${late ? 'najbliżej ' : ''}${fmtWeekdayDate(nd)}` : ''}${mv}`;
                 })())}
                 {!p.active && p.autoStart && p.startDate && ` · włączy się sam ${fmtDate(p.startDate)}`}
               </p>

@@ -2205,3 +2205,55 @@ end $$;
 revoke all on function public.push_clients_status from public, anon;
 grant execute on function public.push_clients_status to authenticated;
 notify pgrst, 'reload schema';
+
+-- ============================================================================================================
+-- 32. Podopieczny przenosi trening z planu na inny dzień (np. nie da rady w poniedziałek → wtorek).
+--     Funkcja zmienia tylko datę tej jednej jednostki w planie i zapisuje, kto i skąd ją przeniósł
+--     (moved: { at, from, by }); plan dalej zmienia tylko trener. Trener dostaje powiadomienie (sekcja 20, jeśli jest).
+--     Można uruchomić ponownie.
+-- ============================================================================================================
+create or replace function public.move_plan_workout(p_plan_id text, p_workout_id text, p_date text, p_from text default null)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  pl record;
+  trainer boolean := is_trainer();
+  wname text;
+  nd jsonb;
+  src text := case when coalesce(p_from, '') ~ '^\d{4}-\d{2}-\d{2}$' then p_from end;
+begin
+  if auth.uid() is null then raise exception 'Brak dostępu'; end if;
+  select id, client_id, data into pl from plans where id = p_plan_id;
+  if pl.id is null then raise exception 'Nie ma takiego planu'; end if;
+  if not (trainer or pl.client_id in (select my_client_ids())) then raise exception 'Brak dostępu'; end if;
+  if (pl.data ->> 'template') = 'true' then raise exception 'To szablon, nie plan'; end if;
+  if coalesce(p_date, '') !~ '^\d{4}-\d{2}-\d{2}$' then raise exception 'Zła data'; end if;
+  if p_date::date < current_date - 1 or p_date::date > current_date + 60 then raise exception 'Data poza zakresem (od wczoraj do 60 dni naprzód)'; end if;
+  select k ->> 'name' into wname
+  from jsonb_array_elements(case when jsonb_typeof(pl.data -> 'weeks') = 'array' then pl.data -> 'weeks' else '[]'::jsonb end) wk,
+       jsonb_array_elements(case when jsonb_typeof(wk -> 'workouts') = 'array' then wk -> 'workouts' else '[]'::jsonb end) k
+  where k ->> 'id' = p_workout_id limit 1;
+  if wname is null then raise exception 'Nie ma takiego treningu w planie'; end if;
+  nd := jsonb_set(pl.data, '{weeks}', coalesce((
+    select jsonb_agg(case when jsonb_typeof(wk -> 'workouts') = 'array' then jsonb_set(wk, '{workouts}', coalesce((
+             select jsonb_agg(case when k ->> 'id' = p_workout_id
+                                   then (k - 'moved') || jsonb_build_object('date', p_date, 'moved',
+                                          jsonb_strip_nulls(jsonb_build_object('at', to_jsonb(now()), 'from', src, 'by', case when trainer then 'trainer' else 'client' end)))
+                                   else k end order by o2)
+             from jsonb_array_elements(wk -> 'workouts') with ordinality t2(k, o2)), '[]'::jsonb))
+           else wk end order by o1)
+    from jsonb_array_elements(pl.data -> 'weeks') with ordinality t1(wk, o1)), '[]'::jsonb))
+    || jsonb_build_object('updatedAt', to_jsonb(now()));
+  update plans set data = nd, updated_at = now() where id = p_plan_id;
+  if not trainer then
+    begin
+      perform push_send('trainer', pl.client_id, 'Przeniesiony trening: ' || push_first_name(pl.client_id),
+        wname || coalesce(' · ' || push_dm(src), '') || ' → ' || push_dm(p_date), '/app/?c=' || pl.client_id || '&t=Plan', 'move-' || pl.client_id);
+    exception when others then null; -- bez sekcji 20 (powiadomień) — przeniesienie i tak zapisane
+    end;
+  end if;
+  return jsonb_build_object('date', p_date);
+end $$;
+revoke all on function public.move_plan_workout from public, anon;
+grant execute on function public.move_plan_workout to authenticated;
+notify pgrst, 'reload schema';

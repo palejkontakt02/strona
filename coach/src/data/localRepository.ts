@@ -1,3 +1,4 @@
+import { moveWorkoutInPlan } from '../lib/plan';
 import { apptWithReply } from '../lib/appts';
 import { applyChanges, normalizeDb, withEntry, type Db, type Repository } from './db';
 import { createSeed } from './seed';
@@ -99,6 +100,10 @@ export function createLocalRepository(): Repository {
     },
     async saveTrainerProfile(p) {
       saveProfileLocal(p);
+    },
+    async movePlanWorkout(planId, workoutId, date, from) {
+      db = { ...db, plans: db.plans.map((p) => (p.id === planId ? moveWorkoutInPlan(p, workoutId, date, from, 'client') : p)) };
+      persist();
     },
     async setAthleteLive(clientId, mark) {
       db = {

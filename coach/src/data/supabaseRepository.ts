@@ -113,6 +113,11 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
       }));
     },
 
+    async movePlanWorkout(planId, workoutId, date, from) {
+      const { error } = await supabase.rpc('move_plan_workout', { p_plan_id: planId, p_workout_id: workoutId, p_date: date, p_from: from ?? null });
+      if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');
+      if (error) throw error;
+    },
     async setAthleteLive(clientId, mark) {
       const { error } = await supabase.rpc('set_athlete_live', { p_client_id: clientId, p_mark: mark });
       if (error && /function|schema cache|does not exist/i.test(error.message)) throw new Error('DB_OUTDATED');

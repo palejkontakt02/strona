@@ -426,6 +426,8 @@ export interface PlanWorkout {
   assignedAt?: ISODate;
   /** Plan: dzień tygodnia tej jednostki (1 = pon … 7 = niedz.); data liczona od startu planu i numeru tygodnia. */
   day?: number;
+  /** Przeniesiona na inny dzień (`date`) przez podopiecznego albo trenera: kiedy, z jakiego dnia, kto. */
+  moved?: { at: string; from?: ISODate; by: 'client' | 'trainer' };
   exercises: PlanExercise[];
 }
 

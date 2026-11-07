@@ -44,6 +44,11 @@ describe('completeSet autoregulation', () => {
     res = completeSet({ ...r, sets }, 1);
     expect(res.sets[2].load).toBe('95');
   });
+  it('after the top set all back-off sets of the group get the load at once', () => {
+    const r = buildRunExercise(ex([g({ type: 'Top set', load: '200' }), g({ type: 'Back-off', load: '-10%', rpe: '7' }), g({ type: 'Back-off', load: '-10%', rpe: '7' }), g({ type: 'Back-off', load: '-10%', rpe: '7' })]), []);
+    const res = completeSet(r, 0);
+    expect(res.sets.slice(1).map((x) => x.load)).toEqual(['180', '180', '180']);
+  });
   it('empty spec picks load from this set e1RM toward target RPE', () => {
     const r = buildRunExercise(ex([g({ load: '100', rpe: '8' }), g({ load: '', rpe: '8' })]), []);
     const sets = r.sets.map((s) => ({ ...s }));

@@ -5639,3 +5639,13 @@ button.mini-day {
 .gs-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0; }
 .pi-adv { margin-top: var(--space-2); }
 .pi-adv summary { cursor: pointer; color: var(--muted, inherit); }
+
+/* odtwarzacz: nazwa ćwiczenia nad serią w superserii / obwodzie */
+.set-exname { font-size: 0.8rem; font-weight: 600; color: var(--color-neutral-400); margin: 6px 0 2px 2px; line-height: 1.25; overflow-wrap: anywhere; }
+.set-exname.done { opacity: 0.6; }
+
+/* podopieczny: przeniesienie treningu na inny dzień */
+.ath-move-btn { display: inline-block; margin-top: 4px; }
+.move-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.move-day { justify-content: center; }
+.move-day.is-current { opacity: 0.5; }

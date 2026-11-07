@@ -694,6 +694,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const snInner = label ? <span className="ex-label">{label}</span> : num;
     return (
       <div key={`${k}-${i}`} data-set={`${k}-${i}`}>
+        {/* superseria / obwód: nazwa ćwiczenia przy każdej serii (samo „C1” nic nie mówi) */}
+        {label && (
+          <div className={`set-exname ${s.done ? 'done' : ''}`}>
+            {e.name}
+            {s.warmup ? ' · rozgrzewka' : ''}
+          </div>
+        )}
         <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${bare && !e.cardio ? 'noload' : ''} ${blockNoLoad === undefined && e.perSide && !e.cardio && !bare && !sidesWide(e) ? 'sides' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''}`}>
           {trainer && run.ex[k].sets.length > 1 ? (
             <button type="button" className="sn sn-btn" {...pressProps(k, i, num)} aria-label={`Seria ${num}, ${run.ex[k].name} — przytrzymaj, żeby usunąć`} title="Przytrzymaj, żeby usunąć tę serię">
@@ -1071,7 +1078,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {ks.map((k) => header(k, bare))}
         <div className={`sgrid sgrid-head ${bare ? 'noload' : ''}`}>
           <span />
-          <span>powt. / czas</span>
+          <span>{ks.some((k) => run.ex[k].timed || run.ex[k].cardio) ? 'powt./czas' : 'powt.'}</span>
           {!bare && <span>kg</span>}
           <span title="RPE: jak ciężka była seria, 1–10 (10 = nie dało się zrobić ani jednego powtórzenia więcej)">RPE</span>
           {!bare && <span />}

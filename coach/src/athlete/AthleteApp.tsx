@@ -525,7 +525,8 @@ function TodayTab({
   onDiscard: () => void;
   onIntake: () => void;
 }) {
-  const { db, ask, saveCheckin } = useStore();
+  const { db, ask, saveCheckin, movePlanWorkout, toast: notifyToast } = useStore();
+  const [moving, setMoving] = useState(false);
   const { profile } = useTrainerProfile();
   const client = clientById(db, clientId)!;
   const today = todayISO();
@@ -703,6 +704,25 @@ function TodayTab({
                 ) : soon ? (
                   <p className="small muted">Najbliższy termin: {dayWord(soon, today)}</p>
                 ) : null}
+                {nx.workout.moved?.by === 'client' && nx.workout.moved.from && <p className="small muted">Przeniesiony przez Ciebie z {fmtDay(nx.workout.moved.from)}.</p>}
+                {plan && !visitInHero && (
+                  <button type="button" className="link small ath-move-btn" onClick={() => setMoving(true)}>
+                    Przenieś na inny dzień
+                  </button>
+                )}
+                {moving && plan && (
+                  <MoveWorkoutSheet
+                    name={nx.workout.name}
+                    current={(d && due === 'upcoming' ? d : soon) ?? d ?? undefined}
+                    today={today}
+                    onClose={() => setMoving(false)}
+                    onPick={async (date) => {
+                      setMoving(false);
+                      const from = (d && due === 'upcoming' ? d : soon) ?? d ?? undefined;
+                      if (await movePlanWorkout(plan.id, nx.workout.id, date, from ?? undefined)) notifyToast(`„${nx.workout.name}” przeniesiony na ${dayWord(date, today)}. Trener to zobaczy.`);
+                    }}
+                  />
+                )}
               </>
             );
           })()}
@@ -1460,5 +1480,23 @@ function Workouts({
       )}
       {shown && <SessionSheet s={shown} onClose={() => setShown(null)} />}
     </section>
+  );
+}
+
+
+/** Wybór dnia, na który podopieczny przenosi trening z planu (dziś + 13 dni). */
+function MoveWorkoutSheet({ name, current, today, onClose, onPick }: { name: string; current?: string; today: string; onClose: () => void; onPick: (date: string) => void }) {
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
+  return (
+    <Sheet label={`Przenieś „${name}”`} onClose={onClose}>
+      <p className="muted small">Wybierz dzień, w którym zrobisz ten trening. Kolejne treningi z planu zostają na swoich dniach — trener zobaczy zmianę.</p>
+      <div className="move-days">
+        {days.map((d) => (
+          <button key={d} type="button" className={`btn btn-secondary move-day ${d === current ? 'is-current' : ''}`} disabled={d === current} onClick={() => onPick(d)}>
+            {dayWord(d, today)}
+          </button>
+        ))}
+      </div>
+    </Sheet>
   );
 }

@@ -136,6 +136,8 @@ export interface Repository {
   outboxScope?(): Promise<string>;
   /** Podopieczny potwierdza albo odwołuje wizytę (funkcja client_respond_appointment, sekcja 23). Zwraca zapisaną wizytę. */
   respondAppointment?(id: string, kind: 'confirm' | 'cancel', reason?: string): Promise<Appointment | null>;
+  /** Przeniesienie treningu z planu na inny dzień (funkcja move_plan_workout, sekcja 32 — także dla podopiecznego). */
+  movePlanWorkout?(planId: string, workoutId: string, date: string, from?: string): Promise<void>;
   /** Podopieczny: znacznik „trenuje teraz u siebie” (null = koniec). Sekcja 27 w hardening.sql. */
   setAthleteLive?(clientId: string, mark: { name: string; workoutId?: string } | null): Promise<void>;
   /** Lekki odczyt znaczników treningu w toku (trener / podopieczny) — bez pobierania całej bazy. */

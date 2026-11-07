@@ -256,6 +256,18 @@ export function workoutDate(plan: Pick<Plan, 'startDate' | 'extra'>, weekIndex: 
   return addDays(weekStart(plan.startDate), weekIndex * 7 + (k.day - 1));
 }
 
+/** Plan z jednostką przeniesioną na `date` (zapis jak funkcja move_plan_workout w bazie, sekcja 32). */
+export function moveWorkoutInPlan(plan: Plan, workoutId: string, date: string, from: string | undefined, by: 'client' | 'trainer'): Plan {
+  return {
+    ...plan,
+    updatedAt: new Date().toISOString(),
+    weeks: plan.weeks.map((w) => ({
+      ...w,
+      workouts: w.workouts.map((k) => (k.id === workoutId ? { ...k, date, moved: { at: new Date().toISOString(), ...(from ? { from } : {}), by } } : k)),
+    })),
+  };
+}
+
 /** Jednostki planu bez dnia ani daty (z ćwiczeniami) — do zatwierdzenia planu. */
 export function undatedWorkouts(plan: Plan): string[] {
   if (plan.extra) return [];

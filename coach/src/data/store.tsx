@@ -1,3 +1,4 @@
+import { moveWorkoutInPlan } from '../lib/plan';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Checkin, ClientNote, DayLog, Measurement, ProgressPhoto, WeeklyReport } from '../domain';
 import type { Intake } from '../lib/intake';
@@ -41,6 +42,8 @@ interface StoreValue {
   respondAppointment: (id: string, kind: 'confirm' | 'cancel', reason?: string) => Promise<boolean>;
   /** Podopieczny: znacznik treningu w toku (cicho — przy starej bazie nic się nie dzieje). */
   setAthleteLive: (clientId: string, mark: { name: string; workoutId?: string } | null) => Promise<void>;
+  /** Przeniesienie treningu z planu na inny dzień; false — nie udało się (komunikat już pokazany). */
+  movePlanWorkout: (planId: string, workoutId: string, date: string, from?: string) => Promise<boolean>;
   /** true — dane w chmurze (Supabase), false — tylko w tej przeglądarce. */
   cloud: boolean;
   /** Zapisy zrobione bez internetu, które czekają na wysłanie (kolejka offline). */
@@ -354,6 +357,29 @@ export function StoreProvider({
     [repo, toast],
   );
 
+  const movePlanWorkout = useCallback(
+    async (planId: string, workoutId: string, date: string, from?: string) => {
+      if (!repo.movePlanWorkout) return false;
+      const before = db?.plans.find((p) => p.id === planId);
+      if (!before) return false;
+      setDb((cur) => (cur ? { ...cur, plans: cur.plans.map((p) => (p.id === planId ? moveWorkoutInPlan(p, workoutId, date, from, 'client') : p)) } : cur));
+      try {
+        await repo.movePlanWorkout(planId, workoutId, date, from);
+        return true;
+      } catch (e) {
+        setDb((cur) => (cur ? { ...cur, plans: cur.plans.map((p) => (p.id === planId ? before : p)) } : cur));
+        toast(
+          (e as Error)?.message === 'DB_OUTDATED'
+            ? 'Przenoszenie treningów wymaga aktualizacji bazy przez trenera (sekcja 32). Napisz do trenera, kiedy zrobisz trening.'
+            : navigator.onLine === false
+              ? 'Brak internetu — trening nie został przeniesiony. Spróbuj, gdy będziesz online.'
+              : `Nie udało się przenieść treningu: ${(e as Error)?.message ?? 'błąd'}`,
+        );
+        return false;
+      }
+    },
+    [repo, db, toast],
+  );
   const setAthleteLive = useCallback(
     async (clientId: string, mark: { name: string; workoutId?: string } | null) => {
       if (!repo.setAthleteLive) return;
@@ -400,9 +426,9 @@ export function StoreProvider({
   const value = useMemo(
     () =>
       db
-        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, cloud, signOut, pending, sendPending: () => void sendPending() }
+        ? { db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, movePlanWorkout, cloud, signOut, pending, sendPending: () => void sendPending() }
         : null,
-    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, cloud, signOut, pending, sendPending],
+    [db, apply, toast, ask, reset, importDb, saveCheckin, addMeasurement, saveIntake, saveClientEntry, saveHabitDay, sendClientNote, sendClientMessage, respondAppointment, setAthleteLive, movePlanWorkout, cloud, signOut, pending, sendPending],
   );
   if (loadError)
     return (
