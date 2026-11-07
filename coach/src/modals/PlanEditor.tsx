@@ -267,7 +267,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                     {k.date ? (
                       <input className="input input-sm" type="date" value={k.date} onChange={(e) => upd((d) => void (findWorkout(d, wi, ki).date = e.target.value || undefined))} aria-label={`Data: ${k.name}`} />
                     ) : (
-                      workoutDate(p, wi, k) && <span className="muted small">{fmtDay(workoutDate(p, wi, k)!)}</span>
+                      workoutDate(p, wi, k) && (p.startDate && workoutDate(p, wi, k)! < p.startDate ? <span className="small warn-text" title="Dzień wypada przed datą startu planu">{fmtDay(workoutDate(p, wi, k)!)} — przed startem</span> : <span className="muted small">{fmtDay(workoutDate(p, wi, k)!)}</span>)
                     )}
                   </span>
                 )}

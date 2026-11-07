@@ -355,6 +355,12 @@ describe('alerts', () => {
 describe('moving and removing within blocks', () => {
   const L = (spec: string) => spec.split(' ').map((t) => ({ n: t.replace('*', ''), linked: t.endsWith('*') || undefined }));
   const show = (l: { n: string; linked?: boolean }[]) => l.map((e) => e.n + (e.linked ? '*' : '')).join(' ');
+  it('reordering inside a block keeps rests on their positions (transition / round rest)', async () => {
+    const { moveInBlocks } = await import('./plan');
+    const l = [{ n: 'A', rest: '' }, { n: 'B', linked: true, rest: '2:00' }];
+    const out = moveInBlocks(l, 1, -1);
+    expect(out.map((e) => `${e.n}:${e.rest}`)).toEqual(['B:', 'A:2:00']);
+  });
   it('reorders inside a block without changing its boundaries', async () => {
     const { moveInBlocks } = await import('./plan');
     // A | B C* D* | E   (C, D w bloku z B)

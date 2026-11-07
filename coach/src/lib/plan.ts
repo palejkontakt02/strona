@@ -222,7 +222,9 @@ export function moveInBlocks<T extends { linked?: boolean }>(list: T[], k: numbe
     const out = [...list];
     const lk = out[k].linked;
     const lj = out[j].linked;
-    [out[k], out[j]] = [{ ...out[j], linked: lk }, { ...out[k], linked: lj }];
+    // w bloku przerwa należy do pozycji (przejście A1→A2, po rundzie na ostatnim) — zostaje na miejscu
+    const pos = <X extends T>(x: X, from: T): X => ('rest' in (from as object) || 'rest' in (x as object) ? { ...x, rest: (from as { rest?: unknown }).rest } : x);
+    [out[k], out[j]] = [pos({ ...out[j], linked: lk }, out[k]), pos({ ...out[k], linked: lj }, out[j])];
     return out;
   }
   // poza blokiem: ćwiczenie przeskakuje CAŁY sąsiedni blok i zostaje samodzielne — nie wpada przypadkiem

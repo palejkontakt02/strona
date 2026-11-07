@@ -687,7 +687,8 @@ function TodayTab({
           {(() => {
             // dzień z planu (ustawiony przez trenera); „zaległy” tylko gdy od terminu nie było treningu z tego planu
             const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
-            const due = planDue(d, today, sessions, plan?.id);
+            // termin sprzed startu planu (start w środku tygodnia) nie jest „zaległy” — pokazujemy najbliższy termin
+            const due = d && plan?.startDate && d < plan.startDate ? null : planDue(d, today, sessions, plan?.id);
             // plan przerobiony / po dacie końca: podopieczny wie, co się dzieje (trener widzi to samo w swoim panelu)
             const st = plan ? planStatus(plan, today) : null;
             // „robisz go od nowa” tylko, gdy plan faktycznie przerobiony albo po dacie końca następny jest znów pierwszy
