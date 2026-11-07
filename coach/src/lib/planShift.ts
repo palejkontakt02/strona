@@ -1,7 +1,7 @@
 import type { ISODate, Plan, TrainingSession } from '../domain';
 import { fmtShort, uid } from '../format';
 import { addDays, daysBetween, todayISO, weekStart } from './dates';
-import { workoutDate } from './plan';
+import { nextWorkout, workoutDate } from './plan';
 
 /** Dzień tygodnia 1 (pon.) … 7 (niedz.). */
 const isoDay = (iso: ISODate) => ((new Date(`${iso}T12:00:00`).getDay() + 6) % 7) + 1;
@@ -19,9 +19,9 @@ export function planDates(plan: Plan): { wi: number; ki: number; date: ISODate }
 }
 
 /** Id jednostek tego planu, które już mają zapisany trening (nie przesuwamy ich i nie liczymy). Przerwane z bólu się nie liczą. */
-export function doneWorkoutIds(plan: Plan, sessions?: Pick<TrainingSession, 'planId' | 'workoutId' | 'stoppedForPain'>[]): Set<string> {
+export function doneWorkoutIds(plan: Plan, sessions?: (Pick<TrainingSession, 'planId' | 'workoutId' | 'stoppedForPain'> & { date?: string })[]): Set<string> {
   const out = new Set<string>();
-  for (const s of sessions ?? []) if (s.planId === plan.id && s.workoutId && !s.stoppedForPain) out.add(s.workoutId);
+  for (const s of sessions ?? []) if (s.planId === plan.id && s.workoutId && !s.stoppedForPain && (!plan.passFrom || (s.date ?? '') >= plan.passFrom)) out.add(s.workoutId);
   return out;
 }
 
@@ -153,8 +153,14 @@ export interface Absence {
 export function absenceShift(plan: Plan, absences: Absence[] | undefined, today: ISODate, sessions?: TrainingSession[]): { absence: Absence; from: ISODate; days: number; range: string } | null {
   if (!absences?.length || plan.extra) return null;
   const dates = movable(plan, sessions).map((x) => x.date);
+  // następna jednostka z zaległym terminem (sprzed nieobecności) też musi przejść za nieobecność — inaczej po
+  // przesunięciu wypadałaby w środku nieobecności, a podopieczny widziałby ją jako „zaległą”
+  const nx = sessions ? nextWorkout(plan, sessions) : null;
+  const nxDate = nx ? workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout) : undefined;
   for (const a of [...absences].sort((x, y) => x.from.localeCompare(y.from))) {
     if (!a.from || !a.to || a.to < today || a.to < a.from) continue;
+    if (nxDate && nxDate < a.from && nxDate < today && dates.includes(nxDate))
+      return { absence: a, from: nxDate, days: Math.ceil((daysBetween(nxDate, a.to) + 1) / 7) * 7, range: fmtRange(a.from, a.to) };
     const hit = dates.filter((d) => d >= a.from && d <= a.to).sort();
     if (!hit.length) continue;
     const len = daysBetween(a.from, a.to) + 1;

@@ -87,10 +87,28 @@ function mergeWorkout(old: PlanWorkout | undefined, imp: PlanWorkout, where: str
 }
 
 /** Plan po wczytaniu arkusza (to samo id, nazwa, start i status) i lista zmian. */
+/** Numer tygodnia z nazwy („Tydzień 4 (deload)” → 4); bez numeru — nazwa. */
+const weekKey = (name: string) => {
+  const m = name.match(/\d+/);
+  return m ? `#${Number(m[0])}` : norm(name);
+};
+
 export function mergePlan(old: Plan, imp: Plan): { plan: Plan; diff: PlanDiff } {
   const diff: PlanDiff = { added: 0, removed: 0, changed: 0, lines: [] };
+  // tygodnie łączone po numerze / nazwie (usunięcie „Tygodnia 1” w arkuszu nie przesuwa wykonanych treningów
+  // na kolejne tygodnie); po kolejności tylko wtedy, gdy nazwy się nie zgadzają
+  const left = [...old.weeks];
+  const pairs = imp.weeks.map((w) => {
+    const i = left.findIndex((o) => weekKey(o.name) === weekKey(w.name));
+    return i >= 0 ? left.splice(i, 1)[0] : undefined;
+  });
+  imp.weeks.forEach((_w, wi) => {
+    if (pairs[wi]) return;
+    const pos = old.weeks[wi];
+    if (pos && left.includes(pos) && !imp.weeks.some((x) => weekKey(x.name) === weekKey(pos.name))) pairs[wi] = left.splice(left.indexOf(pos), 1)[0];
+  });
   const weeks = imp.weeks.map((w, wi) => {
-    const ow = old.weeks[wi];
+    const ow = pairs[wi];
     const pool = [...(ow?.workouts ?? [])];
     const workouts = w.workouts.map((k, ki) => {
       let i = pool.findIndex((o) => norm(o.name) === norm(k.name));
@@ -108,7 +126,7 @@ export function mergePlan(old: Plan, imp: Plan): { plan: Plan; diff: PlanDiff } 
     if (!ow) diff.lines.splice(diff.lines.length - w.workouts.length, 0, `${w.name}: nowy tydzień`);
     return ow ? { ...ow, name: w.name, workouts } : w;
   });
-  for (const ow of old.weeks.slice(imp.weeks.length)) {
+  for (const ow of left) {
     const n = ow.workouts.reduce((a, k) => a + k.exercises.filter((e) => e.name.trim()).length, 0);
     diff.removed += n;
     diff.lines.push(`${ow.name}: tydzień usunięty (${n} ćw.)`);

@@ -58,8 +58,8 @@ export function WorkoutList({ client }: { client: Client }) {
   // Treningi zrobione bez planu (np. wklejone z notatki, „pusty trening”) — też do podglądu i powtórki.
   const adhoc = sessions.filter((s) => !s.planId || !db.plans.some((p) => p.id === s.planId)).slice(0, 12);
   // ostatnie zaliczone wykonanie (bez przerwanych z bólu) i ostatnie w ogóle
-  const lastSession = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id && !s.stoppedForPain);
-  const lastAny = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id);
+  const lastSession = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id && !s.stoppedForPain && (!p.passFrom || s.date >= p.passFrom));
+  const lastAny = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id && (!p.passFrom || s.date >= p.passFrom));
   const last = (p: Plan, id: string) => lastSession(p, id)?.date;
   const [preview, setPreview] = useState<{ workout: PlanWorkout; plan: Plan } | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);

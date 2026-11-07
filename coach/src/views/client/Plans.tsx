@@ -105,7 +105,9 @@ export function ClientPlans({ client }: { client: Client }) {
     const first = planDates(p).map((x) => x.date).sort()[0];
     const days = p.startDate ? daysBetween(weekStart(p.startDate), nextMonday(today)) : 0;
     if (!first || days <= 0) return openModal({ kind: 'plan', plan: p });
-    const moved = shiftPlanFrom(p, first, days);
+    const moved = { ...shiftPlanFrom(p, first, days), passFrom: today };
+    const firstK = p.weeks[0]?.workouts[0];
+    if (!(await ask(`Plan „${p.name}” od nowa: ${p.weeks[0]?.name ?? 'Tydzień 1'}${firstK ? ` · ${firstK.name}` : ''} od ${fmtDate(moved.startDate ?? nextMonday(today))}, kolejne tygodnie co 7 dni. Dotychczasowe treningi zostają w historii, ale nie odhaczają jednostek nowego przejścia.`, { confirm: 'Zacznij od nowa', danger: false }))) return;
     if (!(await apply(savePlan(db, moved)))) return;
     toast(`Plan „${p.name}” zaczyna się od nowa ${fmtDate(moved.startDate ?? nextMonday(today))}.`, {
       label: 'Cofnij',
@@ -257,7 +259,7 @@ export function ClientPlans({ client }: { client: Client }) {
                     <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku — od razu aktywna">
                       Następny blok
                     </button>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restartDates(p)} title="Ten sam plan od najbliższego poniedziałku (podgląd przed zapisem)">
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restartDates(p)} title="Ten sam plan jeszcze raz od tygodnia 1, od najbliższego poniedziałku (z cofnięciem)">
                       Ustaw daty od nowa
                     </button>
                   </span>

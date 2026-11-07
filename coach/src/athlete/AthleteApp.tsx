@@ -626,6 +626,27 @@ function TodayTab({
           {run.workoutId && sessions.some((x) => x.planId === run.planId && x.workoutId === run.workoutId && x.date === run.date) && (
             <p className="small warn-text">Ten trening jest już zapisany dziś (np. z trenerem). Jeśli to ten sam — porzuć ten, żeby nie było dwóch zapisów.</p>
           )}
+          {(() => {
+            // trener zmienił ten trening w planie po rozpoczęciu (nazwa, ćwiczenia, kolejność) — rozpoczęty jest w starej wersji
+            const pw = run.workoutId ? plansOf(db, clientId).find((p) => p.id === run.planId)?.weeks.flatMap((w) => w.workouts).find((k) => k.id === run.workoutId) : undefined;
+            if (!pw) return null;
+            const now = pw.exercises.filter((e) => e.name.trim()).map((e) => e.name.trim()).join('|');
+            const then = run.ex.filter((e) => e.planExId).map((e) => e.name.trim()).join('|');
+            if (pw.name === run.name && now === then) return null;
+            return (
+              <p className="small warn-text">
+                Trener zmienił ten trening w planie{pw.name !== run.name ? ` (teraz „${pw.name}”)` : ''}. Rozpoczęty jest w poprzedniej wersji.{' '}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  // otwiera nową wersję (przy wpisanych seriach pyta „Porzucić go i otworzyć ten?”)
+                  onClick={() => onStartFrom({ planId: run.planId, workoutId: run.workoutId })}
+                >
+                  Zacznij nową wersję
+                </button>
+              </p>
+            );
+          })()}
           <p className="muted small">
             {run.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)} z {run.ex.reduce((a, e) => a + e.sets.length, 0)} serii · rozpoczęty {run.date !== todayISO() ? `${fmtDay(run.date)}, ` : ''}
             {new Date(run.startedAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
@@ -1299,7 +1320,8 @@ function Workouts({
   // zadane na dzień i już zrobione są w historii — z listy znikają; bez terminu zostają (do powtarzania)
   const extraWorkouts = (extra?.weeks.flatMap((w) => w.workouts) ?? []).filter((k) => extraState(k, extra?.id, sessions, todayISO()).state !== 'done');
   if (!plan && extraWorkouts.length === 0) return null;
-  const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id)?.date; // sesje od najnowszej
+  // sesje od najnowszej; po „Ustaw daty od nowa” liczą się tylko treningi z nowego przejścia
+  const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id && (planId !== plan?.id || !plan?.passFrom || s.date >= plan.passFrom))?.date;
   // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
   const seqIds = plan ? planSequence(plan).map((x) => x.workout.id) : [];
   const nextIdx = nextId ? seqIds.indexOf(nextId) : -1;

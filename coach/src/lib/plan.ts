@@ -56,6 +56,8 @@ export function currentPlan(plans: Plan[]): Plan | null {
 
 /** Trening przerwany z powodu bólu nie zalicza jednostki planu (trener decyduje, co dalej). */
 const counts = (s: TrainingSession) => !s.stoppedForPain;
+/** Trening należy do bieżącego przejścia planu (po „Ustaw daty od nowa” liczą się tylko nowsze). */
+export const inPlanPass = (plan: Pick<Plan, 'passFrom'>, s: { date?: string }) => !plan.passFrom || (s.date ?? '') >= plan.passFrom;
 
 /**
  * Następny trening: jednostka po ostatnio wykonanej z tego planu (wg daty, w kolejności
@@ -69,7 +71,7 @@ export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (Pl
   const pos = new Map(seq.map((x, i) => [x.workout.id, i]));
   let last: { date: string; i: number } | null = null;
   for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId) || !counts(s)) continue;
+    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId) || !counts(s) || !inPlanPass(plan, s)) continue;
     const i = pos.get(s.workoutId)!;
     if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
   }
@@ -85,7 +87,7 @@ export function doneInPass(plan: Plan | null, sessions: TrainingSession[]): Set<
   const seq = planSequence(plan).map((x) => x.workout.id);
   const ni = nx ? seq.indexOf(nx.workout.id) : -1;
   for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !counts(s)) continue;
+    if (s.planId !== plan.id || !s.workoutId || !counts(s) || !inPlanPass(plan, s)) continue;
     const i = seq.indexOf(s.workoutId);
     if (i >= 0 && (ni < 0 || i < ni)) out.add(s.workoutId);
   }
