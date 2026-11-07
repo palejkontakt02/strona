@@ -409,7 +409,10 @@ export function cloneWeek(w: Plan['weeks'][number], name: string, mode: Progress
         // deload przy seriach rozpisanych pojedynczo: jedna seria robocza mniej
         const work = groups.filter((g) => g.type !== 'Rozgrzewka');
         if (mode === 'deload' && work.length > 1 && work.every((g) => !g.sets || g.sets === '1')) {
-          const last = groups.lastIndexOf(work[work.length - 1]);
+          // odpada ostatnia zwykła seria (robocza / back-off), nie AMRAP ani seria główna
+          const plain = work.filter((g) => g.type === 'Robocze' || g.type === 'Back-off');
+          const drop = plain.length ? plain[plain.length - 1] : work[work.length - 1];
+          const last = groups.lastIndexOf(drop);
           groups = groups.filter((_, i) => i !== last);
         }
         return { ...e, id: uid(), groups };
@@ -509,6 +512,12 @@ function shiftTime(reps: string, fn: (sec: number) => number): string | null {
  * (sztanga 2,5 kg, hantle 1–2 kg, małe ciężary < 20 kg co 0,5–1 kg), przy wzroście co najmniej jeden krok.
  * Ćwiczenie na czas (`ex`): „+1 powtórzenie” / +2,5% → +5 s, +5% → +10 s, deload −20% czasu (i −1 seria).
  */
+/** Zmiana ciężaru o procent; skok o więcej niż 30% (np. hantelka 1 kg → 2 kg przy +5%) — ciężar bez zmian. */
+function safeScale(kg: number, f: number, name: string, per?: 'one' | 'sum'): number {
+  const v = scaleLoad(kg, f, name, per);
+  return kg > 0 && Math.abs(v - kg) / kg > 0.3 ? kg : v;
+}
+
 export function progressGroup(g: SetGroup, mode: Progression, ex?: Pick<PlanExercise, 'name' | 'groups' | 'timed' | 'cardio' | 'loadPer'>): SetGroup {
   if (mode === 'none' || g.type === 'Rozgrzewka') return { ...g };
   const out = { ...g };
@@ -532,18 +541,21 @@ export function progressGroup(g: SetGroup, mode: Progression, ex?: Pick<PlanExer
   }
   if (mode === 'load2' || mode === 'load5') {
     const f = mode === 'load2' ? 0.025 : 0.05;
-    if (kg != null) out.load = fmtN(scaleLoad(kg, f, name, per));
+    if (kg != null) out.load = fmtN(safeScale(kg, f, name, per));
     else if (pctV != null) out.load = `${fmtN(pctV + f * 100)}%`;
   } else if (mode === 'rep') {
     const m = g.reps.trim().match(/^(\d+)(\s*\/\s*str\.?)?$/i);
+    // zakres („8–12”, „12-15/str.”) przesuwa się cały: 9–13
+    const r = g.reps.trim().match(/^(\d+)\s*[–-]\s*(\d+)(\s*\/\s*str\.?)?$/i);
     if (m) out.reps = `${parseInt(m[1], 10) + 1}${m[2] ?? ''}`;
+    else if (r) out.reps = `${parseInt(r[1], 10) + 1}–${parseInt(r[2], 10) + 1}${r[3] ?? ''}`;
   } else if (mode === 'rpe') {
     if (rpe != null) out.rpe = fmtN(Math.min(10, rpe + 0.5));
   } else if (mode === 'deload') {
     const n = parseInt(g.sets || '1', 10);
     if (Number.isFinite(n) && n > 1) out.sets = String(n - 1);
-    if (kg != null) out.load = fmtN(scaleLoad(kg, -0.1, name, per));
-    else if (pctV != null) out.load = `${fmtN(pctV - 10)}%`;
+    if (kg != null) out.load = fmtN(safeScale(kg, -0.1, name, per));
+    else if (pctV != null) out.load = `${fmtN(Math.round(pctV * 0.9 * 2) / 2)}%`; // −10% ciężaru, nie −10 punktów
     if (rpe != null) out.rpe = fmtN(Math.max(5, rpe - 2));
   }
   return out;

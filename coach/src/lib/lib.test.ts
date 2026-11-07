@@ -365,9 +365,11 @@ describe('moving and removing within blocks', () => {
     expect(show(moveInBlocks(L('A B C* D* E'), 1, -1))).toBe('B A C D* E');
     expect(show(moveInBlocks(L('A B C* D* E'), 3, 1))).toBe('A B C* E D');
   });
-  it('moving into the middle of a block joins it', async () => {
+  it('a standalone exercise jumps over a whole block (does not join it) and moving back undoes it', async () => {
     const { moveInBlocks } = await import('./plan');
-    expect(show(moveInBlocks(L('A B C* D* E'), 4, -1))).toBe('A B C* E* D*');
+    expect(show(moveInBlocks(L('A B C* D* E'), 4, -1))).toBe('A E B C* D*');
+    expect(show(moveInBlocks(L('A B C*'), 0, 1))).toBe('B C* A');
+    expect(show(moveInBlocks(moveInBlocks(L('A B C*'), 0, 1), 2, -1))).toBe('A B C*');
   });
   it('removing a block head keeps the rest together', async () => {
     const { removeFromBlocks } = await import('./plan');

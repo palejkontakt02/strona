@@ -109,8 +109,25 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
           }
         }
     if (!clean.extra && !tpl && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
+    // tydzień 1 = tydzień daty startu: start np. w sobotę, a treningi w pon./czw. — wypadłyby przed startem
+    // (podopieczny widziałby „zaległy” pierwszego dnia planu). Plan jeszcze nie ruszył → proponujemy start od poniedziałku.
+    if (!clean.extra && !tpl && clean.startDate && clean.startDate >= todayISO()) {
+      const before = (clean.weeks[0]?.workouts ?? []).filter((k) => !k.date && k.day && k.exercises.some((e) => e.name.trim()) && (workoutDate(clean, 0, k) ?? '') < clean.startDate!);
+      if (before.length) {
+        const mon = addDays(clean.startDate, (8 - (new Date(`${clean.startDate}T12:00:00`).getDay() || 7)) % 7);
+        const ok = await ask(`Start planu: ${fmtDay(clean.startDate)}, a ${before.map((k) => `„${k.name}” (${WEEKDAYS[(k.day ?? 1) - 1]})`).join(', ')} z tygodnia 1 wypada przed startem — podopieczny zobaczy go jako zaległy. Zacząć plan od poniedziałku ${fmtDay(mon)}?`, { confirm: `Start od ${fmtDay(mon)}`, cancel: 'Zostaw', danger: false });
+        if (ok) clean.startDate = mon;
+      }
+    }
     for (const w of clean.weeks)
-      for (const k of w.workouts) for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
+      for (const k of w.workouts) {
+        for (let i = k.exercises.length - 1; i >= 0; i--) if (!k.exercises[i].name.trim()) k.exercises = removeFromBlocks(k.exercises, i);
+        // puste wiersze serii (bez powt., ciężaru, RPE i tempa) — zostają tylko, gdy ćwiczenie nie ma żadnych innych
+        for (const e of k.exercises) {
+          const filled = e.groups.filter((g) => g.reps.trim() || g.load.trim() || g.rpe.trim() || g.pace?.trim());
+          if (filled.length && filled.length < e.groups.length) e.groups = filled;
+        }
+      }
     const focused = clean.weeks.flatMap((w) => w.workouts).find((k) => k.id === m.focusWorkoutId);
     // przy błędzie zapisu edytor zostaje otwarty — zmiany nie przepadają
     if (await apply(savePlan(db, clean), clean.extra ? (only && focused ? `Zapisano „${focused.name}”${focused.date ? ` na ${fmtDay(focused.date)}` : ''}.` : 'Treningi poza planem zapisane.') : tpl ? 'Szablon zapisany.' : m.isNew ? 'Plan utworzony.' : 'Plan zapisany.')) closeModal();
@@ -228,7 +245,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                           const w = findWorkout(d, wi, ki);
                           if (v === 'date') {
                             w.day = undefined;
-                            w.date = w.date ?? workoutDate(d, wi, w) ?? todayISO();
+                            const start = d.startDate && d.startDate > todayISO() ? d.startDate : todayISO();
+                            w.date = w.date ?? workoutDate(d, wi, w) ?? start;
                             return;
                           }
                           w.date = undefined;
@@ -287,7 +305,20 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         type="button"
                         className={`pe-link ${e.linked ? 'on' : ''}`}
                         aria-pressed={!!e.linked}
-                        onClick={() => setEx((x) => void (x.linked = !x.linked))}
+                        onClick={() =>
+                          upd((d) => {
+                            const list = findWorkout(d, wi, ki).exercises;
+                            const x = list[ei];
+                            const prev = list[ei - 1];
+                            x.linked = !x.linked;
+                            // połączenie: przerwa poprzedniego staje się „przejściem” w bloku — domyślne 2:00 rozbijałoby superserię;
+                            // przerwa po rundzie przechodzi na ostatnie ćwiczenie bloku
+                            if (x.linked && prev) {
+                              if (prev.rest && !list[ei + 1]?.linked && (!x.rest || x.rest === prev.rest || x.rest === '2:00')) x.rest = prev.rest;
+                              prev.rest = '';
+                            }
+                          })
+                        }
                         title="Ćwiczenia w bloku robi się na zmianę (A1 → A2 → A3), przerwa po całej rundzie"
                       >
                         {e.linked ? <><Icon name="link" size={14} /> w bloku z {labels[ei - 1]} · rozłącz</> : '+ połącz z poprzednim (superseria / obwód)'}

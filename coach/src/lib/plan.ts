@@ -198,11 +198,13 @@ export function moveInBlocks<T extends { linked?: boolean }>(list: T[], k: numbe
     [out[k], out[j]] = [{ ...out[j], linked: lk }, { ...out[k], linked: lj }];
     return out;
   }
+  // poza blokiem: ćwiczenie przeskakuje CAŁY sąsiedni blok i zostaje samodzielne — nie wpada przypadkiem
+  // do superserii (do bloku łączy się przyciskiem „połącz”), a ruch w drugą stronę cofa poprzedni
   const item = list[k];
+  const target = blocks[blockOf(j)];
   const rest = removeFromBlocks(list, k);
-  const next = rest[j];
-  const joined = !!next?.linked && j > 0;
-  const out = [...rest.slice(0, j), { ...item, linked: joined ? true : undefined }, ...rest.slice(j)];
+  const at = dir > 0 ? target[target.length - 1] : target[0];
+  const out = [...rest.slice(0, at), { ...item, linked: undefined }, ...rest.slice(at)];
   return out.map((e, i) => (i === 0 && e.linked ? { ...e, linked: undefined } : e));
 }
 
