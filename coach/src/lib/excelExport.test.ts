@@ -62,7 +62,7 @@ describe('układ arkusza trenera: PLAN | REALIZACJA (KG / REP w każdej serii) |
     expect(head.slice(0, 3)).toEqual(['Ćwiczenie', 'Serie', 'Powt.']);
     const s1 = head.indexOf('Seria 1');
     expect(s1).toBeGreaterThan(2);
-    expect(rows[top + 2].slice(s1, s1 + 2)).toEqual(['KG', 'REP']);
+    expect(rows[top + 2].slice(s1, s1 + 6)).toEqual(['KG', 'REP', 'RPE', 'KG', 'REP', 'RPE']);
     expect(sh.rowBreaks?.length).toBeGreaterThan(0);
     const k = plan.weeks[0].workouts.find((w) => w.exercises.some((e) => e.name.trim()))!;
     const first = k.exercises.find((e) => e.name.trim())!;
@@ -83,7 +83,7 @@ describe('układ arkusza trenera: PLAN | REALIZACJA (KG / REP w każdej serii) |
     const n = sess.exercises.filter((e) => e.name.trim()).length;
     expect(rows.slice(hi + 2).filter((r) => r.length && r[0]).length).toBe(n);
     const sx = sessionExRows({ ...sess, exercises: [{ name: 'Wiosłowanie', setsLog: [{ reps: 10, load: 30, rpe: 7 }, { reps: 8, load: 32.5, rpe: 8 }] }] });
-    expect(sx[0].sets).toEqual([{ kg: 30, rep: 10 }, { kg: 32.5, rep: 8 }]);
+    expect(sx[0].sets).toEqual([{ kg: 30, rep: 10, rpe: 7 }, { kg: 32.5, rep: 8, rpe: 8 }]);
     expect(sx[0].rpe).toBe('7 / 8');
   });
   it('wszystkie treningi: lista i tabela każdego treningu', async () => {

@@ -172,6 +172,8 @@ const joinSeq = (vals: (string | undefined)[]) => {
 export interface XSet {
   kg: string | number | null;
   rep: string | number | null;
+  /** RPE tej serii (plan: cel, kursywą; trening: wpisane). */
+  rpe?: string | number | null;
   text?: string;
   hint?: string;
 }
@@ -192,13 +194,13 @@ type PlanKey = keyof ExRow['plan'];
 const LEFT: { key: PlanKey; head: string; w: number; always?: boolean }[] = [
   { key: 'sets', head: 'Serie', w: 6, always: true },
   { key: 'reps', head: 'Powt.', w: 8, always: true },
-  { key: 'rpe', head: 'RPE', w: 6 },
   { key: 'tempo', head: 'Tempo', w: 8 },
   { key: 'rest', head: 'Przerwa', w: 9 },
 ];
 const NAME_W = 26;
 const KG_W = 7;
 const REP_W = 6;
+const RPE_W = 5.5;
 const NOTE_W = 30;
 const DATE_W = 11;
 
@@ -229,11 +231,12 @@ class Grid {
   private get s0() {
     return 1 + this.left.length;
   }
-  private get rpe() {
-    return this.s0 + 2 * this.n;
+  /** Ostatnia kolumna realizacji (RPE ostatniej serii). */
+  private get end() {
+    return this.s0 + 3 * this.n - 1;
   }
   widths(): number[] {
-    return [NAME_W, ...this.left.map((c) => c.w), ...Array.from({ length: this.n }, () => [KG_W, REP_W]).flat(), 6, DATE_W, NOTE_W];
+    return [NAME_W, ...this.left.map((c) => c.w), ...Array.from({ length: this.n }, () => [KG_W, REP_W, RPE_W]).flat(), DATE_W, NOTE_W];
   }
   private put(r: number, c: number, v: XCell) {
     while (this.rows.length <= r) this.rows.push([]);
@@ -281,7 +284,7 @@ class Grid {
     }
   }
   block(title: string, date: string, ex: ExRow[], dateLabel = 'DATA:') {
-    const L = { s0: this.s0, rpe: this.rpe, date: this.rpe + 1, note: this.rpe + 2 };
+    const L = { s0: this.s0, end: this.end, date: this.end + 1, note: this.end + 2 };
     const list = ex.length ? ex : [{ name: '', plan: { sets: '', reps: '', rpe: '', tempo: '', rest: '' }, sets: [], rpe: null, notes: '' } as ExRow];
     // wysokości wierszy ćwiczeń (miejsce na wpis długopisem, zawijane nazwy i uwagi)
     const hs = this.rowHeights(list);
@@ -295,19 +298,20 @@ class Grid {
     const bl = (edge: Edge) => st(C.blue, { bold: true, edge });
     // wiersz 1: tytuł | REALIZACJA | DATA: | NOTATKI
     this.merge(top, 0, top, L.s0 - 1, title, dark({ l: true, t: true, r: true }, title.length > 52 ? 10 : 12, 'left'));
-    this.merge(top, L.s0, top, L.rpe, 'REALIZACJA', dark({ l: true, t: true, r: true }));
+    this.merge(top, L.s0, top, L.end, 'REALIZACJA', dark({ l: true, t: true, r: true }));
     this.merge(top, L.date, top, L.date, dateLabel, dark({ t: true }));
     this.merge(top, L.note, top + 2, L.note, 'NOTATKI', dark({ t: true, r: true }, 10));
-    // wiersze 2–3: nagłówki planu, „Seria N” nad KG | REP, RPE, data
+    // wiersze 2–3: nagłówki planu, „Seria N” nad KG | REP | RPE, data
     this.merge(top + 1, 0, top + 2, 0, 'Ćwiczenie', bl({ l: true }));
     this.left.forEach((c, i) => this.merge(top + 1, 1 + i, top + 2, 1 + i, c.head, bl({ r: i === this.left.length - 1 })));
     for (let i = 0; i < this.n; i++) {
-      const c = L.s0 + 2 * i;
-      this.merge(top + 1, c, top + 1, c + 1, `Seria ${i + 1}`, bl({ l: i === 0 }));
+      const c = L.s0 + 3 * i;
+      const lastS = i === this.n - 1;
+      this.merge(top + 1, c, top + 1, c + 2, `Seria ${i + 1}`, bl({ l: i === 0, r: lastS }));
       this.put(top + 2, c, cell('KG', st(C.blue, { bold: true, size: 8, edge: { l: i === 0 } })));
       this.put(top + 2, c + 1, cell('REP', st(C.blue, { bold: true, size: 8 })));
+      this.put(top + 2, c + 2, cell('RPE', st(C.blue, { bold: true, size: 8, edge: { r: lastS } })));
     }
-    this.merge(top + 1, L.rpe, top + 2, L.rpe, 'RPE', bl({ r: true }));
     this.merge(top + 1, L.date, top + 2, L.date, date, st(C.white, { bold: true }));
     this.heights[top] = 20;
     this.heights[top + 1] = 18;
@@ -321,19 +325,25 @@ class Grid {
       this.put(r, 0, cell(e.name, st(C.white, { bold: true, align: 'left', wrap: true, indent: 1, size: 10, edge: ed({ l: true }) })));
       this.left.forEach((c, i) => this.put(r, 1 + i, cell(num(e.plan[c.key]), st(C.white, { edge: ed({ r: i === this.left.length - 1 }) }))));
       for (let i = 0; i < this.n; i++) {
-        const c = L.s0 + 2 * i;
+        const c = L.s0 + 3 * i;
         const x = e.sets[i];
+        const lastS = i === this.n - 1;
+        // RPE serii: plan — cel kursywą (do nadpisania), trening — wpisane
+        const rpeCell = () => this.put(r, c + 2, cell(x?.rpe != null && x.rpe !== '' ? num(x.rpe) : null, st(C.white, { bold: !e.target, italic: e.target, color: e.target ? C.hint : C.black, edge: ed({ r: lastS }) })));
         if (!x) {
           // poza liczbą serii — „—” na jasnym tle: od razu widać, ile serii zrobić
           this.put(r, c, cell('—', st(C.none, { color: C.faint, edge: ed({ l: i === 0 }) })));
           this.put(r, c + 1, cell('—', st(C.none, { color: C.faint, edge: ed() })));
-        } else if (x.text) this.merge(r, c, r, c + 1, x.text, st(C.kg, { size: 8, wrap: true, italic: e.target, edge: ed({ l: i === 0 }) }));
-        else {
+          this.put(r, c + 2, cell('—', st(C.none, { color: C.faint, edge: ed({ r: lastS }) })));
+        } else if (x.text) {
+          this.merge(r, c, r, c + 1, x.text, st(C.kg, { size: 8, wrap: true, italic: e.target, edge: ed({ l: i === 0 }) }));
+          rpeCell();
+        } else {
+          rpeCell();
           this.put(r, c, cell(typeof x.kg === 'string' ? minus(x.kg) : x.kg, st(x.kg == null && !e.target ? C.white : C.kg, { bold: !e.target, italic: e.target, color: e.target ? C.hint : C.black, edge: ed({ l: i === 0 }) })));
           this.put(r, c + 1, cell(x.rep ?? x.hint ?? null, st(C.white, { italic: x.rep == null && !!x.hint, color: x.rep == null && x.hint ? C.hint : C.black, size: x.rep == null && x.hint ? 8 : undefined, edge: ed() })));
         }
       }
-      this.put(r, L.rpe, cell(num(e.rpe), st(C.white, { bold: true, edge: ed({ r: true }) })));
       this.merge(r, L.date, r, L.note, e.notes, st(C.white, { align: 'left', wrap: true, size: 9, indent: 1, edge: ed({ r: true }) }));
     });
     this.heights[this.rows.length] = 12;
@@ -373,7 +383,7 @@ export function planExRows(k: PlanWorkout): ExRow[] {
       const warm = all.filter((g) => g.type === 'Rozgrzewka');
       const work = all.filter((g) => g.type !== 'Rozgrzewka' && g.type !== 'Schłodzenie' && g.type !== 'Przerwa');
       const cardioText = (g: (typeof all)[number]) => [g.reps && `${g.reps}${/\d$/.test(g.reps) ? ' min' : ''}`, g.load && `${g.load.replace('.', ',')}${/\d$/.test(g.load) ? ' km' : ''}`, g.pace].filter(Boolean).join(' · ');
-      const sets: XSet[] = work.map((g) => (e.cardio ? { kg: null, rep: null, text: cardioText(g) } : { kg: num(g.load), rep: null, hint: g.type === 'AMRAP' ? 'max' : undefined }));
+      const sets: XSet[] = work.map((g) => (e.cardio ? { kg: null, rep: null, text: cardioText(g), rpe: g.rpe || null } : { kg: num(g.load), rep: null, rpe: g.rpe || null, hint: g.type === 'AMRAP' ? 'max' : undefined }));
       const t = splitTempo(e.notes);
       const warmText = warm.length ? `Rozgrzewka: ${warm.map((g) => (e.cardio ? cardioText(g) : [g.reps, kgText(g.load)].filter(Boolean).join(' × '))).join(', ')}` : '';
       const types = [...new Set(e.groups.map((g) => TYPE_PL[g.type]).filter(Boolean))];
@@ -411,7 +421,7 @@ export function planTableSheet(plan: Plan, client?: Pick<Client, 'name'>): XShee
   g.info(
     [...(client ? ([['Podopieczny', client.name]] as [string, string][]) : []), ...(plan.startDate ? ([['Start', dmy(plan.startDate)]] as [string, string][]) : [])],
     plan.name,
-    'Jak czytać: KG (szare pole) — ciężar z planu, wpisz ten, który zrobiłeś; −10% = o 10% lżej niż seria główna; REP — wpisz powtórzenia; RPE — wysiłek 1–10 (10 = nie dało się więcej); — = brak tej serii.',
+    'Jak czytać: przy każdej serii KG, REP i RPE. KG (szare pole) — ciężar z planu, wpisz ten, który zrobiłeś; −10% = o 10% lżej niż seria główna; REP — wpisz powtórzenia; RPE — cel z planu (kursywą), wpisz, jak ciężka była seria 1–10 (10 = nie dało się więcej); — = brak tej serii.',
   );
   for (const blocks of weeks) {
     // cały tydzień na jednej kartce, jeśli się mieści
@@ -441,13 +451,13 @@ export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>): XSheet[
 /* ---------- treningi ---------- */
 
 function setCell(e: SessionExercise, x: SetLog): XSet {
-  if (e.cardio) return { kg: null, rep: null, text: [x.reps != null ? fmtClock(x.reps) : '', x.dist ? `${String(x.dist).replace('.', ',')} km` : '', x.hr ? `${x.hr} ud/min` : ''].filter(Boolean).join(' · ') };
+  if (e.cardio) return { kg: null, rep: null, rpe: x.rpe ?? null, text: [x.reps != null ? fmtClock(x.reps) : '', x.dist ? `${String(x.dist).replace('.', ',')} km` : '', x.hr ? `${x.hr} ud/min` : ''].filter(Boolean).join(' · ') };
   let rep: string | number | null = x.reps ?? null;
   if (x.unit === 's' && x.reps != null) rep = `${x.reps} s`;
   else if (x.unit === 'min' && x.reps != null) rep = `${String(x.reps).replace('.', ',')} min`;
   else if (x.complex) rep = x.complex;
   if (x.repsR != null) rep = `${String(rep ?? '').replace(/ s$/, '')}/${x.repsR}${x.unit === 's' ? ' s' : ''}`;
-  return { kg: x.load != null ? Math.round(x.load * 100) / 100 : null, rep };
+  return { kg: x.load != null ? Math.round(x.load * 100) / 100 : null, rep, rpe: x.rpe ?? null };
 }
 
 /** Ćwiczenia zapisanego treningu (seria po serii: KG i REP; rozgrzewka w uwagach). */
@@ -465,7 +475,7 @@ export function sessionExRows(s: TrainingSession): ExRow[] {
       if (!logs.length) {
         // zapis skrócony („3 × 8 · 60 kg”) — rozpisany na serie
         const n = Math.min(20, Math.max(1, Number(e.sets) || 1));
-        return { ...base, plan, sets: Array.from({ length: n }, () => ({ kg: num(e.load), rep: num(e.reps) })), rpe: num(e.rpe) };
+        return { ...base, plan, sets: Array.from({ length: n }, () => ({ kg: num(e.load), rep: num(e.reps), rpe: num(e.rpe) })), rpe: num(e.rpe) };
       }
       return { ...base, plan: { ...plan, sets: plan.sets || String(work.length) }, sets: work.map((x) => setCell(e, x)), rpe: joinRpe(work.map((x) => x.rpe)) };
     });
