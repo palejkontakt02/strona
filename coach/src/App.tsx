@@ -12,6 +12,7 @@ import { groupOf } from './data/ops';
 import { useStore } from './data/store';
 import { put } from './data/db';
 import { savePlan } from './data/ops';
+import { defaultCharge } from './lib/billing';
 import { dueBlock } from './lib/plan';
 import { todayISO } from './lib/dates';
 import type { Plan } from './domain';
@@ -147,8 +148,12 @@ export function App() {
         const first = (cur.clients.find((c) => c.id === clientId)?.name ?? '').split(' ')[0];
         void ask(`${first} zapisał(a) już ${appt.date === todayISO() ? 'dziś' : 'tego dnia'} trening „${own.workoutName || 'Trening'}”. Połączyć go z tą wizytą zamiast zapisywać drugi? (Potem ustawisz rozliczenie.)`, { confirm: 'Połącz z wizytą', cancel: 'Nowy trening', danger: false }).then(async (link) => {
           if (!link) return go();
-          const ok = await apply([put('appointments', { ...appt, status: 'done', sessionId: own.id }), put('sessions', { ...own, solo: false })], 'Trening połączony z wizytą — ustaw rozliczenie.');
-          if (ok) setModal({ kind: 'session', session: { ...own, solo: false } });
+          // trening z trenerem: rozliczenie jak zwykle u tego podopiecznego (pakiet / pojedyncza / klub), nie „brak” z zapisu podopiecznego
+          const cl = cur.clients.find((c) => c.id === clientId);
+          const charge = own.charge === 'brak' && cl ? defaultCharge(cl, cur.sessions.filter((s) => s.clientId === clientId && s.id !== own.id)) : own.charge;
+          const linked = { ...own, solo: false, charge };
+          const ok = await apply([put('appointments', { ...appt, status: 'done', sessionId: own.id }), put('sessions', linked)], 'Trening połączony z wizytą — sprawdź rozliczenie.');
+          if (ok) setModal({ kind: 'session', session: linked });
         });
       },
     }),

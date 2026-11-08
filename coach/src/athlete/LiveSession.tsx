@@ -333,7 +333,7 @@ export function LiveSession({
                   {w.workouts.map((k) => (
                     <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${inPass.has(k.id) && nx?.workout.id !== k.id ? 'done' : ''}`} disabled={!k.exercises.length} onClick={async () => {
                       // spoza kolejki — plan pójdzie dalej od wybranego (pominie jednostki pomiędzy); pytamy jak u podopiecznego
-                      if (nx && plan.active && k.id !== nx.workout.id && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). ${inPass.has(k.id) ? 'Ten trening jest już zrobiony w tym przejściu planu — powtórka nie przesunie planu' : 'Po zapisie plan pójdzie dalej od wybranego'}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
+                      if (nx && plan.active && k.id !== nx.workout.id && !savedSameDay(db, clientId, plan.id, k.id, todayISO()) && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). ${inPass.has(k.id) ? 'Ten trening jest już zrobiony w tym przejściu planu — powtórka nie przesunie planu' : 'Po zapisie plan pójdzie dalej od wybranego'}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
                       start(k.id);
                     }}>
                       <span className="wo-st">{nx?.workout.id === k.id ? '▶' : inPass.has(k.id) ? '✓' : ''}</span>
