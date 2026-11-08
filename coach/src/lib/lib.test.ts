@@ -307,6 +307,21 @@ describe('plan', () => {
     expect(nextWorkout(plan, outOfOrder)?.workout.id).toBe('c');
     expect(nextWorkout(null, [])).toBeNull();
   });
+  it('B przed A w tym samym tygodniu → następny C; ten sam trening dwa razy nie przesuwa planu; pominięty wraca', () => {
+    const plan: Plan = {
+      id: 'p1', clientId: 'c1', name: 'Plan', active: true,
+      weeks: [
+        { id: 'w1', name: 'T1', workouts: ['a1', 'b1', 'c1'].map((id) => ({ id, name: id, exercises: [] })) },
+        { id: 'w2', name: 'T2', workouts: ['a2', 'b2', 'c2'].map((id) => ({ id, name: id, exercises: [] })) },
+      ],
+    };
+    const S = (w: string, d: string) => sess({ date: d, planId: 'p1', workoutId: w });
+    const base = [S('a1', '2026-11-01'), S('b1', '2026-11-03'), S('c1', '2026-11-05')];
+    expect(nextWorkout(plan, [...base, S('b2', '2026-11-09'), S('a2', '2026-11-10')])?.workout.id).toBe('c2');
+    expect(nextWorkout(plan, [...base, S('c1', '2026-11-05')])?.workout.id).toBe('a2');
+    // pominięte a2, b2 (od razu c2) — wracają jako zaległe
+    expect(nextWorkout(plan, [...base, S('c2', '2026-11-09')])?.workout.id).toBe('a2');
+  });
 });
 
 describe('calendar', () => {

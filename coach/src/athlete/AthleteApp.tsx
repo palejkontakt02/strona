@@ -13,7 +13,7 @@ import { refreshPush } from '../data/push';
 import { OfflineBadge } from '../components/OfflineBadge';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
-import { allMeasurements, clientById, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { allMeasurements, clientById, dupText, savedSameDay, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
@@ -255,9 +255,12 @@ export function AthleteApp({
   const startOwn = () => void replaceRun(emptyRun('Trening własny', todayISO()));
   const editSession = (s: TrainingSession) => void replaceRun(sessionToRun(s));
 
-  const startFrom = (st: RunStart) => {
+  const startFrom = async (st: RunStart) => {
     const r = runFromStart(db, clientId, st, todayISO());
     if (typeof r === 'string') return toast(r);
+    // ten sam trening z planu zapisany już dziś (sam albo z trenerem) — pytamy przed drugim zapisem
+    const dup = !st.repeatSessionId && savedSameDay(db, clientId, r.planId, r.workoutId, todayISO());
+    if (dup && !(await ask(dupText(dup), { confirm: 'Zapisz drugi raz', danger: false }))) return;
     void replaceRun(r);
   };
   const start = async (workoutId?: string) => {
@@ -266,7 +269,9 @@ export function AthleteApp({
     const id = workoutId ?? nx?.workout.id;
     if (!id) return toast('Nie znaleziono treningu w planie.');
     // trening spoza kolejki przesuwa „następny” — pytamy, żeby plan nie przeskoczył przez pomyłkę
-    if (nx && id !== nx.workout.id && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}). Po zapisie plan pójdzie dalej od wybranego. Zacząć mimo to?`, { confirm: 'Zacznij ten' }))) return;
+    const today = todayISO();
+    const sameDay = savedSameDay(db, clientId, plan.id, id, today);
+    if (nx && id !== nx.workout.id && !sameDay && !(await ask(doneInPass(plan, sessions).has(id) ? `Ten trening jest już zrobiony w tym przejściu planu (następny: ${nx.workout.name}). Zrobić go jeszcze raz?` : `To nie jest następny trening z planu (następny: ${nx.workout.name}). Po zapisie plan pójdzie dalej od wybranego. Zacząć mimo to?`, { confirm: 'Zacznij ten' }))) return;
     startFrom({ planId: plan.id, workoutId: id });
   };
   const undo = async (s: TrainingSession) => {
@@ -1379,16 +1384,15 @@ function Workouts({
   // sesje od najnowszej; po „Ustaw daty od nowa” liczą się tylko treningi z nowego przejścia
   const done = (planId: string, id: string) => sessions.find((s) => s.planId === planId && s.workoutId === id && (planId !== plan?.id || !plan?.passFrom || s.date >= plan.passFrom))?.date;
   // Plan idzie po kolei: ✓ tylko dla jednostek przed „następną” (bieżące przejście planu); dalsze to poprzednie przejście.
-  const seqIds = plan ? planSequence(plan).map((x) => x.workout.id) : [];
   // plan przerobiony do końca — wszystkie ✓ zostają (nowe przejście ruszy od pierwszego treningu)
-  const nextIdx = plan && planCompleted(plan, sessions) ? -1 : nextId ? seqIds.indexOf(nextId) : -1;
+  const passDone = plan ? doneInPass(plan, sessions) : new Set<string>();
   // minione tygodnie (przed tygodniem następnej jednostki) — zwinięte
   const open = plan ? firstOpenWeek(plan.weeks, nextId) : 0;
   const item = (k: PlanWorkout, planId: string, isNext: boolean) => {
     const n = k.exercises.filter((e) => e.name).length;
     const dn = done(planId, k.id);
-    const idx = planId === plan?.id ? seqIds.indexOf(k.id) : -1;
-    const doneNow = !!dn && !isNext && (planId !== plan?.id || nextIdx < 0 || idx < nextIdx);
+    // plan: ✓ tylko w bieżącym przejściu (jak u trenera); poza planem — dowolne wykonanie
+    const doneNow = !!dn && !isNext && (planId !== plan?.id || passDone.has(k.id));
     const wk = plan?.weeks.find((w) => w.workouts.some((x) => x.id === k.id));
     const raw = planId === plan?.id && plan && wk ? workoutDate(plan, plan.weeks.indexOf(wk), k) : undefined;
     // następny: najbliższy realny termin (jak na „Dziś”); dalsze: data planu, o ile nie minęła (stare daty z poprzedniego przejścia — bez daty)

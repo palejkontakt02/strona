@@ -1,6 +1,6 @@
 import type { Db } from '../data/db';
 import { plansOf, sessionsOf } from '../data/ops';
-import { currentPlan, planSequence } from '../lib/plan';
+import { currentPlan, nextWorkout, planSequence } from '../lib/plan';
 import { buildRun, repeatRun, type Run } from '../lib/run';
 
 /** Co uruchomić: jednostkę z planu albo powtórkę zapisanego treningu. */
@@ -18,14 +18,21 @@ export function runFromStart(db: Db, clientId: string, st: RunStart, date: strin
     if (!s) return 'Nie znaleziono tego treningu.';
     if (s.exercises.length === 0) return 'Ten trening nie ma zapisanych ćwiczeń.';
     // bieg z planu: powtórka z jednostki (cele, strefy, przerwy, bloki), bez przesuwania postępu planu; siła — z zapisanych ciężarów
+    // powtórka treningu, który jest właśnie następnym w aktywnym planie (np. „C” z zeszłego tygodnia, a następny to „C”
+    // z tego tygodnia) — zaliczamy jednostkę z TEGO tygodnia; inaczej powtórka bez przesuwania planu
+    const cur = currentPlan(plansOf(db, clientId));
+    const nx = cur ? nextWorkout(cur, sessions) : null;
+    const srcName = (s.planId ? db.plans.find((p) => p.id === s.planId)?.weeks.flatMap((w) => w.workouts).find((k) => k.id === s.workoutId)?.name : undefined) ?? s.workoutName;
+    const link = cur && nx && srcName && nx.workout.name.trim().toLowerCase() === srcName.trim().toLowerCase() ? { planId: cur.id, workoutId: nx.workout.id, weekName: nx.week.name, planName: cur.name } : null;
     const src = s.exercises.some((e) => e.cardio) ? db.plans.find((p) => p.id === s.planId && p.clientId === clientId) : undefined;
     const step = src && planSequence(src).find((x) => x.workout.id === s.workoutId);
     if (src && step && step.workout.exercises.some((e) => e.name)) {
       const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
       const r = buildRun(src, step.week.name, step.workout, sessions, videos, date, Date.now(), db.clients.find((c) => c.id === clientId)?.tests ?? []);
-      return { ...r, planId: '', workoutId: '', name: s.workoutName || r.name };
+      return { ...r, planId: link?.planId ?? '', workoutId: link?.workoutId ?? '', ...(link ? { weekName: link.weekName, planName: link.planName } : {}), name: s.workoutName || r.name };
     }
-    return repeatRun(s, date);
+    const rr = repeatRun(s, date);
+    return link ? { ...rr, planId: link.planId, workoutId: link.workoutId, weekName: link.weekName, planName: link.planName } : rr;
   }
   const plans = plansOf(db, clientId);
   const plan = db.plans.find((p) => p.id === st.planId && p.clientId === clientId) ?? currentPlan(plans);

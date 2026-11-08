@@ -1,5 +1,5 @@
 import type { Client, Plan, PlanWorkout, SessionExercise, SetLog, TrainingSession } from '../domain';
-import { exerciseLabels, exerciseSummary, expandSets, workoutDate } from './plan';
+import { doneInPass, exerciseLabels, exerciseSummary, expandSets, nextWorkout, workoutDate } from './plan';
 import { planRows } from './sheetImport';
 import { planGrid, type GridCell } from './planGrid';
 import { colActuals } from './planActuals';
@@ -492,7 +492,10 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
 
   const DOW = ['nd', 'pn', 'wt', 'śr', 'cz', 'pt', 'sb'];
   for (const slot of slots) {
-    const act = colActuals(plan, slot.cols, sessions);
+    // wykonanie tylko jednostek zrobionych w bieżącym przejściu planu (bez następnej)
+    const passDone = doneInPass(plan, sessions);
+    const nextId = sessions.length ? nextWorkout(plan, sessions)?.workout.id : undefined;
+    const act = colActuals(plan, slot.cols, sessions).map((a, i) => (passDone.has(slot.cols[i].k.id) && slot.cols[i].k.id !== nextId ? a : null));
     for (let from = 0; from < slot.cols.length; from += PER) {
       const cols = slot.cols.slice(from, from + PER);
       const acts = act.slice(from, from + PER);

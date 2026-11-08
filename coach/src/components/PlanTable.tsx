@@ -126,7 +126,7 @@ export function PlanTable({
                 </span>
               )}
             </div>
-            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals actuals={sessions ? colActuals(plan, s.cols, sessions) : undefined} />
+            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals actuals={sessions ? colActuals(plan, s.cols, sessions).map((a, i) => (done.has(s.cols[i].k.id) && s.cols[i].k.id !== nextId ? a : null)) : undefined} />
           </section>
         );
       })}

@@ -69,54 +69,57 @@ const counts = (s: TrainingSession) => !s.stoppedForPain;
 export const inPlanPass = (plan: Pick<Plan, 'passFrom'>, s: { date?: string }) => !plan.passFrom || (s.date ?? '') >= plan.passFrom;
 
 /**
- * Następny trening: jednostka po ostatnio wykonanej z tego planu (wg daty, w kolejności
- * tydzień → jednostka), cyklicznie — po ostatniej wraca do pierwszej. Bez historii — pierwsza.
- * Treningi przerwane z bólu (`stoppedForPain`) się nie liczą — następna zostaje ta sama jednostka.
+ * Przejście planu z historii (chronologicznie): które jednostki są zrobione w bieżącym przejściu i która następna.
+ * - jednostka zrobiona drugi raz pod rząd (np. dwa zapisy tego samego dnia) — bez zmian;
+ * - powrót do jednostki już zrobionej i wcześniejszej niż ostatnia albo skok wstecz o ponad pół planu — nowe przejście;
+ * - komplet jednostek — kolejny zapis zaczyna nowe przejście.
+ * Następna: pierwsza niezrobiona po ostatniej wykonanej; gdy za nią wszystko zrobione — najwcześniejsza pominięta;
+ * komplet — pierwsza (nowe przejście), `completed`. Treningi przerwane z bólu się nie liczą.
  */
+export function passState(plan: Plan, sessions: TrainingSession[]): { done: Set<string>; next: number; completed: boolean; last: number } {
+  const seq = planSequence(plan).map((x) => x.workout.id);
+  const pos = new Map(seq.map((id, i) => [id, i]));
+  const list = sessions
+    .filter((s) => s.planId === plan.id && s.workoutId && pos.has(s.workoutId) && counts(s) && inPlanPass(plan, s))
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || pos.get(a.workoutId!)! - pos.get(b.workoutId!)!);
+  let done = new Set<number>();
+  let last = -1;
+  for (const s of list) {
+    const i = pos.get(s.workoutId!)!;
+    if (i === last && done.has(i)) continue; // ten sam trening drugi raz
+    // nowe przejście: komplet zrobiony, powrót do już zrobionej jednostki albo duży skok wstecz (z końca planu na początek);
+    // mały krok wstecz (B, potem A z tego samego tygodnia) to ta sama runda
+    if (done.size === seq.length || (done.has(i) && i <= last) || (last >= 0 && last - i > seq.length / 2)) done = new Set();
+    done.add(i);
+    last = i;
+  }
+  const completed = seq.length > 0 && done.size === seq.length;
+  let next = 0;
+  if (!completed && done.size) {
+    const after = seq.findIndex((_, i) => i > last && !done.has(i));
+    next = after >= 0 ? after : seq.findIndex((_, i) => !done.has(i));
+  }
+  return { done: new Set([...done].map((i) => seq[i])), next: Math.max(0, next), completed, last };
+}
+
+/** Następny trening z planu (patrz `passState`). Bez historii — pierwszy. */
 export function nextWorkout(plan: Plan | null, sessions: TrainingSession[]): (PlanStep & { total: number }) | null {
   if (!plan) return null;
   const seq = planSequence(plan);
   if (seq.length === 0) return null;
-  const pos = new Map(seq.map((x, i) => [x.workout.id, i]));
-  let last: { date: string; i: number } | null = null;
-  for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !pos.has(s.workoutId) || !counts(s) || !inPlanPass(plan, s)) continue;
-    const i = pos.get(s.workoutId)!;
-    if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
-  }
-  const nx = seq[last ? (last.i + 1) % seq.length : 0];
+  const nx = seq[passState(plan, sessions).next] ?? seq[0];
   return { ...nx, total: seq.length };
 }
 
-/** Ostatnio zapisana jednostka planu to jego ostatni trening (plan przerobiony do końca, nowe przejście jeszcze nie ruszyło). */
+/** Plan przerobiony do końca w bieżącym przejściu (wszystkie jednostki zrobione; nowe przejście jeszcze nie ruszyło). */
 export function planCompleted(plan: Plan | null, sessions: TrainingSession[]): boolean {
-  if (!plan) return false;
-  const seq = planSequence(plan).map((x) => x.workout.id);
-  if (seq.length < 2) return false;
-  let last: { date: string; i: number } | null = null;
-  for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !counts(s) || !inPlanPass(plan, s)) continue;
-    const i = seq.indexOf(s.workoutId);
-    if (i < 0) continue;
-    if (!last || s.date > last.date || (s.date === last.date && i > last.i)) last = { date: s.date, i };
-  }
-  return !!last && last.i === seq.length - 1;
+  if (!plan || planSequence(plan).length < 2) return false;
+  return passState(plan, sessions).completed;
 }
 
-/** Jednostki zrobione w bieżącym przejściu planu (przed „następną”) — dalsze to poprzednie przejście. */
+/** Jednostki zrobione w bieżącym przejściu planu (bez poprzednich przejść). */
 export function doneInPass(plan: Plan | null, sessions: TrainingSession[]): Set<string> {
-  const out = new Set<string>();
-  if (!plan) return out;
-  const nx = nextWorkout(plan, sessions);
-  const seq = planSequence(plan).map((x) => x.workout.id);
-  // plan ukończony (ostatnia jednostka zrobiona) — wszystkie ✓ zostają, nowe przejście dopiero od pierwszego treningu
-  const ni = planCompleted(plan, sessions) ? -1 : nx ? seq.indexOf(nx.workout.id) : -1;
-  for (const s of sessions) {
-    if (s.planId !== plan.id || !s.workoutId || !counts(s) || !inPlanPass(plan, s)) continue;
-    const i = seq.indexOf(s.workoutId);
-    if (i >= 0 && (ni < 0 || i < ni)) out.add(s.workoutId);
-  }
-  return out;
+  return plan ? passState(plan, sessions).done : new Set<string>();
 }
 
 /**

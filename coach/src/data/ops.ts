@@ -170,6 +170,14 @@ function withClubRate(db: Db, session: TrainingSession): TrainingSession {
   return { ...session, clubRate: loc?.clubRate };
 }
 
+/** Ten sam trening z planu zapisany już tego dnia (ostrzeżenie przed drugim zapisem). */
+export function savedSameDay(db: Db, clientId: string, planId: string | undefined, workoutId: string | undefined, date: ISODate): TrainingSession | undefined {
+  if (!planId || !workoutId) return undefined;
+  return db.sessions.find((s) => s.clientId === clientId && s.planId === planId && s.workoutId === workoutId && s.date === date);
+}
+const dupText = (s: TrainingSession) => `„${s.workoutName || 'Ten trening'}” jest już zapisany dziś${s.createdAt ? ` (o ${new Date(s.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })})` : ''}. Zapisać go drugi raz? Drugi zapis nie przesunie planu — żeby coś poprawić, otwórz zapisany trening w historii.`;
+export { dupText };
+
 /** Problem z rozliczeniem „przez klub”: miejsce musi być klubem. */
 export function chargeProblem(db: Db, charge: string, locationId?: string): string | null {
   if (charge !== 'klub') return null;

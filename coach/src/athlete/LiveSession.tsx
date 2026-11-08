@@ -2,7 +2,7 @@ import { liveMarkActive } from '../lib/liveMark';
 import type { Client as LiveClient } from '../domain';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, Icon } from '../components/ui';
-import { clientById, extraPlanOf, extraState, plansOf, sessionsOf } from '../data/ops';
+import { clientById, dupText, extraPlanOf, extraState, plansOf, savedSameDay, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { dropUnsavedVideos } from '../data/videos';
 import { fmtDay, nEx, nSets } from '../format';
@@ -96,6 +96,8 @@ export function LiveSession({
     const r = runFromStart(db, clientId, initial, todayISO());
     if (typeof r === 'string') return void toast(r);
     void (async () => {
+      const dup = savedSameDay(db, clientId, r.planId, r.workoutId, todayISO());
+      if (dup && !(await ask(dupText(dup), { confirm: 'Zapisz drugi raz', danger: false }))) return;
       if (run && run.ex.some((e) => e.sets.some((x) => x.done)) && !(await ask('Masz rozpoczęty trening z tym podopiecznym. Porzucić go i zacząć wybrany?', { confirm: 'Tak' }))) return;
       if (!run && liveMarkActive(client?.athleteLive) && !(await ask(athleteLiveAsk(client!), { confirm: 'Prowadź mimo to' }))) return;
       // ten sam trening podopieczny już zaczął sam — przejmujemy jego serie
@@ -157,11 +159,13 @@ export function LiveSession({
   for (const s of sessions) if (plan && s.planId === plan.id && s.workoutId && !done[s.workoutId]) done[s.workoutId] = s.date; // sesje od najnowszej
   const inPass = doneInPass(plan ?? null, sessions);
 
-  const start = (workoutId: string | null) => {
+  const start = async (workoutId: string | null) => {
     if (!workoutId || !plan) {
       setRun(emptyRun('Trening', todayISO()));
       return;
     }
+    const dup = savedSameDay(db, clientId, plan.id, workoutId, todayISO());
+    if (dup && !(await ask(dupText(dup), { confirm: 'Zapisz drugi raz', danger: false }))) return;
     const step = planSequence(plan).find((x) => x.workout.id === workoutId);
     if (!step) return toast('Nie znaleziono treningu w planie.');
     const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
