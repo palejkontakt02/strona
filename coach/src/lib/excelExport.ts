@@ -1,6 +1,8 @@
 import type { Client, Plan, PlanWorkout, SessionExercise, SetLog, TrainingSession } from '../domain';
 import { exerciseLabels, exerciseSummary, expandSets, workoutDate } from './plan';
 import { planRows } from './sheetImport';
+import { planGrid, type GridCell } from './planGrid';
+import { colActuals } from './planActuals';
 import { sessionLoad, tonnage } from './load';
 import { fmtClock, runTotals } from './running';
 import { colName, numOrText, type XCell, type XSheet, type XStyle } from './xlsxWrite';
@@ -432,8 +434,155 @@ export function planTableSheet(plan: Plan, client?: Pick<Client, 'name'>): XShee
   return g.sheet('Plan', [plan.name, client?.name].filter(Boolean).join(' · '));
 }
 
+/* ---------- plan: jedna jednostka, tygodnie obok siebie (plan + wykonanie) ---------- */
+
+const kgNum = (v: string) => {
+  const t = v.replace(/\s*kg$/i, '').trim();
+  return /^-?\d+(?:[.,]\d+)?$/.test(t) ? Number(t.replace(',', '.')) : t ? minus(t) : null;
+};
+const numCell = (v: string) => {
+  const t = v.trim();
+  return /^\d+(?:[.,]\d+)?$/.test(t) ? Number(t.replace(',', '.')) : t || null;
+};
+
+/**
+ * Arkusz „Plan”: każda jednostka (np. „A – dół ciała”, pon.) jako tabela, tygodnie obok siebie, przy każdej serii
+ * KG | REP | RPE. Tydzień zrobiony — wykonanie (pogrubione), pozostałe — plan (szara kursywa, do porównania / wpisania).
+ * Po 4 tygodnie w jednej tabeli (szerzej nie da się czytelnie wydrukować).
+ */
+export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sessions: TrainingSession[] = []): XSheet {
+  const PER = 4;
+  const slots = planGrid(plan, () => false, false).filter((x) => x.rows.length);
+  const maxCols = Math.min(PER, Math.max(1, ...slots.map((x) => x.cols.length)));
+  const W0 = 2; // Ćwiczenie, Seria
+  const noteCol = W0 + maxCols * 3;
+  const widths = [26, 6, ...Array.from({ length: maxCols }, () => [7, 6, 5.5]).flat(), 30];
+  const rows: XCell[][] = [];
+  const merges: string[] = [];
+  const heights: Record<number, number> = {};
+  const breaks: number[] = [];
+  const put = (r: number, c: number, v: XCell) => {
+    while (rows.length <= r) rows.push([]);
+    while (rows[r].length < c) rows[r].push(null);
+    rows[r][c] = v;
+  };
+  const merge = (r0: number, c0: number, r1: number, c1: number, v: string | number | null | undefined, sty: XStyle) => {
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) put(r, c, cell(r === r0 && c === c0 ? v : null, sty));
+    if (r1 > r0 || c1 > c0) merges.push(`${colName(c0)}${r0 + 1}:${colName(c1)}${r1 + 1}`);
+  };
+  // nagłówek pliku
+  heights[0] = 22;
+  rows.push([cell(plan.name, { bold: true, size: 14, align: 'left' })]);
+  if (client) rows.push([cell('Podopieczny', { bold: true, align: 'left' }), cell(client.name, { align: 'left' })]);
+  if (plan.startDate) rows.push([cell('Start', { bold: true, align: 'left' }), cell(dmy(plan.startDate), { align: 'left' })]);
+  {
+    const r = rows.length;
+    merge(r, 0, r, noteCol, 'Jak czytać: każda tabela to jeden trening (np. poniedziałek), tygodnie obok siebie. Przy każdej serii KG | REP | RPE. Szara kursywa — plan; pogrubione — to, co zostało zrobione (tydzień z ✓). — = brak tej serii w danym tygodniu.', { align: 'left', valign: 'center', wrap: true, size: 9, italic: true, color: C.hint });
+    heights[r] = 26;
+  }
+  rows.push([]);
+  // wysokość strony (A4 poziomo, dopasowanie do szerokości) — jak w arkuszu treningów
+  const widthPt = widths.reduce((a, w) => a + w, 0) * 5.6;
+  const pageH = 490 / Math.min(1, 790 / widthPt);
+  let used = rows.reduce((a, _r, i) => a + (heights[i] ?? 13), 0);
+  let onPage = 0;
+
+  const DOW = ['nd', 'pn', 'wt', 'śr', 'cz', 'pt', 'sb'];
+  for (const slot of slots) {
+    const act = colActuals(plan, slot.cols, sessions);
+    for (let from = 0; from < slot.cols.length; from += PER) {
+      const cols = slot.cols.slice(from, from + PER);
+      const acts = act.slice(from, from + PER);
+      const nLines = slot.rows.reduce((a, r) => a + r.lines.length, 0);
+      const blockH = 20 + 18 + 14 + nLines * 18 + 12;
+      if (onPage > 0 && used + blockH > pageH) {
+        breaks.push(rows.length);
+        used = 0;
+        onPage = 0;
+      }
+      used += blockH;
+      onPage++;
+      const top = rows.length;
+      const first = cols[0];
+      const day = first?.date ? DOW[new Date(`${first.date}T12:00:00`).getDay()] : '';
+      const dark = (edge: Edge, size = 9, align: 'left' | 'center' = 'center') => st(C.dark, { bold: true, color: C.white, size, edge, align, indent: align === 'left' ? 1 : undefined });
+      const bl = (edge: Edge, size?: number) => st(C.blue, { bold: true, size, wrap: true, edge });
+      // wiersz 1: nazwa jednostki | tygodnie | UWAGI
+      merge(top, 0, top, W0 - 1, `${slot.name.toUpperCase()}${day ? `  (${day})` : ''}${slot.cols.length > PER ? `  ·  tyg. ${from + 1}–${from + cols.length}` : ''}`, dark({ l: true, t: true }, 11, 'left'));
+      cols.forEach((c, i) => {
+        const a = acts[i];
+        const x = W0 + i * 3;
+        merge(top, x, top, x + 2, c.week.name, { ...dark({ t: true, l: i === 0 }, c.week.name.length > 14 ? 8 : 9), wrap: true });
+        merge(top + 1, x, top + 1, x + 2, a ? `✓ zrobione ${dmy(a.session.date).slice(0, 5)}` : c.date ? `plan · ${dmy(c.date).slice(0, 5)}` : 'plan', st(a ? C.kg : C.white, { bold: !!a, size: 8, italic: !a, color: a ? C.black : C.hint, edge: { l: i === 0 } }));
+        put(top + 2, x, cell('KG', bl({ l: i === 0 }, 8)));
+        put(top + 2, x + 1, cell('REP', bl({}, 8)));
+        put(top + 2, x + 2, cell('RPE', bl({}, 8)));
+      });
+      for (let i = cols.length; i < maxCols; i++) for (let j = 0; j < 3; j++) [top, top + 1, top + 2].forEach((r) => put(r, W0 + i * 3 + j, cell(null, st(undefined, { bare: true }))));
+      merge(top, noteCol, top + 2, noteCol, 'UWAGI', dark({ t: true, r: true, l: true }, 10));
+      merge(top + 1, 0, top + 2, 0, 'Ćwiczenie', bl({ l: true }));
+      merge(top + 1, 1, top + 2, 1, 'Seria', bl({}));
+      heights[top] = cols.some((c) => c.week.name.length > 14) ? 24 : 20;
+      heights[top + 1] = 16;
+      heights[top + 2] = 14;
+      let r = top + 3;
+      slot.rows.forEach((row, ri) => {
+        const lastRow = ri === slot.rows.length - 1;
+        const r0 = r;
+        row.lines.forEach((line, li) => {
+          const last = lastRow && li === row.lines.length - 1;
+          heights[r] = 18;
+          put(r, 1, cell(line.no, st(C.white, { size: 9, edge: { b: last } })));
+          cols.forEach((_c, i) => {
+            const x = W0 + i * 3;
+            const pc = line.cells[from + i];
+            const a = acts[i];
+            const got = a && !row.cardio ? a.ex.get(row.name)?.get(line.key) : undefined;
+            const ed: Edge = { l: i === 0, b: last };
+            if (pc === 'none' || (pc == null && !got)) {
+              [0, 1, 2].forEach((j) => put(r, x + j, cell('—', st(C.none, { color: C.faint, edge: j === 0 ? ed : { b: last } }))));
+              return;
+            }
+            const v = got ?? (pc as GridCell);
+            const done = !!got;
+            const miss = !!a && !got && !row.cardio;
+            const sty = (fill: string | undefined, j: number) => st(fill, { bold: done, italic: !done, color: done ? C.black : miss ? C.faint : C.hint, edge: j === 0 ? ed : { b: last } });
+            if (row.cardio) {
+              merge(r, x, r, x + 1, [v.reps, v.load].filter(Boolean).join(' · '), { ...sty(C.kg, 0), size: 8, wrap: true });
+            } else {
+              put(r, x, cell(kgNum(v.load), sty(C.kg, 0)));
+              const rep = numCell(v.reps.replace(/\s*\((Top|B-off|Drop|AMRAP)\)$/, ''));
+              // dłuższy zapis („20 s/str.”, „8/7”) — mniejsza czcionka, żeby zmieścił się w kolumnie
+              put(r, x + 1, cell(rep, typeof rep === 'string' && rep.length > 4 ? { ...sty(C.white, 1), size: rep.length > 7 ? 6 : 7 } : sty(C.white, 1)));
+            }
+            put(r, x + 2, cell(numCell(v.rpe), sty(C.white, 2)));
+          });
+          r++;
+        });
+        // nazwa ćwiczenia i uwagi na wszystkie serie ćwiczenia
+        merge(r0, 0, r - 1, 0, `${row.label && /\d/.test(row.label) ? `${row.label}  ` : ''}${row.name}${row.loadPer ? `\n(kg: ${row.loadPer})` : ''}`, st(C.white, { bold: true, align: 'left', wrap: true, indent: 1, size: 10, edge: { l: true, b: lastRow } }));
+        merge(r0, noteCol, r - 1, noteCol, [row.rest && `przerwa ${mmss(row.rest)}`, row.notes].filter(Boolean).join(' · '), st(C.white, { align: 'left', wrap: true, size: 9, indent: 1, edge: { r: true, l: true, b: lastRow } }));
+      });
+      heights[r] = 12;
+      rows.push([]);
+    }
+  }
+  return {
+    name: 'Plan',
+    rows,
+    merges,
+    heights,
+    widths,
+    noGrid: true,
+    landscape: true,
+    freezeCols: 2,
+    rowBreaks: breaks,
+    pageFooter: `&L${[plan.name, client?.name].filter(Boolean).join(' · ').replace(/&/g, '&&')}&RStrona &P z &N`,
+  };
+}
+
 /** Skoroszyt planu: „Plan” (tabela do druku), „Tygodnie” (progresja) i „Do importu” (wczytasz go z powrotem). */
-export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>): XSheet[] {
+export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>, sessions: TrainingSession[] = []): XSheet[] {
   const rows = planRows(plan);
   const restCol = rows[0].indexOf('Przerwa');
   // przerwa „90” (sekundy) → „1:30”, żeby w arkuszu było jednolicie m:ss
@@ -442,8 +591,7 @@ export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>): XSheet[
     r.map((c) => cell(c as string | number | null, st(ri === 0 ? C.blue : ri % 2 ? undefined : C.note, { bold: ri === 0, align: 'left', indent: 1 }))),
   );
   return [
-    planTableSheet(plan, client),
-    planGridSheet(plan, client),
+    planCompareSheet(plan, client, sessions),
     { name: 'Do importu', rows: imp, header: true, noGrid: true, fitWidth: true, landscape: true, printTitleRows: '$1:$1', pageFooter: '&LArkusz do ponownego wczytania w aplikacji — nie zmieniaj nagłówków&RStrona &P z &N' },
   ];
 }

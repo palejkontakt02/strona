@@ -1423,7 +1423,7 @@ function Workouts({
         )}
       </div>
       {plan && (
-        <button type="button" className="btn btn-ghost btn-sm ath-plan-xlsx" onClick={() => void downloadXlsx(xlsxName('plan', plan.name), planWorkbook(plan))} title="Plan do Excela: ćwiczenia jedno pod drugim, serie w kolumnach">
+        <button type="button" className="btn btn-ghost btn-sm ath-plan-xlsx" onClick={() => void downloadXlsx(xlsxName('plan', plan.name), planWorkbook(plan, undefined, sessions))} title="Plan do Excela: każdy trening z tygodniami obok siebie — plan i to, co już zrobiłeś">
           <Icon name="download" size={16} /> Pobierz plan (Excel)
         </button>
       )}

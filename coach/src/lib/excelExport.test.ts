@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../data/seed';
-import { planExRows, planWorkbook, sessionExRows, sessionWorkbook, sessionsWorkbook, splitTempo, xlsxName } from './excelExport';
+import { planExRows, planTableSheet, planWorkbook, sessionExRows, sessionWorkbook, sessionsWorkbook, splitTempo, xlsxName } from './excelExport';
 import { detectColumns, parseTable, planToCsv, sheetToPlan } from './sheetImport';
 import { readXlsx } from './xlsxRead';
 import { sheetName, xlsx } from './xlsxWrite';
@@ -42,18 +42,28 @@ describe('plan do Excela', () => {
     expect(back.weeks.length).toBe(plan.weeks.length);
     expect(names(back)).toEqual(names(viaCsv));
   });
-  it('arkusz „Tygodnie”: jednostka, nagłówek tygodni i ćwiczenia', () => {
-    const grid = planWorkbook(plan, { name: 'Jan Kowalski' })[1].rows;
-    const flat = grid.map((r) => r.map((c) => (c != null && typeof c === 'object' ? c.v : c)));
-    expect(flat[0][0]).toBe(plan.name);
-    expect(flat.some((r) => r[0] === 'Ćwiczenie' && r.length === 1 + plan.weeks.filter((w) => w.workouts.some((k) => k.name === plan.weeks[0].workouts[0].name)).length)).toBe(true);
+  it('arkusz „Plan”: jednostka z tygodniami obok siebie (KG | REP | RPE), wykonanie pogrubione', () => {
+    const ss = db.sessions.filter((x) => x.planId === plan.id);
+    const sh = planWorkbook(plan, { name: 'Jan Kowalski' }, ss)[0];
+    expect(sh.name).toBe('Plan');
+    const rows = sh.rows.map((r) => r.map((c) => (c != null && typeof c === 'object' ? c.v : c)));
+    expect(rows[0][0]).toBe(plan.name);
+    const top = rows.findIndex((r) => r.includes('UWAGI'));
+    expect(String(rows[top][2])).toContain(plan.weeks[0].name);
+    expect(rows[top + 2].slice(2, 8)).toEqual(['KG', 'REP', 'RPE', 'KG', 'REP', 'RPE']);
+    expect(rows[top + 1][0]).toBe('Ćwiczenie');
+    // tydzień zrobiony: nagłówek „✓ zrobione” i pogrubione wartości
+    if (ss.some((x) => plan.weeks[0].workouts.some((k) => k.id === x.workoutId))) {
+      expect(rows.some((r) => r.some((c) => typeof c === 'string' && c.startsWith('✓ zrobione')))).toBe(true);
+      expect(sh.rows.some((r) => r.some((c) => c != null && typeof c === 'object' && c.st?.bold && typeof c.v === 'number'))).toBe(true);
+    }
   });
 });
 
 describe('układ arkusza trenera: PLAN | REALIZACJA (KG / REP w każdej serii) | RPE | DATA | NOTATKI', () => {
   const flat = (rows: unknown[][]) => rows.map((r) => r.map((c) => (c != null && typeof c === 'object' ? (c as { v: unknown }).v : c)));
   it('plan: nagłówki, scalenia i ćwiczenia jedno pod drugim', () => {
-    const sh = planWorkbook(plan)[0];
+    const sh = planTableSheet(plan);
     const rows = flat(sh.rows);
     const top = rows.findIndex((r) => r.includes('REALIZACJA'));
     expect(rows[top]).toContain('DATA:');

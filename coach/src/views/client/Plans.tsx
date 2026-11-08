@@ -223,7 +223,7 @@ export function ClientPlans({ client }: { client: Client }) {
                         <Icon name="print" size={16} /> Następny tydzień
                       </button>
                     )}
-                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client))} title="Plik Excel (.xlsx): arkusz „Plan” (da się go wczytać z powrotem) i „Tygodnie” (siatka jak w aplikacji)">
+                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client, sessions))} title="Plik Excel (.xlsx): każdy trening z tygodniami obok siebie (plan i wykonanie) oraz arkusz „Do importu” (wczytasz go z powrotem)">
                       <Icon name="download" size={16} /> Excel
                     </button>
                     {gs && (
@@ -292,6 +292,7 @@ export function ClientPlans({ client }: { client: Client }) {
                 <PlanTable
                   plan={p}
                   done={done}
+                  sessions={sessions}
                   nextId={nx?.workout.id}
                   nextDate={nd}
                   profile={client.run}
@@ -314,7 +315,7 @@ export function ClientPlans({ client }: { client: Client }) {
               { icon: 'lib', text: 'Zapisz jako szablon', run: () => saveTemplate(menuPlan) },
               { icon: 'print', text: 'Drukuj', run: () => printPlan(menuPlan, client, sessions) },
               ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
-              { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client)) },
+              { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client, sessions)) },
               { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
               ...(gs ? [{ icon: 'link', text: menuPlan.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(menuPlan.id) }] : []),
               { icon: 'up', text: 'Wczytaj zmiany z arkusza', run: () => setSyncing(menuPlan) },

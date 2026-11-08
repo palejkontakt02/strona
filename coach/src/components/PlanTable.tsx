@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import type { Plan, PlanWorkout, RunProfile } from '../domain';
+import type { Plan, PlanWorkout, RunProfile, TrainingSession } from '../domain';
+import { colActuals, type ColActual } from '../lib/planActuals';
 import { planGrid, type GridCell, type GridSlot } from '../lib/planGrid';
 import { cardioByName } from '../lib/run';
 import { NOT_RUN, planRunTotals, targetText, zoneOf } from '../lib/running';
@@ -52,9 +53,12 @@ export function PlanTable({
   nextExtra,
   onLive,
   onAthlete,
+  sessions,
 }: {
   plan: Plan;
   done: Set<string>;
+  /** Zapisane treningi — w tygodniach zrobionych wykonanie (pogrubione) zamiast planu. */
+  sessions?: TrainingSession[];
   nextId?: string;
   /** Rzeczywista data następnej jednostki (plan cykliczny — daty z tabeli mogą być już przeszłe). */
   nextDate?: string;
@@ -122,7 +126,7 @@ export function PlanTable({
                 </span>
               )}
             </div>
-            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals />
+            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals actuals={sessions ? colActuals(plan, s.cols, sessions) : undefined} />
           </section>
         );
       })}
@@ -164,8 +168,11 @@ function GridTable({
   profile,
   dob,
   runTotals,
+  actuals,
 }: {
   slot: GridSlot;
+  /** Wykonanie w kolumnach (tygodniach) — null: jednostka jeszcze niezrobiona. */
+  actuals?: (ColActual | null)[];
   nextId?: string;
   nextDate?: string;
   done?: Set<string>;
@@ -233,9 +240,13 @@ function GridTable({
               return (
                 <th key={week.id} colSpan={span} className={`ptab-week ${cls(k.id, dl)}`}>
                   {dl ? weekLabel(week.name) : week.name}
-                  {k.id === nextId ? ' ▶' : done?.has(k.id) ? ' ✓' : ''}
+                  {k.id === nextId ? ' ▶' : done?.has(k.id) || actuals?.[cols.findIndex((c) => c.k.id === k.id)] ? ' ✓' : ''}
                   {dl && <span className="ptab-deload-lbl">deload</span>}
-                  {shown && <span className="ptab-date">{fmtWeekdayDate(shown)}</span>}
+                  {(() => {
+                    // zrobione: data wykonania zamiast daty z planu (plan mógł być robiony w innym tygodniu / przejściu)
+                    const a = actuals?.[cols.findIndex((c) => c.k.id === k.id)];
+                    return a ? <span className="ptab-date">zrobione {fmtWeekdayDate(a.session.date)}</span> : shown && <span className="ptab-date">{fmtWeekdayDate(shown)}</span>;
+                  })()}
                   {rt && <span className="ptab-date ptab-runsum">{rt}</span>}
                 </th>
               );
@@ -286,10 +297,16 @@ function GridTable({
                       {rest || '—'}
                     </td>
                   )}
-                  {line.cells.map((c, ci) => {
+                  {line.cells.map((cPlan, ci) => {
                     const { week, k } = cols[ci];
                     const id = k.id;
-                    const base = `${id === nextId ? 'is-next' : ''} ${c && c !== 'none' && c.warm ? 'ptab-warm' : ''} ${isDeload(week.name) ? 'ptab-deload' : ''}`;
+                    // tydzień zrobiony: wykonanie tej serii (pogrubione), plan w podpowiedzi; seria niezrobiona — plan wyszarzony
+                    const act = actuals?.[ci];
+                    const got = act && !r.cardio ? act.ex.get(r.name)?.get(line.key) : undefined;
+                    const c = got && cPlan !== 'none' ? got : cPlan;
+                    const miss = !!act && !got && !r.cardio && cPlan && cPlan !== 'none' && !cPlan.warm;
+                    const planTip = got && cPlan && cPlan !== 'none' ? `Plan: ${[cPlan.reps, cPlan.load, cPlan.rpe && `RPE ${cPlan.rpe}`].filter(Boolean).join(' · ')}` : miss ? 'Ta seria nie została zrobiona' : undefined;
+                    const base = `${id === nextId ? 'is-next' : ''} ${c && c !== 'none' && c.warm ? 'ptab-warm' : ''} ${isDeload(week.name) ? 'ptab-deload' : ''} ${got ? 'ptab-act' : ''} ${miss ? 'ptab-miss' : ''}`;
                     if (c === 'none')
                       return (
                         <td key={week.id} colSpan={span} className={`ptab-wk ${base} muted`}>
@@ -306,17 +323,17 @@ function GridTable({
                         </td>
                       );
                     return [
-                      <td key={`${week.id}-r`} className={`ptab-wk ${base}`}>
+                      <td key={`${week.id}-r`} className={`ptab-wk ${base}`} title={planTip}>
                         {c && (r.cardio ? runReps(c) : c.reps)}
                       </td>,
                       hasLoad && (
-                        <td key={`${week.id}-l`} className={`ptab-load ${base} ${r.cardio ? 'ptab-goal' : ''}`} title={hint?.full}>
+                        <td key={`${week.id}-l`} className={`ptab-load ${base} ${r.cardio ? 'ptab-goal' : ''}`} title={hint?.full ?? planTip}>
                           {c?.load}
                           {tgt}
                         </td>
                       ),
                       hasRpe && (
-                        <td key={`${week.id}-p`} className={`ptab-rpe ${base}`}>
+                        <td key={`${week.id}-p`} className={`ptab-rpe ${base}`} title={planTip}>
                           {c?.rpe}
                         </td>
                       ),
@@ -328,6 +345,7 @@ function GridTable({
           )}
         </tbody>
       </table>
+      {actuals?.some(Boolean) && <p className="muted small ptab-legend">Tygodnie z ✓: <b>pogrubione</b> — to, co zrobił podopieczny; wyszarzone — seria z planu niezrobiona. Pozostałe tygodnie — plan.</p>}
     </div>
   );
 }

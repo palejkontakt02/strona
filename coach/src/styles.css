@@ -5649,3 +5649,8 @@ button.mini-day {
 .move-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .move-day { justify-content: center; }
 .move-day.is-current { opacity: 0.5; }
+
+/* tabela planu: wykonanie w tygodniach zrobionych */
+.ptab-table td.ptab-act { font-weight: 800; }
+.ptab-table td.ptab-miss { opacity: 0.45; text-decoration: line-through; }
+.ptab-legend { margin: 6px 0 0; }

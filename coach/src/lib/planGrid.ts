@@ -72,7 +72,7 @@ export interface GridRow {
   /** Hantle: „1 hantel” / „2 hantle (suma)” — jak czytać ciężar. */
   loadPer?: string;
   /** Wiersze serii: numer („R”, „1”…) i komórka w każdym tygodniu (null — brak tej serii, 'none' — brak ćwiczenia w tygodniu). */
-  lines: { no: string; cells: (GridCell | null | 'none')[] }[];
+  lines: { no: string; /** Klucz serii („R1”, „1”, „x1”) — do dopasowania wykonania. */ key: string; cells: (GridCell | null | 'none')[] }[];
 }
 export interface GridSlot {
   name: string;
@@ -141,6 +141,7 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = f
       const no = (key: string) => (key.startsWith('R') ? (warmN > 1 ? key : 'R') : key.startsWith('x') ? (isCardio ? key.slice(1) : '') : key);
       const lines = (keys.length ? keys : ['']).map((key, i) => ({
         no: key ? no(key) : '',
+        key,
         cells: keyed.map((m) => (m == null ? (i === 0 ? ('none' as const) : null) : (m.get(key) ?? null))),
       }));
       const labels = colLabels.map((m) => m.get(r.name));
