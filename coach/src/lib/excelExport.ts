@@ -561,7 +561,18 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
         });
         // nazwa ćwiczenia i uwagi na wszystkie serie ćwiczenia
         merge(r0, 0, r - 1, 0, `${row.label && /\d/.test(row.label) ? `${row.label}  ` : ''}${row.name}${row.loadPer ? `\n(kg: ${row.loadPer})` : ''}`, st(C.white, { bold: true, align: 'left', wrap: true, indent: 1, size: 10, edge: { l: true, b: lastRow } }));
-        merge(r0, noteCol, r - 1, noteCol, [row.rest && `przerwa ${mmss(row.rest)}`, row.notes].filter(Boolean).join(' · '), st(C.white, { align: 'left', wrap: true, size: 9, indent: 1, edge: { r: true, l: true, b: lastRow } }));
+        merge(r0, noteCol, r - 1, noteCol, [row.rest && `przerwa ${mmss(row.rest)}`, row.notesVary ? '' : row.notes].filter(Boolean).join(' · '), st(C.white, { align: 'left', wrap: true, size: 9, indent: 1, edge: { r: true, l: true, b: lastRow && !row.notesVary } }));
+        // uwagi różne w tygodniach (np. % 1RM) — wiersz pod seriami, każda w kolumnie swojego tygodnia
+        if (row.notesVary) {
+          const note = (edge: Edge) => st(C.note, { italic: true, size: 8, wrap: true, align: 'left', color: C.hint, edge: { ...edge, b: lastRow } });
+          put(r, 0, cell('uwagi', note({ l: true })));
+          put(r, 1, cell(null, note({})));
+          cols.forEach((_c, i) => merge(r, W0 + i * 3, r, W0 + i * 3 + 2, row.weekNotes[from + i] ?? '', note({ l: i === 0 })));
+          for (let i = cols.length; i < maxCols; i++) for (let j = 0; j < 3; j++) put(r, W0 + i * 3 + j, cell(null, note({})));
+          put(r, noteCol, cell(null, note({ r: true, l: true })));
+          heights[r] = 26;
+          r++;
+        }
       });
       heights[r] = 12;
       rows.push([]);

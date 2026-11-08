@@ -274,8 +274,8 @@ function GridTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) =>
-            r.lines.map((line, i) => {
+          {rows.map((r) => [
+            ...r.lines.map((line, i) => {
               // bieg: „Rozgrz.” / „Schł.” zamiast numeru pozycji
               const first = line.cells.find((c): c is GridCell & { no?: string } => !!c && c !== 'none');
               const no = r.cardio && first?.no && WARM_NO[first.no] ? WARM_NO[first.no] : r.cardio && first?.no ? first.no : line.no;
@@ -288,7 +288,7 @@ function GridTable({
                       {r.loadPer && <span className="ptab-note">kg: {r.loadPer}</span>}
                       {noRest && rest && <span className="ptab-note">przerwa {rest}</span>}
                       {!noRest && rest && <span className="ptab-restnote">przerwa {rest}</span>}
-                      {r.notes && <span className="ptab-note">{r.notes}</span>}
+                      {r.notes && !r.notesVary && <span className="ptab-note">{r.notes}</span>}
                     </th>
                   )}
                   <td className="ptab-no">{no}</td>
@@ -342,7 +342,20 @@ function GridTable({
                 </tr>
               );
             }),
-          )}
+            // uwagi różne w tygodniach (np. % 1RM) — pod seriami, każda w kolumnie swojego tygodnia
+            r.notesVary && (
+              <tr key={`${r.name}-notes`} className="ptab-noteline">
+                <td className="ptab-ex ptab-note-lbl">uwagi</td>
+                <td className="ptab-no" />
+                {!noRest && <td className="ptab-rest" />}
+                {r.weekNotes.map((n, ci) => (
+                  <td key={cols[ci].week.id} colSpan={span} className={`ptab-wknote ${cols[ci].k.id === nextId ? 'is-next' : ''}`}>
+                    {n ?? ''}
+                  </td>
+                ))}
+              </tr>
+            ),
+          ])}
         </tbody>
       </table>
       {actuals?.some(Boolean) && <p className="muted small ptab-legend">Tygodnie z ✓: <b>pogrubione</b> — to, co zrobił podopieczny; wyszarzone — seria z planu niezrobiona. Pozostałe tygodnie — plan.</p>}

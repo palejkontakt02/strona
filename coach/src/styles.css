@@ -5655,3 +5655,6 @@ button.mini-day {
 .ptab-table td.ptab-miss { opacity: 0.45; text-decoration: line-through; }
 .ptab-legend { margin: 6px 0 0; }
 .ath-plan-view { margin: 8px 0; }
+/* tabela planu: uwagi różne w tygodniach — pod seriami */
+.ptab-noteline td { font-size: var(--fs-xs); color: var(--color-neutral-400); padding-top: 4px; padding-bottom: 6px; vertical-align: top; line-height: 1.3; white-space: normal; }
+.ptab-noteline .ptab-note-lbl { font-style: italic; }

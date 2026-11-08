@@ -65,6 +65,8 @@ export interface GridRow {
   notes?: string;
   /** Notatka ćwiczenia w każdym tygodniu (kolumnie). */
   weekNotes: (string | undefined)[];
+  /** Notatki różne w tygodniach (np. „72,5% 1RM”, „77,5% 1RM”) — tabela pokazuje je pod seriami, w kolumnie tygodnia. */
+  notesVary: boolean;
   rest?: string;
   linked: boolean;
   /** Bieg / cardio: kolumny to odcinek | cel | RPE. */
@@ -152,7 +154,7 @@ export function planGrid(plan: Plan, warm: (slot: string) => boolean, perRep = f
       const weekNotes = cols.map(({ k }) => k.exercises.find((x) => x.name === r.name)?.notes?.trim() || undefined);
       const uNotes = [...new Set(weekNotes.filter(Boolean))];
       const notes = uNotes.length <= 1 ? uNotes[0] : cols.map((c, i) => (weekNotes[i] ? `${c.week.name}: ${weekNotes[i]}` : '')).filter(Boolean).join(' · ');
-      return { name: r.name, label, labels, notes, weekNotes, linked: /\d$/.test(refLabel) && !refLabel.endsWith('1'), rest: r.first.rest || undefined, cardio: !!isCardio, loadPer: !isCardio && !isTimed(r.first) && loadPerOf(r.first) ? LOAD_PER_TEXT[loadPerOf(r.first)!] : undefined, lines };
+      return { name: r.name, label, labels, notes, weekNotes, notesVary: uNotes.length > 1, linked: /\d$/.test(refLabel) && !refLabel.endsWith('1'), rest: r.first.rest || undefined, cardio: !!isCardio, loadPer: !isCardio && !isTimed(r.first) && loadPerOf(r.first) ? LOAD_PER_TEXT[loadPerOf(r.first)!] : undefined, lines };
     });
     return { name: slot, cols, rows, hasWarm, orderVaries };
   });
