@@ -1,6 +1,6 @@
 // Service worker aplikacji: działa offline po pierwszym wejściu.
 // Pliki z hashem w nazwie (assets/) i fonty — z pamięci podręcznej; strona główna — najpierw sieć.
-const CACHE = 'fitowa-coach-v2';
+const CACHE = 'fitowa-coach-v3';
 const FONTS = 'fitowa-fonts-v1';
 const SHELL = ['/app/', '/app/manifest.webmanifest', '/app/icon-192.png'];
 
@@ -48,8 +48,10 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => keep(CACHE, e.request, res))));
     return;
   }
+  // strona główna: zawsze świeża z serwera (z pominięciem pamięci przeglądarki — po wdrożeniu nowa wersja od razu)
+  const isPage = e.request.mode === 'navigate' || url.pathname === '/app/' || url.pathname === '/app/index.html';
   e.respondWith(
-    fetch(e.request)
+    (isPage ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request))
       .then((res) => {
         keep(CACHE, e.request, res);
         if (res.ok && (url.pathname === '/app/' || url.pathname === '/app/index.html')) res.clone().text().then(pruneAssets).catch(() => undefined);

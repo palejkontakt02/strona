@@ -4,10 +4,11 @@ import { liveMarkActive, markNeedsUpdate, wantedMark } from '../lib/liveMark';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LineChart, WeightTrendChart } from '../components/charts';
 import { weightTrend, weightTrendText } from '../lib/progress';
-import { Icon } from '../components/ui';
+import { Icon, Seg } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { PalettePicker } from '../components/PalettePicker';
 import { PushSettings } from '../components/PushSettings';
+import { PlanTable } from '../components/PlanTable';
 import { refreshPush } from '../data/push';
 import { OfflineBadge } from '../components/OfflineBadge';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
@@ -1370,6 +1371,8 @@ function Workouts({
   const [preview, setPreview] = useState<{ workout: PlanWorkout; planId: string } | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
   const [past, setPast] = useState(false);
+  // porównanie tygodni: każdy trening z tygodniami obok siebie (plan i to, co zrobione) — jak u trenera
+  const [cmp, setCmp] = useState(false);
   // zadane na dzień i już zrobione są w historii — z listy znikają; bez terminu zostają (do powtarzania)
   const extraWorkouts = (extra?.weeks.flatMap((w) => w.workouts) ?? []).filter((k) => extraState(k, extra?.id, sessions, todayISO()).state !== 'done');
   if (!plan && extraWorkouts.length === 0) return null;
@@ -1427,7 +1430,13 @@ function Workouts({
           <Icon name="download" size={16} /> Pobierz plan (Excel)
         </button>
       )}
-      {plan && open > 0 && (
+      {plan && (
+        <div className="ath-plan-view">
+          <Seg options={['Lista', 'Porównaj tygodnie'] as const} value={cmp ? 'Porównaj tygodnie' : 'Lista'} onChange={(v) => setCmp(v === 'Porównaj tygodnie')} label="Widok planu" />
+        </div>
+      )}
+      {plan && cmp && <PlanTable plan={plan} done={doneInPass(plan, sessions)} sessions={sessions} nextId={nextId} nextDate={nextId ? nextDate(plan, nextWorkout(plan, sessions), todayISO()) : undefined} />}
+      {plan && !cmp && open > 0 && (
         <button type="button" className="wk-past-toggle" aria-expanded={past} onClick={() => setPast(!past)}>
           <span>
             {past ? 'Ukryj' : 'Pokaż'} minione tygodnie ({open})
@@ -1435,7 +1444,7 @@ function Workouts({
           <span aria-hidden>{past ? '▴' : '▾'}</span>
         </button>
       )}
-      {plan?.weeks.map((w, wi) =>
+      {!cmp && plan?.weeks.map((w, wi) =>
         wi < open && !past ? null : (
           <div key={w.id} className={wi < open ? 'wk-past' : ''}>
             <div className="wk-label">{w.name}</div>
