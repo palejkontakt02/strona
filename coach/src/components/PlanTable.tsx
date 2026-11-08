@@ -136,6 +136,12 @@ export function PlanTable({
 
 const WARM_NO: Record<string, string> = { R: 'Rozgrz.', S: 'Schł.', trucht: 'trucht' };
 
+/** Litera bloku („C” dla C1/C2/C3) — tylko ćwiczenia w superserii / obwodzie. */
+const blockKey = (r?: { label: string }) => {
+  const l = r?.label.split('/')[0] ?? '';
+  return /^[A-Z]+\d+$/.test(l) ? l.replace(/\d+$/, '') : null;
+};
+
 /** Komórka biegu bez przedrostka „R ” / „S ” / „trucht ” (rodzaj odcinka jest w kolumnie „Seria”). */
 const runReps = (c: GridCell & { no?: string }) => (c.no && WARM_NO[c.no] ? c.reps.replace(new RegExp(`^${c.no} `), '') : c.reps);
 
@@ -274,20 +280,38 @@ function GridTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => [
+          {rows.map((r, ri) => {
+            // blok (superseria / triseria / obwód): pasek z opisem nad blokiem, ramka z lewej, „przejście” zamiast przerwy
+            const bk = blockKey(r);
+            const startBlock = !!bk && (ri === 0 || blockKey(rows[ri - 1]) !== bk);
+            const endBlock = !!bk && blockKey(rows[ri + 1]) !== bk;
+            const size = bk ? rows.filter((x) => blockKey(x) === bk).length : 0;
+            const roundRest = bk ? fmtRest([...rows].reverse().find((x) => blockKey(x) === bk)?.rest) : '';
+            const inCls = bk ? `ptab-inblock ${endBlock ? 'ptab-blockend' : ''}` : '';
+            const restWord = bk && !endBlock ? 'przejście' : bk ? 'po rundzie' : 'przerwa';
+            return [
+            startBlock && (
+              <tr key={`${r.name}-block`} className="ptab-blockhead">
+                <th colSpan={2 + (noRest ? 0 : 1) + cols.length * span} scope="rowgroup">
+                  <span className="ptab-blockhead-txt">
+                    <span className="ex-label">{bk}</span> {size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : `Obwód`} — {size} ćwiczenia na zmianę{roundRest ? ` · przerwa po rundzie ${roundRest}` : ''}
+                  </span>
+                </th>
+              </tr>
+            ),
             ...r.lines.map((line, i) => {
               // bieg: „Rozgrz.” / „Schł.” zamiast numeru pozycji
               const first = line.cells.find((c): c is GridCell & { no?: string } => !!c && c !== 'none');
               const no = r.cardio && first?.no && WARM_NO[first.no] ? WARM_NO[first.no] : r.cardio && first?.no ? first.no : line.no;
               const rest = fmtRest(r.rest);
               return (
-                <tr key={`${r.name}-${i}`} className={`${r.linked ? 'ptab-linked' : ''} ${i === 0 ? 'ptab-first' : ''} ${line.no.startsWith('R') || (r.cardio && first?.warm) ? 'ptab-warmline' : ''} ${r.cardio ? 'ptab-runline' : ''}`}>
+                <tr key={`${r.name}-${i}`} className={`${inCls} ${i === r.lines.length - 1 && !r.notesVary ? 'ptab-lastline' : ''} ${i === 0 ? 'ptab-first' : ''} ${line.no.startsWith('R') || (r.cardio && first?.warm) ? 'ptab-warmline' : ''} ${r.cardio ? 'ptab-runline' : ''}`}>
                   {i === 0 && (
                     <th scope="row" className="ptab-ex" rowSpan={r.lines.length}>
                       <span className="ex-label">{r.label}</span> {r.name}
                       {r.loadPer && <span className="ptab-note">kg: {r.loadPer}</span>}
-                      {noRest && rest && <span className="ptab-note">przerwa {rest}</span>}
-                      {!noRest && rest && <span className="ptab-restnote">przerwa {rest}</span>}
+                      {noRest && rest && <span className="ptab-note">{restWord} {rest}</span>}
+                      {!noRest && rest && <span className="ptab-restnote">{restWord} {rest}</span>}
                       {r.notes && !r.notesVary && <span className="ptab-note">{r.notes}</span>}
                     </th>
                   )}
@@ -344,7 +368,7 @@ function GridTable({
             }),
             // uwagi różne w tygodniach (np. % 1RM) — pod seriami, każda w kolumnie swojego tygodnia
             r.notesVary && (
-              <tr key={`${r.name}-notes`} className="ptab-noteline">
+              <tr key={`${r.name}-notes`} className={`ptab-noteline ${inCls} ptab-lastline`}>
                 <td className="ptab-ex ptab-note-lbl">uwagi</td>
                 <td className="ptab-no" />
                 {!noRest && <td className="ptab-rest" />}
@@ -355,7 +379,8 @@ function GridTable({
                 ))}
               </tr>
             ),
-          ])}
+          ];
+          })}
         </tbody>
       </table>
       {actuals?.some(Boolean) && <p className="muted small ptab-legend">Tygodnie z ✓: <b>pogrubione</b> — to, co zrobił podopieczny; wyszarzone — seria z planu niezrobiona. Pozostałe tygodnie — plan.</p>}

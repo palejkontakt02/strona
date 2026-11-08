@@ -451,12 +451,15 @@ const numCell = (v: string) => {
  * Po 4 tygodnie w jednej tabeli (szerzej nie da się czytelnie wydrukować).
  */
 export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sessions: TrainingSession[] = []): XSheet {
-  const PER = 4;
   const slots = planGrid(plan, () => false, false).filter((x) => x.rows.length);
-  const maxCols = Math.min(PER, Math.max(1, ...slots.map((x) => x.cols.length)));
+  // wszystkie tygodnie w jednym ciągu (porównanie tydzień do tygodnia w jednym wierszu)
+  const maxCols = Math.max(1, ...slots.map((x) => x.cols.length));
+  const PER = maxCols;
   const W0 = 2; // Ćwiczenie, Seria
   const noteCol = W0 + maxCols * 3;
-  const widths = [26, 6, ...Array.from({ length: maxCols }, () => [7, 6, 5.5]).flat(), 30];
+  // przy wielu tygodniach węższe kolumny, żeby wydruk na A4 poziomo był czytelny
+  const wk = maxCols > 6 ? [6.5, 5.5, 5] : [7, 6, 5.5];
+  const widths = [24, 5, ...Array.from({ length: maxCols }, () => wk).flat(), maxCols > 6 ? 24 : 30];
   const rows: XCell[][] = [];
   const merges: string[] = [];
   const heights: Record<number, number> = {};
@@ -508,7 +511,7 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
       const dark = (edge: Edge, size = 9, align: 'left' | 'center' = 'center') => st(C.dark, { bold: true, color: C.white, size, edge, align, indent: align === 'left' ? 1 : undefined });
       const bl = (edge: Edge, size?: number) => st(C.blue, { bold: true, size, wrap: true, edge });
       // wiersz 1: nazwa jednostki | tygodnie | UWAGI
-      merge(top, 0, top, W0 - 1, `${slot.name.toUpperCase()}${day ? `  (${day})` : ''}${slot.cols.length > PER ? `  ·  tyg. ${from + 1}–${from + cols.length}` : ''}`, dark({ l: true, t: true }, 11, 'left'));
+      merge(top, 0, top, W0 - 1, `${slot.name.toUpperCase()}${day ? `  (${day})` : ''}`, { ...dark({ l: true, t: true }, slot.name.length > 22 ? 9 : 11, 'left'), wrap: true });
       cols.forEach((c, i) => {
         const a = acts[i];
         const x = W0 + i * 3;
@@ -522,12 +525,25 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
       merge(top, noteCol, top + 2, noteCol, 'UWAGI', dark({ t: true, r: true, l: true }, 10));
       merge(top + 1, 0, top + 2, 0, 'Ćwiczenie', bl({ l: true }));
       merge(top + 1, 1, top + 2, 1, 'Seria', bl({}));
-      heights[top] = cols.some((c) => c.week.name.length > 14) ? 24 : 20;
+      heights[top] = cols.some((c) => c.week.name.length > 14) || slot.name.length > 22 ? 26 : 20;
       heights[top + 1] = 16;
       heights[top + 2] = 14;
       let r = top + 3;
+      const bKey = (x?: { label: string }) => {
+        const l = x?.label.split('/')[0] ?? '';
+        return /^[A-Z]+\d+$/.test(l) ? l.replace(/\d+$/, '') : null;
+      };
       slot.rows.forEach((row, ri) => {
         const lastRow = ri === slot.rows.length - 1;
+        // blok (superseria / triseria / obwód): pasek z opisem nad blokiem
+        const bk = bKey(row);
+        if (bk && (ri === 0 || bKey(slot.rows[ri - 1]) !== bk)) {
+          const size = slot.rows.filter((x) => bKey(x) === bk).length;
+          const lastIn = [...slot.rows].reverse().find((x) => bKey(x) === bk);
+          merge(r, 0, r, noteCol, `${bk} · ${size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : 'Obwód'} — ${size} ćwiczenia na zmianę${lastIn?.rest ? ` · przerwa po rundzie ${mmss(lastIn.rest)}` : ''}`, st(C.note, { bold: true, size: 9, align: 'left', indent: 1, edge: { l: true, r: true, t: true } }));
+          heights[r] = 16;
+          r++;
+        }
         const r0 = r;
         row.lines.forEach((line, li) => {
           const last = lastRow && li === row.lines.length - 1;
