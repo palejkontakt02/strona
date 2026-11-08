@@ -113,6 +113,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                 </span>
                 <span className="grow">
                   <b>{s.workoutName || 'Trening'}</b>
+                  {s.repeatOf && <span className="muted small"> · powtórka z {fmtDay(s.repeatOf.date)}</span>}
                   <span className="muted small">
                     {nEx(s.exercises.length)}
                     {s.duration ? ` · ${s.duration} min` : ''}
@@ -186,6 +187,7 @@ export function SessionSheet({
           <div>
             <span className="eyebrow first-cap">{fmtLong(s.date)}</span>
             <h2>{s.workoutName || 'Trening'}</h2>
+            {s.repeatOf && <p className="muted small">Powtórka treningu z {fmtDay(s.repeatOf.date)}</p>}
           </div>
           <span className="actions">
             <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('trening', s.workoutName, s.date), sessionWorkbook(s))} title="Ten trening do Excela — seria po serii">

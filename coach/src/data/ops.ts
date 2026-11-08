@@ -60,7 +60,7 @@ export interface ExtraState {
 
 /** Stan treningu poza planem. Zadany na dzień liczy się jako wykonany, gdy jest zapis od dnia przed terminem. */
 export function extraState(k: PlanWorkout, extraId: string | undefined, sessions: TrainingSession[], today: ISODate): ExtraState {
-  const done = sessions.filter((s) => s.planId === extraId && s.workoutId === k.id).sort((a, b) => b.date.localeCompare(a.date));
+  const done = sessions.filter((s) => (s.planId === extraId && s.workoutId === k.id) || (s.extraOf?.planId === extraId && s.extraOf?.workoutId === k.id)).sort((a, b) => b.date.localeCompare(a.date));
   if (!k.date) return { state: 'open', date: done[0]?.date };
   const since = k.assignedAt && k.assignedAt <= k.date ? k.assignedAt : addDays(k.date, -1);
   const hit = done.find((s) => s.date >= since);

@@ -29,9 +29,9 @@ export function runFromStart(db: Db, clientId: string, st: RunStart, date: strin
     if (src && step && step.workout.exercises.some((e) => e.name)) {
       const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
       const r = buildRun(src, step.week.name, step.workout, sessions, videos, date, Date.now(), db.clients.find((c) => c.id === clientId)?.tests ?? []);
-      return { ...r, planId: link?.planId ?? '', workoutId: link?.workoutId ?? '', ...(link ? { weekName: link.weekName, planName: link.planName } : {}), name: s.workoutName || r.name };
+      return { ...r, planId: link?.planId ?? '', workoutId: link?.workoutId ?? '', ...(link ? { weekName: link.weekName, planName: link.planName } : {}), name: s.workoutName || r.name, repeatOf: { sessionId: s.id, date: s.date } };
     }
-    const rr = repeatRun(s, date);
+    const rr = { ...repeatRun(s, date), repeatOf: { sessionId: s.id, date: s.date } };
     return link ? { ...rr, planId: link.planId, workoutId: link.workoutId, weekName: link.weekName, planName: link.planName } : rr;
   }
   const plans = plansOf(db, clientId);
@@ -41,5 +41,13 @@ export function runFromStart(db: Db, clientId: string, st: RunStart, date: strin
   if (!step.workout.exercises.some((e) => e.name)) return 'Ten trening nie ma jeszcze ćwiczeń.';
   const videos = Object.fromEntries(db.library.map((e) => [e.name, e.video]));
   const r = buildRun(plan, step.week.name, step.workout, sessions, videos, date, Date.now(), db.clients.find((c) => c.id === clientId)?.tests ?? []);
-  return plan.extra ? { ...r, planName: 'Trening dodatkowy', weekName: '' } : r;
+  if (plan.extra) {
+    // zadany trening = kopia następnej jednostki planu (ta sama nazwa) — zalicza też plan (bez robienia go dwa razy)
+    const cur = currentPlan(plans);
+    const nx = cur ? nextWorkout(cur, sessions) : null;
+    if (cur && nx && nx.workout.name.trim().toLowerCase() === step.workout.name.trim().toLowerCase())
+      return { ...r, planId: cur.id, workoutId: nx.workout.id, planName: cur.name, weekName: nx.week.name, extraOf: { planId: plan.id, workoutId: step.workout.id } };
+    return { ...r, planName: 'Trening dodatkowy', weekName: '' };
+  }
+  return r;
 }

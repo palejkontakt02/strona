@@ -505,6 +505,10 @@ export interface SessionExercise {
 
 export interface TrainingSession {
   id: string;
+  /** Trening zadany przez trenera (poza planem), który zaliczył też jednostkę planu — do odhaczenia na liście „poza planem”. */
+  extraOf?: { planId: string; workoutId: string };
+  /** Powtórka zapisanego treningu (historia: „powtórka z …”). */
+  repeatOf?: { sessionId: string; date: string };
   /** Płatność za sesję pojedynczą utworzona przy zapisie tego treningu. */
   paymentId?: string;
   locationId?: string;

@@ -29,7 +29,14 @@ export function sameAsPartner(pr: Run, db: Db, clientId: string, date: string): 
     if (pe) return { ...buildRunExercise(pe, sessions, videos[e.name], tests), label: e.label, linked: e.linked };
     return { ...e, sets: e.sets.map((x, i) => ({ ...x, done: false, edited: false, first: i === 0, video: undefined, load: e.cardio ? x.load : '', rpe: '', hr: '', prev: undefined, sug: '' })) };
   });
-  // to nie jest jednostka z planu tej osoby — bez przesuwania jej „następnego treningu”
+  // jednostka o tej samej nazwie w planie tej osoby (najpierw jej następna) — zalicza się u niej; inaczej bez planu
+  const own = currentPlan(plansOf(db, clientId));
+  const nm = (src && planSequence(src).find((x) => x.workout.id === pr.workoutId)?.workout.name) || pr.name;
+  const same = (n: string) => n.trim().toLowerCase() === nm.trim().toLowerCase();
+  const nx = own ? nextWorkout(own, sessions) : null;
+  const done = own ? doneInPass(own, sessions) : new Set<string>();
+  const hit = own && (nx && same(nx.workout.name) ? nx : planSequence(own).find((x) => same(x.workout.name) && !done.has(x.workout.id)));
+  if (own && hit) return { ...emptyRun(pr.name, date), ex, planId: own.id, workoutId: hit.workout.id, planName: own.name, weekName: hit.week.name };
   return { ...emptyRun(pr.name, date), ex };
 }
 
@@ -354,7 +361,7 @@ export function LiveSession({
             <section className="acard">
               <h3>Dodatkowe treningi</h3>
               {extraWorkouts.map((k) => {
-                const last = sessions.find((x) => x.planId === extra?.id && x.workoutId === k.id)?.date;
+                const last = sessions.find((x) => (x.planId === extra?.id && x.workoutId === k.id) || (x.extraOf?.planId === extra?.id && x.extraOf?.workoutId === k.id))?.date;
                 return (
                   <button key={k.id} className="wo-item" onClick={() => startExtra(k.id)}>
                     <span className="wo-st">{last ? '✓' : ''}</span>

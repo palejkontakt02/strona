@@ -7,7 +7,7 @@ import { Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import { isSolo, plansOf, sessionsOf } from '../../data/ops';
 import { needsReview, sessionVideos } from '../../data/videos';
 import { useStore } from '../../data/store';
-import { fmtDate, fnum } from '../../format';
+import { fmtDate, fmtDay, fnum } from '../../format';
 import { sessionLoad, tonnage } from '../../lib/load';
 import { wellnessTotal } from '../../lib/wellness';
 import { threadForSession } from '../../lib/chat';
@@ -228,6 +228,7 @@ export function ClientSessions({ client }: { client: Client }) {
                 <li key={s.id} className={`row row-top${s.stoppedForPain ? ' sess-stopped' : ''}`}>
                   <button className="grow sess-open" onClick={() => setShown(s)}>
                     <strong>{s.workoutName || 'Trening'}</strong>
+                    {s.repeatOf && <span className="muted small"> · powtórka z {fmtDay(s.repeatOf.date)}</span>}
                     <SessionBadges s={s} info={info.get(s.id)} />
                     <span className="muted small sess-meta">
                       {[fmtDate(s.date), s.duration != null && `${s.duration}\u00a0min`, s.srpe != null && `sRPE\u00a0${fnum(s.srpe)}`, load != null && `${fnum(load, 0)}\u00a0AU`, run, ton ? fmtTon(ton) : null].filter(Boolean).join(' · ')}
@@ -286,7 +287,8 @@ export function ClientSessions({ client }: { client: Client }) {
                       <td className="nowrap">{fmtDate(s.date)}</td>
                       <td className="sess-name">
                         <span className="sess-title">
-                          {s.workoutName || 'Trening'} <LocationTag id={s.locationId} short />
+                          {s.workoutName || 'Trening'}
+                          {s.repeatOf && <span className="muted small"> · powtórka z {fmtDay(s.repeatOf.date)}</span>} <LocationTag id={s.locationId} short />
                         </span>
                         <SessionBadges s={s} info={info.get(s.id)} />
                         {s.notes && <div className="muted small ellipsis sess-note">{s.notes}</div>}

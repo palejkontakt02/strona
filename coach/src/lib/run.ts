@@ -118,6 +118,10 @@ export interface Run {
   appointmentId?: string;
   /** Trening w parze / grupie: pozostałe osoby prowadzone razem (id podopiecznych). */
   pairWith?: string[];
+  /** Zadany trening poza planem, zaliczany też jako jednostka planu (planId/workoutId wskazują jednostkę planu). */
+  extraOf?: { planId: string; workoutId: string };
+  /** Powtórka zapisanego treningu. */
+  repeatOf?: { sessionId: string; date: string };
 }
 
 const TEMPO_RE = /[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]\s*-\s*[0-9xX]/;

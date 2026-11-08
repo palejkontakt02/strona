@@ -1,3 +1,4 @@
+import { currentPlan, nextWorkout } from '../lib/plan';
 import { runTotals } from '../lib/running';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet } from '../components/Sheet';
@@ -10,7 +11,7 @@ import { PlateCalc } from '../components/PlateCalc';
 import { PainMap } from '../components/PainMap';
 import { cleanPainMap, painSummary } from '../lib/painMap';
 import { RunBuilder, RunTargetList } from '../components/RunBuilder';
-import { chargeProblem, isSolo, savePlan, saveSession, sessionsOf } from '../data/ops';
+import { chargeProblem, isSolo, plansOf, savePlan, savedSameDay, saveSession, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
@@ -458,6 +459,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       locationId: (trainer ? finish.locationId : undefined) || undefined,
       planId: run.planId,
       workoutId: run.workoutId,
+      ...(run.extraOf ? { extraOf: run.extraOf } : {}),
+      ...(run.repeatOf ? { repeatOf: run.repeatOf } : {}),
       exercises: runToExercises(run),
       solo: finish.solo,
       withIds: run.pairWith?.filter((id) => id !== client.id).length ? run.pairWith.filter((id) => id !== client.id) : undefined,
@@ -466,6 +469,19 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     };
     // przerwany z bólu: zapis także bez zaliczonej serii (trener widzi, że trening się zaczął i dlaczego się skończył)
     if (session.exercises.length === 0 && !session.stoppedForPain) return toast('Zalicz przynajmniej jedną serię (✓), zanim zapiszesz trening.');
+    // trening bez planu (własny, pusty, powtórka), a ćwiczenia w większości jak następny z planu — zaliczyć go w planie?
+    if (!session.planId && !session.stoppedForPain) {
+      const cur = currentPlan(plansOf(db, client.id));
+      const nx = cur ? nextWorkout(cur, sessionsOf(db, client.id)) : null;
+      const want = nx ? [...new Set(nx.workout.exercises.map((e) => e.name.trim().toLowerCase()).filter(Boolean))] : [];
+      const got = new Set(session.exercises.map((e) => e.name.trim().toLowerCase()));
+      if (cur && nx && want.length >= 2 && want.filter((n) => got.has(n)).length / want.length >= 0.7 && !savedSameDay(db, client.id, cur.id, nx.workout.id, session.date)) {
+        if (await ask(`Ten trening wygląda jak „${nx.workout.name}” z planu (${nx.week.name}). Zaliczyć go w planie? Plan przejdzie do następnego treningu.`, { confirm: 'Zalicz w planie', cancel: 'Nie, zapisz osobno', danger: false })) {
+          session.planId = cur.id;
+          session.workoutId = nx.workout.id;
+        }
+      }
+    }
     // wizyta z innego dnia: zapis z datą wizyty albo bez łączenia z nią
     let apptId = finish.solo ? undefined : appointmentId;
     const appt = apptId ? db.appointments.find((a) => a.id === apptId) : undefined;
