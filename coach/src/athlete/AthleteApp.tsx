@@ -271,7 +271,7 @@ export function AthleteApp({
     // trening spoza kolejki przesuwa „następny” — pytamy, żeby plan nie przeskoczył przez pomyłkę
     const today = todayISO();
     const sameDay = savedSameDay(db, clientId, plan.id, id, today);
-    if (nx && id !== nx.workout.id && !sameDay && !(await ask(doneInPass(plan, sessions).has(id) ? `Ten trening jest już zrobiony w tym przejściu planu (następny: ${nx.workout.name}). Zrobić go jeszcze raz?` : `To nie jest następny trening z planu (następny: ${nx.workout.name}). Po zapisie plan pójdzie dalej od wybranego. Zacząć mimo to?`, { confirm: 'Zacznij ten' }))) return;
+    if (nx && id !== nx.workout.id && !sameDay && !(await ask(doneInPass(plan, sessions).has(id) ? `Ten trening jest już zrobiony w tym przejściu planu (następny: ${nx.workout.name}). Zrobić go jeszcze raz? Plan się nie przesunie.` : `To nie jest następny trening z planu (następny: ${nx.workout.name}). Po zapisie plan pójdzie dalej od wybranego. Zacząć mimo to?`, { confirm: 'Zacznij ten' }))) return;
     startFrom({ planId: plan.id, workoutId: id });
   };
   const undo = async (s: TrainingSession) => {

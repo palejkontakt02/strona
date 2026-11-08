@@ -70,8 +70,8 @@ export const inPlanPass = (plan: Pick<Plan, 'passFrom'>, s: { date?: string }) =
 
 /**
  * Przejście planu z historii (chronologicznie): które jednostki są zrobione w bieżącym przejściu i która następna.
- * - jednostka zrobiona drugi raz pod rząd (np. dwa zapisy tego samego dnia) — bez zmian;
- * - powrót do jednostki już zrobionej i wcześniejszej niż ostatnia albo skok wstecz o ponad pół planu — nowe przejście;
+ * - jednostka już zrobiona w tym przejściu (powtórka, drugi zapis tego dnia) — plan bez zmian;
+ * - skok wstecz o ponad pół planu (z końca na początek) — nowe przejście;
  * - komplet jednostek — kolejny zapis zaczyna nowe przejście.
  * Następna: pierwsza niezrobiona po ostatniej wykonanej; gdy za nią wszystko zrobione — najwcześniejsza pominięta;
  * komplet — pierwsza (nowe przejście), `completed`. Treningi przerwane z bólu się nie liczą.
@@ -86,10 +86,10 @@ export function passState(plan: Plan, sessions: TrainingSession[]): { done: Set<
   let last = -1;
   for (const s of list) {
     const i = pos.get(s.workoutId!)!;
-    if (i === last && done.has(i)) continue; // ten sam trening drugi raz
-    // nowe przejście: komplet zrobiony, powrót do już zrobionej jednostki albo duży skok wstecz (z końca planu na początek);
-    // mały krok wstecz (B, potem A z tego samego tygodnia) to ta sama runda
-    if (done.size === seq.length || (done.has(i) && i <= last) || (last >= 0 && last - i > seq.length / 2)) done = new Set();
+    // nowe przejście: komplet zrobiony albo duży skok wstecz (z końca planu na początek)
+    if (done.size === seq.length || (last >= 0 && last - i > seq.length / 2)) done = new Set();
+    // powtórka jednostki już zrobionej w tym przejściu (ten sam dzień, poprzedni tydzień) — plan bez zmian
+    else if (done.has(i)) continue;
     done.add(i);
     last = i;
   }
