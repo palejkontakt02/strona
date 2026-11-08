@@ -1,6 +1,6 @@
-import { Card, Empty, Icon, Tag } from '../../components/ui';
+import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
-import { extraPlanOf, plansOf, sessionsOf } from '../../data/ops';
+import { extraPlanOf, extraState, plansOf, savePlan, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
 import { fmtDate, plural } from '../../format';
 import { currentPlan, doneInPass, nextDate, nextWorkout, planSequence, workoutDate } from '../../lib/plan';
@@ -19,7 +19,9 @@ import { newPlan } from './Plans';
  * Przy każdej: prowadź (trener), jako zawodnik, edytuj.
  */
 export function WorkoutList({ client }: { client: Client }) {
-  const { db } = useStore();
+  const { db, apply, ask } = useStore();
+  // zadane na dzień i już zrobione — zwinięte (są w historii), żeby lista nie rosła z każdym tygodniem
+  const [showDoneExtra, setShowDoneExtra] = useState(false);
   const { openModal, startLive, startAthlete } = useNav();
   const sessions = sessionsOf(db, client.id);
   const plan = currentPlan(plansOf(db, client.id));
@@ -32,7 +34,7 @@ export function WorkoutList({ client }: { client: Client }) {
   const [showPast, setShowPast] = useState(false);
   const allGroups: { plan: Plan; label: string; weekIndex: number; workouts: Plan['weeks'][number]['workouts'] }[] = [
     ...(plan ? plan.weeks.map((w, i) => ({ plan, label: `${plan.name} · ${w.name}`, weekIndex: i, workouts: w.workouts })) : []),
-    ...(extra ? [{ plan: extra, label: 'Poza planem', weekIndex: -1, workouts: extra.weeks.flatMap((w) => w.workouts) }] : []),
+    ...(extra ? [{ plan: extra, label: 'Poza planem', weekIndex: -1, workouts: extra.weeks.flatMap((w) => w.workouts).filter((k) => showDoneExtra || !k.date || extraState(k, extra.id, sessions, todayISO()).state !== 'done') }] : []),
   ].filter((g) => g.workouts.length);
   // minione tygodnie bieżącego przejścia (przed tygodniem następnej jednostki) — zwinięte
   const isPast = (g: { plan: Plan; weekIndex: number }) => !g.plan.extra && nxWeek > 0 && g.weekIndex < nxWeek;
@@ -61,6 +63,14 @@ export function WorkoutList({ client }: { client: Client }) {
   const lastSession = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id && !s.stoppedForPain && (!p.passFrom || s.date >= p.passFrom));
   const lastAny = (p: Plan, id: string) => sessions.find((s) => s.planId === p.id && s.workoutId === id && (!p.passFrom || s.date >= p.passFrom));
   const last = (p: Plan, id: string) => lastSession(p, id)?.date;
+  const doneExtraN = extra ? extra.weeks.flatMap((w) => w.workouts).filter((k) => k.date && extraState(k, extra.id, sessions, today).state === 'done').length : 0;
+  // usunięcie treningu poza planem z listy (zapisany trening zostaje w historii)
+  const removeExtra = async (k: PlanWorkout) => {
+    if (!extra) return;
+    const d = last(extra, k.id);
+    if (!(await ask(`Usunąć „${k.name}” z treningów poza planem?${d ? ` Zapisany trening z ${fmtDate(d)} zostanie w historii.` : ''}`, { confirm: 'Usuń' }))) return;
+    await apply(savePlan(db, { ...extra, weeks: extra.weeks.map((w) => ({ ...w, workouts: w.workouts.filter((x) => x.id !== k.id) })) }), `Usunięto „${k.name}”.`);
+  };
   const [preview, setPreview] = useState<{ workout: PlanWorkout; plan: Plan } | null>(null);
   const [shown, setShown] = useState<TrainingSession | null>(null);
 
@@ -133,11 +143,17 @@ export function WorkoutList({ client }: { client: Client }) {
                       <button className="btn btn-ghost btn-sm" onClick={() => openModal({ kind: 'plan', plan: g.plan, focusWorkoutId: k.id })}>
                         <Icon name="edit" size={15} /> Edytuj
                       </button>
+                      {g.plan.extra && <IconBtn icon="trash" label={`Usuń „${k.name}”`} danger onClick={() => void removeExtra(k)} />}
                     </span>
                   </li>
                 );
               })}
             </ul>
+            {g.plan.extra && doneExtraN > 0 && (
+              <button type="button" className="btn btn-ghost btn-sm wl-past" aria-expanded={showDoneExtra} onClick={() => setShowDoneExtra(!showDoneExtra)}>
+                {showDoneExtra ? 'Ukryj wykonane zadane' : `Pokaż wykonane zadane (${doneExtraN})`}
+              </button>
+            )}
           </div>
         ))}
         </>

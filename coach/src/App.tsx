@@ -53,7 +53,7 @@ export function App() {
   const [athlete, setAthlete] = useState<{ id: string; start?: RunStart } | null>(null);
   const [live, setLive] = useState<{ clientId: string; appointmentId?: string; editSessionId?: string; start?: RunStart; pair?: { clientId: string; appointmentId?: string }[] } | null>(null);
   const [bannerOpen, setBannerOpen] = useState(false);
-  const { db, apply } = useStore();
+  const { db, apply, ask } = useStore();
   // trening prowadzony na żywo jest tylko w pamięci telefonu trenera — znacznik w danych klienta
   // pokazuje podopiecznemu, że trening trwa (inaczej mógłby zacząć drugi zapis u siebie)
   const dbRef = useRef(db);
@@ -131,13 +131,28 @@ export function App() {
         window.scrollTo(0, 0);
       },
       startLive: (clientId, appointmentId, editSessionId, start) => {
-        setModal(null);
-        setAthlete(null);
-        setLive({ clientId, appointmentId, editSessionId, start });
-        window.scrollTo(0, 0);
+        const go = () => {
+          setModal(null);
+          setAthlete(null);
+          setLive({ clientId, appointmentId, editSessionId, start });
+          window.scrollTo(0, 0);
+        };
+        // wizyta, a podopieczny już zapisał trening tego dnia (sam, z telefonu) — połącz zamiast drugiego zapisu
+        const cur = dbRef.current;
+        const appt = appointmentId && !editSessionId ? cur.appointments.find((a) => a.id === appointmentId && !a.sessionId) : undefined;
+        const own = appt
+          ? cur.sessions.filter((s) => s.clientId === clientId && s.date === appt.date && !cur.appointments.some((a) => a.sessionId === s.id)).sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0]
+          : undefined;
+        if (!appt || !own) return go();
+        const first = (cur.clients.find((c) => c.id === clientId)?.name ?? '').split(' ')[0];
+        void ask(`${first} zapisał(a) już ${appt.date === todayISO() ? 'dziś' : 'tego dnia'} trening „${own.workoutName || 'Trening'}”. Połączyć go z tą wizytą zamiast zapisywać drugi? (Potem ustawisz rozliczenie.)`, { confirm: 'Połącz z wizytą', cancel: 'Nowy trening', danger: false }).then(async (link) => {
+          if (!link) return go();
+          const ok = await apply([put('appointments', { ...appt, status: 'done', sessionId: own.id }), put('sessions', { ...own, solo: false })], 'Trening połączony z wizytą — ustaw rozliczenie.');
+          if (ok) setModal({ kind: 'session', session: { ...own, solo: false } });
+        });
       },
     }),
-    [section, go, clientId, clientTab],
+    [section, go, clientId, clientTab, ask, apply],
   );
 
   // Powiadomienie push → podopieczny i zakładka (adres /app/?c=<id>&t=<zakładka>): przy starcie i z otwartej aplikacji.

@@ -1,3 +1,4 @@
+import { put } from '../data/db';
 import { useMemo, useState } from 'react';
 import { Field, Icon, IconBtn, Modal, Seg } from '../components/ui';
 import { SetVideoButton } from '../components/SetVideo';
@@ -392,6 +393,9 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
       })),
     };
     const { changes, message } = saveSession(db, { session, isNew: !existing, appointmentId: solo ? undefined : m.appt?.id, amount: num(amount) ?? undefined, paidNow });
+    // poprawka daty treningu z wizyty — wizyta przechodzi razem z nim
+    const linkedA = existing && existing.date !== session.date ? db.appointments.find((a) => a.sessionId === existing.id) : undefined;
+    if (linkedA) changes.push(put('appointments', { ...linkedA, date: session.date }));
     // ten sam trening dla partnerów z pary: ich rozliczenie domyślne, ich wizyta z tego terminu
     const copies = !existing && !solo && copyToPartners
       ? withIds.flatMap((pid) => {

@@ -83,12 +83,18 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const wasCharged = !!cl?.noShowCharges?.includes(draft.id);
     const chargeChange = cl && chargeNow !== wasCharged ? [put('clients', { ...cl, noShowCharges: chargeNow ? [...(cl.noShowCharges ?? []), draft.id] : (cl.noShowCharges ?? []).filter((x) => x !== draft.id) })] : [];
     if (partners.includes(clientId)) return toast('Ta sama osoba jest wybrana dwa razy.');
+    // wizyta z zapisanym treningiem: odwołanie / nieobecność rozjechałyby się z treningiem (pakiet, płatność)
+    const linkedS = editing?.sessionId ? db.sessions.find((x) => x.id === editing.sessionId) : undefined;
+    if (linkedS && (draft.status === 'cancel' || draft.status === 'noshow'))
+      return toast('Do tej wizyty jest zapisany trening. Najpierw usuń trening („Pokaż trening” → „Usuń trening”) — wtedy wizytę można odwołać.');
     const grouped = partners.length > 0 || !!editing?.groupId;
     const d2: Appointment = { ...draft, groupId: partners.length ? (editing?.groupId ?? uid()) : undefined };
     const main = grouped ? saveGroupAppointments(db, d2, partners, allNext ? 1 : n, editing) : saveAppointment(d2, n);
     const pairMsg = partners.length ? ` W parze z: ${partners.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : '';
     const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
-    if (!(await apply([...main, ...(allNext && editing ? seriesEdit(db, editing, d2) : []), ...chargeChange], msg + pairMsg))) return;
+    // zmiana daty wizyty z zapisanym treningiem — trening przechodzi razem z nią (jedna para wizyta + trening)
+    const moveSession = linkedS && editing && editing.date !== draft.date ? [put('sessions', { ...linkedS, date: draft.date })] : [];
+    if (!(await apply([...main, ...(allNext && editing ? seriesEdit(db, editing, d2) : []), ...chargeChange, ...moveSession], msg + pairMsg + (moveSession.length ? ' Zapisany trening przeniesiony na ten sam dzień.' : '')))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
       if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {

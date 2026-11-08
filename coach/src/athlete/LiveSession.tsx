@@ -327,7 +327,11 @@ export function LiveSession({
                 <div key={w.id}>
                   <div className="wk-label">{w.name}</div>
                   {w.workouts.map((k) => (
-                    <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${inPass.has(k.id) && nx?.workout.id !== k.id ? 'done' : ''}`} disabled={!k.exercises.length} onClick={() => start(k.id)}>
+                    <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${inPass.has(k.id) && nx?.workout.id !== k.id ? 'done' : ''}`} disabled={!k.exercises.length} onClick={async () => {
+                      // spoza kolejki — plan pójdzie dalej od wybranego (pominie jednostki pomiędzy); pytamy jak u podopiecznego
+                      if (nx && plan.active && k.id !== nx.workout.id && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). Po zapisie plan pójdzie dalej od wybranego${inPass.has(k.id) ? ' — ten trening był już zrobiony w tym przejściu planu' : ''}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
+                      start(k.id);
+                    }}>
                       <span className="wo-st">{nx?.workout.id === k.id ? '▶' : inPass.has(k.id) ? '✓' : ''}</span>
                       <span className="wo-tx">
                         <b>{k.name}</b>
