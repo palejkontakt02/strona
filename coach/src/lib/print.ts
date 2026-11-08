@@ -91,7 +91,7 @@ const GRID_CSS = (wide: boolean) => `<style>@page{size:A4 ${wide ? 'landscape' :
       .date{display:block;font-family:Inter,system-ui,sans-serif;font-size:9px;font-weight:500;opacity:.8;margin-top:1px}
       table.grid td.ex{white-space:normal;min-width:120px;max-width:210px;font-weight:600;vertical-align:top;padding-top:5px;background:white;border-right:1px solid rgb(0 0 0 / 40%)}
       table.grid .lab{display:inline-block;min-width:18px;padding:0 3px;margin-right:5px;border:1px solid rgb(0 0 0 / 75%);border-radius:3px;font-size:9.5px;text-align:center;font-weight:700;line-height:13px}
-      table.grid .note{font-weight:400;margin-top:1px}
+      table.grid .note{font-weight:400;margin-top:1px} table.grid tr.wnotes td{font-style:italic;font-size:10px;color:rgb(0 0 0 / 68%);background:#f5f5f5;text-align:left;vertical-align:top}
       table.grid .num{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13.5px;font-weight:500;font-variant-numeric:tabular-nums}
       table.grid .no{text-align:center;color:rgb(0 0 0 / 60%);width:1%} table.grid td.rest{vertical-align:top;padding-top:5px}
       table.grid .wk{border-left:1.5px solid black} table.grid td.reps{text-align:left} table.grid td.load{text-align:right;min-width:42px} table.grid td.rpe,table.grid th.rpe{text-align:center;width:1%}
@@ -134,7 +134,7 @@ function gridTables(slots: ReturnType<typeof planGrid>, opts: { didit?: boolean;
         .map((r) =>
           r.lines
             .map((line, i) => {
-              const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><span class="lab">${esc(r.label)}</span>${esc(r.name)}${r.loadPer ? `<div class="note">kg: ${esc(r.loadPer)}</div>` : ''}${r.notes ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
+              const ex = i === 0 ? `<td class="ex" rowspan="${r.lines.length}"><span class="lab">${esc(r.label)}</span>${esc(r.name)}${r.loadPer ? `<div class="note">kg: ${esc(r.loadPer)}</div>` : ''}${r.notes && !r.notesVary ? `<div class="note">${esc(r.notes)}</div>` : ''}</td>` : '';
               const rest = i === 0 ? `<td class="no num rest" rowspan="${r.lines.length}">${esc(restText(r.rest) || '—')}</td>` : '';
               const first = line.cells.find((c) => c && c !== 'none') as (GridCell & { no?: string }) | undefined;
               const no = r.cardio && first?.no ? (RUN_NO[first.no] ?? first.no) : line.no;
@@ -151,7 +151,11 @@ function gridTables(slots: ReturnType<typeof planGrid>, opts: { didit?: boolean;
               const warm = line.no.startsWith('R') || (r.cardio && !!first?.warm);
               return `<tr class="${i === 0 ? 'first' : ''} ${zebra++ % 2 ? 'z' : ''} ${warm ? 'wline' : ''}">${ex}<td class="no num">${esc(no)}</td>${rest}${cells}${opts.didit ? '<td class="didit"></td>' : ''}</tr>`;
             })
-            .join(''),
+            .join('') +
+          // uwagi różne w tygodniach (np. % 1RM) — wiersz pod seriami, każda w kolumnie swojego tygodnia
+          (r.notesVary
+            ? `<tr class="wnotes"><td class="ex note">uwagi</td><td></td><td></td>${r.weekNotes.map((n) => `<td class="wk note" colspan="3">${esc(n ?? '')}</td>`).join('')}${opts.didit ? '<td class="didit"></td>' : ''}</tr>`
+            : ''),
         )
         .join('');
       return `<section class="slot">${opts.didit ? '' : `<h2>${esc(slot.name)}</h2>`}<table class="grid">${head}<tbody>${body}</tbody></table></section>`;
