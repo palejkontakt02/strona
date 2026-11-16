@@ -220,6 +220,9 @@ function GridTable({
   const hasLoad = filled((c) => c.load);
   const hasRpe = filled((c) => c.rpe);
   const span = 1 + Number(hasLoad) + Number(hasRpe);
+  // ćwiczenie bez ciężaru w żadnym tygodniu (plan i wykonanie): „m.c.” (masa ciała) zamiast pustej kolumny
+  const bodyweight = (r: (typeof rows)[number]) =>
+    !r.cardio && r.lines.every((l) => l.cells.every((c) => !c || c === 'none' || !c.load)) && !(actuals ?? []).some((a) => a && [...(a.ex.get(r.name)?.values() ?? [])].some((x) => x.load));
   // 4+ tygodnie: przerwa pod nazwą ćwiczenia, żeby tygodnie zmieściły się bez przewijania
   const noRest = noRestProp ?? cols.length >= 4;
   const cls = (id: string, deload: boolean) => `${id === nextId ? 'is-next' : ''} ${done?.has(id) && id !== nextId ? 'is-done' : ''} ${deload ? 'ptab-deload' : ''}`;
@@ -300,6 +303,7 @@ function GridTable({
               </tr>
             ),
             ...r.lines.map((line, i) => {
+              const bw = bodyweight(r);
               // bieg: „Rozgrz.” / „Schł.” zamiast numeru pozycji
               const first = line.cells.find((c): c is GridCell & { no?: string } => !!c && c !== 'none');
               const no = r.cardio && first?.no && WARM_NO[first.no] ? WARM_NO[first.no] : r.cardio && first?.no ? first.no : line.no;
@@ -352,7 +356,7 @@ function GridTable({
                       </td>,
                       hasLoad && (
                         <td key={`${week.id}-l`} className={`ptab-load ${base} ${r.cardio ? 'ptab-goal' : ''}`} title={hint?.full ?? planTip}>
-                          {c?.load}
+                          {c?.load || (bw && c ? <span className="ptab-bw">m.c.</span> : null)}
                           {tgt}
                         </td>
                       ),

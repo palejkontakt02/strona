@@ -983,3 +983,11 @@
     max-width: 280px;
   }
 }
+
+/* ćwiczenie z masą ciała — „m.c.” zamiast pustej kolumny ciężaru */
+.ptab-table td .ptab-bw {
+  color: var(--color-neutral-400);
+  font-weight: 400;
+  font-style: normal;
+  font-size: 0.85em;
+}
