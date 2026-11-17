@@ -6,6 +6,8 @@ import { nextMonday } from '../lib/analytics';
 import { detectColumns, FIELD_LABEL, parseTable, SHEET_FIELDS, sheetToPlan, type SheetField } from '../lib/sheetImport';
 import { readXlsxSheets } from '../lib/xlsxRead';
 import { normalizeLayout, type LayoutResult } from '../lib/sheetLayouts';
+import { templateWorkbook } from '../lib/planTemplate';
+import { downloadXlsx } from '../lib/xlsxWrite';
 import { mergePlan } from '../lib/planMerge';
 import { Field, Modal } from './ui';
 
@@ -59,6 +61,8 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
         const sheets = await readXlsxSheets(await f.arrayBuffer());
         const l = normalizeLayout(sheets);
         setLayout(l);
+        if (l?.name) setName(l.name);
+        if (l?.start) setStart(l.start);
         setFileRows(l?.rows ?? (sheets.find((x) => x.name === 'Do importu') ?? sheets[0]).rows);
       }
       else if (/\.xls$/i.test(f.name)) throw new Error('Stary format .xls — zapisz arkusz jako .xlsx albo CSV.');
@@ -96,6 +100,14 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
       {target && !initialRows && (
         <p className="small">
           Wybierz plik pobrany przyciskiem „Excel” (albo CSV) po zmianach w Excelu / Arkuszach Google. Plan zostanie ten sam: wykonane treningi, komentarze i notatki podopiecznego zostają, zmieniają się ćwiczenia, serie, ciężary, przerwy i uwagi.
+        </p>
+      )}
+      {!initialRows && !target && (
+        <p className="small pi-template">
+          Najprościej: pisz plany w stałym szablonie Fitowej (zakładka = dzień treningowy, tygodnie obok siebie) — wczyta się bez poprawiania.{' '}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadXlsx('szablon-planu-fitowa.xlsx', templateWorkbook(null))}>
+            Pobierz pusty szablon
+          </button>
         </p>
       )}
       {!initialRows && <p className="muted small">

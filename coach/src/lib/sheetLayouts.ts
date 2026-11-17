@@ -1,3 +1,4 @@
+import { readTemplate } from './planTemplate';
 import { FIELD_LABEL, fold, type SheetField } from './sheetImport';
 
 /**
@@ -21,6 +22,9 @@ export interface LayoutResult {
   /** Opis rozpoznanego układu (do pokazania trenerowi). */
   info: string;
   warnings: string[];
+  /** Nazwa planu i start (rrrr-mm-dd) z pól szablonu, jeśli są. */
+  name?: string;
+  start?: string;
 }
 
 const OUT: SheetField[] = ['week', 'day', 'workout', 'exercise', 'sets', 'reps', 'load', 'rpe', 'rest', 'notes'];
@@ -266,5 +270,5 @@ function weeksLayout(sheets: LayoutSheet[]): LayoutResult | null {
 
 /** Rozpoznany układ trenera → płaska tabela do importu; null — zwykła tabela (bez zmian). */
 export function normalizeLayout(sheets: LayoutSheet[]): LayoutResult | null {
-  return blockLayout(sheets) ?? weeksLayout(sheets);
+  return readTemplate(sheets) ?? blockLayout(sheets) ?? weeksLayout(sheets);
 }

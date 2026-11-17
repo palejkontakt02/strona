@@ -1,5 +1,6 @@
 import { downloadXlsx } from '../../lib/xlsxWrite';
 import { planWorkbook, xlsxName } from '../../lib/excelExport';
+import { templateWorkbook } from '../../lib/planTemplate';
 import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Plan } from '../../domain';
 import { printPlan } from '../../lib/print';
@@ -231,6 +232,9 @@ export function ClientPlans({ client }: { client: Client }) {
                         <Icon name="link" size={16} /> {p.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google'}
                       </button>
                     )}
+                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name, 'do-edycji'), templateWorkbook(p, client))} title="Plan w stałym szablonie Fitowej (zakładka = dzień, tygodnie obok siebie) — zmień w Excelu / Arkuszach Google i wczytaj przyciskiem „Wczytaj zmiany”">
+                      <Icon name="download" size={16} /> Do edycji
+                    </button>
                     <button className="btn btn-ghost btn-sm" onClick={() => setSyncing(p)} title="Wczytaj plik Excel / CSV tego planu po zmianach — aktualizuje ten sam plan (z podglądem zmian)">
                       <Icon name="up" size={16} /> Wczytaj zmiany
                     </button>
@@ -316,6 +320,7 @@ export function ClientPlans({ client }: { client: Client }) {
               { icon: 'print', text: 'Drukuj', run: () => printPlan(menuPlan, client, sessions) },
               ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
               { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client, sessions)) },
+              { icon: 'download', text: 'Do edycji (szablon .xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name, 'do-edycji'), templateWorkbook(menuPlan, client)) },
               { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
               ...(gs ? [{ icon: 'link', text: menuPlan.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(menuPlan.id) }] : []),
               { icon: 'up', text: 'Wczytaj zmiany z arkusza', run: () => setSyncing(menuPlan) },
