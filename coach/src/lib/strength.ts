@@ -95,6 +95,9 @@ export function resolveLoad(
       ? { load: round25((e1 * Number(pc[1])) / 100), why: `${pc[1]}% ${opts.maxLabel ?? 'szac. 1RM'}` }
       : { load: null, why: `${pc[1]}% 1RM – brak historii, dobierz ciężar` };
   }
+  // zakres „6–8” — start od dolnej wartości, zakres w podpowiedzi
+  const rg = String(spec || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$/);
+  if (rg) return { load: Number(rg[1].replace(',', '.')), why: `zakres ${rg[1].replace('.', ',')}–${rg[2].replace('.', ',')} kg` };
   const kg = num(sp);
   if (kg != null) return { load: kg, why: '' };
   if (e1 && repsN(reps)) {

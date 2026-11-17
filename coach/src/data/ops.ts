@@ -552,7 +552,9 @@ export function progressGroup(g: SetGroup, mode: Progression, ex?: Pick<PlanExer
   }
   if (mode === 'load2' || mode === 'load5') {
     const f = mode === 'load2' ? 0.025 : 0.05;
+    const rg = g.load.match(/^\s*(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)\s*(kg)?\s*$/i);
     if (kg != null) out.load = fmtN(safeScale(kg, f, name, per));
+    else if (rg) out.load = `${fmtN(safeScale(parseFloat(rg[1].replace(',', '.')), f, name, per))}–${fmtN(safeScale(parseFloat(rg[2].replace(',', '.')), f, name, per))}`;
     else if (pctV != null) out.load = `${fmtN(pctV + f * 100)}%`;
   } else if (mode === 'rep') {
     const m = g.reps.trim().match(/^(\d+)(\s*\/\s*str\.?)?$/i);

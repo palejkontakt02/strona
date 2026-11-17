@@ -240,6 +240,14 @@
   color: var(--danger-fg);
   margin: 0 0 var(--space-4);
 }
+.pi-layout {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-neutral-700, rgba(127, 127, 127, 0.35));
+  display: grid;
+  gap: 4px;
+}
 .pi-head-row {
   display: flex;
   flex-wrap: wrap;

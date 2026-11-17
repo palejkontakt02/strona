@@ -107,12 +107,17 @@ describe('sheetToPlan', () => {
   });
 
   it('superserie A1/A2 → połączone ćwiczenia; nierozpoznany ciężar do uwag', () => {
-    const { plan, warnings } = imp(['Ćwiczenie\tSerie\tPowt.\tCiężar', 'A1 Podciąganie\t3\t6\tmasa ciała', 'A2 Pompki\t3\t12\t', 'B Przysiad\t3\t5\t100'].join('\n'));
+    const { plan, warnings } = imp(['Ćwiczenie\tSerie\tPowt.\tCiężar', 'A1 Podciąganie\t3\t6\tgumą czerwoną', 'A2 Pompki\t3\t12\t', 'B Przysiad\t3\t5\t100'].join('\n'));
     const k = plan.weeks[0].workouts[0];
     expect(k.exercises.map((e) => [e.name, !!e.linked])).toEqual([['Podciąganie', false], ['Pompki', true], ['Przysiad', false]]);
-    expect(k.exercises[0].notes).toBe('ciężar: masa ciała');
+    expect(k.exercises[0].notes).toBe('ciężar: gumą czerwoną');
     expect(k.exercises[0].groups[0].load).toBe('');
     expect(warnings.some((w) => /nierozpoznany/.test(w))).toBe(true);
+  });
+  it('„masa ciała” w kolumnie ciężaru → bez ciężaru, bez ostrzeżenia', () => {
+    const { plan, warnings } = imp(['Ćwiczenie\tSerie\tPowt.\tCiężar', 'Podciąganie\t3\t6\tmasa ciała'].join('\n'));
+    expect(plan.weeks[0].workouts[0].exercises[0].groups[0].load).toBe('');
+    expect(warnings.some((w) => /nierozpoznany/.test(w))).toBe(false);
   });
 
   it('dzień jako tekst bez kolumny treningu — trening na każdy dzień', () => {

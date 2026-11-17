@@ -240,14 +240,27 @@ function setType(v: string): SetType {
   return 'Robocze';
 }
 
-/** Ciężar: „100 kg” → „100”, „102,5” → „102.5”, „75%” / „-10%” bez zmian; inny tekst → null (trafi do uwag). */
-function cleanLoad(v: string): string | null {
-  const t = v.trim().replace(/\s*kg\.?$/i, '').trim();
-  if (!t) return '';
+/** Dopisek „na rękę / hantel” przy ciężarze („8–10 kg/rękę”, „12 kg na rękę”) — ciężar jednego hantla. */
+const PER_HAND = /\s*(?:\/\s*(?:rękę|reke|hantel|hantla|szt\.?)|na\s+(?:rękę|reke|hantel)|każdy|kazdy)\s*$/i;
+
+/**
+ * Ciężar: „100 kg” → „100”, „102,5” → „102.5”, „75%” / „-10%” bez zmian, zakres „6–8 kg” / „6-8” → „6–8”
+ * (odtwarzacz podpowiada dolną wartość); „masa ciała” → puste; inny tekst → null (trafi do uwag).
+ */
+export function cleanLoad(v: string): string | null {
+  const t = v.trim().replace(PER_HAND, '').replace(/\s*kg\.?$/i, '').trim();
+  if (!t || /^(m\.?\s?c\.?|masa ciała|masa ciala|bw|bodyweight|ciało|cialo)$/i.test(t)) return '';
   if (/^[+-]?\d+(?:[.,]\d+)?\s*%$/.test(t)) return t.replace(/\s/g, '').replace(',', '.');
   if (/^\d+(?:[.,]\d+)?$/.test(t)) return t.replace(',', '.');
+  const r = t.match(/^(\d+(?:[.,]\d+)?)\s*(?:kg)?\s*(?:[-–—]|→|->|do)\s*(\d+(?:[.,]\d+)?)$/i);
+  if (r) {
+    const [a, b] = [r[1], r[2]].map((x) => x.replace(',', '.'));
+    return Number(a) === Number(b) ? a : `${a}–${b}`;
+  }
   return null;
 }
+/** Ciężar podany na jeden hantel („/rękę”, „na rękę”). */
+export const loadPerHand = (v: string) => PER_HAND.test(v.trim());
 const cleanRpe = (v: string) => v.replace(/rpe|@/gi, '').trim().replace(/,/g, '.').replace(/\s*-\s*/, '–');
 const cleanReps = (v: string) => v.trim().replace(/\s*-\s*/, '–');
 
@@ -437,6 +450,7 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     }
     if (isCardio) ex.cardio = true;
     if (side) ex.perSide = true;
+    if (!isCardio && loadPerHand(loadRaw)) ex.loadPer = 'one';
     ex.groups.push(...groups);
     if (rest && !ex.rest && !isCardio) ex.rest = rest;
     for (const nt of [notes, extraNote]) if (nt && !(ex.notes ?? '').split(' · ').includes(nt)) ex.notes = ex.notes ? `${ex.notes} · ${nt}` : nt;

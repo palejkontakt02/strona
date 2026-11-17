@@ -4,7 +4,7 @@ import { cardioByName, isTimed, LOAD_PER_TEXT, loadPerOf, perSideByName } from '
 import { fmtDur, fmtKm, parseDur, parseKm } from './running';
 import { fmtSec, secOf } from './parse';
 
-const kg = (load: string) => (/^\d+([.,]\d+)?$/.test(load.trim()) ? `${load.trim().replace('.', ',')} kg` : load.trim());
+const kg = (load: string) => (/^\d+([.,]\d+)?(\s*[-–]\s*\d+([.,]\d+)?)?$/.test(load.trim()) ? `${load.trim().replace(/\./g, ',').replace(/\s*[-–]\s*/, '–')} kg` : load.trim());
 const PREFIX: Record<string, string> = { Rozgrzewka: 'R', 'Top set': 'Top', 'Back-off': 'B-off', 'Drop set': 'Drop', AMRAP: 'AMRAP', Schłodzenie: 'S', Przerwa: 'trucht' };
 
 /** Komórka serii rozbita na kolumny: powtórzenia (lub czas / dystans), ciężar (lub cel biegu), RPE. */

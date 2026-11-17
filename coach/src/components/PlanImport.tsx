@@ -4,7 +4,8 @@ import { fmtDate, plural } from '../format';
 import { todayISO } from '../lib/dates';
 import { nextMonday } from '../lib/analytics';
 import { detectColumns, FIELD_LABEL, parseTable, SHEET_FIELDS, sheetToPlan, type SheetField } from '../lib/sheetImport';
-import { readXlsx } from '../lib/xlsxRead';
+import { readXlsxSheets } from '../lib/xlsxRead';
+import { normalizeLayout, type LayoutResult } from '../lib/sheetLayouts';
 import { mergePlan } from '../lib/planMerge';
 import { Field, Modal } from './ui';
 
@@ -26,7 +27,16 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
   // domyślnie aktywny, gdy klient nie ma aktywnego planu albo aktywny już się zakończył
   const [makeActive, setMakeActive] = useState(active);
 
-  const rows = useMemo(() => fileRows ?? (text.trim() ? parseTable(text) : null), [fileRows, text]);
+  // rozpoznany układ trenera (bloki „TYDZIEŃ · DZIEŃ”, tygodnie obok siebie) — zamieniony na płaską tabelę
+  const [layout, setLayout] = useState<LayoutResult | null>(null);
+  const pasted = useMemo(() => {
+    if (fileRows || !text.trim()) return null;
+    const raw = parseTable(text);
+    const l = normalizeLayout([{ name: '', rows: raw }]);
+    return { rows: l?.rows ?? raw, layout: l };
+  }, [fileRows, text]);
+  const rows = fileRows ?? pasted?.rows ?? null;
+  const shownLayout = fileRows ? layout : (pasted?.layout ?? null);
   const guess = useMemo(() => (rows ? detectColumns(rows) : null), [rows]);
   const cols = map ?? guess?.map ?? [];
   const headerRow = header ?? guess?.headerRow ?? -1;
@@ -45,11 +55,22 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
     setFileName(f.name.replace(/\.[^.]+$/, ''));
     setName(f.name.replace(/\.[^.]+$/, ''));
     try {
-      if (/\.xlsx$/i.test(f.name)) setFileRows(await readXlsx(await f.arrayBuffer()));
+      if (/\.xlsx$/i.test(f.name)) {
+        const sheets = await readXlsxSheets(await f.arrayBuffer());
+        const l = normalizeLayout(sheets);
+        setLayout(l);
+        setFileRows(l?.rows ?? (sheets.find((x) => x.name === 'Do importu') ?? sheets[0]).rows);
+      }
       else if (/\.xls$/i.test(f.name)) throw new Error('Stary format .xls — zapisz arkusz jako .xlsx albo CSV.');
-      else setFileRows(parseTable(await f.text()));
+      else {
+        const raw = parseTable(await f.text());
+        const l = normalizeLayout([{ name: f.name.replace(/\.[^.]+$/, ''), rows: raw }]);
+        setLayout(l);
+        setFileRows(l?.rows ?? raw);
+      }
     } catch (e) {
       setFileRows(null);
+      setLayout(null);
       setErr(e instanceof Error ? e.message : 'Nie udało się odczytać pliku.');
     }
   };
@@ -106,6 +127,16 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
       </div>
       )}
       {err && <p className="pi-error small" role="alert">{err}</p>}
+      {shownLayout && (
+        <div className="pi-layout small" role="status">
+          <strong>Rozpoznano Twój układ arkusza.</strong> {shownLayout.info}
+          {shownLayout.warnings.map((w) => (
+            <div key={w} className="muted">
+              {w}
+            </div>
+          ))}
+        </div>
+      )}
 
       {rows && rows.length > 0 && !target && (
         <>
