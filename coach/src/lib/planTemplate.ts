@@ -195,11 +195,14 @@ export interface TemplateRead {
   warnings: string[];
 }
 
-/** Przerwa zamieniona przez Excel na czas (ułamek doby, np. 0,104 = 2:30) → „2:30”. */
+/**
+ * Przerwa zamieniona przez Excel na czas: wpis „2:30” Excel czyta jako 2 h 30 min (ułamek doby 0,104…),
+ * a trener miał na myśli 2 min 30 s — godziny → minuty, minuty → sekundy.
+ */
 function restText(v: string): string {
   const t = v.replace(',', '.');
   if (!/^0?\.\d+$/.test(t)) return v;
-  const sec = Math.round(Number(t) * 86400);
+  const sec = Math.round(Number(t) * 1440);
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
