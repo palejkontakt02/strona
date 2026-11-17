@@ -36,7 +36,7 @@ describe('szablon — pisany ręcznie', () => {
     sheet('Pon – rwanie', 'pon', [
       ['A', 'Snatch', 'Top set', '2:30', 'Stop: 2 spalone', '1', '1', '88', '50', '8', '', '1', '1', '80', '45', '7'],
       ['', '', 'Back-off', '', '', '3', '2', '80', '', '7', '', '2', '2', '75', '', '6', 'lżej'],
-      ['B1', 'Good morning', '', '', '', '3', '8', '', '40–50', '7', '', '2', '8', '', '40', '6'],
+      ['B1', 'Good morning', '', '0.0625', '', '3', '8', '', '40–50', '7', '', '2', '8', '', '40', '6'],
       ['B2', 'Wiosłowanie hantlem', '', '1:30', '', '3', '8/str.', '', '22/rękę', '7.5', '', '', '', '', '', ''],
       [],
     ]),
@@ -68,6 +68,7 @@ describe('szablon — pisany ręcznie', () => {
   it('superseria B1/B2, na stronę, kg na rękę, zakres; ćwiczenie nieobecne w tygodniu 2', () => {
     const [, gm, row] = plan.weeks[0].workouts[0].exercises;
     expect(gm.groups[0].load).toBe('40–50');
+    expect(gm.rest).toBe('1:30');
     expect(row.linked).toBe(true);
     expect(row.perSide).toBe(true);
     expect(row.loadPer).toBe('one');

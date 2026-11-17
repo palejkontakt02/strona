@@ -195,6 +195,14 @@ export interface TemplateRead {
   warnings: string[];
 }
 
+/** Przerwa zamieniona przez Excel na czas (ułamek doby, np. 0,104 = 2:30) → „2:30”. */
+function restText(v: string): string {
+  const t = v.replace(',', '.');
+  if (!/^0?\.\d+$/.test(t)) return v;
+  const sec = Math.round(Number(t) * 86400);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
 const OUT_HEAD = ['Tydzień', 'Dzień', 'Trening', 'Ćwiczenie', 'Serie', 'Powt.', 'Ciężar', 'RPE', 'Przerwa', 'Uwagi', 'Typ serii'];
 const cell = (r: string[] | undefined, i: number) => (i >= 0 && r ? (r[i] ?? '').trim() : '');
 
@@ -244,7 +252,7 @@ export function readTemplate(sheets: { name: string; rows: string[][] }[]): Temp
     let found = 0;
     for (const r of rows.slice(hi + 1)) {
       const exn = cell(r, eI);
-      if (exn) cur = { name: exn, label: cell(r, oI), type: '', rest: cell(r, pI), notes: cell(r, nI) };
+      if (exn) cur = { name: exn, label: cell(r, oI), type: '', rest: restText(cell(r, pI)), notes: cell(r, nI) };
       if (!cur) continue;
       const type = cell(r, tI);
       for (const w of weeks) {
