@@ -220,7 +220,7 @@ body.ready .hero-line { opacity: 1; transform: translateY(0); }
 /* STATS */
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid rgba(237,237,237,0.08);
 }
 .stat {
@@ -288,7 +288,7 @@ body.about-visible #about-img { transform: scale(1); }
 /* GALLERY */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2px;
   background: #161616;
 }
@@ -460,7 +460,8 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
 }
 .contact-form textarea { resize: vertical; }
 .contact-form select { cursor: pointer; }
-.contact-form select:invalid { color: rgba(237,237,237,0.45); }
+.contact-form select:invalid { color: rgba(237,237,237,0.62); }
+.contact-form ::placeholder { color: rgba(237,237,237,0.62); opacity: 1; }
 
 .rodo-consent {
   display: flex;
@@ -504,10 +505,11 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
   display: flex;
   justify-content: space-between;
   font-size: 13px;
-  color: rgba(237,237,237,0.4);
+  color: rgba(237,237,237,0.6);
 }
 .footer-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
-.footer-links a { color: rgba(237,237,237,0.4); }
+.footer-links a { color: rgba(237,237,237,0.6); }
+.footer-links a:hover { color: #F0F0F0; }
 
 .form-note {
   font-size: 13px;
@@ -537,9 +539,8 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
   .about-img-wrap { min-height: 380px; }
   .gallery { grid-template-columns: 1fr; }
   .plans { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .stat:nth-child(2) { border-right: none; }
-  .stat { border-bottom: 1px solid rgba(237,237,237,0.08); }
+  .stat { padding: 32px 16px; }
+  .stat-value { font-size: 34px; }
   .contact-row { grid-template-columns: 1fr; }
   .nav-links { display: none; }
 }
@@ -754,4 +755,40 @@ body.contact-visible .contact-inner { opacity: 1; transform: translateY(0); }
 @media (max-width: 640px) {
   .app-cta { padding: 20px; }
   .app-cta-go { width: 100%; text-align: center; }
+
+@media (max-width: 520px) {
+  .stats { grid-template-columns: 1fr; }
+  .stat { border-right: none; border-bottom: 1px solid rgba(237,237,237,0.08); padding: 28px 16px; }
+  .stat:last-child { border-bottom: none; }
+}
+
+/* DOSTEPNOSC: fokus klawiatury, skip link, ograniczenie animacji */
+:focus-visible {
+  outline: 2px solid #EDEDED;
+  outline-offset: 3px;
+}
+main:focus { outline: none; }
+.gallery-item:focus-visible { outline-offset: -4px; }
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -100px;
+  z-index: 200;
+  padding: 12px 18px;
+  background: #EDEDED;
+  color: #161616;
+  font-weight: 700;
+  border-radius: 3px;
+}
+.skip-link:focus { top: 16px; color: #161616; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .marquee-track { animation: none; }
 }

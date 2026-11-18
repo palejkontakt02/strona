@@ -6,7 +6,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sebastian Palej — Trener personalny · Kraków</title>
-<meta name="description" content="Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.">
+<meta name="description" content="Trening oparty na medycynie opartej na faktach (EBM) i praktyce opartej na dowodach (EBP), tworzony specjalnie pod Ciebie. Pokażę Ci, że dźwigać może każdy.">
 <link rel="canonical" href="https://sebastianpalej.pl/">
 
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -18,14 +18,14 @@
 <meta property="og:locale" content="pl_PL">
 <meta property="og:site_name" content="Sebastian Palej — Trener Personalny">
 <meta property="og:title" content="Sebastian Palej — Trener personalny · Kraków">
-<meta property="og:description" content="Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.">
+<meta property="og:description" content="Trening oparty na medycynie opartej na faktach (EBM) i praktyce opartej na dowodach (EBP), tworzony specjalnie pod Ciebie. Pokażę Ci, że dźwigać może każdy.">
 <meta property="og:url" content="https://sebastianpalej.pl/">
 <meta property="og:image" content="https://sebastianpalej.pl/images/og-home.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Sebastian Palej — Trener personalny · Kraków">
-<meta name="twitter:description" content="Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.">
+<meta name="twitter:description" content="Trening oparty na medycynie opartej na faktach (EBM) i praktyce opartej na dowodach (EBP), tworzony specjalnie pod Ciebie. Pokażę Ci, że dźwigać może każdy.">
 <meta name="twitter:image" content="https://sebastianpalej.pl/images/og-home.jpg">
 
 <script type="application/ld+json">
@@ -35,6 +35,7 @@
   "name": "Sebastian Palej — Trener Personalny",
   "image": "https://sebastianpalej.pl/images/hero-gym.jpg",
   "url": "https://sebastianpalej.pl/",
+  "description": "Trener personalny w Krakowie i online. Trening oparty na dowodach naukowych (EBM/EBP), plan tworzony od zera pod Ciebie, wsparcie wiedzą z fizjoterapii.",
   "telephone": "+48534701788",
   "priceRange": "180 zł – 5400 zł",
   "areaServed": "Kraków",
@@ -53,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261015">
+<link rel="stylesheet" href="styles.css?v=20261118">
 </head>
 <body>
   <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Zgoda na pliki cookies">
@@ -71,8 +72,10 @@
   <!-- SCROLL PROGRESS -->
   <div id="scroll-progress"></div>
 
+  <a href="#main" class="skip-link">Przejdź do treści</a>
+
   <!-- NAV -->
-  <div class="nav">
+  <nav class="nav" aria-label="Główna nawigacja">
     <a href="index.html" class="nav-logo hoverable">Sebastian Palej</a>
     <div class="nav-links">
       <a href="#o-mnie" class="nav-link hoverable" data-key="about">O mnie</a>
@@ -80,12 +83,13 @@
       <a href="#opinie" class="nav-link hoverable" data-key="reviews">Opinie</a>
     </div>
     <a href="#kontakt" class="nav-cta hoverable">Umów trening</a>
-  </div>
+  </nav>
 
+  <main id="main" tabindex="-1">
   <!-- HERO -->
   <div class="hero" id="hero" data-section="hero">
     <div class="hero-img-wrap" id="hero-img-wrap">
-      <img src="images/hero-gym.jpg" alt="Sala treningowa" />
+      <img src="images/hero-gym.jpg" alt="Sala treningowa na siłowni w Krakowie" width="848" height="1400" fetchpriority="high" />
     </div>
     <div class="hero-gradient"></div>
     <div class="hero-content">
@@ -100,24 +104,20 @@
         </h1>
       </div>
       <div class="hero-side" id="hero-side">
-        <p class="hero-desc">Indywidualny plan treningowy oparty na wiedzy z fizjoterapii — bezpiecznie, skutecznie, bez zbędnego bólu.</p>
+        <p class="hero-desc">Trening oparty na dowodach naukowych: medycynie opartej na faktach (EBM) i praktyce opartej na dowodach (EBP). Plan tworzę od zera, specjalnie pod Ciebie. Pokażę Ci, że dźwigać może każdy, a razem znajdziemy formę treningu, która pasuje do Ciebie i Twojego stylu życia.</p>
         <a href="#kontakt" class="btn-primary hoverable">Umów konsultację →</a>
       </div>
     </div>
-    <div class="scroll-hint">PRZEWIŃ ⌄</div>
+    <div class="scroll-hint" aria-hidden="true">PRZEWIŃ ⌄</div>
   </div>
 
   <!-- MARQUEE -->
-  <div class="marquee-wrap">
+  <div class="marquee-wrap" aria-hidden="true">
     <div class="marquee-track" id="marquee-track"></div>
   </div>
 
   <!-- STATS -->
   <div class="stats" id="stats" data-section="stats">
-    <div class="stat">
-      <div class="stat-value" data-target="100" data-suffix="">0</div>
-      <div class="stat-label">przeszkolonych sesji</div>
-    </div>
     <div class="stat">
       <div class="stat-value" data-target="1" data-suffix=":1">0:1</div>
       <div class="stat-label">indywidualne podejście</div>
@@ -135,7 +135,7 @@
   <!-- O MNIE -->
   <div class="about" id="o-mnie" data-section="about">
     <div class="about-img-wrap">
-      <img src="images/sidebar-trainer.jpg" alt="Sebastian Palej" id="about-img" />
+      <img src="images/sidebar-trainer.jpg" alt="Sebastian Palej, trener personalny" id="about-img" width="1200" height="1600" loading="lazy" decoding="async" />
     </div>
     <div class="about-content" id="about-content">
       <div class="eyebrow">O mnie</div>
@@ -143,10 +143,6 @@
       <p class="about-p">Jestem studentem fizjoterapii i trenerem personalnym — łączę wiedzę o pracy ciała z praktycznym doświadczeniem treningowym.</p>
       <p class="about-p">Każdy plan buduję pod Twoją sylwetkę, historię kontuzji i tempo życia. Bez gotowych szablonów — z pełną kontrolą techniki.</p>
       <div class="about-badges">
-        <div>
-          <div class="about-badge-value">Fizjo</div>
-          <div class="about-badge-label">wykształcenie</div>
-        </div>
         <div>
           <div class="about-badge-value">1:1</div>
           <div class="about-badge-label">podejście</div>
@@ -157,21 +153,18 @@
 
   <!-- GALERIA -->
   <div class="gallery" id="galeria" data-section="gallery">
-    <div class="gallery-item hoverable-zoom" data-src="images/gallery-1.jpg" style="transition-delay:0s">
-      <img src="images/gallery-1.jpg" alt="Sesja treningowa" style="object-position:center 15%" />
+    <div class="gallery-item hoverable-zoom" data-src="images/gallery-1.jpg" style="transition-delay:0s" role="button" tabindex="0" aria-label="Powiększ zdjęcie: sesja treningowa">
+      <img src="images/gallery-1.jpg" alt="Sesja treningu personalnego" style="object-position:center 15%" width="1200" height="1139" loading="lazy" decoding="async" />
     </div>
-    <div class="gallery-item hoverable-zoom" data-src="images/gallery-2.jpg" style="transition-delay:0.12s">
-      <img src="images/gallery-2.jpg" alt="Trener personalny" style="object-position:center 15%" />
-    </div>
-    <div class="gallery-item hoverable-zoom" data-src="images/gallery-3.jpg" style="transition-delay:0.24s">
-      <img src="images/gallery-3.jpg" alt="Portret" style="object-position:center 15%" />
+    <div class="gallery-item hoverable-zoom" data-src="images/gallery-3.jpg" style="transition-delay:0.12s" role="button" tabindex="0" aria-label="Powiększ zdjęcie: portret trenera">
+      <img src="images/gallery-3.jpg" alt="Portret Sebastiana Palej" style="object-position:center 15%" width="1050" height="1400" loading="lazy" decoding="async" />
     </div>
   </div>
 
   <!-- LIGHTBOX -->
-  <div class="lightbox" id="lightbox">
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Powiększone zdjęcie">
     <img id="lightbox-img" src="" alt="" />
-    <button id="lightbox-close" aria-label="Zamknij">×</button>
+    <button type="button" id="lightbox-close" aria-label="Zamknij">×</button>
   </div>
 
   <!-- OPINIE -->
@@ -215,13 +208,13 @@
         <input type="hidden" name="_subject" value="Nowe zgloszenie ze strony sebastianpalej.pl" />
         <input type="hidden" name="_template" value="table" />
         <input type="hidden" name="_captcha" value="false" />
-        <p class="hp-field"><label>Firma <input name="_honey" tabindex="-1" autocomplete="off" /></label></p>
+        <p class="hp-field" aria-hidden="true"><label>Firma <input name="_honey" tabindex="-1" autocomplete="off" /></label></p>
         <div class="contact-row">
-          <input type="text" name="name" placeholder="Imię i nazwisko" required />
-          <input type="text" name="contact" placeholder="Telefon lub e-mail" required />
+          <input type="text" name="name" placeholder="Imię i nazwisko" aria-label="Imię i nazwisko" autocomplete="name" required />
+          <input type="text" name="contact" placeholder="Telefon lub e-mail" aria-label="Telefon lub e-mail" required />
         </div>
         <div class="contact-row">
-          <select name="cel_treningu" required>
+          <select name="cel_treningu" aria-label="Cel treningu" required>
             <option value="" disabled selected>Cel treningu</option>
             <option>Redukcja tkanki tłuszczowej</option>
             <option>Budowa masy mięśniowej / siły</option>
@@ -229,20 +222,20 @@
             <option>Ogólna sprawność i zdrowie</option>
             <option>Przygotowanie do zawodów / startu</option>
           </select>
-          <select name="poziom_zaawansowania" required>
+          <select name="poziom_zaawansowania" aria-label="Poziom zaawansowania" required>
             <option value="" disabled selected>Poziom zaawansowania</option>
             <option>Początkujący/a</option>
             <option>Średnio zaawansowany/a</option>
             <option>Zaawansowany/a</option>
           </select>
         </div>
-        <select name="forma_wspolpracy" required>
+        <select name="forma_wspolpracy" aria-label="Preferowana forma współpracy" required>
           <option value="" disabled selected>Preferowana forma współpracy</option>
           <option>Stacjonarnie w Krakowie</option>
           <option>Online</option>
           <option>Nie mam preferencji</option>
         </select>
-        <textarea name="dodatkowe_informacje" placeholder="Kontuzje, ograniczenia zdrowotne, inne uwagi (opcjonalnie)" rows="4"></textarea>
+        <textarea name="dodatkowe_informacje" placeholder="Kontuzje, ograniczenia zdrowotne, inne uwagi (opcjonalnie)" aria-label="Dodatkowe informacje (opcjonalnie)" rows="4"></textarea>
         <label class="rodo-consent">
           <input type="checkbox" name="zgoda_rodo" required />
           <span>Wyrażam zgodę na przetwarzanie moich danych osobowych podanych w formularzu przez Sebastiana Palej w celu udzielenia odpowiedzi na zapytanie i przygotowania oferty treningowej, zgodnie z <a href="polityka-prywatnosci.html" target="_blank" rel="noopener" class="hoverable">Polityką Prywatności</a>.</span>
@@ -257,18 +250,19 @@
         </div>
         <a href="/app/" class="app-cta-go hoverable">Zaloguj się →</a>
       </div>
-      <div class="footer">
+      <footer class="footer">
         <div>© 2026 Sebastian Palej · Trener Personalny</div>
         <div class="footer-links">
           <a href="https://instagram.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Instagram</a>
           <a href="https://facebook.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Facebook</a>
           <a href="polityka-prywatnosci.html" class="hoverable">Polityka Prywatności</a>
-          <a href="#" class="hoverable cookie-manage-link">Ustawienia cookies</a>
+          <a href="#" class="hoverable cookie-manage-link" role="button">Ustawienia cookies</a>
         </div>
-      </div>
+      </footer>
     </div>
   </div>
+  </main>
 
-<script src="script.js?v=20261015"></script>
+<script src="script.js?v=20261118"></script>
 </body>
 </html>
