@@ -42,7 +42,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261015">
+<link rel="stylesheet" href="styles.css?v=20261118">
 </head>
 <body>
   <div id="cookie-banner" class="cookie-banner" role="dialog" aria-label="Zgoda na pliki cookies">
@@ -60,8 +60,10 @@
   <!-- SCROLL PROGRESS -->
   <div id="scroll-progress"></div>
 
+  <a href="#main" class="skip-link">Przejdź do treści</a>
+
   <!-- NAV -->
-  <div class="nav">
+  <nav class="nav" aria-label="Główna nawigacja">
     <a href="index.html" class="nav-logo hoverable">Sebastian Palej</a>
     <div class="nav-links">
       <a href="index.html#o-mnie" class="nav-link hoverable" data-key="about">O mnie</a>
@@ -69,15 +71,16 @@
       <a href="index.html#opinie" class="nav-link hoverable" data-key="reviews">Opinie</a>
     </div>
     <a href="index.html#kontakt" class="nav-cta hoverable">Umów trening</a>
-  </div>
+  </nav>
 
+  <main id="main" tabindex="-1">
   <!-- OFERTA -->
   <div class="offer" id="oferta" data-section="offer">
     <div class="offer-inner" id="offer-inner">
       <div class="offer-head">
         <div>
           <div class="eyebrow">Oferta</div>
-          <h2 class="section-title">Cennik współpracy</h2>
+          <h1 class="section-title">Cennik współpracy</h1>
         </div>
       </div>
 
@@ -149,20 +152,22 @@
         </div>
         <a href="/app/" class="app-cta-go hoverable">Zaloguj się →</a>
       </div>
-      <div class="footer">
+      <footer class="footer">
         <div>© 2026 Sebastian Palej · Trener Personalny</div>
         <div class="footer-links">
           <a href="https://instagram.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Instagram</a>
           <a href="https://facebook.com/sebastianpalej" target="_blank" rel="noopener" class="hoverable">Facebook</a>
           <a href="polityka-prywatnosci.html" class="hoverable">Polityka Prywatności</a>
-          <a href="#" class="hoverable cookie-manage-link">Ustawienia cookies</a>
+          <a href="#" class="hoverable cookie-manage-link" role="button">Ustawienia cookies</a>
         </div>
-      </div>
+      </footer>
     </div>
   </div>
 
 
 
-<script src="script.js?v=20261015"></script>
+  </main>
+
+<script src="script.js?v=20261118"></script>
 </body>
 </html>

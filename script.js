@@ -2,6 +2,7 @@
   'use strict';
 
   var isTouch = window.matchMedia('(hover: none)').matches;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* CUSTOM CURSOR */
   var cursor = document.getElementById('cursor');
@@ -51,7 +52,7 @@
     var docH = document.documentElement.scrollHeight - window.innerHeight;
     var progress = docH > 0 ? (window.scrollY / docH) * 100 : 0;
     progressBar.style.width = progress.toFixed(1) + '%';
-    if (heroImgWrap) {
+    if (heroImgWrap && !reduceMotion) {
       heroImgWrap.style.transform = 'translateY(' + (window.scrollY * 0.25) + 'px)';
     }
   }
@@ -116,7 +117,8 @@
       var target = document.getElementById(href.slice(1));
       if (target) {
         e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        if (target.id === 'main') target.focus({ preventScroll: true });
       }
     });
   });
@@ -165,15 +167,38 @@
   var lightbox = document.getElementById('lightbox');
   var lightboxImg = document.getElementById('lightbox-img');
   if (lightbox && lightboxImg) {
+    var lightboxCloseBtn = document.getElementById('lightbox-close');
+    var lastFocused = null;
+    var openLightbox = function (item) {
+      var thumb = item.querySelector('img');
+      lastFocused = document.activeElement;
+      lightboxImg.src = item.getAttribute('data-src');
+      lightboxImg.alt = thumb ? thumb.alt : '';
+      lightbox.classList.add('open');
+      if (lightboxCloseBtn) lightboxCloseBtn.focus();
+    };
     document.querySelectorAll('.gallery-item').forEach(function (item) {
-      item.addEventListener('click', function () {
-        lightboxImg.src = item.getAttribute('data-src');
-        lightbox.classList.add('open');
+      item.addEventListener('click', function () { openLightbox(item); });
+      item.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openLightbox(item);
+        }
       });
     });
-    var closeLightbox = function () { lightbox.classList.remove('open'); };
+    var closeLightbox = function () {
+      if (!lightbox.classList.contains('open')) return;
+      lightbox.classList.remove('open');
+      if (lastFocused) lastFocused.focus();
+    };
     lightbox.addEventListener('click', closeLightbox);
-    var lightboxCloseBtn = document.getElementById('lightbox-close');
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'Tab' && lightbox.classList.contains('open')) {
+        e.preventDefault();
+        if (lightboxCloseBtn) lightboxCloseBtn.focus();
+      }
+    });
     if (lightboxCloseBtn) {
       lightboxCloseBtn.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -202,6 +227,11 @@
       reviewsTrack.style.transform = 'translateX(-' + reviewIndex + '00%)';
       dots.forEach(function (d, i) {
         d.classList.toggle('active', i === reviewIndex);
+        if (i === reviewIndex) d.setAttribute('aria-current', 'true');
+        else d.removeAttribute('aria-current');
+      });
+      reviewCards.forEach(function (card, i) {
+        card.setAttribute('aria-hidden', i === reviewIndex ? 'false' : 'true');
       });
     };
     var goToReview = function (i) {
@@ -217,10 +247,25 @@
       reviewIndex = (reviewIndex - 1 + reviewCards.length) % reviewCards.length;
       renderReview();
     };
+    var reviewsPaused = false;
     var restartAutoplay = function () {
       if (reviewTimer) clearInterval(reviewTimer);
+      reviewTimer = null;
+      if (reduceMotion || reviewsPaused) return;
       reviewTimer = setInterval(nextReview, 6000);
     };
+    // Autoplay zatrzymuje sie, gdy uzytkownik najedzie mysza lub przejdzie klawiatura (WCAG 2.2.2)
+    var carousel = reviewsTrack.closest('.reviews-carousel');
+    if (carousel) {
+      var pause = function () { reviewsPaused = true; restartAutoplay(); };
+      var resume = function () { reviewsPaused = false; restartAutoplay(); };
+      carousel.addEventListener('mouseenter', pause);
+      carousel.addEventListener('mouseleave', resume);
+      carousel.addEventListener('focusin', pause);
+      carousel.addEventListener('focusout', function (e) {
+        if (!carousel.contains(e.relatedTarget)) resume();
+      });
+    }
 
     var reviewNextBtn = document.getElementById('review-next');
     var reviewPrevBtn = document.getElementById('review-prev');
