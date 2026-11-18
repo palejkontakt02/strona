@@ -573,6 +573,8 @@ export interface Appointment {
    * `late` — odwołanie krócej niż 24 h przed wizytą (trening może przepaść). Zapis przez funkcję client_respond_appointment.
    */
   reply?: ApptReply;
+  /** Wizyta umówiona na konkretną jednostkę planu („Termin” w tabeli planu) — zmiana terminu przesuwa jedno i drugie. */
+  planRef?: { planId: string; workoutId: string };
 }
 
 export interface ApptReply {

@@ -1,6 +1,6 @@
 import type { Appointment, ISODate } from '../domain';
 import { put, type Change, type Db } from '../data/db';
-import { groupOf } from '../data/ops';
+import { followPlan, groupOf } from '../data/ops';
 import { addDays, daysBetween } from './dates';
 
 /** Wizytę można przesunąć: zaplanowana i bez zapisanego treningu. */
@@ -33,6 +33,8 @@ export function moveVisit(db: Db, appt: Appointment, date: ISODate, time: string
   const group = groupOf(db.appointments, appt).filter(canMove);
   const moved = (group.length ? group : [appt]).map((a) => ({ ...a, date, time }));
   const changes: Change[] = moved.map((a) => put('appointments', a));
+  // wizyta umówiona na jednostkę planu — jednostka przechodzi na ten sam dzień
+  for (const a of group.length ? group : [appt]) changes.push(...followPlan(db, a, date));
   if (withSeries) {
     const seen = new Set(moved.map((a) => a.id));
     for (const a of group.length ? group : [appt]) {

@@ -1,10 +1,10 @@
 import { downloadXlsx } from '../../lib/xlsxWrite';
 import { planWorkbook, xlsxName } from '../../lib/excelExport';
 import { templateWorkbook } from '../../lib/planTemplate';
-import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
-import type { Client, Plan } from '../../domain';
+import { Card, Empty, Field, Icon, IconBtn, Modal, Tag } from '../../components/ui';
+import type { Client, Plan, PlanWorkout } from '../../domain';
 import { printPlan } from '../../lib/print';
-import { extraPlanOf, extraState, plansOf, savePlan, sessionsOf, type ExtraState } from '../../data/ops';
+import { extraPlanOf, extraState, plansOf, savePlan, scheduleWorkout, sessionsOf, workoutAppointment, type ExtraState } from '../../data/ops';
 import { useState } from 'react';
 import { del, put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -60,6 +60,8 @@ export function ClientPlans({ client }: { client: Client }) {
   const [showDone, setShowDone] = useState(false);
   // „Przesuń plan” (id planu + ewentualnie gotowe ustawienia z nieobecności) i import z arkusza
   const [shift, setShift] = useState<{ planId: string; preset?: { from: string; days: number } } | null>(null);
+  // „Termin” jednostki planu: dzień + godzina wizyty
+  const [sched, setSched] = useState<{ plan: Plan; k: PlanWorkout; date: string; time: string; from?: string } | null>(null);
   const [importing, setImporting] = useState(false);
   /** Plan, do którego wczytujemy zmiany z arkusza. */
   const [syncing, setSyncing] = useState<Plan | null>(null);
@@ -304,12 +306,42 @@ export function ClientPlans({ client }: { client: Client }) {
                   nextExtra={<QuickShift plan={p} sessions={sessions} />}
                   onLive={(id) => startLive(client.id, undefined, undefined, { planId: p.id, workoutId: id })}
                   onAthlete={(id) => startAthlete(client.id, { planId: p.id, workoutId: id })}
+                  apptTime={(id) => workoutAppointment(db, p.id, id)?.time}
+                  onSchedule={(k, date) => {
+                    const a = workoutAppointment(db, p.id, k.id);
+                    // podpowiedź godziny: wizyta tego dnia, inaczej ostatnia godzina wizyty tego podopiecznego
+                    const last = db.appointments.filter((x) => x.clientId === client.id && x.time).sort((x, y) => (y.date + y.time).localeCompare(x.date + x.time))[0];
+                    setSched({ plan: p, k, date: a?.date ?? date ?? todayISO(), time: a?.time ?? last?.time ?? '', from: date });
+                  }}
                 />
               )}
             </Card>
           );
         })}
       </div>
+      {sched && (
+        <Modal
+          title={`Termin — ${sched.k.name}`}
+          onClose={() => setSched(null)}
+          submitLabel="Zapisz termin"
+          onSubmit={async () => {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(sched.date)) return toast('Wybierz dzień.');
+            if (sched.time && !/^\d{1,2}:\d{2}$/.test(sched.time)) return toast('Godzina, np. 18:00.');
+            const ok = await apply(scheduleWorkout(db, sched.plan, sched.k.id, sched.date, sched.time, sched.from), `„${sched.k.name}” — ${fmtWeekdayDate(sched.date)}${sched.time ? `, ${sched.time.padStart(5, '0')}` : ''}${sched.time ? ' · wizyta w kalendarzu' : ''}.`);
+            if (ok) setSched(null);
+          }}
+        >
+          <p className="small muted">Trening przejdzie na ten dzień (podopieczny zobaczy nowy termin). Z godziną — także wizyta w kalendarzu; ponowna zmiana terminu przesuwa tę samą wizytę.</p>
+          <div className="form-grid">
+            <Field label="Dzień">
+              <input className="input" type="date" value={sched.date} onChange={(e) => setSched({ ...sched, date: e.target.value })} aria-label="Dzień treningu" />
+            </Field>
+            <Field label="Godzina (wizyta)" hint="puste — bez wizyty">
+              <input className="input" type="time" value={sched.time} onChange={(e) => setSched({ ...sched, time: e.target.value })} aria-label="Godzina treningu" />
+            </Field>
+          </div>
+        </Modal>
+      )}
       {menuPlan && (
         <Sheet label={`Plan „${menuPlan.name}” — więcej`} onClose={() => setMenu(null)}>
           <strong className="pl-sheet-title">{menuPlan.name}</strong>

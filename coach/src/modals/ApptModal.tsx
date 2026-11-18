@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Field, Icon, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, groupOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
+import { clientById, deleteAppointment, followPlan, groupOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
 import { canMove, moveVisit, seriesEdit, visitsLeftInPackage } from '../lib/calendarMove';
 import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
@@ -94,6 +94,8 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
     // zmiana daty wizyty z zapisanym treningiem — trening przechodzi razem z nią (jedna para wizyta + trening)
     const moveSession = linkedS && editing && editing.date !== draft.date ? [put('sessions', { ...linkedS, date: draft.date })] : [];
+    // wizyta umówiona na jednostkę planu („Termin” w planie) — jednostka przechodzi na nowy dzień
+    if (editing && draft.status === 'planned') moveSession.push(...followPlan(db, editing, draft.date));
     if (!(await apply([...main, ...(allNext && editing ? seriesEdit(db, editing, d2) : []), ...chargeChange, ...moveSession], msg + pairMsg + (moveSession.length ? ' Zapisany trening przeniesiony na ten sam dzień.' : '')))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {

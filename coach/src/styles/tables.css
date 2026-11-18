@@ -1008,3 +1008,26 @@
   display: grid;
   gap: 2px;
 }
+
+/* „Termin” jednostki planu w nagłówku tygodnia (trener) */
+.ptab-table th .ptab-date-btn {
+  display: flex;
+  width: fit-content;
+  margin: 3px auto 0;
+  white-space: nowrap;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  color: inherit;
+  font: inherit;
+  padding: 1px 6px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.ptab-date-btn:hover,
+.ptab-date-btn:focus-visible {
+  opacity: 1;
+  border-style: solid;
+}

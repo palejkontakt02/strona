@@ -7,7 +7,7 @@ import { addDays } from '../lib/dates';
 import { parseDur, parseKm } from '../lib/running';
 import { cardioByName, isTimed, loadPerOf } from '../lib/run';
 import { fmtSec, secOf } from '../lib/parse';
-import { expandSets } from '../lib/plan';
+import { expandSets, moveWorkoutInPlan } from '../lib/plan';
 import { roundReal, scaleLoad } from '../lib/strength';
 import { del, put, type Change, type Db } from './db';
 
@@ -583,4 +583,39 @@ export function setPaymentStatus(client: Client, paymentId: string, paid: boolea
       p.id === paymentId ? { ...p, status: paid ? 'paid' : 'due', paidDate: paid ? today : undefined } : p,
     ),
   });
+}
+
+/**
+ * Termin jednostki planu: dzień (jednostka przeniesiona na ten dzień) i opcjonalnie godzina — wizyta w kalendarzu
+ * powiązana z jednostką. Ponowna zmiana terminu przesuwa tę samą wizytę (nie tworzy drugiej); wizyta już
+ * zaplanowana tego dnia u podopiecznego zostaje podpięta zamiast dublowania.
+ */
+export function scheduleWorkout(db: Db, plan: Plan, workoutId: string, date: string, time: string, from?: string): Change[] {
+  const changes: Change[] = [...savePlan(db, moveWorkoutInPlan(plan, workoutId, date, from, 'trainer'))];
+  const client = db.clients.find((c) => c.id === plan.clientId);
+  const open = (a: Appointment) => a.clientId === plan.clientId && a.status === 'planned' && !a.sessionId;
+  const linked = db.appointments.find((a) => open(a) && a.planRef?.planId === plan.id && a.planRef.workoutId === workoutId);
+  const t = time.trim() ? time.trim().padStart(5, '0') : '';
+  if (linked) {
+    if (linked.date !== date || (t && linked.time !== t)) changes.push(put('appointments', { ...linked, date, time: t || linked.time }));
+    return changes;
+  }
+  if (!t) return changes;
+  const sameDay = db.appointments.find((a) => open(a) && a.date === date && !a.planRef);
+  if (sameDay) changes.push(put('appointments', { ...sameDay, time: t, planRef: { planId: plan.id, workoutId } }));
+  else changes.push(put('appointments', { id: uid(), clientId: plan.clientId, date, time: t, duration: 60, status: 'planned', locationId: client?.locationId, planRef: { planId: plan.id, workoutId } }));
+  return changes;
+}
+
+/** Wizyta powiązana z jednostką planu (zaplanowana, jeszcze bez treningu). */
+export function workoutAppointment(db: Pick<Db, 'appointments'>, planId: string, workoutId: string): Appointment | undefined {
+  return db.appointments.find((a) => a.status === 'planned' && !a.sessionId && a.planRef?.planId === planId && a.planRef.workoutId === workoutId);
+}
+
+/** Wizyta umówiona na jednostkę planu przeniesiona na inny dzień — jednostka idzie razem z nią. */
+export function followPlan(db: Db, before: Appointment, date: string): Change[] {
+  if (!before.planRef || before.date === date || before.status !== 'planned' || before.sessionId) return [];
+  const plan = db.plans.find((p) => p.id === before.planRef!.planId);
+  if (!plan || !plan.weeks.some((w) => w.workouts.some((k) => k.id === before.planRef!.workoutId))) return [];
+  return savePlan(db, moveWorkoutInPlan(plan, before.planRef.workoutId, date, before.date, 'trainer'));
 }

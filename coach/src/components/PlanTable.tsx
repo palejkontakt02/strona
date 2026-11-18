@@ -4,7 +4,7 @@ import { colActuals, type ColActual } from '../lib/planActuals';
 import { planGrid, type GridCell, type GridSlot } from '../lib/planGrid';
 import { cardioByName } from '../lib/run';
 import { NOT_RUN, planRunTotals, targetText, zoneOf } from '../lib/running';
-import { Tag } from './ui';
+import { Icon, Tag } from './ui';
 import { fmtWeekdayDate } from '../lib/planGrid';
 
 /** Przerwa zawsze jako m:ss: „90” → „1:30”, „2” (minuty) → „2:00”; inny zapis bez zmian. */
@@ -54,8 +54,14 @@ export function PlanTable({
   onLive,
   onAthlete,
   sessions,
+  onSchedule,
+  apptTime,
 }: {
   plan: Plan;
+  /** Trener: „Termin” jednostki (dzień i godzina wizyty) z nagłówka tygodnia. */
+  onSchedule?: (k: PlanWorkout, date?: string) => void;
+  /** Godzina wizyty umówionej na jednostkę. */
+  apptTime?: (workoutId: string) => string | undefined;
   done: Set<string>;
   /** Zapisane treningi — w tygodniach zrobionych wykonanie (pogrubione) zamiast planu. */
   sessions?: TrainingSession[];
@@ -126,7 +132,7 @@ export function PlanTable({
                 </span>
               )}
             </div>
-            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals actuals={sessions ? colActuals(plan, s.cols, sessions).map((a, i) => (done.has(s.cols[i].k.id) && s.cols[i].k.id !== nextId ? a : null)) : undefined} />
+            <GridTable slot={s} nextId={nextId} nextDate={nextDate} done={done} profile={profile} dob={dob} runTotals onSchedule={onSchedule} apptTime={apptTime} actuals={sessions ? colActuals(plan, s.cols, sessions).map((a, i) => (done.has(s.cols[i].k.id) && s.cols[i].k.id !== nextId ? a : null)) : undefined} />
           </section>
         );
       })}
@@ -175,8 +181,12 @@ function GridTable({
   dob,
   runTotals,
   actuals,
+  onSchedule,
+  apptTime,
 }: {
   slot: GridSlot;
+  onSchedule?: (k: PlanWorkout, date?: string) => void;
+  apptTime?: (workoutId: string) => string | undefined;
   /** Wykonanie w kolumnach (tygodniach) — null: jednostka jeszcze niezrobiona. */
   actuals?: (ColActual | null)[];
   nextId?: string;
@@ -254,7 +264,18 @@ function GridTable({
                   {(() => {
                     // zrobione: data wykonania zamiast daty z planu (plan mógł być robiony w innym tygodniu / przejściu)
                     const a = actuals?.[cols.findIndex((c) => c.k.id === k.id)];
-                    return a ? <span className="ptab-date">zrobione {fmtWeekdayDate(a.session.date)}</span> : shown && <span className="ptab-date">{fmtWeekdayDate(shown)}</span>;
+                    if (a) return <span className="ptab-date">zrobione {fmtWeekdayDate(a.session.date)}</span>;
+                    // następna, ale jej dzień z planu minął: „zaległy” (data przesunięta pokazuje się przy „następny”, nie w nagłówku — inaczej dubluje datę kolejnego tygodnia)
+                    const late = k.id === nextId && nextDate && date && nextDate !== date && !k.date;
+                    const at = apptTime?.(k.id);
+                    const text = late ? `zaległy · plan ${fmtWeekdayDate(date!)}` : `${shown ? fmtWeekdayDate(shown) : 'bez daty'}${at ? ` · ${at}` : ''}`;
+                    if (onSchedule && !done?.has(k.id))
+                      return (
+                        <button type="button" className="ptab-date ptab-date-btn" onClick={() => onSchedule(k, late ? nextDate : shown)} title="Ustaw dzień i godzinę tego treningu (wizyta w kalendarzu)">
+                          <Icon name="calendar" size={12} /> {text}
+                        </button>
+                      );
+                    return (shown || late) && <span className="ptab-date">{text}</span>;
                   })()}
                   {rt && <span className="ptab-date ptab-runsum">{rt}</span>}
                 </th>
