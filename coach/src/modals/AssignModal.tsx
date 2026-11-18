@@ -11,11 +11,19 @@ import { currentPlan, planSequence } from '../lib/plan';
 import { emptyRunExercise, RUN_TEMPLATES } from '../lib/running';
 import { useNav, type ModalState } from '../nav';
 import { put } from '../data/db';
+import { pastedWorkout } from '../lib/pasteWorkout';
 import { ClientSelect } from './ModalHost';
 
 const WHEN = ['Dziś', 'Jutro', 'Inny dzień', 'Kiedy chce'] as const;
 type When = (typeof WHEN)[number];
-type Source = 'empty' | 'run' | 'plan' | 'repeat';
+type Source = 'empty' | 'paste' | 'run' | 'plan' | 'repeat';
+
+/** „4 serie: 8×40, 8×50, 8×60 @9, 8×65 kg” — podgląd wklejonego ćwiczenia. */
+function pasteSummary(e: PlanExercise): string {
+  const parts = e.groups.map((g) => `${Number(g.sets) > 1 ? `${g.sets}×` : ''}${g.reps || '?'}${e.perSide ? '/str.' : ''}${g.load ? ` × ${g.load.replace('.', ',')}` : ''}${g.rpe ? ` @${g.rpe.replace('.', ',')}` : ''}`);
+  const sets = e.groups.reduce((a, g) => a + (Number(g.sets) || 1), 0);
+  return `${sets} ${sets === 1 ? 'seria' : sets < 5 ? 'serie' : 'serii'}: ${parts.join(', ')}${e.groups.some((g) => /^\d/.test(g.load)) ? ' kg' : ''}`;
+}
 
 /** Kopia ćwiczeń z nowymi id (zmiany w zadanym treningu nie ruszają planu). */
 const copyEx = (ex: PlanExercise[]): PlanExercise[] => structuredClone(ex).map((e) => ({ ...e, id: uid() }));
@@ -41,6 +49,9 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
   // ciężary z oryginału albo puste (podpowiedź z historii tej osoby) — przy kopii dla kogoś innego domyślnie puste
   const [keepLoads, setKeepLoads] = useState<boolean | null>(null);
   const [time, setTime] = useState('');
+  // wklejona notatka z telefonu albo zakres z arkusza
+  const [pasteText, setPasteText] = useState('');
+  const pasted = pastedWorkout(pasteText, today);
   // ten sam trening także dla innych osób (każda dostaje własną kopię; ciężary dobierze historia tej osoby)
   const [others, setOthers] = useState<string[]>([]);
   const [manyOpen, setManyOpen] = useState(false);
@@ -59,6 +70,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
 
   /** Ćwiczenia i domyślna nazwa z wybranego źródła. */
   const fromSource = (s: Source, id: string): { name: string; exercises: PlanExercise[] } | null => {
+    if (s === 'paste') return pasted && pasted.exercises.length ? { name: pasted.name ?? '', exercises: pasted.exercises } : null;
     if (s === 'run') {
       if (id === 'custom') return { name: 'Bieg', exercises: [emptyRunExercise()] };
       const t = RUN_TEMPLATES.find((x) => x.id === id);
@@ -93,7 +105,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     if (time && !date) return toast('Godzina wizyty — wybierz też dzień (nie „Kiedy chce”).'), null;
     if (time && !/^\d{1,2}:\d{2}$/.test(time)) return toast('Godzina wizyty, np. 9:00.'), null;
     const n = extraPlanOf(db, client.id)?.weeks.reduce((a, w) => a + w.workouts.length, 0) ?? 0;
-    return { id: uid(), name: name.trim() || chosen?.name || `Trening dodatkowy ${n + 1}`, date, assignedAt: date ? today : undefined, exercises: chosen?.exercises ?? [] };
+    return { id: uid(), name: name.trim() || chosen?.name || (src === 'paste' && date ? `Trening ${date.slice(8, 10)}.${date.slice(5, 7)}` : `Trening dodatkowy ${n + 1}`), date, assignedAt: date ? today : undefined, exercises: chosen?.exercises ?? [] };
   };
 
   /** Od razu zapis (gdy trening ma ćwiczenia). */
@@ -162,6 +174,47 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
               <span className="muted small">ćwiczenia ułożysz w następnym kroku</span>
             </span>
           </label>
+          <label className={`assign-opt ${src === 'paste' ? 'on' : ''}`}>
+            <input type="radio" checked={src === 'paste'} onChange={() => choose('paste', '')} />
+            <span>
+              <b><Icon name="clipboard" size={15} /> Wklej z notatki albo arkusza</b>
+              <span className="muted small">notatka z telefonu (np. „Przysiad / 6x45 / 6x50”) albo zakres skopiowany z Excela / Arkuszy Google</span>
+            </span>
+          </label>
+          {src === 'paste' && (
+            <div className="assign-paste">
+              <textarea
+                className="input"
+                rows={8}
+                autoFocus
+                value={pasteText}
+                onChange={(e) => {
+                  setPasteText(e.target.value);
+                  const r = pastedWorkout(e.target.value, today);
+                  if (r?.name && !name.trim()) setName(r.name);
+                }}
+                placeholder={'Wklej trening, np.\n\nPrzysiad\n6x45\n6x50kg (RPE 8)\n\nPompki\n8/8/8\n\nOdwodzenie na wyciągu\n8+8x15kg'}
+                aria-label="Wklejony trening"
+              />
+              {pasted && pasted.exercises.length > 0 && (
+                <ul className="assign-paste-list small">
+                  {pasted.exercises.map((e) => (
+                    <li key={e.id}>
+                      <b>{e.name}</b> — {pasteSummary(e)}
+                      {e.notes ? <span className="muted"> · {e.notes}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {pasted && (pasted.skipped.length > 0 || pasted.warnings.length > 0) && (
+                <p className="small pi-error">
+                  {pasted.skipped.length > 0 && <>Nie rozpoznano: {pasted.skipped.map((x) => `„${x}”`).join(', ')}. </>}
+                  {pasted.warnings.join(' ')}
+                </p>
+              )}
+              {pasteText.trim() && pasted && !pasted.exercises.length && <p className="small pi-error">Nie rozpoznano ćwiczeń — nazwa ćwiczenia w osobnej linii, pod nią serie (np. „8x40kg”).</p>}
+            </div>
+          )}
           <label className={`assign-opt ${src === 'run' ? 'on' : ''}`}>
             <input type="radio" checked={src === 'run'} onChange={() => choose('run', 'custom')} />
             <span>

@@ -145,12 +145,19 @@ const cleanName = (s: string) => s.replace(/[\s:–\-/|]+$/, '').trim();
  * „3x10 8kg”, „8kg 3x10”, „5/3” i „3x5/4” (lewa / prawa), „Plank 3x45s”.
  * Kompleksy „2+1x60kg” zapisuje jako 3 powtórzenia z opisem w uwagach.
  */
-export function parseWorkoutNote(text: string): ParsedNote {
+export function parseWorkoutNote(text: string, opts: { plan?: boolean } = {}): ParsedNote {
   const out: ParsedNote = { exercises: [], skipped: [], warnings: [] };
-  let cur: (SessionExercise & { specs: SetSpec[] }) | null = null;
+  type Cur = SessionExercise & { specs: SetSpec[]; /** Superseria z ćwiczeniem wyżej (tylko przy zadawaniu treningu). */ linked?: boolean; /** RPE z nazwy („(ciężko, RPE 9)”) dla serii bez własnego. */ rpeAll?: number };
+  let cur: Cur | null = null;
+  // superseria: „SUPERSERIA – …” (do kreski) albo linia „+” między ćwiczeniami
+  let block = false;
+  let linkNext = false;
+  let blockCount = 0;
+  // opis w nawiasie przed ćwiczeniem („(seria RDL → od razu …)”) — uwaga do następnego ćwiczenia
+  let pending = '';
   const flush = () => {
     if (!cur) return;
-    const { specs, ...ex } = cur;
+    const { specs, rpeAll, ...ex } = cur;
     cur = null;
     if (!specs.length) return void out.skipped.push(ex.name);
     // ćwiczenie zapisane w kg („8x70kg”) — niejednoznaczne „3x10” to też powtórzenia × kg
@@ -167,7 +174,15 @@ export function parseWorkoutNote(text: string): ParsedNote {
       if (s.load != null && s.load > 400) out.warnings.push(`„${ex.name}”: ${String(s.load).replace('.', ',')} kg — sprawdź zapis.`);
       const unit = s.timed ? (/\bm$/.test(s.repsText) ? 'min' : 's') : undefined;
       for (let i = 0; i < Math.min(s.count, 20); i++)
-        setsLog.push({ load: s.load, reps: s.reps, repsR: s.repsR != null && s.repsR !== s.reps ? s.repsR : undefined, rpe: s.rpe, unit, complex: s.repsText.includes('+') ? s.repsText : undefined });
+        setsLog.push({
+          load: s.load,
+          reps: s.reps,
+          repsR: s.repsR != null && s.repsR !== s.reps ? s.repsR : undefined,
+          rpe: s.rpe ?? rpeAll,
+          unit,
+          // plan (zadany trening): zakres „6–8” zostaje zapisem powtórzeń
+          complex: s.repsText.includes('+') || (opts.plan && /^\d+–\d+$/.test(s.repsText)) ? s.repsText : undefined,
+        });
     }
     if (!setsLog.length) return void out.skipped.push(ex.name);
     const first = setsLog[0];
@@ -185,16 +200,110 @@ export function parseWorkoutNote(text: string): ParsedNote {
   };
   const start = (name: string) => {
     flush();
-    cur = { name: cleanName(name), specs: [] };
+    // „odwodzenie (ciężko, RPE 9)” — dopisek w nawiasie do uwag, RPE dla wszystkich serii
+    // tylko opis (liczby, RPE, przecinek, dłuższy tekst) — „Clean & Jerk (z podłogi)” zostaje nazwą
+    const par0 = name.match(/^(.*?\S)\s*\(([^()]+)\)\s*$/);
+    const par = par0 && (/\d|rpe|,/i.test(par0[2]) || par0[2].length > 25) ? par0 : null;
+    const base = par ? par[1] : name;
+    cur = { name: cleanName(base), specs: [] };
+    const extra = [pending, par ? par[2].trim() : ''].filter(Boolean);
+    if (extra.length) cur.notes = extra.map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join(' · ');
+    const r = par?.[2].match(/rpe\s*(\d+(?:[.,]\d+)?)/i);
+    if (r) cur.rpeAll = n(r[1]);
+    pending = '';
     if (perSideByName(cur.name)) cur.perSide = true;
+    if (linkNext || (block && blockCount > 0)) cur.linked = true;
+    linkNext = false;
+    if (block) blockCount++;
   };
   const add = (r: { specs: SetSpec[]; sided: boolean }) => {
     cur!.specs.push(...r.specs);
     if (r.sided) cur!.perSide = true;
   };
+  // `cur` zmienia się w funkcjach pomocniczych — odczyt przez funkcję (bez zawężenia typu do null)
+  const now = () => cur as Cur | null;
+  const note = (t: string) => {
+    const cur = now();
+    if (cur) cur.notes = [cur.notes, t].filter(Boolean).join(' · ');
+  };
   for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
+    let line = raw.trim();
     if (!line) continue;
+    // „———————-” — koniec ćwiczenia / bloku
+    if (/^[—–\-_=~·.*]{3,}$/.test(line)) {
+      flush();
+      block = false;
+      blockCount = 0;
+      linkNext = false;
+      continue;
+    }
+    // „+” między ćwiczeniami — superseria
+    if (line === '+') {
+      linkNext = true;
+      continue;
+    }
+    // nagłówek sekcji wielkimi literami: „PLYOMETRIA”, „CORE”, „SUPERSERIA – RDL + wiosłowanie”
+    const head = line.match(/^(\p{Lu}{3,})(?:\s|$|[–—:-])/u);
+    if (head && !/\d/.test(line) && (line === line.toUpperCase() || /^(SUPERSERIA|TRISERIA|OBW[ÓO]D|GIANT)/.test(head[1]))) {
+      flush();
+      block = /^(SUPERSERIA|TRISERIA|OBW[ÓO]D|GIANT)/.test(head[1]);
+      blockCount = 0;
+      continue;
+    }
+    // „(przysiad)” — nazwa ćwiczenia w nawiasie; „(seria RDL → … przerwa 90 s …)” — opis do następnego ćwiczenia
+    const par = line.match(/^\((.+)\)$/);
+    if (par && !/\d/.test(par[1])) line = par[1].trim();
+    else if (par) {
+      if (!now()?.specs.length || block) {
+        flush();
+        pending = par[1].trim();
+      } else note(par[1].trim());
+      continue;
+    }
+    // „8/str x 16kg”, „8/nogę x 12,5kg” — na stronę; „8 x ?kg”, „6-8 x mc” — bez ciężaru
+    let sided = false;
+    line = line.replace(/^(\d+(?:\s*[-–]\s*\d+)?(?:\s*s)?)\s*\/\s*(?:str\.?|stron[ęea]|nog[ęea]|rękę|reke)(?=\s*(?:[x×*]|$))/i, (_m, a: string) => {
+      sided = true;
+      return a;
+    });
+    let unknownLoad = false;
+    line = line.replace(/\s*[x×*]\s*(\?\s*(?:kg)?|mc|m\.\s?c\.|bw)(?=\s|$)/i, (_m, w: string) => {
+      if (w.startsWith('?')) unknownLoad = true;
+      return 'x';
+    });
+    // „6-8 x 45kg” — zakres powtórzeń (w serii zapisany jako dolna wartość, w planie „6–8”)
+    let range = '';
+    line = line.replace(/^(\d+)\s*[-–]\s*(\d+)(?=\s*(?:[x×*]|$))/, (_m, a: string, b: string) => {
+      range = `${a}–${b}`;
+      return a;
+    });
+    // „10”, „4”, „20 s” — same powtórzenia / czas (seria bez ciężaru)
+    if (/^\d+(?:\s*s)?$/.test(line) && now()) line = /s$/.test(line) ? `1x${line.replace(/\s/g, '')}` : `${line}x`;
+    // „8x60kg (RPE 9)” → „8x60kg RPE 9”
+    line = line.replace(/\(\s*((?:rpe|@)\s*\d+(?:[.,]\d+)?)\s*\)/gi, ' $1').replace(/\s+/g, ' ').trim();
+    // „8x65❌” — seria oznaczona jako nieudana
+    const failed = /[❌✗✘]/u.test(line);
+    if (failed) line = line.replace(/[❌✗✘]/gu, '').trim();
+    // „8+8x15kg” (te same liczby, od 5 w górę) — powtórzenia na każdą stronę, nie kompleks
+    let sidedLine = false;
+    line = line.replace(/^(\d+)\s*\+\s*(\d+)(?=\s*[x×*])/, (m, a: string, b: string) => {
+      if (a !== b || Number(a) < 5) return m;
+      sidedLine = true;
+      return a;
+    });
+    // „8/8/8” — serie po kolei (3 i więcej liczb; „5/3” to lewa / prawa)
+    const list = line.match(/^(\d+(?:\s*\/\s*\d+){2,})$/);
+    if (list && now()) {
+      for (const x of list[1].split('/')) now()!.specs.push({ count: 1, repsText: x.trim(), reps: Number(x) });
+      continue;
+    }
+    // „poziom 16/16/16”, „guma czerwona/czerwona/zielona” — opis serii do uwag
+    const attr = line.match(/^(\p{L}[\p{L} .]*?)\s+(\S+(?:\s*\/\s*\S+){2,})$/u);
+    if (attr && now()?.specs.length) {
+      const vals = [...new Set(attr[2].split('/').map((x) => x.trim()))];
+      note(`${attr[1].charAt(0).toUpperCase()}${attr[1].slice(1)} ${vals.join(' / ')}`);
+      continue;
+    }
     const d = line.match(DATE);
     if (d) {
       const iso = `${d[3]}-${d[2].padStart(2, '0')}-${d[1].padStart(2, '0')}`;
@@ -208,7 +317,14 @@ export function parseWorkoutNote(text: string): ParsedNote {
     const whole = readSets(line, false);
     if (whole) {
       if (!cur) out.skipped.push(line);
-      else add(whole);
+      else {
+        add(whole);
+        const c = now()!;
+        if (sidedLine || sided) c.perSide = true;
+        if (range) for (const sp of whole.specs) sp.repsText = range;
+        if (unknownLoad && !/do dobrania/.test(c.notes ?? '')) note('Ciężar do dobrania');
+        if (failed) note(`Seria ${now()!.specs.length} (${line.replace(/\s*(kg)\b/i, ' kg')}) — nieudana`);
+      }
       continue;
     }
     // „Podciąganie 4x6”, „Przysiad 140x5x3”, „Wyciskanie leżąc 102,5 kg 3x5 @8”, „Step down / 3x10” — nazwa i serie w jednej linii

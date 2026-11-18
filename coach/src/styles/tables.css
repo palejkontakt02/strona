@@ -991,3 +991,20 @@
   font-style: normal;
   font-size: 0.85em;
 }
+
+/* „Zadaj trening” → wklejona notatka / zakres arkusza */
+.assign-paste {
+  display: grid;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-2, 8px);
+}
+.assign-paste textarea {
+  font-family: inherit;
+  min-height: 9rem;
+}
+.assign-paste-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 2px;
+}
