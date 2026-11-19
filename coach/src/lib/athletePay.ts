@@ -83,3 +83,26 @@ export function fmtAccount(v: string): string {
   const n = d.replace(/^PL/i, '');
   return `${/^PL/i.test(d) ? 'PL ' : ''}${n.slice(0, 2)} ${n.slice(2).replace(/(\d{4})(?=\d)/g, '$1 ')}`;
 }
+
+export interface PaidItem {
+  id: string;
+  /** Dzień wpłaty (albo dzień płatności, gdy trener nie wpisał dnia wpłaty). */
+  date: ISODate;
+  amount: number;
+  label: string;
+  method?: string;
+  doc?: string;
+}
+
+/** Historia opłaconych płatności podopiecznego: od najnowszej. */
+export function paidItems(client: Pick<Client, 'payments'>): PaidItem[] {
+  return (client.payments ?? [])
+    .filter((p) => p.status === 'paid')
+    .map((p) => ({ id: p.id, date: p.paidDate || p.date, amount: p.amount, label: payLabel(p), method: p.method, doc: p.doc?.trim() || undefined }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/** Suma wpłat w danym roku (rrrr). */
+export function paidInYear(items: PaidItem[], year: string): number {
+  return items.filter((x) => x.date.startsWith(year)).reduce((a, x) => a + x.amount, 0);
+}

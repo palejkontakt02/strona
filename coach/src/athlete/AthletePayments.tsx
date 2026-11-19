@@ -6,7 +6,7 @@ import { useTrainerProfile } from '../data/trainerProfile';
 import { Icon } from '../components/ui';
 import { packageStatus } from '../lib/billing';
 import { todayISO } from '../lib/dates';
-import { dueItems, dueLine, fmtAccount, packageLine, packageValidTo, paidMessage, reportedAt, transferTitle, type DueItem, type PaidVia } from '../lib/athletePay';
+import { dm, dueItems, dueLine, fmtAccount, fmtZl, packageLine, packageValidTo, paidInYear, paidItems, paidMessage, reportedAt, transferTitle, type DueItem, type PaidVia } from '../lib/athletePay';
 import { pastForm } from '../lib/gender';
 
 async function copyText(text: string): Promise<boolean> {
@@ -59,7 +59,12 @@ export function AthletePayments({ client, preview }: { client: Client; preview?:
   const [open, setOpen] = useState<string | null>(null);
   const [via, setVia] = useState<PaidVia>('przelew');
   const [busy, setBusy] = useState(false);
-  if (!pkg && !due.length) return null;
+  const [all, setAll] = useState(false);
+  const paid = paidItems(client);
+  if (!pkg && !due.length && !paid.length) return null;
+  const year = today.slice(0, 4);
+  const yearSum = paidInYear(paid, year);
+  const shown = all ? paid : paid.slice(0, 5);
   const paidWord = pastForm(client as Client & { sex?: string }, 'Zapłaciłam', 'Zapłaciłem');
   const hasBank = !!profile.bankAccount?.trim();
   const hasBlik = !!profile.blikPhone?.trim();
@@ -130,6 +135,31 @@ export function AthletePayments({ client, preview }: { client: Client; preview?:
           </div>
         );
       })}
+      {paid.length > 0 && (
+        <div className="r7-pay-hist">
+          <div className="r7-pay-hist-head">
+            <b>Historia wpłat</b>
+            {yearSum > 0 && <span className="muted small">{year}: {fmtZl(yearSum)}</span>}
+          </div>
+          <ul>
+            {shown.map((x) => (
+              <li key={x.id}>
+                <span className="r7-pay-hist-date num">{dm(x.date)}{x.date.slice(0, 4) !== year ? `.${x.date.slice(0, 4)}` : ''}</span>
+                <span className="grow">
+                  {x.label.charAt(0).toUpperCase() + x.label.slice(1)}
+                  {(x.method || x.doc) && <span className="muted small"> · {[x.method, x.doc && `dok. ${x.doc}`].filter(Boolean).join(' · ')}</span>}
+                </span>
+                <b className="num">{fmtZl(x.amount)}</b>
+              </li>
+            ))}
+          </ul>
+          {paid.length > 5 && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll(!all)}>
+              {all ? 'Pokaż mniej' : `Pokaż wszystkie (${paid.length})`}
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

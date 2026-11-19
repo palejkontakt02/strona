@@ -178,3 +178,36 @@
 .consent-why {
   color: var(--color-text);
 }
+
+/* historia wpłat podopiecznego */
+.r7-pay-hist {
+  margin-top: var(--space-3, 12px);
+  border-top: 1px solid var(--color-divider);
+  padding-top: var(--space-3, 12px);
+}
+.r7-pay-hist-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.r7-pay-hist ul {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+.r7-pay-hist li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.r7-pay-hist li:last-child {
+  border-bottom: 0;
+}
+.r7-pay-hist-date {
+  color: var(--color-neutral-400);
+  min-width: 3.2em;
+}
