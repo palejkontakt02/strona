@@ -325,7 +325,7 @@ export function ClientPlans({ client }: { client: Client }) {
         }
       >
         {extraWorkouts.length === 0 ? (
-          <p className="muted small">Trening na konkretny dzień (np. jutro bieg, w sobotę mobilność) albo do zrobienia w dowolnym momencie. Plan i jego kolejność się nie zmieniają.</p>
+          <p className="muted small">Na konkretny dzień albo bez terminu. Plan zostaje bez zmian.</p>
         ) : (
           <div className="plan-week">
             {visibleExtra.map((k) => (

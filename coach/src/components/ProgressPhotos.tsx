@@ -263,7 +263,7 @@ export function CoachPhotos({ client }: { client: Client }) {
   const { apply } = useStore();
   const photos = [...(client.progressPhotos ?? [])].sort((a, b) => b.date.localeCompare(a.date) || POSES.indexOf(a.pose) - POSES.indexOf(b.pose));
   const [all, setAll] = useState(false);
-  if (!photos.length) return <p className="empty">Podopieczny nie dodał jeszcze zdjęć sylwetki (dodaje je w aplikacji albo w raporcie tygodniowym).</p>;
+  if (!photos.length) return <p className="empty">Brak zdjęć sylwetki.</p>;
   const toggle = (p: ProgressPhoto) =>
     apply([put('clients', { ...client, progressPhotos: (client.progressPhotos ?? []).map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x)) })], p.hidden ? 'Zdjęcie znowu widoczne.' : 'Zdjęcie ukryte przed podopiecznym.');
   return (

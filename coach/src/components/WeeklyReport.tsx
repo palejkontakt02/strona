@@ -238,7 +238,7 @@ export function CoachReports({ client }: { client: Client }) {
         <span>Raport tygodniowy: {on ? 'wymagany' : 'niewymagany'}</span>
       </label>
       {reps.length === 0 ? (
-        <p className="empty">{on ? 'Brak raportów. Podopieczny zobaczy kartę „Raport tygodnia” od piątku do poniedziałku.' : 'Włącz, by podopieczny co tydzień wysyłał wagę, sen, stres, energię, kroki i zdjęcia.'}</p>
+        <p className="empty">{on ? 'Brak raportów. Karta pojawia się od piątku do poniedziałku.' : 'Co tydzień: waga, sen, stres, energia, kroki i zdjęcia.'}</p>
       ) : (
         <>
           {weights.length >= 2 && <LineChart label="Waga z raportów" series={[{ label: 'Waga (kg)', pts: weights }]} height={140} />}

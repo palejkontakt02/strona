@@ -824,7 +824,7 @@ function TodayTab({
         <section className="acard ath-intake today-second">
           <span className="ath-intake-tx">
             <b>Ankieta startowa</b>
-            <span className="muted small">Zdrowie, styl życia i cele. Ok. 5 minut.</span>
+            <span className="muted small">Zdrowie i cele. 5 minut.</span>
             {intakeLater && <span className="muted small">Odłożona {fmtDay(intakeLater.slice(0, 10))}. Zapisane odpowiedzi czekają.</span>}
           </span>
           <button className="btn btn-secondary" onClick={onIntake}>

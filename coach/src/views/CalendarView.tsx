@@ -547,8 +547,7 @@ export function CalendarView() {
         />
       )}
       <p className="muted small legend-note">
-        kropka = miejsce · „sam” = trening samodzielny (kropkowany pasek) ·
-        przerywana ramka = zadany do zrobienia
+        „sam”: trening samodzielny · przerywana ramka: zadany do zrobienia
       </p>
     </div>
   );

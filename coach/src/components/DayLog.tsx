@@ -174,7 +174,7 @@ export function CoachTargets({ client }: { client: Client }) {
               Zapisz cele
             </button>
           </div>
-          <p className="muted small">Puste pole = bez celu. Podopieczny wpisuje wartości w karcie „Dziś”. Cel osiągnięty: kcal ±10%, reszta min. 90%. Tłuszcze i węglowodany widać w karcie „Jedzenie” (bez wliczania do realizacji).</p>
+          <p className="muted small">Puste pole: bez celu. Cel osiągnięty: kcal ±10%, reszta min. 90%.</p>
         </div>
       ) : (
         <>

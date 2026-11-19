@@ -158,7 +158,7 @@ export function ClientHabits({ client }: { client: Client }) {
         </>
       )}
       {editing === 'new' && <HabitForm protein={client.targets?.protein} taken={habits.map((h) => h.title.toLowerCase())} onCancel={() => setEditing(null)} onSave={(h) => void save([...(client.habits ?? []), h], 'Dodano zadanie.').then(() => setEditing(null))} />}
-      {habits.length === 0 && !editing && <Empty>Dodaj zadania, które podopieczny ma odhaczać każdego dnia (kroki, woda, sen, mobilność…). Zobaczy je w swojej aplikacji jako koło do zamknięcia.</Empty>}
+      {habits.length === 0 && !editing && <Empty>Zadania do odhaczania codziennie: kroki, woda, sen, mobilność.</Empty>}
       <ul className="rows">
         {habits.map((h) =>
           editing !== 'new' && editing?.id === h.id ? (

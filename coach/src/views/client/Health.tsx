@@ -61,7 +61,7 @@ export function ClientIntakeCard({ client }: { client: Client }) {
     >
       {!i?.completedAt ? (
         <p className="muted small">
-          Podopieczny wypełnia ankietę po pierwszym zalogowaniu (zdrowie, styl życia, odżywianie, sport, cele). Możesz też uzupełnić ją z nim:{' '}
+          Podopieczny wypełnia ankietę po pierwszym logowaniu. Możesz też wypełnić ją z nim{' '}
           <button className="link small" onClick={() => startAthlete(client.id)}>
             w trybie zawodnika
           </button>
