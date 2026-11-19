@@ -1,0 +1,116 @@
+/* Paleta danych (DESIGN.md, „Kolor danych”). Oddzielona od koloru akcji (--color-accent = czerń / biel).
+   Zasada: kolor danych stoi ZAWSZE obok liczby, słowa albo kształtu, nigdy zamiast nich. Nie do dekoracji.
+   Odcienie: --rpe-N / --kind-* / --st-* do znaczników (pasek, kropka, linia; kontrast min. 3:1 z kartą),
+   --rpe-N-fg do tekstu w kolorze (min. 4,5:1). Pomocnik w TS: src/lib/dataColors.ts (rpeLevel, sessionKind). */
+
+/* jasne: Biały (bazowy :root) i Jasny */
+:root {
+  /* RPE w pięciu krokach, jak strefy tętna: ≤6 szary, 7 niebieski, 8 zielony, 9 pomarańczowy, 10 czerwony */
+  --rpe-1: #8a8a8a;
+  --rpe-2: #2a62d4;
+  --rpe-3: #1a7f37;
+  --rpe-4: #d35f00;
+  --rpe-5: #d1242f;
+  --rpe-1-fg: #5e5e5e;
+  --rpe-2-fg: #1f4fb0;
+  --rpe-3-fg: #116329;
+  --rpe-4-fg: #9a4300;
+  --rpe-5-fg: #a40e26;
+  /* typ jednostki: wąski pasek jak na numerze startowym, zawsze z nazwą jednostki */
+  --kind-sila: #111111;
+  --kind-dwuboj: #2a62d4;
+  --kind-bieg: #0b7f86;
+  --kind-rehab: #a3367a;
+  --kind-inne: #8a8a8a;
+  /* status jednostki / serii */
+  --st-done: var(--color-ok);
+  --st-next: var(--color-text);
+  --st-missed: var(--color-warn);
+  --st-moved: var(--color-neutral-500);
+  --st-deload: var(--color-neutral-500);
+}
+
+/* ciemne: Czarny i pozostałe ciemne motywy */
+:root[data-palette='mono'],
+:root[data-palette='kobalt'],
+:root[data-palette='morski'],
+:root[data-palette='grafit'],
+:root[data-palette='fiolet'] {
+  --rpe-1: #7f7f7f;
+  --rpe-2: #5b8fff;
+  --rpe-3: #3ccf6e;
+  --rpe-4: #ff8f3d;
+  --rpe-5: #ff5c57;
+  --rpe-1-fg: #a8a8a8;
+  --rpe-2-fg: #8fb2ff;
+  --rpe-3-fg: #6fdc93;
+  --rpe-4-fg: #ffab6e;
+  --rpe-5-fg: #ff8a85;
+  --kind-sila: #f2f2f2;
+  --kind-dwuboj: #5b8fff;
+  --kind-bieg: #34c3c9;
+  --kind-rehab: #e57ab8;
+  --kind-inne: #7f7f7f;
+}
+
+/* znacznik RPE: krótki pionowy pasek tuż przed liczbą (liczba zostaje w kolorze tekstu) */
+.rpe-cue {
+  display: inline-block;
+  width: 3px;
+  height: 0.9em;
+  margin-right: 5px;
+  vertical-align: -0.08em;
+  background: var(--rpe-c, transparent);
+}
+[data-rpe='1'] {
+  --rpe-c: var(--rpe-1);
+}
+[data-rpe='2'] {
+  --rpe-c: var(--rpe-2);
+}
+[data-rpe='3'] {
+  --rpe-c: var(--rpe-3);
+}
+[data-rpe='4'] {
+  --rpe-c: var(--rpe-4);
+}
+[data-rpe='5'] {
+  --rpe-c: var(--rpe-5);
+}
+
+/* znacznik typu jednostki (do użycia w planie i kalendarzu): data-kind na elemencie, pasek z lewej */
+[data-kind='sila'] {
+  --kind-c: var(--kind-sila);
+}
+[data-kind='dwuboj'] {
+  --kind-c: var(--kind-dwuboj);
+}
+[data-kind='bieg'] {
+  --kind-c: var(--kind-bieg);
+}
+[data-kind='rehab'] {
+  --kind-c: var(--kind-rehab);
+}
+[data-kind='inne'] {
+  --kind-c: var(--kind-inne);
+}
+.kind-bar {
+  box-shadow: inset 3px 0 0 var(--kind-c, transparent);
+}
+
+/* cyfry tabelaryczne wszędzie, gdzie liczby stoją w kolumnach, licznikach i polach */
+table,
+input,
+.kpi,
+.kpi-value,
+.display-num,
+.month-num,
+.row-time,
+.tile-time,
+.rb-time,
+.rf-time,
+.restbar,
+.rest-full,
+.num {
+  font-variant-numeric: tabular-nums;
+}

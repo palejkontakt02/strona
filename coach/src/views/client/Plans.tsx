@@ -426,7 +426,7 @@ export function ClientPlans({ client }: { client: Client }) {
                   {k.exercises.some((e) => e.name) ? (
                     <span className="plan-workout-actions">
                       <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
-                        ▶ Prowadź
+                        <Icon name="play" size={14} /> Prowadź
                       </button>
                       <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: extra!.id, workoutId: k.id })}>
                         Jako zawodnik
@@ -453,7 +453,7 @@ export function ClientPlans({ client }: { client: Client }) {
 
 /** Stan treningu poza planem: na dzień / zaległy / wykonany / bez terminu (ostatnio). */
 export function ExtraTag({ st }: { st: ExtraState }) {
-  if (st.state === 'done') return <Tag tone="ok">✓ wykonany {fmtDate(st.date!)}</Tag>;
+  if (st.state === 'done') return <Tag tone="ok"><Icon name="check" size={12} /> wykonany {fmtDate(st.date!)}</Tag>;
   if (st.state === 'overdue') return <Tag tone="warn">zaległy · był na {fmtDate(st.date!)}</Tag>;
   if (st.state === 'due') return <Tag tone="accent">na {fmtDate(st.date!)}</Tag>;
   return <Tag tone="muted">bez terminu{st.date ? ` · ostatnio ${fmtDate(st.date)}` : ''}</Tag>;

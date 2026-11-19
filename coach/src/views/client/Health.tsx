@@ -253,7 +253,7 @@ export function ClientHealth({ client }: { client: Client }) {
                 Zapisz
               </button>
             ) : rec.health ? (
-              <span className="save-state">✓ Zapisano</span>
+              <span className="save-state"><Icon name="check" size={14} /> Zapisano</span>
             ) : null}
           </div>
         </>

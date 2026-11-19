@@ -162,7 +162,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
       title={client?.name ?? 'Trening'}
       onClose={closeModal}
       onSubmit={() => void save()}
-      submitLabel={hasVids && !s.reviewedAt ? 'Obejrzane ✓' : 'Zapisz komentarz'}
+      submitLabel={hasVids && !s.reviewedAt ? 'Obejrzane' : 'Zapisz komentarz'}
       wide
       extraActions={
         <>
@@ -230,7 +230,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
           )}
           <div className="review-ctrl row">
             <button type="button" className="btn btn-secondary btn-sm" disabled={idx === 0} onClick={() => setIdx(idx - 1)} aria-label="Poprzednie nagranie">
-              ‹ <span className="hide-xs">Poprzednie</span>
+              <Icon name="chevL" size={14} /> <span className="hide-xs">Poprzednie</span>
             </button>
             <div className="seg" role="group" aria-label="Tempo odtwarzania">
               {[0.25, 0.5, 1].map((r) => (
@@ -240,7 +240,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
               ))}
             </div>
             <button type="button" className="btn btn-secondary btn-sm" disabled={idx >= vids.length - 1} onClick={() => setIdx(idx + 1)} aria-label="Następne nagranie">
-              <span className="hide-xs">Następne</span> ›
+              <span className="hide-xs">Następne</span> <Icon name="chevR" size={14} />
             </button>
           </div>
         </div>

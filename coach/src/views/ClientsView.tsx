@@ -147,7 +147,7 @@ export function ClientsView() {
         {selected ? (
           <div className="detail">
             <button className="btn btn-ghost btn-sm back" onClick={closeClient}>
-              ‹ Wszyscy podopieczni
+              <Icon name="chevL" size={14} /> Wszyscy podopieczni
             </button>
             <header className="detail-header">
               <Avatar name={selected.name} size={64} />

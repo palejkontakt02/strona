@@ -266,7 +266,7 @@ export function ClientProfile({ client }: { client: Client }) {
               Zapisz
             </button>
           ) : (
-            <span className="save-state">✓ Zapisano</span>
+            <span className="save-state"><Icon name="check" size={14} /> Zapisano</span>
           )}
         </div>
         <ClientFields d={d} set={set} />

@@ -121,7 +121,7 @@ export function WorkoutList({ client }: { client: Client }) {
                           <span title="Trening przerwany z powodu bólu — jednostka nie jest zaliczona">przerwany {fmtDate(stopped.date)}</span>
                         </Tag>
                       ) : dn && !isNext ? (
-                        <Tag tone="ok">✓ {fmtDate(dn)}</Tag>
+                        <Tag tone="ok"><Icon name="check" size={12} /> {fmtDate(dn)}</Tag>
                       ) : null}
                       <div className="muted small">{[when && dayText(when), planWorkoutSummary(k, client.run)].filter(Boolean).join(' · ')}</div>
                     </div>
@@ -130,7 +130,7 @@ export function WorkoutList({ client }: { client: Client }) {
                       {n > 0 && (isNext || g.plan.extra) && (
                         <>
                           <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: g.plan.id, workoutId: k.id })}>
-                            ▶ Prowadź
+                            <Icon name="play" size={14} /> Prowadź
                           </button>
                           <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: g.plan.id, workoutId: k.id })}>
                             Jako zawodnik
@@ -166,7 +166,7 @@ export function WorkoutList({ client }: { client: Client }) {
               <li key={s.id} className="row wl-row">
                 <div className="grow">
                   <strong>{s.workoutName || 'Trening'}</strong>{' '}
-                  {s.stoppedForPain ? <Tag tone="warn">przerwany {fmtDate(s.date)}</Tag> : <Tag tone="ok">✓ {fmtDate(s.date)}</Tag>}
+                  {s.stoppedForPain ? <Tag tone="warn">przerwany {fmtDate(s.date)}</Tag> : <Tag tone="ok"><Icon name="check" size={12} /> {fmtDate(s.date)}</Tag>}
                   <div className="muted small">
                     {(() => {
                       const ex = s.exercises.length;
@@ -179,7 +179,7 @@ export function WorkoutList({ client }: { client: Client }) {
                   {s.exercises.length > 0 && (
                     <>
                       <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { repeatSessionId: s.id })}>
-                        ▶ Prowadź
+                        <Icon name="play" size={14} /> Prowadź
                       </button>
                       <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { repeatSessionId: s.id })}>
                         Jako zawodnik

@@ -314,7 +314,7 @@ export function ClientMultiPick({ value, onChange, exclude = [] }: { value: stri
         <div className="chips multi-pick-chosen">
           {value.map((id) => (
             <button key={id} type="button" className="chip active" onClick={() => toggle(id)} aria-label={`Usuń ${clientById(db, id)?.name ?? ''}`}>
-              {clientById(db, id)?.name ?? '—'} ✕
+              {clientById(db, id)?.name ?? '—'} <Icon name="x" size={12} />
             </button>
           ))}
         </div>

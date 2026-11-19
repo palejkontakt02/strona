@@ -195,7 +195,7 @@ export function LiveSession({
             onExit();
           }}
         >
-          ‹ Panel
+          <Icon name="chevL" size={16} /> Panel
         </button>
       </div>}
       {pair && <p className="pair-who">Prowadzisz: <b>{client.name}</b></p>}
@@ -206,7 +206,7 @@ export function LiveSession({
           client={client}
           run={run}
           setRun={setRun}
-          homeLabel={run.editSessionId ? '‹ Anuluj poprawki' : '‹ Zmień trening'}
+          homeLabel={run.editSessionId ? 'Anuluj poprawki' : 'Zmień trening'}
           appointmentId={run.appointmentId ?? appointmentId}
           onHome={async () => {
             if (run.editSessionId) {
@@ -343,7 +343,7 @@ export function LiveSession({
                       if (nx && plan.active && k.id !== nx.workout.id && !savedSameDay(db, clientId, plan.id, k.id, todayISO()) && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). ${inPass.has(k.id) ? 'Ten trening jest już zrobiony w tym przejściu planu — powtórka nie przesunie planu' : 'Po zapisie plan pójdzie dalej od wybranego'}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
                       start(k.id);
                     }}>
-                      <span className="wo-st">{nx?.workout.id === k.id ? '▶' : inPass.has(k.id) ? '✓' : ''}</span>
+                      <span className="wo-st">{nx?.workout.id === k.id ? <Icon name="play" size={14} /> : inPass.has(k.id) ? <Icon name="check" size={16} /> : ''}</span>
                       <span className="wo-tx">
                         <b>{k.name}</b>
                         <span className="muted small">
@@ -364,7 +364,7 @@ export function LiveSession({
                 const last = sessions.find((x) => (x.planId === extra?.id && x.workoutId === k.id) || (x.extraOf?.planId === extra?.id && x.extraOf?.workoutId === k.id))?.date;
                 return (
                   <button key={k.id} className="wo-item" onClick={() => startExtra(k.id)}>
-                    <span className="wo-st">{last ? '✓' : ''}</span>
+                    <span className="wo-st">{last ? <Icon name="check" size={16} /> : ''}</span>
                     <span className="wo-tx">
                       <b>{k.name}</b>
                       <span className="muted small">
@@ -431,7 +431,7 @@ export function PairLive({ people: initial, onExit }: { people: { clientId: stri
               <button key={id} role="tab" aria-selected={active === id} className={`pair-tab ${active === id ? 'active' : ''} ${isDone ? 'done' : ''}`} onClick={() => (setActive(id), window.scrollTo(0, 0))} disabled={isDone}>
                 <Avatar name={c?.name ?? '?'} size={22} />
                 <span className="pair-name">{c?.name.split(' ')[0] ?? '—'}</span>
-                <span className="pair-prog">{isDone ? '✓ zapisany' : p ? `${p.d}/${p.t}` : 'wybór'}</span>
+                <span className="pair-prog">{isDone ? <><Icon name="check" size={12} /> zapisany</> : p ? `${p.d}/${p.t}` : 'wybór'}</span>
                 {(() => {
                   // przerwa osoby niewidocznej na ekranie: odliczanie, potem „gotowy”
                   const end = rests[id];
@@ -481,7 +481,7 @@ export function PairLive({ people: initial, onExit }: { people: { clientId: stri
             onExit();
           }}
         >
-          ‹ Panel
+          <Icon name="chevL" size={16} /> Panel
         </button>
       </div>
       {people.map(({ clientId: id, appointmentId }) =>

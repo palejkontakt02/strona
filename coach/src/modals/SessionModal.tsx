@@ -445,7 +445,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             </button>
             {existing.exercises.length > 0 && (
               <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'assign', clientId: existing.clientId, sessionId: existing.id })}>
-                ↻ Powtórz / kopiuj
+                <Icon name="repeat" size={16} /> Powtórz / kopiuj
               </button>
             )}
           </>

@@ -4,6 +4,7 @@ import { useStore } from '../data/store';
 import { INTAKE, INTAKE_PARQ, intakeProgress, type Intake, type IntakeField, type IntakeFile } from '../lib/intake';
 import { ClientFiles } from '../components/ClientFiles';
 import { Consents } from '../components/Consents';
+import { Icon } from '../components/ui';
 import { CONSENT_TEXT, consentDate, hasConsent } from '../lib/rodo';
 
 const DRAFT = (id: string) => `fitowa-intake-draft:${id}`;
@@ -132,7 +133,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
             client={client}
             variant="prompt"
             only={['health']}
-            saveLabel="Dalej ›"
+            saveLabel="Dalej"
             onLater={onClose}
             onDone={(c) => {
               if (!c.health) {
@@ -191,7 +192,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
       <div className="intake-nav">
         {step > 0 ? (
           <button className="btn btn-ghost" onClick={() => setStep(step - 1)}>
-            ‹ Wstecz
+            <Icon name="chevL" size={16} /> Wstecz
           </button>
         ) : (
           <button className="btn btn-ghost" onClick={onClose}>
@@ -200,7 +201,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
         )}
         {step < steps - 1 ? (
           <button className="btn btn-primary btn-lg" onClick={() => setStep(step + 1)}>
-            Dalej ›
+            Dalej
           </button>
         ) : (
           <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => void finish()}>
@@ -225,7 +226,7 @@ function IntakeInput({ f, value, onChange, exclude }: { f: IntakeField; value: s
             const on = sel.includes(o);
             return (
               <button key={o} type="button" aria-pressed={on} className={on ? 'active' : ''} onClick={() => onChange((on ? sel.filter((x) => x !== o) : [...sel, o]).join(', '))}>
-                {on ? '✓ ' : ''}
+                {on ? <Icon name="check" size={14} /> : null}{on ? ' ' : ''}
                 {o}
               </button>
             );

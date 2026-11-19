@@ -137,7 +137,7 @@ function elapsedMinutes(startedAt: number): string {
   return m >= 10 && m <= 240 ? String(m) : '';
 }
 
-export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = '‹ Wróć', appointmentId, onRest }: Props) {
+export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 'athlete', homeLabel = 'Wróć', appointmentId, onRest }: Props) {
   const { db, apply, toast, ask, sendClientNote, sendClientMessage, saveHabitDay, saveClientEntry } = useStore();
   const [rest, setRest] = useState<{ end: number; total: number; note?: string } | null>(null);
   useEffect(() => {
@@ -774,7 +774,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </>
           )}
           <button className="ok" aria-pressed={s.done} aria-label={s.done ? 'Cofnij serię' : 'Seria zaliczona'} onClick={() => onDone(k, i)}>
-            ✓
+            <Icon name="check" size={22} />
           </button>
         </div>
         {run.ex[k].cardio && (s.pace || paceText(parseDur(s.reps), parseKm(s.dist))) && (
@@ -823,22 +823,22 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           <div className="warm-tools">
             {run.ex[k].sets[i - 1]?.warmup && !run.ex[k].sets[i - 1].done && (
               <button className="link small muted" aria-label="Przesuń serię wstępną wyżej" onClick={() => moveWarmup(k, i, -1)}>
-                ↑ wyżej
+                <Icon name="up" size={12} /> wyżej
               </button>
             )}
             {run.ex[k].sets[i + 1]?.warmup && (
               <button className="link small muted" aria-label="Przesuń serię wstępną niżej" onClick={() => moveWarmup(k, i, 1)}>
-                ↓ niżej
+                <Icon name="chevD" size={12} /> niżej
               </button>
             )}
             <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, 'wstępną') : removeWarmup(k, i))}>
-              ✕ usuń tę serię wstępną
+              <Icon name="x" size={12} /> usuń tę serię wstępną
             </button>
           </div>
         )}
         {trainer && !s.warmup && !s.done && !s.reps.trim() && !s.load.trim() && run.ex[k].sets.length > 1 && (
           <button className="link small muted warm-remove" onClick={() => (s.video ? void removeAt(k, i, num) : removeWarmup(k, i))}>
-            ✕ usuń tę serię
+            <Icon name="x" size={12} /> usuń tę serię
           </button>
         )}
       </div>
@@ -1188,12 +1188,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         })()}
       <div className="between">
         <button className="btn btn-ghost btn-sm" onClick={onHome}>
-          {homeLabel}
+          <Icon name="chevL" size={16} /> {homeLabel}
         </button>
         <span className="actions">
           {trainer && run.ex.length > 0 && (
             <button className="btn btn-secondary btn-sm" onClick={() => setLayoutOpen(true)}>
-              ✎ Układ
+              <Icon name="edit" size={14} /> Układ
             </button>
           )}
           {tempoEx && (
@@ -1325,7 +1325,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       {/* przyklejone do dołu ekranu: poprzednie / następne ćwiczenie, na ostatnim — zakończenie */}
       <nav className="navrow pnav" aria-label="Ćwiczenia">
         <button className="btn btn-ghost pnav-prev" disabled={bi === 0} aria-label="Poprzednie ćwiczenie" onClick={() => go(bi - 1)}>
-          ‹
+          <Icon name="chevL" size={20} />
         </button>
         {last ? (
           <button className="btn btn-primary btn-lg" onClick={() => void openFinish()}>
@@ -1333,7 +1333,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           </button>
         ) : (
           <button className="btn btn-primary btn-lg" onClick={() => go(bi + 1)}>
-            Następne ćwiczenie ›
+            Następne ćwiczenie
           </button>
         )}
       </nav>
@@ -1825,7 +1825,7 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
           <span className="muted small">DÓŁ</span>
         </div>
         <div className="tbig">
-          <div className="n">{state.running ? state.rep + 1 : finished ? '✓' : '—'}</div>
+          <div className="n">{state.running ? state.rep + 1 : finished ? <Icon name="check" size={48} /> : '—'}</div>
           <div className="l">{state.running ? PHASES[state.phase][0] : finished ? 'seria zakończona' : 'gotowy?'}</div>
           <div className="muted">{state.running ? PHASES[state.phase][1] : ''}</div>
         </div>

@@ -78,7 +78,7 @@ export function SessionBadges({ s, info }: { s: TrainingSession; info?: SessionI
           <span title="Zrobione ćwiczenia z planu (część pominięta)">{`${info.coverage.done}/${info.coverage.total} ćw.`}</span>
         </Tag>
       )}
-      {info?.record && <Tag tone="ok">✓ rekord</Tag>}
+      {info?.record && <Tag tone="ok"><Icon name="check" size={12} /> rekord</Tag>}
       {info?.week && (
         <Tag tone="muted">
           <span title="Tydzień planu">{info.week}</span>
@@ -130,7 +130,7 @@ function NextCard({ client, sessions }: { client: Client; sessions: TrainingSess
       {can && (
         <span className="sess-next-actions">
           <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: plan.id, workoutId: nx.workout.id })}>
-            ▶ Prowadź
+            <Icon name="play" size={14} /> Prowadź
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: plan.id, workoutId: nx.workout.id })}>
             Jako zawodnik

@@ -258,7 +258,7 @@ export function App() {
               <b>W toku: {running.length} {plural(running.length, 'trening', 'treningi', 'treningów')}</b>
               <span className="muted small">{running.map(({ c }) => c.name.split(' ')[0]).join(', ')}</span>
               <span className="grow" />
-              <span className="live-go">{bannerOpen ? 'Zwiń ▴' : 'Pokaż ▾'}</span>
+              <span className="live-go">{bannerOpen ? 'Zwiń' : 'Pokaż'} <Icon name={bannerOpen ? 'chevU' : 'chevD'} size={14} /></span>
             </button>
           )}
           {(running.length === 1 || bannerOpen) &&
@@ -279,7 +279,7 @@ export function App() {
                   {run!.ex.reduce((a, e) => a + e.sets.filter((s) => s.done).length, 0)}/{run!.ex.reduce((a, e) => a + e.sets.length, 0)} serii
                 </span>
                 <span className="grow" />
-                <span className="live-go">Wróć ›</span>
+                <span className="live-go">Wróć</span>
               </button>
             ))}
         </div>

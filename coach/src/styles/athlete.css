@@ -45,7 +45,7 @@
 .ath .btn-lg,
 .sheet .start-pair .btn-lg,
 .sheet > .btn-lg {
-  /* przyciski zawsze w Inter 600 — Barlow tylko dla liczb */
+  /* przyciski zawsze w Archivo 600 — Barlow tylko dla liczb */
   font-family: var(--font-body);
   font-size: var(--fs-md);
   font-weight: 600;

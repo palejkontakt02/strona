@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../data/supabase';
 import { Screen } from './AuthGate';
 import { readInviteEmail } from '../lib/onboarding';
+import { Icon } from '../components/ui';
 
 const REDIRECT = () => `${location.origin}/app/`;
 
@@ -120,7 +121,7 @@ export function LoginScreen() {
       )}
       {mode === 'reset' && (
         <button type="button" className="link small" onClick={() => setMode('login')}>
-          ‹ Wróć do logowania
+          <Icon name="chevL" size={14} /> Wróć do logowania
         </button>
       )}
     </Screen>

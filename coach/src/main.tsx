@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Root } from './auth/AuthGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './styles.css';
+import './styles/tokens-data.css';
 // warstwy designu (kolejność ma znaczenie: fundamenty, potem obszary)
 import './styles/foundation.css';
 import './styles/shell.css';

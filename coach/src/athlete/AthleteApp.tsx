@@ -688,7 +688,7 @@ function TodayTab({
             <h2>{nx.workout.name}</h2>
             <p className="muted small">
               {nx.week.name} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
-              <span className="r7-hero-more"> · Zobacz ćwiczenia ›</span>
+              <span className="r7-hero-more"> · Zobacz ćwiczenia</span>
             </p>
           </button>
           {(() => {
@@ -1077,11 +1077,11 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
       <div className="between">
         <span className="row-inline mini-cal-nav">
           <button className="icon-btn icon-btn-sm" aria-label="Poprzedni miesiąc" onClick={() => shift(-1)}>
-            ‹
+            <Icon name="chevL" size={16} />
           </button>
           <h3 className="first-cap">{fmtMonth(month)}</h3>
           <button className="icon-btn icon-btn-sm" aria-label="Następny miesiąc" onClick={() => shift(1)}>
-            ›
+            <Icon name="chevR" size={16} />
           </button>
         </span>
         <span className="muted small">
@@ -1119,7 +1119,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
           <li className="muted small first-cap">{fmtLong(pick)}</li>
           {done.get(pick)?.map((name, i) => (
             <li key={`d${i}`} className="done">
-              ✓ {name} — zrobiony
+              <Icon name="check" size={14} /> {name}, zrobiony
             </li>
           ))}
           {items.map((x, i) => (
@@ -1399,7 +1399,7 @@ function Workouts({
     const planned = isNext && plan && wk ? nextDate(plan, { week: wk, workout: k }, todayISO()) : raw && (doneNow || raw >= todayISO()) ? raw : undefined;
     return (
       <button key={k.id} className={`wo-item ${isNext ? 'next' : ''} ${doneNow ? 'done' : ''}`} disabled={!n} onClick={() => setPreview({ workout: k, planId })}>
-        <span className="wo-st">{isNext ? '▶' : doneNow ? '✓' : ''}</span>
+        <span className="wo-st">{isNext ? <Icon name="play" size={14} /> : doneNow ? <Icon name="check" size={16} /> : ''}</span>
         <span className="wo-tx">
           <b>{k.name}</b>
           <span className="muted small">
@@ -1408,7 +1408,7 @@ function Workouts({
             {isNext ? ` · następny${dn ? ` (ostatnio ${fmtDay(dn)})` : ''}` : dn ? ` · ${doneNow && planId !== extra?.id ? 'zrobione' : 'ostatnio'} ${fmtDay(dn)}` : ''}
           </span>
         </span>
-        <span className="wo-go">{n ? 'Zobacz ›' : ''}</span>
+        <span className="wo-go">{n ? 'Zobacz' : ''}</span>
       </button>
     );
   };
@@ -1445,7 +1445,7 @@ function Workouts({
           <span>
             {past ? 'Ukryj' : 'Pokaż'} minione tygodnie ({open})
           </span>
-          <span aria-hidden>{past ? '▴' : '▾'}</span>
+          <Icon name={past ? 'chevU' : 'chevD'} size={16} />
         </button>
       )}
       {!cmp && plan?.weeks.map((w, wi) =>

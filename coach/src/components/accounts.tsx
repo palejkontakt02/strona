@@ -4,7 +4,7 @@ import { inviteState } from '../lib/onboarding';
 import { InviteButton, InviteStatusTag } from './Onboarding';
 import { useStore } from '../data/store';
 import { fmtDate } from '../format';
-import { Tag } from './ui';
+import { Icon, Tag } from './ui';
 
 const TONE = { active: 'ok', unconfirmed: 'warn', none: 'neutral', 'no-email': 'neutral' } as const;
 const day = (iso?: string | null) => (iso ? fmtDate(iso.slice(0, 10)) : '—');
@@ -14,7 +14,7 @@ const day = (iso?: string | null) => (iso ? fmtDate(iso.slice(0, 10)) : '—');
 export function AccountBadge({ client, state }: { client: Client; state: AccountsState }) {
   if (state.status === 'loading') return null;
   const st = inviteState(client, accountKnown(client, state));
-  if (st === 'connected' && state.status === 'ok') return <Tag tone="ok">konto ✓</Tag>;
+  if (st === 'connected' && state.status === 'ok') return <Tag tone="ok">konto <Icon name="check" size={12} /></Tag>;
   if (st === 'unconfirmed') return <Tag tone="warn">niepotwierdzone</Tag>;
   if (client.status === 'zakończony' && st !== 'connected') return null;
   return <InviteStatusTag client={client} state={st} />;
@@ -84,7 +84,7 @@ export function AccountsPanel() {
                   {c || a.is_trainer ? `${a.email} · ` : ''}założone {day(a.created_at)} · logowanie {day(a.last_sign_in_at)}
                 </div>
               </div>
-              {a.is_trainer ? null : !a.confirmed ? <Tag tone="warn">niepotwierdzone</Tag> : c ? <Tag tone="ok">✓</Tag> : <Tag tone="danger">bez podopiecznego</Tag>}
+              {a.is_trainer ? null : !a.confirmed ? <Tag tone="warn">niepotwierdzone</Tag> : c ? <Tag tone="ok"><Icon name="check" size={12} /></Tag> : <Tag tone="danger">bez podopiecznego</Tag>}
             </li>
           );
         })}

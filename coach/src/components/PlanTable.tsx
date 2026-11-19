@@ -5,6 +5,7 @@ import { planGrid, type GridCell, type GridSlot } from '../lib/planGrid';
 import { cardioByName } from '../lib/run';
 import { NOT_RUN, planRunTotals, targetText, zoneOf } from '../lib/running';
 import { Icon, Tag } from './ui';
+import { rpeLevel } from '../lib/dataColors';
 import { fmtWeekdayDate } from '../lib/planGrid';
 
 /** Przerwa zawsze jako m:ss: „90” → „1:30”, „2” (minuty) → „2:00”; inny zapis bez zmian. */
@@ -121,7 +122,7 @@ export function PlanTable({
                   {nextExtra}
                   {onLive && (
                     <button className="btn btn-primary btn-sm" onClick={() => onLive(next.k.id)}>
-                      ▶ Prowadź
+                      <Icon name="play" size={14} /> Prowadź
                     </button>
                   )}
                   {onAthlete && (
@@ -382,7 +383,8 @@ function GridTable({
                         </td>
                       ),
                       hasRpe && (
-                        <td key={`${week.id}-p`} className={`ptab-rpe ${base}`} title={planTip}>
+                        <td key={`${week.id}-p`} className={`ptab-rpe ${base}`} title={planTip} data-rpe={rpeLevel(c?.rpe) ?? undefined}>
+                          {c?.rpe && rpeLevel(c.rpe) && <span className="rpe-cue" aria-hidden="true" />}
                           {c?.rpe}
                         </td>
                       ),

@@ -65,7 +65,7 @@ export function WorkoutPreview({
         </div>
         {done && onShowDone && (
           <button className="btn btn-secondary btn-block" onClick={onShowDone}>
-            Zobacz, jak poszło {fmtDay(done)} ›
+            Zobacz, jak poszło {fmtDay(done)}
           </button>
         )}
         <WorkoutTable workout={{ ...workout, exercises: workout.exercises.filter((e) => e.name) }} done={session?.exercises.length ? doneWorkout(session) : undefined} doneName={session ? `Wykonano ${fmtDay(session.date)}` : undefined} />

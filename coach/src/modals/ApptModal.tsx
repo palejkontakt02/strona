@@ -297,7 +297,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
-        {editing?.seriesId && <p className="muted small field-wide">↻ Wizyta cykliczna (co tydzień). Zmianę godziny, czasu lub miejsca możesz zastosować do kolejnych wizyt z serii.</p>}
+        {editing?.seriesId && <p className="muted small field-wide"><Icon name="repeat" size={14} /> Wizyta cykliczna (co tydzień). Zmianę godziny, czasu lub miejsca możesz zastosować do kolejnych wizyt z serii.</p>}
         {!editing && (
           <div className="field-wide check-row repeat-row">
             <label className="check">

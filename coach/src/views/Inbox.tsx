@@ -196,12 +196,12 @@ export function Inbox() {
               <>
                 <div className="inbox-detail-head">
                   <button className="btn btn-ghost btn-sm inbox-back" onClick={() => setOpenId(null)}>
-                    ‹ Wszystkie rozmowy
+                    <Icon name="chevL" size={14} /> Wszystkie rozmowy
                   </button>
                   <Avatar name={open.name} size={36} />
                   <b className="grow ellipsis">{open.name}</b>
                   <button className="btn btn-ghost btn-sm" onClick={() => openClient(open.id, 'Przegląd')}>
-                    Karta <span className="hide-xs">podopiecznego</span> ›
+                    Karta <span className="hide-xs">podopiecznego</span>
                   </button>
                 </div>
                 <Chat key={open.id} client={open} side="coach" onOpenSession={(sessionId) => openModal({ kind: 'review', sessionId })} />
@@ -355,7 +355,7 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
         {session && (
           <p className="small">
             <button className="link" onClick={() => openModal({ kind: 'review', sessionId: session.id, ...(note?.ref?.exIndex != null ? { exIndex: note.ref.exIndex } : {}) })}>
-              {item.kind === 'video' ? 'Obejrzyj nagrania' : 'Zobacz trening'} ›
+              {item.kind === 'video' ? 'Obejrzyj nagrania' : 'Zobacz trening'}
             </button>
             <span className="muted"> · {session.workoutName || 'Trening'}, {fmtDay(session.date)}</span>
           </p>
@@ -394,7 +394,7 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
             </button>
           )}
           <button className="btn btn-ghost" disabled={i >= items.length - 1} onClick={() => goTo(i + 1)}>
-            Następny ›
+            Następny
           </button>
         </div>
         </div>

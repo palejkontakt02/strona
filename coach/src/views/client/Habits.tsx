@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Ring } from '../../components/ring';
-import { Card, Empty, IconBtn, Tag } from '../../components/ui';
+import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Habit, HabitSchedule } from '../../domain';
 import { Chat } from '../../components/Chat';
 import { CoachTargets } from '../../components/DayLog';
@@ -176,7 +176,7 @@ export function ClientHabits({ client }: { client: Client }) {
                 <div className="muted small">{scheduleLabel(h.schedule)}</div>
                 <HabitStats habit={h} client={client} today={today} />
               </div>
-              {(client.habitLog ?? []).some((d) => d.date === today && d.done.includes(h.id)) && <Tag tone="ok">✓ dziś</Tag>}
+              {(client.habitLog ?? []).some((d) => d.date === today && d.done.includes(h.id)) && <Tag tone="ok"><Icon name="check" size={12} /> dziś</Tag>}
               <IconBtn icon="edit" label={`Edytuj „${h.title}”`} onClick={() => setEditing(h)} />
               <IconBtn
                 icon="trash"

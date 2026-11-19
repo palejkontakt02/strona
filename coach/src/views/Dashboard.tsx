@@ -437,7 +437,7 @@ export function Dashboard() {
             className="btn btn-ghost btn-sm"
             onClick={() => openInbox(go)}
           >
-            Wszystkie ›
+            Wszystkie
           </button>
         }
       >
@@ -497,7 +497,7 @@ export function Dashboard() {
                     className="link small"
                     onClick={() => openInbox(go, { clientId: c.id })}
                   >
-                    Rozmowa ›
+                    Rozmowa
                   </button>
                   {(() => {
                     const hit = ns.find((n) => {
@@ -518,7 +518,7 @@ export function Dashboard() {
                           })
                         }
                       >
-                        Zobacz trening ›
+                        Zobacz trening
                       </button>
                     ) : null;
                   })()}
@@ -536,7 +536,7 @@ export function Dashboard() {
                       ])
                     }
                   >
-                    ✓ Przeczytane
+                    <Icon name="check" size={14} /> Przeczytane
                   </button>
                 </div>
               </div>
@@ -548,7 +548,7 @@ export function Dashboard() {
             className="btn btn-ghost btn-sm"
             onClick={() => openInbox(go)}
           >
-            I jeszcze {groups.length - 5} — wszystkie rozmowy ›
+            I jeszcze {groups.length - 5}: wszystkie rozmowy
           </button>
         )}
       </Card>
@@ -670,7 +670,7 @@ export function Dashboard() {
             className="btn btn-primary btn-sm"
             onClick={() => openInbox(go, { tab: "Do przejrzenia" })}
           >
-            Przejrzyj ›
+            Przejrzyj
           </button>
         }
       >
@@ -783,7 +783,7 @@ export function Dashboard() {
                   onClick={() => openClient(r.client.id, "Plan")}
                   title="Karta podopiecznego → Plan: przycisk „Następny blok”"
                 >
-                  Następny blok ›
+                  Następny blok
                 </button>
               </li>
             ))}
@@ -962,7 +962,7 @@ export function Dashboard() {
             >
               Później: {dues.later.length}{" "}
               {plural(dues.later.length, "płatność", "płatności", "płatności")}{" "}
-              · {pln(dues.laterSum)} ›
+              · {pln(dues.laterSum)}
             </button>
           )}
         </>

@@ -265,10 +265,6 @@
 .kpi-strip .kpi-link:hover {
   background: var(--color-surface-2);
 }
-.kpi-strip .kpi-link .kpi-label::after {
-  content: ' ›';
-  color: var(--color-accent);
-}
 @media (max-width: 900px) {
   .kpi-strip,
   .kpi-strip.kpi-grid-3 {

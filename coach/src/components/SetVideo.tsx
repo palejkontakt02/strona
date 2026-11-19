@@ -224,7 +224,7 @@ export function VideoChip({ video, title }: { video: string; title: string }) {
           setOpen(true);
         }}
       >
-        ▶ Film
+        <Icon name="play" size={14} /> Film
       </button>
       {open && <VideoViewer video={video} title={title} onClose={() => setOpen(false)} />}
     </>

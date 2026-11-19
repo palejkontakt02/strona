@@ -715,12 +715,13 @@ code {
   border-radius: 50%;
   background: var(--color-accent-900);
   color: var(--color-accent-200);
-  font-family: var(--font-display);
+  /* inicjały krojem tekstu: w Barlow Condensed przy 12 px wyglądały jak zaślepka */
+  font-family: var(--font-body);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 
-/* przyciski: 8 px, wysokość 40 (telefon 44), półgruby Inter */
+/* przyciski: --radius-md, wysokość 40 (telefon 44), półgruby Archivo */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -3000,8 +3001,8 @@ h2,
 }
 /* trzy poziomy nagłówków:
    H1 ekranu — Barlow Condensed 600 (h1, .page-head h2);
-   H2 karty — Inter 600 17 px w kolorze tekstu;
-   H3 podsekcji — Inter 600 13 px, szary. */
+   H2 karty — Archivo 600 17 px w kolorze tekstu;
+   H3 podsekcji — Archivo 600 13 px, szary. */
 .toolbar h3,
 .card-head h4,
 .acard h3 {

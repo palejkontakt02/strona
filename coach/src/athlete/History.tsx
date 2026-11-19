@@ -122,7 +122,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
                   </span>
                   {s.stoppedForPain && <span className="sb-stop small">{stoppedLabel(s)}</span>}
                 </span>
-                <span className="wo-go">›</span>
+                <span className="wo-go"><Icon name="chevR" size={16} /></span>
               </button>
             </li>
           ))}
@@ -219,7 +219,7 @@ export function SessionSheet({
         {onReview && (
           <button className={`btn ${needsReview(s) ? 'btn-primary' : 'btn-secondary'} btn-block`} onClick={onReview}>
             <Icon name={nVid ? 'cam' : 'chat'} size={16} /> {nVid ? `Przejrzyj nagrania (${nVid})` : 'Komentarz dla podopiecznego'}
-            {s.reviewedAt ? ' · obejrzane ✓' : ''}
+            {s.reviewedAt ? ' · obejrzane' : ''}
           </button>
         )}
         <div className="hist-stats">
@@ -350,22 +350,22 @@ export function SessionSheet({
         {onAssign && s.exercises.length > 0 && (
           <div className="sheet-assign">
             <button className="btn btn-secondary" onClick={() => onAssign(false)}>
-              ↻ Powtórz trening
+              <Icon name="repeat" size={16} /> Powtórz trening
             </button>
             <button className="btn btn-secondary" onClick={() => onAssign(true)}>
-              ⧉ Kopiuj na innego
+              <Icon name="copy" size={16} /> Kopiuj na innego
             </button>
           </div>
         )}
         <div className="sheet-actions">
           {onEdit && (
             <button className="btn btn-secondary" onClick={onEdit}>
-              ✎ Popraw
+              <Icon name="edit" size={16} /> Popraw
             </button>
           )}
           {onUndo && (
             <button className="btn btn-ghost btn-danger-text" onClick={onUndo}>
-              ✕ Oznacz jako niewykonany
+              <Icon name="x" size={16} /> Oznacz jako niewykonany
             </button>
           )}
         </div>

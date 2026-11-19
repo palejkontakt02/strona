@@ -10,6 +10,7 @@ import { supabase } from '../data/supabase';
 import { createSupabaseRepository } from '../data/supabaseRepository';
 import type { Db } from '../data/db';
 import { LoginScreen, NewPassword } from './LoginScreen';
+import { Icon } from '../components/ui';
 
 /** Punkt wejścia: lokalnie (podgląd) bez logowania, na stronie — logowanie przez Supabase. */
 export function Root() {
@@ -183,13 +184,13 @@ export function Screen({ title, children }: { title: string; children: React.Rea
             <span>Przysiad ze sztangą</span>
             <b>4 × 6</b>
             <b>100 kg</b>
-            <i>✓</i>
+            <i><Icon name="check" size={14} /></i>
           </div>
           <div className="auth-sheet-row done">
             <span>Wyciskanie leżąc</span>
             <b>4 × 8</b>
             <b>72,5 kg</b>
-            <i>✓</i>
+            <i><Icon name="check" size={14} /></i>
           </div>
           <div className="auth-sheet-row next">
             <span>Martwy ciąg rumuński</span>
