@@ -1,7 +1,8 @@
-/* Fitowa / coach — system „Czarno-biały” (DESIGN.md): motywy Biały (biel) i Czarny (mono), kolor tylko dla stanów;
-   Barlow Condensed (tytuły, liczby) + Inter (reszta). Pozostałe motywy (Kobalt, Morski…) do wyboru w ustawieniach. */
+/* Fitowa / coach — „tablica treningowa” (DESIGN.md): motywy Biały (biel, domyślny i bazowy :root) i Czarny (mono),
+   akcja = czerń (w ciemnym biel), kolor tylko dla danych (tokens-data.css) i stanów;
+   Barlow Condensed (tytuły, liczby) + Archivo (tekst i UI). Pozostałe motywy (Kobalt, Morski…) do wyboru w ustawieniach. */
 :root {
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
   --font-heading-weight: 600;
   /* skala pisma (px): 12 / 13 / 15 / 17 / 20 / 26 / 34 + liczby „display” 48 / 56.
@@ -17,11 +18,11 @@
   --fs-2xl: 34px;
   --fs-display: 48px;
   --fs-display-lg: 56px;
-  /* promienie: małe elementy 6, pola i przyciski 8, karty 14, arkusze 20, chipy pełne */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  /* promienie: małe elementy 4, pola i przyciski 6, karty 8, arkusze i modale 12, chipy pełne */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-pill: 999px;
   /* odstępy: 1=4 2=6 3=8 4=12 6=16 5=20 8=24 10=32 px (nazwy historyczne zachowane dla zgodności) */
   --space-1: 4px;
@@ -45,10 +46,10 @@
   --band-fg: var(--color-text);
   --zebra: color-mix(in srgb, var(--color-text) 3%, transparent);
 }
-/* Motywy kolorystyczne — wybór w ustawieniach (data-palette na <html>). Domyślny: „kobalt”, ustawiany przy starcie.
-   Blok bez data-palette = „Jasny”: jasny odpowiednik Kobaltu (chłodna biel, kobaltowy akcent).
-   Skala akcentu/neutrali w motywie jasnym jest odwrócona (100 = najciemniejszy), tak jak była. */
-:root {
+/* Motywy kolorystyczne — wybór w ustawieniach (data-palette na <html>, ustawiany przy starcie).
+   Bazowy :root (bez data-palette) = „Biały”: czerń, biel, szarości. „Jasny” (kobaltowy akcent) tylko z wyboru.
+   Skala akcentu/neutrali w motywach jasnych jest odwrócona (100 = najciemniejszy), tak jak była. */
+:root[data-palette="jasny"] {
   --color-bg: #f1f4f9;
   --color-surface: #ffffff;
   --color-surface-2: #e7ecf4;
@@ -96,8 +97,9 @@
   --tile-s: 60%;
   color-scheme: light;
 }
+:root,
 :root[data-palette="biel"] {
-  /* Biały — domyślny jasny: czerń, biel, szarości; kolor tylko dla stanów (zielony ok, czerwony błąd, żółty uwaga) */
+  /* Biały — domyślny jasny i bazowy: czerń, biel, szarości; kolor tylko dla stanów (zielony ok, czerwony błąd, żółty uwaga) */
   --color-bg: #f3f3f3;
   --color-surface: #ffffff;
   --color-surface-2: #ececec;
@@ -1089,8 +1091,10 @@ input[type='range'] {
   font-weight: 600;
 }
 
+/* przełączenie ekranu: natychmiast, bez animacji wejścia (DESIGN.md, „Ruch”). Klasa .fade zostaje jako znacznik ekranu.
+   @keyframes fade służy już tylko warstwom pojawiającym się po akcji (modal, toast). */
 .fade {
-  animation: fade 0.3s ease;
+  animation: none;
 }
 @keyframes fade {
   from {
@@ -3048,31 +3052,11 @@ h2,
   background: var(--color-surface);
 }
 
-/* KPI jak tablica wyników */
+/* KPI jak tablica wyników: stan niesie kolor liczby (.kpi-ok/-warn/-danger .kpi-value), bez dekoracyjnego paska */
 .kpi {
   position: relative;
   overflow: hidden;
 }
-.kpi::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 42px;
-  height: 3px;
-  border-radius: 0 0 3px 0;
-  background: var(--color-accent);
-  opacity: 0.8;
-}
-.kpi-danger::before {
-  background: var(--color-danger);
-}
-.kpi-warn::before {
-  background: var(--color-warn);
-}
-.kpi-ok::before {
-  background: var(--color-ok);
-}
-
 /* przyciski */
 
 /* lista klientów i zakładki */

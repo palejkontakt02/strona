@@ -46,8 +46,7 @@ export function hasOwnPalette(): boolean {
 
 export function applyPalette(id: PaletteId) {
   const root = document.documentElement;
-  if (id === 'jasny') delete root.dataset.palette;
-  else root.dataset.palette = id;
+  root.dataset.palette = id;
   const p = PALETTES.find((x) => x.id === id)!;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
 }

@@ -227,9 +227,6 @@
   color: inherit;
   overflow: visible;
 }
-.kpi-strip > .kpi::before {
-  display: none;
-}
 .kpi-strip .kpi-label {
   font-family: var(--font-body);
   font-size: var(--fs-xs);
