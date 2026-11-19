@@ -129,10 +129,10 @@ function NextCard({ client, sessions }: { client: Client; sessions: TrainingSess
       </div>
       {can && (
         <span className="sess-next-actions">
-          <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: plan.id, workoutId: nx.workout.id })}>
+          <button className="btn btn-secondary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: plan.id, workoutId: nx.workout.id })}>
             <Icon name="play" size={14} /> Prowadź
           </button>
-          <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: plan.id, workoutId: nx.workout.id })}>
+          <button className="btn btn-ghost btn-sm" onClick={() => startAthlete(client.id, { planId: plan.id, workoutId: nx.workout.id })}>
             Jako zawodnik
           </button>
         </span>
@@ -193,11 +193,11 @@ export function ClientSessions({ client }: { client: Client }) {
               <Icon name="download" size={16} /> Excel
             </button>
           )}
-          <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
+          <button className="btn btn-ghost" onClick={() => openModal({ kind: 'session', clientId: client.id, paste: true })}>
             <Icon name="clipboard" size={16} /> Wklej z notatki
           </button>
-          <button className="btn btn-primary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
-            + Zapisz wykonany trening
+          <button className="btn btn-secondary" onClick={() => openModal({ kind: 'session', clientId: client.id })}>
+            <Icon name="plus" size={16} /> Zapisz wykonany trening
           </button>
         </div>
       </div>

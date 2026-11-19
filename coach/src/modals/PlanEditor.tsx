@@ -492,12 +492,12 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                   </div>
                 );
               })}
-              <div className="actions">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => upd((d) => void findWorkout(d, wi, ki).exercises.push(newExercise()))}>
+              <div className="actions pe-add-row">
+                <button type="button" className="btn pe-add" onClick={() => upd((d) => void findWorkout(d, wi, ki).exercises.push(newExercise()))}>
                   + Ćwiczenie
                 </button>
                 <select
-                  className="input input-sm run-tpl-select"
+                  className="input pe-add pe-add-select run-tpl-select"
                   value=""
                   aria-label="Dodaj bieg z szablonu"
                   onChange={(ev) => {
@@ -520,7 +520,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
           {isOpen(week.id) && !only && (
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn pe-add pe-add-unit"
               onClick={() => upd((d) => void d.weeks[wi].workouts.push({ id: uid(), name: p.extra ? `Trening dodatkowy ${extraCount + 1}` : `Trening ${String.fromCharCode(65 + d.weeks[wi].workouts.length)}`, exercises: [] }))}
             >
               {p.extra ? '+ Trening poza planem' : '+ Trening w tym tygodniu'}
@@ -530,7 +530,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
       ))}
       {!p.extra && <button
         type="button"
-        className="btn btn-secondary"
+        className="btn pe-add pe-add-week"
         onClick={() => {
           const id = uid();
           upd((d) => void d.weeks.push({ id, name: `Tydzień ${d.weeks.length + 1}`, workouts: [] }));

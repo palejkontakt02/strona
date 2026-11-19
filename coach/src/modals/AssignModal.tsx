@@ -138,12 +138,30 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
 
   // „ma treść”: ćwiczenie z nazwą i (dla biegu) przynajmniej jeden odcinek z czasem lub dystansem
   const hasEx = !!chosen?.exercises.some((e) => e.name && (!e.cardio || e.groups.some((g) => g.reps.trim() || g.load.trim())));
+  // kafle „Z czego”: zaznaczony dopiero po wyborze (Pusty bez wyboru zostaje domyślny przy zapisie)
+  const [picked, setPicked] = useState(!!srcSession);
+  const tile = (s: Source, id: string) => {
+    setPicked(true);
+    choose(s, id);
+  };
+  const on = (s: Source) => picked && src === s;
+  // „Wizyta o” i „także dla innych osób” — niżej, otwarte, gdy już coś ustawione
+  const [moreOpen, setMoreOpen] = useState(false);
+  const more = moreOpen || manyOpen || others.length > 0 || !!time;
+  const TILES: { s: Source; icon: string; title: string; hint: string; first: string; show: boolean }[] = [
+    { s: 'empty', icon: 'plus', title: 'Pusty', hint: 'ćwiczenia ułożysz w następnym kroku', first: '', show: true },
+    { s: 'paste', icon: 'clipboard', title: 'Wklej z notatki lub arkusza', hint: 'notatka z telefonu albo zakres z Excela', first: '', show: true },
+    { s: 'plan', icon: 'copy', title: 'Kopia z planu', hint: plan ? plan.name : '', first: steps[0]?.workout.id ?? '', show: steps.length > 0 },
+    { s: 'repeat', icon: 'repeat', title: 'Powtórka wykonanego', hint: done[0] ? `ostatnio ${fmtDay(done[0].date)}` : '', first: done[0]?.id ?? '', show: done.length > 0 },
+    { s: 'run', icon: 'run', title: 'Bieg', hint: 'szablon albo własne odcinki', first: 'custom', show: true },
+  ];
+
   return (
     <Modal
       title="Zadaj trening"
       onClose={closeModal}
       onSubmit={() => void save()}
-      submitLabel={hasEx ? 'Zadaj' : 'Dalej — ułóż ćwiczenia'}
+      submitLabel={hasEx ? 'Zadaj' : 'Ułóż ćwiczenia'}
       extraActions={
         hasEx && !others.length && (
           <button type="button" className="btn btn-secondary" onClick={edit}>
@@ -152,35 +170,31 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
         )
       }
     >
-      <p className="muted small">Trening poza planem — plan i jego kolejność zostają bez zmian. Podopieczny zobaczy go na górze ekranu w wybranym dniu (albo na liście „poza planem”, jeśli bez terminu).</p>
       {(!m.clientId || m.sessionId) && (
         <Field label={m.sessionId ? 'Dla kogo' : 'Podopieczny'}>
-          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setKeepLoads(null), setOthers((o) => o.filter((x) => x !== id)), srcSession ? undefined : (setSrc('empty'), setPick(''), setName('')))} />
+          <ClientSelect value={clientId} onChange={(id) => (setClientId(id), setKeepLoads(null), setOthers((o) => o.filter((x) => x !== id)), srcSession ? undefined : (setSrc('empty'), setPick(''), setName(''), setPicked(false)))} />
         </Field>
       )}
       <div className="field">
         <span>Na kiedy</span>
         <Seg options={WHEN} value={when} onChange={setWhen} label="Na kiedy" />
         {when === 'Inny dzień' && <input className="input assign-day" type="date" value={day} min={today} onChange={(e) => setDay(e.target.value)} aria-label="Dzień" />}
-        {when === 'Kiedy chce' && <span className="muted small">Bez terminu — do zrobienia w dowolnym momencie, można powtarzać.</span>}
+        {when === 'Kiedy chce' && <span className="muted small">Bez terminu, do zrobienia w dowolnym momencie. Można powtarzać.</span>}
       </div>
       <div className="field">
-        <span>Z czego</span>
-        <div className="assign-src" role="radiogroup" aria-label="Z czego">
-          <label className={`assign-opt ${src === 'empty' ? 'on' : ''}`}>
-            <input type="radio" checked={src === 'empty'} onChange={() => choose('empty', '')} />
-            <span>
-              <b>Pusty</b>
-              <span className="muted small">ćwiczenia ułożysz w następnym kroku</span>
-            </span>
-          </label>
-          <label className={`assign-opt ${src === 'paste' ? 'on' : ''}`}>
-            <input type="radio" checked={src === 'paste'} onChange={() => choose('paste', '')} />
-            <span>
-              <b><Icon name="clipboard" size={15} /> Wklej z notatki albo arkusza</b>
-              <span className="muted small">notatka z telefonu (np. „Przysiad / 6x45 / 6x50”) albo zakres skopiowany z Excela / Arkuszy Google</span>
-            </span>
-          </label>
+        <span id="assign-src-l">Z czego</span>
+        <div className="assign-tiles" role="radiogroup" aria-labelledby="assign-src-l">
+          {TILES.filter((t) => t.show).map((t) => (
+            <button key={t.s} type="button" role="radio" aria-checked={on(t.s)} className={`assign-tile ${on(t.s) ? 'on' : ''} ${t.s === 'run' ? 'is-last' : ''}`} onClick={() => tile(t.s, on(t.s) ? pick : t.first)}>
+              <Icon name={t.icon} size={20} />
+              <b>{t.title}</b>
+              {t.hint && <span className="assign-tile-hint">{t.hint}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      {picked && (
+        <div className="assign-detail">
           {src === 'paste' && (
             <div className="assign-paste">
               <textarea
@@ -200,7 +214,7 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
                 <ul className="assign-paste-list small">
                   {pasted.exercises.map((e) => (
                     <li key={e.id}>
-                      <b>{e.name}</b> — {pasteSummary(e)}
+                      <b>{e.name}</b>: {pasteSummary(e)}
                       {e.notes ? <span className="muted"> · {e.notes}</span> : null}
                     </li>
                   ))}
@@ -212,89 +226,86 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
                   {pasted.warnings.join(' ')}
                 </p>
               )}
-              {pasteText.trim() && pasted && !pasted.exercises.length && <p className="small pi-error">Nie rozpoznano ćwiczeń — nazwa ćwiczenia w osobnej linii, pod nią serie (np. „8x40kg”).</p>}
+              {pasteText.trim() && pasted && !pasted.exercises.length && <p className="small pi-error">Nie rozpoznano ćwiczeń. Nazwa ćwiczenia w osobnej linii, pod nią serie (np. „8x40kg”).</p>}
             </div>
           )}
-          <label className={`assign-opt ${src === 'run' ? 'on' : ''}`}>
-            <input type="radio" checked={src === 'run'} onChange={() => choose('run', 'custom')} />
-            <span>
-              <b><Icon name="run" size={15} /> Bieg</b>
-              <select className="input input-sm" value={src === 'run' ? pick : ''} onChange={(e) => choose('run', e.target.value)} aria-label="Rodzaj biegu">
-                {src !== 'run' && <option value="">wybierz…</option>}
-                <option value="custom">Własny — ułożę odcinki</option>
+          {src === 'run' && (
+            <Field label="Rodzaj biegu">
+              <select className="input" value={pick} onChange={(e) => choose('run', e.target.value)} aria-label="Rodzaj biegu">
+                <option value="custom">Własny, ułożę odcinki</option>
                 {RUN_TEMPLATES.map((t) => (
                   <option key={t.id} value={t.id}>
-                    Szablon: {t.name} — {t.hint}
+                    Szablon: {t.name}, {t.hint}
                   </option>
                 ))}
               </select>
-            </span>
-          </label>
-          {steps.length > 0 && (
-            <label className={`assign-opt ${src === 'plan' ? 'on' : ''}`}>
-              <input type="radio" checked={src === 'plan'} onChange={() => choose('plan', steps[0].workout.id)} />
+            </Field>
+          )}
+          {src === 'plan' && (
+            <Field label="Jednostka z planu">
+              <select className="input" value={pick} onChange={(e) => choose('plan', e.target.value)} aria-label="Jednostka z planu">
+                {steps.map((x) => (
+                  <option key={x.workout.id} value={x.workout.id}>
+                    {x.week.name} · {x.workout.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {src === 'repeat' && (
+            <Field label="Wykonany trening">
+              <select className="input" value={pick} onChange={(e) => choose('repeat', e.target.value)} aria-label="Wykonany trening">
+                {done.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {fmtDay(x.date)} · {x.workoutName || 'Trening'}{x.clientId !== clientId ? ` (${clientById(db, x.clientId)?.name ?? ''})` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {src === 'repeat' && chosen && (
+            <label className="assign-loads small">
+              <input type="checkbox" checked={keep} onChange={(e) => setKeepLoads(e.target.checked)} />
               <span>
-                <b>Kopia jednostki z planu</b>
-                <select className="input input-sm" value={src === 'plan' ? pick : ''} onChange={(e) => choose('plan', e.target.value)} aria-label="Jednostka z planu">
-                  {src !== 'plan' && <option value="">wybierz…</option>}
-                  {steps.map((x) => (
-                    <option key={x.workout.id} value={x.workout.id}>
-                      {x.week.name} · {x.workout.name}
-                    </option>
-                  ))}
-                </select>
+                {fromOther(pick) ? `Ciężary z oryginału (${clientById(db, done.find((x) => x.id === pick)?.clientId)?.name.split(' ')[0] ?? '—'})` : 'Ciężary jak w tamtym treningu'}
+                {!keep && <span className="muted">. Bez zaznaczenia ciężary podpowie historia tej osoby.</span>}
               </span>
             </label>
           )}
-          {done.length > 0 && (
-            <label className={`assign-opt ${src === 'repeat' ? 'on' : ''}`}>
-              <input type="radio" checked={src === 'repeat'} onChange={() => choose('repeat', done[0].id)} />
-              <span>
-                <b>Powtórka wykonanego</b>
-                <select className="input input-sm" value={src === 'repeat' ? pick : ''} onChange={(e) => choose('repeat', e.target.value)} aria-label="Wykonany trening">
-                  {src !== 'repeat' && <option value="">wybierz…</option>}
-                  {done.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {fmtDay(x.date)} · {x.workoutName || 'Trening'}{x.clientId !== clientId ? ` (${clientById(db, x.clientId)?.name ?? ''})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </label>
-          )}
+          {hasEx && <span className="muted small">{nEx(chosen!.exercises.filter((e) => e.name).length)}{others.length ? '' : '. Możesz zadać od razu albo najpierw zmienić'}.</span>}
+          <Field label="Nazwa">
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={chosen?.name || 'np. Mobilność + core'} />
+          </Field>
         </div>
-        {src === 'repeat' && chosen && (
-          <label className="assign-loads small">
-            <input type="checkbox" checked={keep} onChange={(e) => setKeepLoads(e.target.checked)} />
-            <span>
-              {fromOther(pick) ? `Ciężary z oryginału (${clientById(db, done.find((x) => x.id === pick)?.clientId)?.name.split(' ')[0] ?? '—'})` : 'Ciężary jak w tamtym treningu'}
-              {!keep && <span className="muted"> — bez zaznaczenia ciężary podpowie historia tej osoby</span>}
-            </span>
-          </label>
-        )}
-        {hasEx && <span className="muted small">{nEx(chosen!.exercises.filter((e) => e.name).length)}{others.length ? '' : ' — możesz zadać od razu albo najpierw zmienić'}.</span>}
-      </div>
-      <div className="field assign-many">
-        {!manyOpen && !others.length ? (
-          <button type="button" className="link small" onClick={() => setManyOpen(true)} disabled={!clientId}>
-            + Ten sam trening także dla innych osób
-          </button>
-        ) : (
-          <>
-            <span>Także dla{others.length ? ` (${others.length})` : ''}</span>
-            <ClientMultiPick value={others} onChange={setOthers} exclude={clientId ? [clientId] : []} />
-            <span className="muted small">Każdy dostaje własną kopię na ten sam dzień{time ? ' i godzinę' : ''}. Kilogramy zostają puste — odtwarzacz podpowie je z historii każdej osoby (zapis w % zostaje).</span>
-          </>
-        )}
-      </div>
-      {when !== 'Kiedy chce' && (
-        <Field label="Wizyta z trenerem o (opcjonalnie)">
-          <input className="input assign-day" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Godzina wizyty" />
-        </Field>
       )}
-      <Field label="Nazwa">
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={chosen?.name || 'np. Mobilność + core'} />
-      </Field>
+      <div className="assign-more">
+        <button type="button" className="assign-more-head" aria-expanded={more} onClick={() => setMoreOpen(!more)} disabled={more && (others.length > 0 || !!time)}>
+          <span>{when === 'Kiedy chce' ? 'Także dla innych osób' : 'Wizyta i inne osoby'}</span>
+          <Icon name={more ? 'chevU' : 'chevD'} size={16} />
+        </button>
+        {more && (
+          <div className="assign-more-body">
+            {when !== 'Kiedy chce' && (
+              <Field label="Wizyta z trenerem o (opcjonalnie)">
+                <input className="input assign-day" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Godzina wizyty" />
+              </Field>
+            )}
+            <div className="field assign-many">
+              {!manyOpen && !others.length ? (
+                <button type="button" className="link small" onClick={() => setManyOpen(true)} disabled={!clientId}>
+                  + Ten sam trening także dla innych osób
+                </button>
+              ) : (
+                <>
+                  <span>Także dla{others.length ? ` (${others.length})` : ''}</span>
+                  <ClientMultiPick value={others} onChange={setOthers} exclude={clientId ? [clientId] : []} />
+                  <span className="muted small">Każdy dostaje własną kopię na ten sam dzień{time ? ' i godzinę' : ''}. Kilogramy zostają puste, odtwarzacz podpowie je z historii każdej osoby (zapis w % zostaje).</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }

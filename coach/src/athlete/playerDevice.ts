@@ -254,3 +254,15 @@ export function speak(text: string, force = false): boolean {
     return false;
   }
 }
+
+/**
+ * Krótkie „stuknięcie” przy zaliczeniu serii: potwierdzenie bez patrzenia na ekran (Android; iOS Safari
+ * nie ma `navigator.vibrate`, wtedy nic się nie dzieje). Rekord ma osobny, dłuższy wzór w odtwarzaczu.
+ */
+export function doneHaptic() {
+  try {
+    navigator.vibrate?.(35);
+  } catch {
+    // brak wibracji
+  }
+}

@@ -17,6 +17,8 @@ export interface RunSet {
   sug: string;
   /** Zawodnik ręcznie zmienił ciężar — autoregulacja go nie nadpisuje. */
   edited: boolean;
+  /** Powtórzenia / czas / dystans wpisane w tej serii (pole, ±, „ostatnio”), a nie tylko zadane z planu. Tylko do wyglądu odtwarzacza. */
+  entered?: boolean;
   /** Typ serii z planu i numer bloku (scalonych identycznych wierszy). */
   label?: SetType;
   gi?: number;

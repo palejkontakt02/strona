@@ -78,16 +78,15 @@ export function WorkoutList({ client }: { client: Client }) {
     <Card
       title="Wszystkie treningi"
       action={
+        !plan && (
         <div className="actions">
-          {!plan && (
+          {(
             <button className="btn btn-ghost btn-sm" onClick={() => openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true })}>
               + Plan
             </button>
           )}
-          <button className="btn btn-secondary btn-sm" onClick={() => openModal({ kind: 'assign', clientId: client.id })}>
-            + Zadaj trening
-          </button>
         </div>
+        )
       }
     >
       {groups.length === 0 && adhoc.length === 0 ? (
@@ -129,10 +128,10 @@ export function WorkoutList({ client }: { client: Client }) {
                       {/* start od razu przy następnym (i dodatkowych); pozostałe — z podglądu */}
                       {n > 0 && (isNext || g.plan.extra) && (
                         <>
-                          <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: g.plan.id, workoutId: k.id })}>
+                          <button className="btn btn-secondary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: g.plan.id, workoutId: k.id })}>
                             <Icon name="play" size={14} /> Prowadź
                           </button>
-                          <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: g.plan.id, workoutId: k.id })}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => startAthlete(client.id, { planId: g.plan.id, workoutId: k.id })}>
                             Jako zawodnik
                           </button>
                         </>
@@ -178,10 +177,10 @@ export function WorkoutList({ client }: { client: Client }) {
                 <span className="wl-actions">
                   {s.exercises.length > 0 && (
                     <>
-                      <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { repeatSessionId: s.id })}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { repeatSessionId: s.id })}>
                         <Icon name="play" size={14} /> Prowadź
                       </button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { repeatSessionId: s.id })}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => startAthlete(client.id, { repeatSessionId: s.id })}>
                         Jako zawodnik
                       </button>
                     </>

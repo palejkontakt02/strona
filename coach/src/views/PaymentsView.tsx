@@ -8,7 +8,8 @@ import { isOverdue } from '../lib/billing';
 import { todayISO } from '../lib/dates';
 import { useNav } from '../nav';
 import { ClubsPanel } from './ClubsPanel';
-import { AddPaymentButton, BulkSubsModal, ChipRow, DueCell, ReminderModal, RemindButton, hasSubscriptionClients } from './payments/PayParts';
+import { AddPaymentButton, BulkRemindModal, BulkSubsModal, DueCell, ReminderModal, hasSubscriptionClients } from './payments/PayParts';
+import { MenuButton } from '../components/MenuButton';
 import { PaymentsReport } from './payments/PaymentsReport';
 
 const FILTERS = ['Wszystkie', 'Do zapłaty', 'Zaległe', 'Opłacone'] as const;
@@ -22,6 +23,7 @@ export function PaymentsView() {
   dbRef.current = db;
   const [remind, setRemind] = useState<{ clientId: string; paymentId: string } | null>(null);
   const [bulk, setBulk] = useState(false);
+  const [bulkRemind, setBulkRemind] = useState(false);
   const today = todayISO();
   // domyślnie to, co trzeba ściągnąć; kafel „Zaległości” z Pulpitu otwiera od razu zaległe
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>(() => {
@@ -63,11 +65,11 @@ export function PaymentsView() {
         <h2>Płatności</h2>
         <div className="actions">
           {hasSubscriptionClients(db) && (
-            <button className="btn btn-secondary btn-sm" onClick={() => setBulk(true)}>
+            <button className="btn btn-ghost" onClick={() => setBulk(true)}>
               <Icon name="money" size={16} /> Wystaw abonamenty
             </button>
           )}
-          <AddPaymentButton />
+          <AddPaymentButton primary />
         </div>
       </div>
       <Seg options={['Od klientów', 'Od klubów', 'Raport'] as const} value={tab} onChange={setTab} label="Rozliczenia" />
@@ -84,15 +86,33 @@ export function PaymentsView() {
         <Kpi label="Zaległe (po terminie)" value={pln(overdue.reduce((a, p) => a + p.amount, 0))} tone={overdue.length ? 'danger' : undefined} />
         <Kpi label="Podopieczni z zaległością" value={new Set(overdue.map((p) => p.client.id)).size} />
       </div>
-      <div className="filters">
-        <ChipRow a={FILTERS} aValue={filter} onA={setFilter} b={TYPES} bValue={type} onB={setType} />
-        <input className="input input-sm" type="search" placeholder="Szukaj klienta…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="filters pay-filters">
+        <div className="chips pay-status" role="group" aria-label="Status">
+          {FILTERS.map((o) => (
+            <button key={o} type="button" className={`chip ${filter === o ? 'active' : ''}`} aria-pressed={filter === o} onClick={() => setFilter(o)}>
+              {o}
+            </button>
+          ))}
+        </div>
+        <select className="input input-sm pay-type-select" value={type} onChange={(e) => setType(e.target.value as (typeof TYPES)[number])} aria-label="Typ płatności">
+          {TYPES.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+        <input className="input input-sm pay-search" type="search" placeholder="Szukaj klienta…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Szukaj klienta" />
+        {overdue.length > 0 && (
+          <button type="button" className="btn btn-ghost btn-sm pay-remind-all" onClick={() => setBulkRemind(true)}>
+            <Icon name="mail" size={16} /> Przypomnij wszystkim zaległym ({overdue.length})
+          </button>
+        )}
       </div>
       {rows.length === 0 ? (
         <Empty>Brak płatności.</Empty>
       ) : (
         <div className="card table-wrap">
-          <table className="table table-cards">
+          <table className="table table-cards pay-table">
             <thead>
               <tr>
                 <th>Podopieczny</th>
@@ -106,30 +126,39 @@ export function PaymentsView() {
             </thead>
             <tbody>
               {rows.map((p) => (
-                <tr key={p.id}>
-                  <td>
+                <tr key={p.id} className={isOverdue(p, today) ? 'is-overdue' : ''}>
+                  <td className="pay-who">
                     <button className="link" onClick={() => openClient(p.client.id, 'Płatności')}>
                       {p.client.name}
                     </button>
                   </td>
-                  <td className="nowrap">{fmtDate(p.date)}</td>
-                  <td>{paymentLabel(p)}</td>
-                  <td className="num">{pln(p.amount)}</td>
-                  <td className="nowrap">
+                  <td className="nowrap pay-issued">{fmtDate(p.date)}</td>
+                  <td className="pay-desc">{paymentLabel(p)}</td>
+                  <td className="num pay-amount">{pln(p.amount)}</td>
+                  <td className="nowrap pay-due-cell">
                     <DueCell p={p} />
                   </td>
-                  <td>{p.status === 'paid' ? <Tag tone="ok">Opłacone</Tag> : isOverdue(p, today) ? <Tag tone="danger">Zaległe</Tag> : <Tag>Do zapłaty</Tag>}</td>
+                  <td className="pay-status-cell">{p.status === 'paid' ? <Tag tone="ok">Opłacone</Tag> : isOverdue(p, today) ? <Tag tone="danger">Zaległe</Tag> : <Tag>Do zapłaty</Tag>}</td>
                   <td className="actions">
-                    {p.status === 'paid' ? (
-                      <button className="btn btn-ghost btn-sm" onClick={() => apply([setPaymentStatus(p.client, p.id, false, today)])}>
-                        Cofnij
-                      </button>
-                    ) : (
+                    {isOverdue(p, today) && (
                       <button className="btn btn-secondary btn-sm" onClick={() => void markPaid({ apply, toast }, p.client, p.id, today)}>
                         Oznacz opłacone
                       </button>
                     )}
-                    <RemindButton client={p.client} p={p} onOpen={setRemind} />
+                    <MenuButton
+                      label={`Więcej: ${p.client.name}, ${paymentLabel(p)}`}
+                      title={`${p.client.name} · ${pln(p.amount)}`}
+                      className="icon-btn"
+                      items={
+                        p.status === 'paid'
+                          ? [{ icon: 'repeat', text: 'Cofnij opłacenie', run: () => void apply([setPaymentStatus(p.client, p.id, false, today)]) }]
+                          : [
+                              ...(isOverdue(p, today) ? [] : [{ icon: 'check', text: 'Oznacz opłacone', run: () => void markPaid({ apply, toast }, p.client, p.id, today) }]),
+                              { icon: 'mail', text: 'Przypomnij', run: () => setRemind({ clientId: p.client.id, paymentId: p.id }) },
+                              { icon: 'user', text: 'Karta podopiecznego', run: () => openClient(p.client.id, 'Płatności') },
+                            ]
+                      }
+                    />
                   </td>
                 </tr>
               ))}
@@ -140,6 +169,7 @@ export function PaymentsView() {
         </>
       )}
       {remind && <ReminderModal {...remind} onClose={() => setRemind(null)} />}
+      {bulkRemind && <BulkRemindModal onClose={() => setBulkRemind(false)} />}
       {bulk && <BulkSubsModal onClose={() => setBulk(false)} latest={() => dbRef.current} />}
     </div>
   );

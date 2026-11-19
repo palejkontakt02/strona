@@ -17,7 +17,8 @@ import { doneOn, dueOn } from '../lib/habits';
 import { fmtDay, fmtRest, fnum, uid } from '../format';
 import { defaultCharge, packageHint, packageStatus } from '../lib/billing';
 import { fmtSec as fmtHold, num, numIn, repsN, secOf, sidesOf, sumReps } from '../lib/parse';
-import { barbellByName, checkRecord, recentE1, sessionRecords } from '../lib/strength';
+import { barbellByName, checkRecord, loadStep, recentE1, sessionRecords, stepLoad } from '../lib/strength';
+import { rpeLevel } from '../lib/dataColors';
 import { emptyRunExercise, fmtDur, paceText, parseDur, parseKm, recoverySec, targetText } from '../lib/running';
 import {
   adHocCardio,
@@ -44,7 +45,7 @@ import { LoadPerToggle } from '../components/LoadPerToggle';
 import { RefComment } from '../components/RefComment';
 import { compareWorkouts, fillFromLast, fmtLast, isNoLoad, lastExerciseLog, previousWorkout, resultDelta, srpeFromSets, workIndex, workoutStats } from '../lib/lastResult';
 import type { SetLog } from '../domain';
-import { canSpeak, primeRestAudio, restAudioPlaying, restFlashOn, restSoundOn, setRestFlash, setRestSound, setVoice, speak, startRestAudio, stopRestAudio, useWakeLock, voiceOn } from './playerDevice';
+import { canSpeak, primeRestAudio, restAudioPlaying, restFlashOn, restSoundOn, doneHaptic, setRestFlash, setRestSound, setVoice, speak, startRestAudio, stopRestAudio, useWakeLock, voiceOn } from './playerDevice';
 import { applyComeback, comebackFor, comebackText, restoreFull, type Comeback, type ComebackOrig } from '../lib/comeback';
 import { flashText, nextSetInfo, speechText } from '../lib/announce';
 import { exNoteEntry, exNoteFor } from '../lib/exNotes';
@@ -163,6 +164,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const block = blocks[bi] ?? [];
   const last = bi >= blocks.length - 1;
   const tempoEx = block.map((k) => run.ex[k]).find((x) => x.tempo);
+  // superseria / obwód: następna seria w kolejności rund (do zaznaczenia bieżącej serii)
+  const blockCur = block.length > 1 ? nextBlockSet(run, block) : null;
   const [hintNext, setHintNext] = useState<number | null>(null);
   // ekran „Trening zakończony” (podopieczny, nowy trening) — po zapisie, przed powrotem do Dziś
   const [doneInfo, setDoneInfo] = useState<DoneInfo | null>(null);
@@ -305,6 +308,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       // „1:20” przy 16 km to 1 min 20 s — tempo niemożliwe, prawie na pewno chodziło o godziny
       if (d && km && km >= 0.8 && d / km < 2.4) return toast(`Tempo ${paceText(d, km)} to za szybko — „${s.reps.trim()}” to ${fmtDur(d)}. Dla godzin wpisz np. 1:20:00 albo 80.`);
       const next = update((r) => void (r.ex[k].sets[i].done = true));
+      doneHaptic();
       // przerwa po powtórzeniu (z odcinka albo całego biegu) — tylko między powtórzeniami tego samego odcinka
       const nextSet = run.ex[k].sets[i + 1];
       const rec = recoverySec(s.rest || ex.rest);
@@ -341,7 +345,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     if (hit) {
       vibrate([80, 60, 80, 60, 160]);
       toast(hit.text);
-    }
+    } else doneHaptic();
     const br = blockRest(next, k, i);
     setHintNext(br.next ?? null);
     const allDone = next.ex.every((e) => e.sets.every((x) => x.done));
@@ -651,11 +655,71 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     onContextMenu: (ev: React.MouseEvent) => ev.preventDefault(),
   });
 
+  /** ± przy bieżącej serii: powtórzenia (±1, seria na czas ±5 s) i ciężar (krok sprzętu: sztanga 2,5 kg, hantle 1 / 2 kg). */
+  const steppers = (k: number, i: number, no: string, bare: boolean) => {
+    const e = run.ex[k];
+    const s = e.sets[i];
+    if (e.cardio || e.perSide) return null;
+    // kompleks („2+1”) i zakres zostają do wpisania; ± tylko przy zwykłej liczbie
+    const showReps = /^\d*$/.test(s.reps.trim());
+    const timed = s.unit === 's';
+    const rStep = timed ? 5 : 1;
+    const reps = Number(s.reps.trim() || 0);
+    const kg = num(s.load) ?? 0;
+    const per = loadPerOf(e);
+    const showKg = !bare && !sidesWide(e);
+    if (!showReps && !showKg) return null;
+    const kgStep = String(loadStep(kg, e.name, per)).replace('.', ',');
+    const setReps = (d: number) => {
+      const v = Math.max(0, reps + d);
+      setSet(k, i, { reps: v > 0 ? String(v) : '', entered: true });
+    };
+    const setKg = (d: number) => {
+      const v = stepLoad(kg, e.name, per, d);
+      setSet(k, i, { load: v > 0 ? String(v) : '', edited: true });
+    };
+    return (
+      <div className={`stp-row ${showReps ? '' : 'kg-only'}`} role="group" aria-label={`Zmień wynik serii ${no}`}>
+        {showReps && (
+          <span className="stp">
+            <button type="button" className="stp-btn stp-minus" aria-label={`${timed ? 'Czas' : 'Powtórzenia'} minus ${rStep}${timed ? ' s' : ''}, ${e.name}, seria ${no}`} disabled={reps <= 0} onClick={() => setReps(-rStep)}>
+              <Icon name="minus" size={20} />
+            </button>
+            <span className="stp-step" aria-hidden="true">
+              {rStep} {timed ? 's' : 'powt.'}
+            </span>
+            <button type="button" className="stp-btn stp-plus" aria-label={`${timed ? 'Czas' : 'Powtórzenia'} plus ${rStep}${timed ? ' s' : ''}, ${e.name}, seria ${no}`} onClick={() => setReps(rStep)}>
+              <Icon name="plus" size={20} />
+            </button>
+          </span>
+        )}
+        {showKg && (
+          <span className="stp">
+            <button type="button" className="stp-btn stp-minus" aria-label={`Ciężar minus ${kgStep} kg, ${e.name}, seria ${no}`} disabled={kg <= 0} onClick={() => setKg(-1)}>
+              <Icon name="minus" size={20} />
+            </button>
+            <span className="stp-step" aria-hidden="true">
+              {kgStep} kg
+            </span>
+            <button type="button" className="stp-btn stp-plus" aria-label={`Ciężar plus ${kgStep} kg, ${e.name}, seria ${no}`} onClick={() => setKg(1)}>
+              <Icon name="plus" size={20} />
+            </button>
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const setRow = (k: number, i: number, num: string, label?: string, blockNoLoad?: boolean) => {
     const s = run.ex[k].sets[i];
     const e = run.ex[k];
     const bare = blockNoLoad ?? noLoad(k);
     const isNext = nextSet ? nextSet.k === k && nextSet.i === i && !s.done : hintNext === k && !s.done;
+    // bieżąca seria (jedna na ekranie): przy niej ± do powtórzeń i ciężaru
+    const active = !s.done && (nextSet ? isNext : blockCur ? blockCur.k === k && blockCur.i === i : e.sets.findIndex((x) => !x.done) === i);
+    // trzy stany wartości: zadana z planu (is-target), wpisana teraz, zaliczona (wiersz .done);
+    // ciężar ma własny znacznik (`edited`), RPE odróżnia wpis od podpowiedzi w placeholderze
+    const tgt = !s.done && !s.entered ? 'is-target' : '';
     // narzędzia serii: tempo z planu i kalkulator talerzy (sztanga)
     const kg = numIn(s.load, 0.01, 2000);
     const showTempo = !!e.tempoStr && !s.done && !s.warmup && !s.unit && !e.cardio;
@@ -694,7 +758,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 aria-label={`Wpisz wynik z ostatniego razu: ${lastText}, ${e.name}, seria ${num}`}
                 onClick={() => {
                   const f = fillFromLast(lastSet!);
-                  setSet(k, i, { reps: f.reps || s.reps, ...(bare || !f.load ? {} : { load: f.load, edited: true }) });
+                  setSet(k, i, { reps: f.reps || s.reps, entered: true, ...(bare || !f.load ? {} : { load: f.load, edited: true }) });
                 }}
               >
                 ostatnio <b>{lastText}</b>
@@ -717,7 +781,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             {s.warmup ? ' · rozgrzewka' : ''}
           </div>
         )}
-        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${bare && !e.cardio ? 'noload' : ''} ${blockNoLoad === undefined && e.perSide && !e.cardio && !bare && !sidesWide(e) ? 'sides' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''}`}>
+        <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${bare && !e.cardio ? 'noload' : ''} ${blockNoLoad === undefined && e.perSide && !e.cardio && !bare && !sidesWide(e) ? 'sides' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''} ${active ? 'is-active' : ''}`}>
           {trainer && run.ex[k].sets.length > 1 ? (
             <button type="button" className="sn sn-btn" {...pressProps(k, i, num)} aria-label={`Seria ${num}, ${run.ex[k].name} — przytrzymaj, żeby usunąć`} title="Przytrzymaj, żeby usunąć tę serię">
               {snInner}
@@ -728,21 +792,21 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           {run.ex[k].cardio ? (
             // cardio: czas, dystans, tętno, RPE (bez ciężaru i nagrania)
             <>
-              <input value={s.reps} placeholder="min" onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas (minuty albo m:ss), ${run.ex[k].name}, odcinek ${num}`} />
-              <input inputMode="decimal" value={s.dist ?? ''} placeholder="km" onChange={(ev) => setSet(k, i, { dist: ev.target.value })} aria-label={`Dystans (km), ${run.ex[k].name}, odcinek ${num}`} />
+              <input value={s.reps} className={tgt} placeholder="min" onChange={(ev) => setSet(k, i, { reps: ev.target.value, entered: true })} aria-label={`Czas (minuty albo m:ss), ${run.ex[k].name}, odcinek ${num}`} />
+              <input inputMode="decimal" value={s.dist ?? ''} className={tgt} placeholder="km" onChange={(ev) => setSet(k, i, { dist: ev.target.value, entered: true })} aria-label={`Dystans (km), ${run.ex[k].name}, odcinek ${num}`} />
               <input inputMode="numeric" value={s.hr ?? ''} placeholder="tętno" onChange={(ev) => setSet(k, i, { hr: ev.target.value })} aria-label={`Średnie tętno, ${run.ex[k].name}, odcinek ${num}`} />
-              <input inputMode="decimal" value={s.rpe} placeholder={s.tRpe || 'RPE'} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, odcinek ${num}`} />
+              <RpeField value={s.rpe} target={s.tRpe} placeholder={s.tRpe || 'RPE'} onChange={(v) => setSet(k, i, { rpe: v })} label={`RPE, ${run.ex[k].name}, odcinek ${num}`} />
             </>
           ) : run.ex[k].perSide ? (
             // na stronę: osobno lewa i prawa (różny wynik, np. 30/20 s)
             <span className={`lr ${sidesWide(run.ex[k]) ? 'wide' : ''}`}>
               {(() => {
                 const [l, r] = sidesOf(s.reps)?.map(String) ?? [s.reps, s.reps];
-                const set = (nl: string, nr: string) => setSet(k, i, { reps: nl === nr ? nl : `${nl}/${nr}` });
+                const set = (nl: string, nr: string) => setSet(k, i, { reps: nl === nr ? nl : `${nl}/${nr}`, entered: true });
                 return (
                   <>
-                    <input inputMode="numeric" value={l} placeholder="L" onFocus={selectAll} onChange={(ev) => set(ev.target.value, r)} aria-label={`Lewa strona, ${run.ex[k].name}, seria ${num}`} />
-                    <input inputMode="numeric" value={r} placeholder="P" onFocus={selectAll} onChange={(ev) => set(l, ev.target.value)} aria-label={`Prawa strona, ${run.ex[k].name}, seria ${num}`} />
+                    <input inputMode="numeric" value={l} className={tgt} placeholder="L" onFocus={selectAll} onChange={(ev) => set(ev.target.value, r)} aria-label={`Lewa strona, ${run.ex[k].name}, seria ${num}`} />
+                    <input inputMode="numeric" value={r} className={tgt} placeholder="P" onFocus={selectAll} onChange={(ev) => set(l, ev.target.value)} aria-label={`Prawa strona, ${run.ex[k].name}, seria ${num}`} />
                   </>
                 );
               })()}
@@ -751,7 +815,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             s.unit && !s.done && holdSec(s) > 0 ? (
               // seria na czas: odliczanie w polu tej serii
               <span className="reps-hold">
-                <input inputMode="text" value={s.reps} placeholder="s" onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`Czas, ${run.ex[k].name}, seria ${num}`} />
+                <input inputMode="text" value={s.reps} className={tgt} placeholder="s" onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value, entered: true })} aria-label={`Czas, ${run.ex[k].name}, seria ${num}`} />
                 <button
                   type="button"
                   className="hold-btn"
@@ -763,13 +827,13 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 </button>
               </span>
             ) : (
-              <input inputMode={s.unit === 's' || complexEx(run.ex[k]) ? 'text' : 'numeric'} value={s.reps} placeholder={s.unit === 's' ? 's' : undefined} onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
+              <input inputMode={s.unit === 's' || complexEx(run.ex[k]) ? 'text' : 'numeric'} value={s.reps} className={tgt} placeholder={s.unit === 's' ? 's' : undefined} onFocus={selectAll} onChange={(ev) => setSet(k, i, { reps: ev.target.value, entered: true })} aria-label={`${s.unit ? 'Czas' : 'Powtórzenia'}, ${run.ex[k].name}, seria ${num}`} />
             )
           )}
           {!run.ex[k].cardio && (
             <>
-              {!sidesWide(run.ex[k]) && !bare && <input inputMode="decimal" value={commaNum(s.load)} className={s.sug && !s.edited ? 'sugg' : ''} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
-              <input inputMode="decimal" value={commaNum(s.rpe)} placeholder={commaNum(s.tRpe)} onChange={(ev) => setSet(k, i, { rpe: ev.target.value })} aria-label={`RPE, ${run.ex[k].name}, seria ${num}`} />
+              {!sidesWide(run.ex[k]) && !bare && <input inputMode="decimal" value={commaNum(s.load)} className={`${s.sug && !s.edited ? 'sugg' : ''} ${!s.done && !s.edited ? 'is-target' : ''}`} onFocus={selectAll} onChange={(ev) => setSet(k, i, { load: ev.target.value, edited: true })} aria-label={`Ciężar, ${run.ex[k].name}, seria ${num}`} />}
+              <RpeField value={commaNum(s.rpe)} target={s.tRpe} placeholder={commaNum(s.tRpe)} onChange={(v) => setSet(k, i, { rpe: v })} label={`RPE, ${run.ex[k].name}, seria ${num}`} />
               {!bare && <SetVideoButton clientId={client.id} video={s.video} title={`${run.ex[k].name} · seria ${num}`} onChange={(video) => setSet(k, i, { video })} />}
             </>
           )}
@@ -801,6 +865,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </div>
           );
         })()}
+        {active && steppers(k, i, num, bare)}
         {/* cardio i „na stronę” — odliczanie pod wierszem (seria na czas ma stoper w polu) */}
         {s.unit && !s.done && (run.ex[k].cardio ? (parseDur(s.reps) ?? 0) > 0 : run.ex[k].perSide && holdSec(s) > 0) && (
           <button
@@ -874,7 +939,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       for (const k of ks) {
         const sets = r.ex[k].sets;
         const src = sets[sets.length - 1];
-        while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, first: false, warmup: false, video: undefined });
+        while (sets.length < target) sets.push({ ...src, done: false, rpe: '', sug: '', edited: false, entered: false, first: false, warmup: false, video: undefined });
       }
     });
   const removeSet = async (ks: number[]) => {
@@ -1155,6 +1220,142 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   /** Ćwiczenie, którego dotyczy zgłoszenie bólu: pierwsze z niezaliczoną serią w bieżącym bloku. */
   const painDefault = () => block.find((k) => run.ex[k].sets.some((x) => !x.done)) ?? block[0] ?? 0;
 
+  /**
+   * Trening na żywo na tablecie / laptopie (od ok. 1000 px, CSS): lewa kolumna to lista ćwiczeń z postępem
+   * (stuknięcie przechodzi do ćwiczenia), prawa to kontekst podopiecznego. Na telefonie obie są ukryte.
+   */
+  const liveRail = () => {
+    const work = run.ex.reduce((a, x) => a + x.sets.filter((st) => !st.warmup).length, 0);
+    const workDone = run.ex.reduce((a, x) => a + x.sets.filter((st) => !st.warmup && st.done).length, 0);
+    return (
+      <aside className="live-rail" aria-label="Ćwiczenia treningu">
+        <div className="live-rail-head">
+          <b className="num">
+            {workDone}/{work}
+          </b>
+          <span className="muted small">serii roboczych</span>
+        </div>
+        <ol className="live-rail-list">
+          {blocks.map((b, j) => {
+            const sets = b.flatMap((k) => run.ex[k].sets.filter((st) => !st.warmup));
+            const d = sets.filter((st) => st.done).length;
+            const all = sets.length > 0 && d === sets.length;
+            return (
+              <li key={j}>
+                <button type="button" className={`live-rail-item ${j === bi ? 'cur' : ''} ${all ? 'done' : ''}`} aria-current={j === bi ? 'step' : undefined} onClick={() => go(j)}>
+                  <span className="live-rail-name">
+                    {b.map((k) => (
+                      <span key={k}>
+                        {run.ex[k].label && <span className="live-rail-label">{run.ex[k].label}</span>}
+                        {run.ex[k].name}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="live-rail-n num">
+                    {all ? <Icon name="check" size={16} /> : null}
+                    {d}/{sets.length}
+                  </span>
+                  <span className="live-rail-bar" aria-hidden="true">
+                    <i style={{ width: `${sets.length ? (d / sets.length) * 100 : 0}%` }} />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </aside>
+    );
+  };
+  const liveCtx = () => {
+    const h = db.trainer_notes.find((n) => n.clientId === client.id)?.health;
+    const injuries = (client.injuryLog ?? []).filter((x) => x.status !== 'wyleczony');
+    const health = [h?.contraindications, h?.restrictions, h?.meds && `leki: ${h.meds}`].filter(Boolean) as string[];
+    const past = history().filter((x) => x.date <= run.date).sort((a, b) => b.date.localeCompare(a.date));
+    const pains = past.filter((x) => (x.pain ?? 0) > 0).slice(0, 3);
+    const cur = block.map((k) => run.ex[k]).filter((x) => !x.cardio);
+    return (
+      <aside className="live-ctx" aria-label={`Kontekst: ${client.name}`}>
+        {(injuries.length > 0 || health.length > 0 || client.injuries) && (
+          <section className="live-ctx-sec live-ctx-warn">
+            <h3>Urazy i ograniczenia</h3>
+            <ul>
+              {injuries.map((x) => (
+                <li key={x.id}>
+                  <b>
+                    {x.name}
+                    {x.side ? ` (${x.side})` : ''}
+                  </b>{' '}
+                  <span className="muted">{x.status}</span>
+                  {x.note && <span className="live-ctx-note">{x.note}</span>}
+                </li>
+              ))}
+              {client.injuries && <li>{client.injuries}</li>}
+              {health.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {cur.map((e) => {
+          const s = past.find((x) => x.exercises.some((y) => y.name.trim().toLowerCase() === e.name.trim().toLowerCase() && !y.cardio));
+          const logs = lastOf(e.name);
+          const note = exNoteFor(client.exNotes, e.name);
+          return (
+            <section key={e.name} className="live-ctx-sec">
+              <h3>
+                Ostatnio: {e.name}
+                {s && <span className="muted small"> {fmtDay(s.date)}</span>}
+              </h3>
+              {logs.length ? (
+                <ol className="live-ctx-sets">
+                  {logs.map((l, j) => (
+                    <li key={j} className="num">
+                      <span className="live-ctx-sn">{j + 1}</span>
+                      <b>{fmtLast(l) ?? ''}</b>
+                      {l.rpe != null && (
+                        <span className="live-ctx-rpe" data-rpe={rpeLevel(l.rpe) ?? undefined}>
+                          {rpeLevel(l.rpe) && <span className="rpe-cue" aria-hidden="true" />}@{String(l.rpe).replace('.', ',')}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="muted small">Pierwszy raz.</p>
+              )}
+              {note && <p className="live-ctx-note">Notatka podopiecznego: {note.text}</p>}
+            </section>
+          );
+        })}
+        {(pains.length > 0 || painStop) && (
+          <section className="live-ctx-sec">
+            <h3>Zgłoszony ból</h3>
+            <ul>
+              {painStop && (
+                <li>
+                  <b className="num">{painStop.level}/10</b> <span className="muted">dziś, {painStop.exName}</span>
+                  {painStop.spots.length ? <span className="live-ctx-note">{painSummary(painStop.spots)}</span> : null}
+                </li>
+              )}
+              {pains.map((x) => (
+                <li key={x.id}>
+                  <b className="num">{x.pain}/10</b> <span className="muted">{fmtDay(x.date)}</span>
+                  {x.painMap?.length ? <span className="live-ctx-note">{painSummary(x.painMap)}</span> : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {client.notes && (
+          <section className="live-ctx-sec">
+            <h3>Notatki</h3>
+            <p className="live-ctx-note">{client.notes}</p>
+          </section>
+        )}
+      </aside>
+    );
+  };
+
   if (doneInfo)
     return (
       <div className="player">
@@ -1173,7 +1374,9 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   };
 
   return (
-    <div className="player fade" onPointerDownCapture={primeRestAudio}>
+    <div className={`player fade ${trainer ? 'player-live' : ''}`} onPointerDownCapture={primeRestAudio}>
+      {trainer && liveRail()}
+      <div className="live-center">
       {trainer &&
         (() => {
           // trener prowadzi trening: przeciwwskazania i ograniczenia z wywiadu (podopieczny tego nie widzi)
@@ -1607,7 +1810,23 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             </button>
           </Sheet>
       )}
+      </div>
+      {trainer && liveCtx()}
     </div>
+  );
+}
+
+/**
+ * Pole RPE z kolorem kroku (paleta danych, tokens-data.css): pasek zawsze obok liczby, nigdy zamiast niej.
+ * Kolor z wpisanego RPE, a przed wpisaniem z RPE zadanego w planie (wtedy liczba jest podpowiedzią w polu).
+ */
+function RpeField({ value, target, placeholder, onChange, label }: { value: string; target: string; placeholder?: string; onChange: (v: string) => void; label: string }) {
+  const lvl = rpeLevel(value.trim() ? value : target);
+  return (
+    <span className={`rpe-field ${value.trim() ? 'has-val' : ''}`} data-rpe={lvl ?? undefined}>
+      {lvl && <span className="rpe-cue" aria-hidden="true" />}
+      <input inputMode="decimal" value={value} placeholder={placeholder} onChange={(ev) => onChange(ev.target.value)} aria-label={label} />
+    </span>
   );
 }
 

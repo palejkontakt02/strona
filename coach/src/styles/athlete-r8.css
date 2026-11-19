@@ -1,0 +1,535 @@
+/* ================= R8: podopieczny i trening na żywo (etap 2b) =================
+   Dziś = jedna wielka rzecz; odtwarzacz z trzema stanami wartości serii (zadana, ostatnio, zrobiona),
+   ± przy bieżącej serii i znacznikiem RPE; trening na żywo w trzech kolumnach od ok. 1000 px.
+   Ładowany jako ostatni arkusz (nadpisuje athlete.css, player.css, r7-player.css, r7-podopieczny.css). */
+
+/* ================= DZIŚ ================= */
+.ath .today-date {
+  margin-bottom: var(--space-3);
+}
+.ath .today-date p {
+  margin: 0;
+  font-size: var(--fs-xs);
+}
+.ath .acard-hero.today-hero {
+  gap: var(--space-2);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border-color: var(--color-divider);
+}
+.ath .today-hero .today-when {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.ath .today-hero .r7-hero-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ath .today-hero .today-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+.ath .today-hero .today-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-4);
+  margin: 0;
+  font-size: var(--fs-body);
+  font-variant-numeric: tabular-nums;
+}
+.ath .today-hero .today-min {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.ath .today-hero .r7-hero-more {
+  flex-basis: 100%;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--color-divider);
+  text-underline-offset: 3px;
+}
+/* Start zaraz pod nazwą i czasem; „Przenieś na inny dzień” pod Startem */
+.ath .today-hero > .btn-primary {
+  order: 1;
+  min-height: 64px;
+  margin-top: var(--space-4);
+  font-size: var(--fs-lg);
+}
+.ath .today-hero > .ath-move-btn {
+  order: 2;
+  align-self: center;
+  margin: 0;
+}
+
+/* drugi poziom: trening własny, powtórka, ankieta (mniejsze, bez tła karty) */
+.ath .ath-home .ath-quick {
+  margin: 0 0 var(--space-2);
+}
+.ath .ath-home .ath-quick .btn {
+  min-height: var(--control-h);
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  font-size: var(--fs-xs);
+}
+.ath .ath-home .ath-quick .btn svg {
+  color: var(--color-neutral-400);
+}
+.ath .ath-home .absence-link {
+  margin: 0 0 var(--space-4);
+}
+.ath .ath-intake.today-second {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: transparent;
+  border: 1px solid var(--color-divider);
+}
+.ath .ath-intake-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ath .ath-intake-tx b {
+  font-weight: 600;
+}
+.ath .ath-intake.today-second .btn {
+  flex: none;
+  min-height: var(--control-h);
+  white-space: nowrap;
+}
+
+/* ================= ODTWARZACZ: trzy stany wartości serii ================= */
+
+/* 1. zadana przez trenera (wartość z planu, jeszcze nie wpisana): szara i lżejsza */
+.player .sgrid:not(.done) input.is-target {
+  color: var(--color-neutral-400);
+  font-weight: 500;
+}
+/* 2. wpisana teraz (albo stuknięte „ostatnio”): pełny kolor i waga */
+.player .sgrid:not(.done) input:not(.is-target) {
+  color: var(--color-text);
+  font-weight: 700;
+}
+/* placeholder (np. RPE zadane) zostaje podpowiedzią */
+.player .sgrid input::placeholder {
+  color: var(--color-neutral-500);
+  font-weight: 500;
+}
+
+/* 3. zaliczona: cały wiersz zielony, liczby pogrubione, pola bez ramki */
+.player .sgrid.done {
+  border-radius: var(--radius-md);
+  background: var(--ath-ok-tint);
+  box-shadow: 0 0 0 4px var(--ath-ok-tint);
+  transition: background-color 0.16s ease-out;
+}
+.player .sgrid.done input {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 700;
+}
+.player .sgrid.done .cam-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* „ostatnio”: cicha informacja drugiego planu (stuknięcie nadal wpisuje wynik) */
+.player .prevhint {
+  color: var(--color-neutral-400);
+}
+.player .last-btn {
+  color: var(--color-neutral-400);
+}
+.player .last-btn b {
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--color-neutral-400);
+  text-decoration: underline;
+  text-decoration-color: var(--color-divider);
+}
+
+/* pola: tło karty (wyglądają na edytowalne, nie na zablokowane) */
+.player .sgrid:not(.done) input {
+  background: var(--color-surface);
+}
+
+/* ✓: cel od początku (ikona w kolorze tekstu, wyraźna ramka), bieżąca seria pełniej.
+   Powtórzona klasa .ok: wygrywa z dawnymi regułami „bieżącej serii” z athlete.css (długie selektory). */
+.player .acard .sgrid:not(.done) .ok.ok.ok.ok {
+  min-width: 56px;
+  min-height: 56px;
+  border: 2px solid var(--color-neutral-500);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.player .acard .sgrid.is-next:not(.done) .ok.ok.ok.ok.ok,
+.player .acard .sgrid.is-active:not(.done) .ok.ok.ok.ok.ok {
+  border-color: var(--color-text);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.player .acard .sgrid.done .ok.ok.ok.ok.ok {
+  border-color: var(--color-ok);
+  background: var(--color-ok);
+  color: var(--on-ok);
+}
+
+/* RPE: pasek koloru kroku przy liczbie, w polu */
+.player .sgrid .rpe-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.player .sgrid .rpe-field input {
+  width: 100%;
+  min-width: 0;
+}
+.player .sgrid .rpe-field .rpe-cue {
+  position: absolute;
+  left: 7px;
+  top: 30%;
+  bottom: 30%;
+  height: auto;
+  width: 4px;
+  margin: 0;
+  border-radius: 1px;
+  pointer-events: none;
+}
+.player .sgrid .rpe-field[data-rpe] input {
+  padding-left: 12px;
+}
+
+/* ± przy bieżącej serii: dwa przełączniki pod polami (powt. i kg), cele 48 px */
+.player .stp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 6px 0 2px 27px;
+}
+.player .stp-row.kg-only .stp {
+  grid-column: 2;
+}
+.player .stp {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.player .stp-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.player .stp-btn:active {
+  background: var(--color-surface-2);
+}
+.player .stp-btn:disabled {
+  color: var(--color-neutral-500);
+  cursor: default;
+}
+.player .stp-step {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--color-neutral-400);
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+/* narzędzia ćwiczenia (notatka, komentarz, nagranie, + kg, wideo): jeden cichy rząd ikon z podpisem */
+.player .ex-tools {
+  gap: 2px;
+  margin: 4px 0 0 -8px;
+}
+.player .ex-tools .btn,
+.player .ex-tools .ex-cam .cam-btn {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--color-neutral-400);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.player .ex-tools .btn:hover,
+.player .ex-tools .ex-cam .cam-btn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.player .ex-tools .exnote-btn.has-note,
+.player .ex-tools .ex-cam.has-video .cam-btn {
+  color: var(--color-text);
+}
+
+@media (min-width: 700px) {
+  .player .stp-row {
+    margin-left: 42px;
+  }
+}
+@media (max-width: 380px) {
+  .player .stp-row {
+    margin-left: 0;
+    gap: var(--space-2);
+  }
+  .player .stp {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+  .player .stp-btn {
+    width: 44px;
+  }
+  .player .ex-tools .btn,
+  .player .ex-tools .ex-cam .cam-btn {
+    padding: 0 6px;
+  }
+}
+
+/* ================= TRENING NA ŻYWO: trzy kolumny od 1000 px ================= */
+.live-center > .between {
+  gap: var(--space-2);
+}
+.live-center > .between .btn {
+  min-height: var(--control-h);
+}
+.player .live-rail,
+.player .live-ctx {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  .ath:has(> .player-live),
+  .ath:has(> .live-bar + .player-live) {
+    max-width: 1320px;
+  }
+  .ath:has(.player-live) > .live-bar {
+    max-width: none;
+  }
+  .player.player-live {
+    display: grid;
+    grid-template-columns: minmax(200px, 280px) minmax(0, 600px) minmax(200px, 280px);
+    justify-content: center;
+    align-items: start;
+    column-gap: var(--space-8);
+  }
+  .player-live > .live-center {
+    min-width: 0;
+  }
+  /* uwaga z wywiadu trafia do prawej kolumny */
+  .player-live > .live-center > .health-bar {
+    display: none;
+  }
+  .player .live-rail,
+  .player .live-ctx {
+    display: block;
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100dvh - 2 * var(--space-4));
+    overflow-y: auto;
+    padding-top: 96px; /* w linii z tytułem treningu */
+  }
+}
+
+/* lewa kolumna: lista ćwiczeń z postępem */
+.live-rail-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+}
+.live-rail-head b {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1;
+}
+.live-rail-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.live-rail-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.live-rail-item:hover {
+  background: var(--color-surface-2);
+}
+.live-rail-item.cur {
+  background: var(--color-surface);
+  box-shadow: inset 3px 0 0 var(--color-text);
+}
+.live-rail-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.live-rail-item.cur .live-rail-name {
+  font-weight: 700;
+}
+.live-rail-item.done .live-rail-name {
+  color: var(--color-neutral-400);
+}
+.live-rail-label {
+  display: inline-block;
+  min-width: 22px;
+  margin-right: 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-neutral-400);
+}
+.live-rail-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--color-neutral-400);
+}
+.live-rail-item.cur .live-rail-n {
+  color: var(--color-text);
+}
+.live-rail-item.done .live-rail-n {
+  color: var(--ath-ok-text, var(--color-ok));
+}
+.live-rail-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  background: var(--color-surface-2);
+}
+.live-rail-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--color-ok);
+}
+
+/* prawa kolumna: kontekst podopiecznego */
+.live-ctx-sec {
+  padding: 0 0 var(--space-4);
+  margin: 0 0 var(--space-4);
+  border-bottom: 1px solid var(--color-divider);
+}
+.live-ctx-sec:last-child {
+  border-bottom: 0;
+}
+.live-ctx-sec h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--color-neutral-400);
+}
+.live-ctx-sec h3 .muted {
+  font-weight: 500;
+}
+.live-ctx-sec ul,
+.live-ctx-sets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.live-ctx-sec li {
+  padding: 3px 0;
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+.live-ctx-warn h3 {
+  color: var(--warn-fg, var(--color-warn));
+}
+.live-ctx-note {
+  display: block;
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--color-neutral-400);
+  overflow-wrap: anywhere;
+}
+.live-ctx-sets li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.live-ctx-sets b {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+.live-ctx-sn {
+  min-width: 14px;
+  font-size: var(--fs-xs);
+  color: var(--color-neutral-400);
+}
+.live-ctx-rpe {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--color-neutral-300);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player .sgrid.done {
+    transition: none;
+  }
+}
+
+/* superseria / obwód: ćwiczenie na stronę (L | P) mieści się w kolumnie powtórzeń, bez nachodzenia na kg */
+.player .round .sgrid .lr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
+}
+.player .round .sgrid .lr input {
+  min-width: 0;
+  padding: 0;
+  font-size: 22px;
+}

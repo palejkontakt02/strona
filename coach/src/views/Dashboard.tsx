@@ -57,7 +57,11 @@ export function useMedia(query: string): boolean {
 
 const FOLD_KEY = "fitowa-dash-folds";
 /** Rozwinięte sekcje Pulpitu (telefon: „Więcej”, „Jutro”) — zapamiętane na tym urządzeniu. */
-function useFolds(): [Record<string, boolean>, (id: string) => void] {
+function useFolds(): [
+  Record<string, boolean>,
+  (id: string) => void,
+  (id: string, v: boolean) => void,
+] {
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem(FOLD_KEY) || "{}") as Record<
@@ -68,6 +72,16 @@ function useFolds(): [Record<string, boolean>, (id: string) => void] {
       return {};
     }
   });
+  const set = (id: string, v: boolean) =>
+    setOpen((o) => {
+      const n = { ...o, [id]: v };
+      try {
+        localStorage.setItem(FOLD_KEY, JSON.stringify(n));
+      } catch {
+        // bez zapamiętania
+      }
+      return n;
+    });
   const toggle = (id: string) =>
     setOpen((o) => {
       const n = { ...o, [id]: !o[id] };
@@ -78,7 +92,7 @@ function useFolds(): [Record<string, boolean>, (id: string) => void] {
       }
       return n;
     });
-  return [open, toggle];
+  return [open, toggle, set];
 }
 
 /** Zwijana sekcja (telefon): nagłówek z liczbą, treść po rozwinięciu. */
@@ -140,7 +154,7 @@ export function Dashboard() {
   const { openClient, openModal, startLive, go } = useNav();
   const { profile } = useTrainerProfile();
   const phone = useMedia("(max-width: 1000px)");
-  const [folds, toggleFold] = useFolds();
+  const [folds, toggleFold, setFold] = useFolds();
   const clubs = db.locations.filter((l) => l.kind === "klub");
   const today = todayISO();
   const [showAllAlerts, setShowAllAlerts] = useState(false);
@@ -251,6 +265,19 @@ export function Dashboard() {
   );
 
   const shortName = (id: string) => clientById(db, id)?.name ?? "—";
+  // najbliższa wizyta (trwa albo przed Tobą) — tylko ona ma czarne „Prowadź”; pozostałe wiersze otwierają szczegóły
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const nearestId = (
+    todayAppts.find(
+      (a) =>
+        a.status === "planned" &&
+        toMin(a.time) + (a.duration || 60) > nowMin,
+    ) ?? todayAppts.find((a) => a.status === "planned")
+  )?.id;
 
   const todayCard = (
     <Card
@@ -270,24 +297,39 @@ export function Dashboard() {
               ).slice(0, 6)
           ).map((a) => {
             const c = clientById(db, a.clientId);
+            const nearest = a.id === nearestId;
+            const pr = groupOf(db.appointments, a).filter(
+              (x) => x.id !== a.id && x.status !== "cancel",
+            );
+            const saved =
+              a.sessionId && db.sessions.find((x) => x.id === a.sessionId);
+            // po czasie i bez zapisu — „Zapisz trening po fakcie”
+            const late =
+              (a.status === "planned" &&
+                !nearest &&
+                toMin(a.time) + (a.duration || 60) <= nowMin) ||
+              (a.status === "done" && !a.sessionId);
             return (
-              <li key={a.id} className="row dash-visit" data-status={a.status}>
-                <span className="row-time">{a.time}</span>
-                <div className="grow row-main">
-                  <button
-                    className="link ellipsis"
-                    onClick={() => c && openClient(c.id)}
-                  >
-                    {c?.name ?? "—"}
-                  </button>
-                  {(() => {
-                    const pr = groupOf(db.appointments, a).filter(
-                      (x) => x.id !== a.id && x.status !== "cancel",
-                    );
-                    return pr.length ? (
+              <li
+                key={a.id}
+                className={`row dash-visit ${nearest ? "is-nearest" : ""}`}
+                data-status={a.status}
+              >
+                <button
+                  type="button"
+                  className="dash-visit-main"
+                  onClick={() => openModal({ kind: "appt", appt: a })}
+                  aria-label={`${a.time} ${c?.name ?? ""}: szczegóły wizyty`}
+                >
+                  <span className="row-time">{a.time}</span>
+                  <span className="grow row-main">
+                    <span className="dash-visit-name ellipsis">
+                      {c?.name ?? "—"}
+                    </span>
+                    {pr.length > 0 && (
                       <span
                         className="muted small nowrap"
-                        title="Trening w parze — „Prowadź” otwiera obie osoby"
+                        title="Trening w parze, „Prowadź” otwiera obie osoby"
                       >
                         <Icon name="users" size={13} /> +{" "}
                         {pr
@@ -298,58 +340,45 @@ export function Dashboard() {
                           )
                           .join(", ")}
                       </span>
-                    ) : null;
-                  })()}
-                  <LocationTag id={a.locationId} short />
-                </div>
-                <span className={a.status === "planned" ? "hide-mobile" : ""}>
-                  <ApptStatusTag status={a.status} />
-                </span>
-                {a.status === "planned" ||
-                (a.status === "done" && !a.sessionId) ? (
-                  <>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => startLive(a.clientId, a.id)}
-                      title="Prowadź trening na żywo, seria po serii"
-                      aria-label="Prowadź trening"
-                    >
-                      <Icon name="play" size={14} />{" "}
-                      <span className="hide-xs">Prowadź</span>
-                    </button>
-                    <IconBtn
-                      icon="edit"
-                      label="Zapisz trening po fakcie"
-                      onClick={() =>
-                        openModal({
-                          kind: "session",
-                          appt: a,
-                          clientId: a.clientId,
-                          date: a.date,
-                        })
-                      }
-                    />
-                  </>
-                ) : a.sessionId &&
-                  db.sessions.some((x) => x.id === a.sessionId) ? (
+                    )}
+                    <LocationTag id={a.locationId} short />
+                  </span>
+                  {a.status !== "planned" && <ApptStatusTag status={a.status} />}
+                </button>
+                {nearest && (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => startLive(a.clientId, a.id)}
+                    title="Prowadź trening na żywo, seria po serii"
+                    aria-label="Prowadź trening"
+                  >
+                    <Icon name="play" size={14} />{" "}
+                    <span className="hide-xs">Prowadź</span>
+                  </button>
+                )}
+                {(nearest || late) && (
+                  <IconBtn
+                    icon="edit"
+                    label="Zapisz trening po fakcie"
+                    onClick={() =>
+                      openModal({
+                        kind: "session",
+                        appt: a,
+                        clientId: a.clientId,
+                        date: a.date,
+                      })
+                    }
+                  />
+                )}
+                {saved && (
                   <IconBtn
                     icon="eye"
                     label="Pokaż zapisany trening"
                     onClick={() =>
-                      openModal({
-                        kind: "session",
-                        session: db.sessions.find((x) => x.id === a.sessionId)!,
-                      })
+                      openModal({ kind: "session", session: saved })
                     }
                   />
-                ) : (
-                  <span className="btn-sm-placeholder" />
                 )}
-                <IconBtn
-                  icon="cal"
-                  label="Szczegóły wizyty (odwołaj, nieobecność, zmiana)"
-                  onClick={() => openModal({ kind: "appt", appt: a })}
-                />
               </li>
             );
           })}
@@ -587,7 +616,7 @@ export function Dashboard() {
                   </span>
                 </div>
                 <button
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => openModal({ kind: "review", sessionId: x.id })}
                 >
                   <Icon name="play" size={14} />{" "}
@@ -667,7 +696,7 @@ export function Dashboard() {
         className="dash-review"
         action={
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-secondary btn-sm"
             onClick={() => openInbox(go, { tab: "Do przejrzenia" })}
           >
             Przejrzyj
@@ -681,6 +710,56 @@ export function Dashboard() {
       </Card>
     );
   })();
+
+  // sygnały: jedna pozycja na osobę (kilka sygnałów w jednej linii), czerwone najpierw
+  const alertGroups = [
+    ...new Map(alerts.map((a) => [a.client.id, a.client])).values(),
+  ]
+    .map((client) => ({
+      client,
+      items: alerts.filter((a) => a.client.id === client.id),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.items.some((x) => x.level === "red")) -
+        Number(a.items.some((x) => x.level === "red")),
+    );
+  const alertList = (
+    <>
+      <ul className="rows">
+        {(showAllAlerts ? alertGroups : alertGroups.slice(0, 5)).map(
+          ({ client, items }) => (
+            <li key={client.id} className="row row-top">
+              <Dot
+                tone={items.some((a) => a.level === "red") ? "danger" : "warn"}
+              />
+              <div className="grow">
+                <button
+                  className="link"
+                  onClick={() => openClient(client.id, "Monitoring")}
+                >
+                  {client.name}
+                </button>
+                <div className="small muted ellipsis-2">
+                  {items.map((a) => a.text).join(" · ")}
+                </div>
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+      {alertGroups.length > 5 && (
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setShowAllAlerts(!showAllAlerts)}
+        >
+          {showAllAlerts
+            ? "Pokaż mniej"
+            : `Pokaż wszystkie (${alertGroups.length})`}
+        </button>
+      )}
+    </>
+  );
 
   const alertsCard = (() => {
     // jedna pozycja na osobę (kilka sygnałów w jednej linii), czerwone najpierw
@@ -779,9 +858,9 @@ export function Dashboard() {
                   </span>
                 </div>
                 <button
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-ghost btn-sm"
                   onClick={() => openClient(r.client.id, "Plan")}
-                  title="Karta podopiecznego → Plan: przycisk „Następny blok”"
+                  title="Karta podopiecznego, zakładka Plan: przycisk „Następny blok”"
                 >
                   Następny blok
                 </button>
@@ -1133,6 +1212,138 @@ export function Dashboard() {
     ) : null;
   const byId = (id: string) => secs.find((x) => x.id === id);
 
+  /* ---- komputer: jedna sekcja „Wymaga uwagi” z grupami (wzór: mobilne akordeony) ---- */
+  const rq = reviewQueue(db.clients, db.sessions, today);
+  const reviewN = rq.length;
+  const dueSec = byId("due");
+  type Group = {
+    id: string;
+    title: string;
+    n: number;
+    badge?: ReactNode;
+    tone?: "danger" | "warn";
+    open: boolean;
+    body: ReactNode;
+  };
+  const allGroups: Group[] = [
+    {
+      id: "alerts",
+      title: "Sygnały",
+      n: alertGroups.length,
+      tone: alertGroups.some((g) => g.items.some((x) => x.level === "red"))
+        ? ("danger" as const)
+        : ("warn" as const),
+      badge: alertGroups.length ? `${alertGroups.length}` : "",
+      open: true,
+      body: alertList,
+    },
+    {
+      id: "review",
+      title: "Do przejrzenia",
+      n: reviewN,
+      badge: reviewN ? `${reviewN}` : "",
+      open: true,
+      body: (
+        <div className="dash-attn-line">
+          <span className="small muted first-cap">
+            {[...new Set(rq.map((x) => x.kind))]
+              .map((k) => REVIEW_LABEL[k].toLowerCase())
+              .join(", ")}
+          </span>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => openInbox(go, { tab: "Do przejrzenia" })}
+          >
+            Przejrzyj
+          </button>
+        </div>
+      ),
+    },
+    {
+      id: "due",
+      title: "Płatności",
+      n: dues.overdue.length + dues.thisWeek.length,
+      badge: dueSec?.badge,
+      tone: dueSec?.tone,
+      open: dues.overdue.length > 0,
+      body: dueSec?.body,
+    },
+    {
+      id: "renew",
+      title: "Plany do odnowienia",
+      n: renew.length,
+      badge: byId("renew")?.badge,
+      tone: byId("renew")?.tone,
+      open: false,
+      body: byId("renew")?.body,
+    },
+    {
+      id: "packages",
+      title: "Kończące się pakiety",
+      n: packages.length,
+      badge: packages.length || "",
+      tone: byId("packages")?.tone,
+      open: packages.some((x) => x.pk!.left <= 0),
+      body: byId("packages")?.body,
+    },
+    {
+      id: "idle",
+      title: "Bez treningu 10+ dni",
+      n: idle.length,
+      badge: idle.length || "",
+      open: false,
+      body: byId("idle")?.body,
+    },
+  ];
+  const groups = allGroups.filter((g) => g.n > 0);
+  const attention = (
+    <section className="card dash-attn">
+      <div className="card-head">
+        <h4>Wymaga uwagi</h4>
+      </div>
+      {groups.length === 0 ? (
+        <Empty>Nic pilnego.</Empty>
+      ) : (
+        groups.map((g) => {
+          const key = `d-${g.id}`;
+          const isOpen = folds[key] ?? g.open;
+          return (
+            <div
+              key={g.id}
+              className={`dash-attn-group dash-attn-${g.id} ${isOpen ? "is-open" : ""}`}
+            >
+              <button
+                type="button"
+                className="dash-attn-head"
+                aria-expanded={isOpen}
+                onClick={() => setFold(key, !isOpen)}
+              >
+                {g.id === "alerts" && (
+                  <span
+                    className={`dash-attn-mark tone-${g.tone}`}
+                    aria-hidden
+                  />
+                )}
+                <span className="dash-attn-title">{g.title}</span>
+                {g.badge != null && g.badge !== "" && (
+                  <span
+                    className={`dash-fold-badge${g.tone ? ` tone-${g.tone}` : ""}`}
+                  >
+                    {g.badge}
+                  </span>
+                )}
+                <span className="dash-fold-chev" aria-hidden>
+                  <Icon name="chevD" size={16} />
+                </span>
+              </button>
+              {isOpen && <div className="dash-attn-body">{g.body}</div>}
+            </div>
+          );
+        })
+      )}
+    </section>
+  );
+
   return (
     <div className={`page fade page-dash ${phone ? "dash-phone" : ""}`}>
       <div className="page-head">
@@ -1181,13 +1392,8 @@ export function Dashboard() {
             {card(byId("recent"))}
           </div>
           <div className="dash-col dash-col-side">
-            {reviewCard}
-            {alertsCard}
-            {card(byId("renew"))}
-            {card(byId("due"))}
+            {attention}
             {card(byId("clubs"))}
-            {card(byId("packages"))}
-            {card(byId("idle"))}
           </div>
         </div>
       )}

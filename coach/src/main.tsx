@@ -28,6 +28,8 @@ import './styles/r7-platnosci.css';
 import './styles/r7-klienci.css';
 import './styles/r7-kalpulpit.css';
 import './styles/r7-podopieczny.css';
+import './styles/trainer-r8.css';
+import './styles/athlete-r8.css';
 import { applyPalette, getPalette, hasOwnPalette, systemPalette } from './theme';
 
 applyPalette(getPalette());

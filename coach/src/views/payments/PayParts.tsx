@@ -23,12 +23,12 @@ const PAY_TYPES: { type: PaymentType; label: string; hint: string }[] = [
   { type: 'inna', label: 'Inna', hint: 'plan dietetyczny, konsultacja…' },
 ];
 
-export function AddPaymentButton({ clientId }: { clientId?: string }) {
+export function AddPaymentButton({ clientId, primary }: { clientId?: string; primary?: boolean }) {
   const { openModal } = useNav();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(true)}>
+      <button type="button" className={`btn ${primary ? 'btn-primary' : 'btn-secondary btn-sm'}`} onClick={() => setOpen(true)}>
         <Icon name="plus" size={16} /> Płatność
       </button>
       {open && (
@@ -320,6 +320,63 @@ export function BulkSubsModal({ onClose, latest }: { onClose: () => void; latest
         Razem {pln(sum)} · termin {fmtDate(due)}
         {skipped ? ` · pominięto ${skipped} (już ${plural(skipped, 'ma', 'mają', 'ma')} abonament za ten miesiąc)` : ''}
       </p>
+    </Modal>
+  );
+}
+
+/* ---------- „Przypomnij wszystkim zaległym” ---------- */
+
+/**
+ * Jedno przypomnienie na każdą zaległą płatność (ta sama treść co „Przypomnij” w wierszu), wysłane w aplikacji
+ * do zaznaczonych osób jednym zapisem; płatność dostaje datę przypomnienia.
+ */
+export function BulkRemindModal({ onClose }: { onClose: () => void }) {
+  const { db, apply, toast } = useStore();
+  const { profile } = useTrainerProfile();
+  const today = todayISO();
+  const rows = db.clients
+    .flatMap((c) => c.payments.filter((p) => isOverdue(p, today)).map((p) => ({ c, p })))
+    .sort((a, b) => (a.p.dueDate ?? '').localeCompare(b.p.dueDate ?? ''));
+  // domyślnie bez osób przypomnianych dziś
+  const [off, setOff] = useState<Record<string, boolean>>(() => Object.fromEntries(rows.filter((r) => r.p.remindedAt === today).map((r) => [r.p.id, true])));
+  const chosen = rows.filter((r) => !off[r.p.id]);
+  const people = new Set(chosen.map((r) => r.c.id)).size;
+  return (
+    <Modal
+      title="Przypomnij zaległym"
+      onClose={onClose}
+      submitLabel={`Wyślij (${chosen.length})`}
+      onSubmit={async () => {
+        if (!chosen.length) return toast('Zaznacz co najmniej jedną płatność.');
+        const at = new Date().toISOString();
+        const changes = [...new Set(chosen.map((r) => r.c.id))].map((cid) => {
+          const c = clientById(db, cid)!;
+          const mine = chosen.filter((r) => r.c.id === cid);
+          const replies = mine.map((r) => ({ id: uid(), at, text: reminderText(c.name, r.p, paymentLabel(r.p), profile, today) }));
+          const ids = new Set(mine.map((r) => r.p.id));
+          return put('clients', { ...c, replies: [...(c.replies ?? []), ...replies].slice(-200), payments: c.payments.map((x) => (ids.has(x.id) ? { ...x, remindedAt: today } : x)) });
+        });
+        if (await apply(changes, `Wysłano ${chosen.length} ${plural(chosen.length, 'przypomnienie', 'przypomnienia', 'przypomnień')} (${people} ${plural(people, 'osoba', 'osoby', 'osób')}).`)) onClose();
+      }}
+    >
+      <p className="muted small">Każda osoba dostanie w aplikacji tę samą wiadomość co z „Przypomnij”: kwota, termin i dane do przelewu z profilu trenera.</p>
+      <ul className="pay-bulk-list">
+        {rows.map(({ c, p }) => (
+          <li key={p.id}>
+            <label className="check grow">
+              <input type="checkbox" checked={!off[p.id]} onChange={(e) => setOff((s) => ({ ...s, [p.id]: !e.target.checked }))} />
+              <span className="pay-bulk-name">
+                {c.name}
+                <span className="small muted">
+                  {paymentLabel(p)} · {overdueText(daysOverdue(p, today))}
+                  {p.remindedAt ? ` · ${remindedText(p.remindedAt, today)}` : ''}
+                </span>
+              </span>
+            </label>
+            <strong className="pay-bulk-sum">{pln(p.amount)}</strong>
+          </li>
+        ))}
+      </ul>
     </Modal>
   );
 }

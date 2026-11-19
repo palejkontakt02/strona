@@ -37,7 +37,7 @@ export function ClientOverview({ client }: { client: Client }) {
   const unpaid = client.payments.filter((p) => p.status !== 'paid').reduce((a, p) => a + p.amount, 0);
 
   return (
-    <>
+    <div className="ov-sections">
       <OnboardingChecklist client={client} />
       {(() => {
         const h = trainerNotesOf(db.trainer_notes, client.id).health;
@@ -58,7 +58,6 @@ export function ClientOverview({ client }: { client: Client }) {
           <Icon name="print" size={16} /> Raport dla lekarza / fizjo
         </button>
       </div>
-      <ClientInbox client={client} />
       <div className="kpi-grid kpi-strip">
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
@@ -89,7 +88,7 @@ export function ClientOverview({ client }: { client: Client }) {
       </div>
 
       <div className="two-col">
-        <Card title="Sygnały">
+        <Card title={alerts.length ? `Sygnały (${alerts.length})` : 'Sygnały'} className={`ov-alerts ${alerts.some((a) => a.level === 'red') ? 'has-red' : ''}`}>
           {alerts.length === 0 ? (
             <Empty>Brak sygnałów ostrzegawczych.</Empty>
           ) : (
@@ -123,7 +122,11 @@ export function ClientOverview({ client }: { client: Client }) {
             <Empty>Brak planu treningowego.</Empty>
           )}
         </Card>
+      </div>
 
+      <ClientInbox client={client} />
+
+      <div className="two-col">
         <Card title="Kontakt">
           <div className="stack-sm">
             {client.phone ? <a href={`tel:${client.phone.replace(/\s/g, '')}`}>{client.phone}</a> : <span className="muted">brak telefonu</span>}
@@ -191,6 +194,6 @@ export function ClientOverview({ client }: { client: Client }) {
       <ClientHabits client={client} />
       <div className="section-gap-sm" />
       <ClientTargets client={client} />
-    </>
+    </div>
   );
 }

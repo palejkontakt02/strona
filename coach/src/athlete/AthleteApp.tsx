@@ -46,6 +46,7 @@ import { AthleteRunCards, isRunner } from '../components/RunVolume'; // funkcje:
 import { History, SessionSheet, upcomingVisits } from './History';
 import { TrainerTop, VacationBanner } from './TrainerInfo';
 import { QuickRun } from './QuickRun';
+import { workoutMinutes } from './estimate';
 import { useTrainerProfile } from '../data/trainerProfile';
 import { isUnchangedEdit } from '../lib/editRun';
 import { intakeFullDue, readLater, storeLater } from '../lib/intakeLater';
@@ -542,7 +543,6 @@ function TodayTab({
   const sessions = sessionsOf(db, clientId);
   const nx = nextWorkout(plan, sessions);
   const extra = extraPlanOf(db, clientId);
-  const first = client.name.split(' ')[0];
 
   const visit = upcomingVisits(db.appointments, clientId)[0];
   const visitText = visit && `${visit.date === today ? 'dziś' : fmtLong(visit.date)}, ${visit.time}`;
@@ -574,8 +574,8 @@ function TodayTab({
 
   return (
     <div className="ath-home fade">
-      <header className="ath-hello">
-        <h1>Cześć, {first}!</h1>
+      {/* bez powitania: ekran zaczyna się od dzisiejszej jednostki (data nad nią, mała) */}
+      <header className="ath-hello today-date">
         <p className="muted first-cap">{fmtLong(today)}</p>
       </header>
       <VacationBanner profile={profile} />
@@ -681,14 +681,33 @@ function TodayTab({
       ) : away && !run ? (
         <AbsenceToday client={client} absence={away} onOwn={onOwn} notify={notify} />
       ) : nx ? (
-        <section className="acard acard-hero">
-          <span className="eyebrow">Następny trening</span>
+        <section className="acard acard-hero today-hero">
+          {(() => {
+            // jedna wielka rzecz: kiedy (dziś albo dzień następnej jednostki), nazwa, szacowany czas
+            const d = plan && workoutDate(plan, plan.weeks.indexOf(nx.week), nx.workout);
+            // termin minął i od tego czasu był trening z planu: liczy się najbliższy kolejny termin
+            const when = d && d < today && planDue(d, today, sessions, plan?.id) !== 'overdue' ? (plan ? nextDate(plan, nx, today) : undefined) : d;
+            const text = !when
+              ? 'Następny trening'
+              : when > today
+                ? `Następny trening: ${dayWord(when, today)}`
+                : visitInHero && visit?.date === today
+                  ? `Dziś, ${visit.time} z trenerem`
+                  : 'Dziś';
+            return <span className="eyebrow today-when">{text}</span>;
+          })()}
           {/* stuknięcie w nazwę / opis → podgląd ćwiczeń; Start bez zmian */}
           <button type="button" className="r7-hero-open" onClick={() => setPeek(true)} aria-label={`Zobacz ćwiczenia: ${nx.workout.name}`}>
-            <h2>{nx.workout.name}</h2>
-            <p className="muted small">
-              {nx.week.name} · {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.index + 1} z {nx.total}
-              <span className="r7-hero-more"> · Zobacz ćwiczenia</span>
+            <h1 className="today-name">{nx.workout.name}</h1>
+            <p className="today-meta">
+              {(() => {
+                const m = workoutMinutes(nx.workout, sessions, client.run);
+                return m ? <b className="today-min">ok. {m} min</b> : null;
+              })()}
+              <span className="muted">
+                {nEx(nx.workout.exercises.filter((e) => e.name).length)} · {nx.week.name}, {nx.index + 1} z {nx.total}
+              </span>
+              <span className="r7-hero-more">Zobacz ćwiczenia</span>
             </p>
           </button>
           {(() => {
@@ -705,11 +724,10 @@ function TodayTab({
             return (
               <>
                 {ended && <p className="small muted">Plan {st?.endDate && st.ended ? `skończył się ${fmtDay(st.endDate)}` : 'jest przerobiony do końca'} — trener przygotuje kolejny blok. Do tego czasu robisz go od nowa.</p>}
-                {d && due ? (
-                  <p className={`small ${due === 'overdue' ? 'warn-text' : 'muted'}`}>{due === 'overdue' ? `Zaplanowany na ${fmtDay(d)} — zaległy${plan && nextDate(plan, nx, today) ? ` · najbliżej: ${dayWord(nextDate(plan, nx, today)!, today)}` : ''}` : `Zaplanowany na ${dayWord(d, today)}`}</p>
-                ) : soon ? (
-                  <p className="small muted">Najbliższy termin: {dayWord(soon, today)}</p>
-                ) : null}
+                {/* termin w przyszłości mówi już nagłówek („Dziś” / „Następny trening: …”); tu tylko zaległy */}
+                {d && due === 'overdue' && (
+                  <p className="small warn-text">{`Zaległy z ${fmtDay(d)}.${plan && nextDate(plan, nx, today) ? ` Najbliżej: ${dayWord(nextDate(plan, nx, today)!, today)}.` : ''}`}</p>
+                )}
                 {nx.workout.moved?.by === 'client' && nx.workout.moved.from && <p className="small muted">Przeniesiony przez Ciebie z {fmtDay(nx.workout.moved.from)}.</p>}
                 {plan && !visitInHero && (
                   <button type="button" className="link small ath-move-btn" onClick={() => setMoving(true)}>
@@ -802,11 +820,14 @@ function TodayTab({
       {!run && (isRunner(client, runVolume([...plansOf(db, clientId), ...(extra ? [extra] : [])], sessions, client.run, 8)) || /bieg/i.test(client.sport ?? '')) && <QuickRun client={client} />}
 
       {!client.intake?.completedAt && (
-        <section className="acard acard-warn ath-intake">
-          <span className="eyebrow">Ankieta startowa</span>
-          <h3>Zdrowie, styl życia i cele — ok. 5 minut</h3>
-          {intakeLater && <p className="muted small">Odłożona {fmtDay(intakeLater.slice(0, 10))} — dokończ, kiedy masz chwilę. Zapisane odpowiedzi czekają.</p>}
-          <button className="btn btn-primary" onClick={onIntake}>
+        // drugi poziom: ankieta nie konkuruje ze Startem (przycisk drugorzędny, bez koloru uwagi)
+        <section className="acard ath-intake today-second">
+          <span className="ath-intake-tx">
+            <b>Ankieta startowa</b>
+            <span className="muted small">Zdrowie, styl życia i cele. Ok. 5 minut.</span>
+            {intakeLater && <span className="muted small">Odłożona {fmtDay(intakeLater.slice(0, 10))}. Zapisane odpowiedzi czekają.</span>}
+          </span>
+          <button className="btn btn-secondary" onClick={onIntake}>
             Wypełnij ankietę
           </button>
         </section>

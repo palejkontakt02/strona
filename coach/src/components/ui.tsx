@@ -172,6 +172,7 @@ const ICONS: Record<string, ReactNode> = {
   money: <path d="M3 6.5h18v11H3zM12 9.5v5M6.5 12h.01M17.5 12h.01" />,
   lib: <path d="M3 12h2M19 12h2M5.5 8.5v7M18.5 8.5v7M8.5 6v12M15.5 6v12M8.5 12h7" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
   x: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   up: <path d="M12 20V5M6 11l6-6 6 6" />,
   trash: <path d="M4 7h16M9.5 7V4h5v3M6.5 7l1 13h9l1-13M10.5 11v5.5M13.5 11v5.5" />,

@@ -21,7 +21,9 @@ import { fmtMonth, fmtShort, fmtWeekday } from "../format";
 import { clashes, clientHue } from "../lib/calendar";
 import { addDays, todayISO, weekStart } from "../lib/dates";
 import { useNav } from "../nav";
-import { doneInPass, nextDate, nextWorkout, planSequence, workoutDate } from "../lib/plan";
+import { currentPlan, doneInPass, nextDate, nextWorkout, planSequence, workoutDate } from "../lib/plan";
+import { sessionKind, SESSION_KIND_LABEL, type SessionKind } from "../lib/dataColors";
+import type { Db } from "../data/db";
 import { LocationTag, locStyle } from "../components/location";
 import { put } from "../data/db";
 import { canMove, moveVisit } from "../lib/calendarMove";
@@ -332,12 +334,16 @@ export function CalendarView() {
             label="Widok"
           />
           {!phone && (
-            <Seg
-              options={WHO}
-              value={who}
-              onChange={setWho}
-              label="Kto trenuje"
-            />
+            // filtr „kto trenuje” wygląda inaczej niż przełącznik widoku (to filtr, nie widok)
+            <div className="cal-who">
+              <span className="cal-who-l">Pokaż</span>
+              <Seg
+                options={WHO}
+                value={who}
+                onChange={setWho}
+                label="Kto trenuje"
+              />
+            </div>
           )}
           <div className="cal-nav">
             <button
@@ -476,6 +482,17 @@ export function CalendarView() {
             />
           </section>
         </div>
+      ) : mode !== "Miesiąc" && !phone ? (
+        <WeekAxis
+          days={Array.from({ length: 7 }, (_, i) => addDays(ws, i))}
+          today={today}
+          dropDay={dropDay}
+          dropProps={dropProps}
+          apptsOn={apptsOn}
+          looseOn={looseOn}
+          assignedOn={assignedOn}
+          onDragEnd={() => setDropDay(null)}
+        />
       ) : mode !== "Miesiąc" ? (
         <div className="week">
           {Array.from({ length: 7 }, (_, i) => addDays(ws, i)).map((date) => (
@@ -560,6 +577,7 @@ function ApptTile({
   const status =
     mixed && all.some((x) => x.status === "planned") ? "planned" : a.status;
   const first = (id: string) => clientById(db, id)?.name.split(" ")[0] ?? "—";
+  const unit = apptUnit(db, a);
   const clash =
     a.status === "planned" && clashes(a, db.appointments).length > 0;
   // komputer: wizytę zaplanowaną można przeciągnąć na inny dzień (godzina zostaje)
@@ -620,6 +638,15 @@ function ApptTile({
           (c?.name ?? "—")
         )}
       </span>
+      {unit && (
+        <span
+          className="tile-unit"
+          data-kind={unit.kind}
+          title={`${SESSION_KIND_LABEL[unit.kind]}: ${unit.name}`}
+        >
+          {unit.name}
+        </span>
+      )}
       <span className="tile-meta">
         <LocationTag id={a.locationId} short />
         {mixed ? (
@@ -679,11 +706,144 @@ function SessionTile({ s }: { s: TrainingSession }) {
         </span>
       </span>
       <span className="tile-name">{c?.name ?? "—"}</span>
+      <span className="tile-unit" data-kind={sessionKind({ name: s.workoutName, exercises: s.exercises })}>
+        {s.workoutName || "Trening"}
+      </span>
       <span className="tile-meta">
         <LocationTag id={s.locationId} short />
-        <span className="tile-status">{s.workoutName || "Trening"}</span>
       </span>
     </button>
+  );
+}
+
+/**
+ * Jednostka treningu przy wizycie: zapisany trening, jednostka planu powiązana z wizytą („Termin”),
+ * a bez powiązania następna jednostka planu, jeśli wypada tego samego dnia.
+ */
+function apptUnit(
+  db: Db,
+  a: Appointment,
+): { name: string; kind: SessionKind } | null {
+  if (a.status === "cancel") return null;
+  if (a.sessionId) {
+    const s = db.sessions.find((x) => x.id === a.sessionId);
+    if (s)
+      return {
+        name: s.workoutName || "Trening",
+        kind: sessionKind({ name: s.workoutName, exercises: s.exercises }),
+      };
+  }
+  if (a.planRef) {
+    const p = db.plans.find((x) => x.id === a.planRef!.planId);
+    const k = p?.weeks
+      .flatMap((w) => w.workouts)
+      .find((x) => x.id === a.planRef!.workoutId);
+    if (k) return { name: k.name, kind: sessionKind(k) };
+  }
+  if (a.status !== "planned") return null;
+  const plan = currentPlan(db.plans.filter((p) => p.clientId === a.clientId && !p.extra));
+  if (!plan) return null;
+  const ss = db.sessions.filter((s) => s.clientId === a.clientId);
+  const nx = nextWorkout(plan, ss);
+  if (!nx || nextDate(plan, nx, todayISO()) !== a.date) return null;
+  return { name: nx.workout.name, kind: sessionKind(nx.workout) };
+}
+
+/**
+ * Tydzień na komputerze: oś godzin jak w widoku Dzień, siedem kolumn ze wspólnym zakresem godzin,
+ * godziny w lewej kolumnie, nad osią rząd „bez godziny” (samodzielne, zadane, z planu).
+ */
+function WeekAxis({
+  days,
+  today,
+  dropDay,
+  dropProps,
+  apptsOn,
+  looseOn,
+  assignedOn,
+  onDragEnd,
+}: {
+  days: ISODate[];
+  today: ISODate;
+  dropDay: ISODate | null;
+  dropProps: (d: ISODate) => Record<string, unknown>;
+  apptsOn: (d: ISODate) => Appointment[];
+  looseOn: (d: ISODate) => TrainingSession[];
+  assignedOn: (d: ISODate) => Assigned[];
+  onDragEnd: () => void;
+}) {
+  const { openModal } = useNav();
+  const { profile } = useTrainerProfile();
+  let from = Infinity;
+  let to = -Infinity;
+  for (const d of days) {
+    const timed = apptsOn(d).filter((a) => a.time);
+    if (!timed.length && !hoursOn(d, profile.workHours)) continue;
+    const r = axisRange(timed, d, profile.workHours);
+    from = Math.min(from, r.from);
+    to = Math.max(to, r.to);
+  }
+  const range =
+    from < to ? { from, to } : { from: 8 * 60, to: 18 * 60 };
+  const hours: number[] = [];
+  for (let m = range.from; m <= range.to; m += 60) hours.push(m);
+  const anyLoose = days.some(
+    (d) => looseOn(d).length + assignedOn(d).length > 0,
+  );
+  return (
+    <div className={`week-axis-grid ${anyLoose ? "has-loose" : ""}`}>
+      <div className="wk-gutter" aria-hidden>
+        <div className="wk-head" />
+        {anyLoose && <div className="wk-loose wk-loose-l">bez godziny</div>}
+        <div
+          className="wk-hours"
+          style={{ height: `${(range.to - range.from) * PX}px` }}
+        >
+          {hours.map((m) => (
+            <span key={m} style={{ top: `${(m - range.from) * PX}px` }}>
+              {hourLabel(m)}
+            </span>
+          ))}
+        </div>
+      </div>
+      {days.map((date) => (
+        <section
+          key={date}
+          data-date={date}
+          className={`week-day wk-day ${date === today ? "is-today" : ""} ${dropDay === date ? "drop-over" : ""}`}
+          {...dropProps(date)}
+        >
+          <header className="wk-head">
+            <span className="first-cap">{fmtWeekday(date)}</span>{" "}
+            <strong>{fmtShort(date)}</strong>
+            <button
+              className="icon-btn icon-btn-sm"
+              aria-label={`Dodaj wizytę ${fmtShort(date)}`}
+              onClick={() => openModal({ kind: "appt", date })}
+            >
+              <Icon name="plus" size={14} />
+            </button>
+          </header>
+          {anyLoose && (
+            <div className="wk-loose" aria-label="Bez godziny / samodzielne">
+              {looseOn(date).map((s) => (
+                <SessionTile key={s.id} s={s} />
+              ))}
+              {assignedOn(date).map((x) => (
+                <AssignedTile key={x.workout.id} x={x} />
+              ))}
+            </div>
+          )}
+          <DayAxis
+            date={date}
+            today={today}
+            appts={apptsOn(date)}
+            onDragEnd={onDragEnd}
+            shared={range}
+          />
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -699,11 +859,14 @@ function DayAxis({
   today,
   appts,
   onDragEnd,
+  shared,
 }: {
   date: ISODate;
   today: ISODate;
   appts: Appointment[];
   onDragEnd: () => void;
+  /** Widok tygodnia: wspólny zakres osi dla wszystkich dni, godziny opisane w osobnej kolumnie. */
+  shared?: { from: number; to: number };
 }) {
   const { db } = useStore();
   const { openModal } = useNav();
@@ -721,13 +884,14 @@ function DayAxis({
   }, [date, today]);
   const timed = appts.filter((a) => a.time);
   // dzień poza godzinami pracy i bez wizyt — bez pustej osi
-  if (!timed.length && !hoursOn(date, profile.workHours))
+  const off = !hoursOn(date, profile.workHours);
+  if (!timed.length && off && !shared)
     return (
       <p className="muted small day-off">
         Dzień wolny — poza godzinami pracy. Wizytę dodasz przyciskiem „+”.
       </p>
     );
-  const range = axisRange(timed, date, profile.workHours);
+  const range = shared ?? axisRange(timed, date, profile.workHours);
   // wolne okienka wg wszystkich wizyt (niezależnie od filtra), tylko od dziś
   const free =
     date < today
@@ -740,10 +904,13 @@ function DayAxis({
   for (let m = range.from; m <= range.to; m += 60) hours.push(m);
   const y = (m: number) => (m - range.from) * PX;
   return (
-    <div className="day-axis" style={{ height: `${y(range.to)}px` }}>
+    <div
+      className={`day-axis ${shared ? "day-axis-week" : ""} ${off ? "is-off" : ""}`}
+      style={{ height: `${y(range.to)}px` }}
+    >
       {hours.map((m) => (
         <div key={m} className="day-hour" style={{ top: `${y(m)}px` }}>
-          <span>{hourLabel(m)}</span>
+          {!shared && <span>{hourLabel(m)}</span>}
         </div>
       ))}
       {free.map((f) => (
@@ -790,7 +957,7 @@ function DayAxis({
           />
         );
       })}
-      {!timed.length && !free.length && (
+      {!timed.length && !free.length && !shared && (
         <p className="muted small day-axis-empty">Brak wizyt.</p>
       )}
     </div>
@@ -828,8 +995,8 @@ function AssignedTile({ x }: { x: Assigned }) {
         {x.state === "overdue" ? "zaległy" : "do zrobienia"}
       </span>
       <span className="tile-name">{c?.name ?? "—"}</span>
-      <span className="tile-meta">
-        <span className="tile-status">{x.workout.name}</span>
+      <span className="tile-unit" data-kind={sessionKind(x.workout)}>
+        {x.workout.name}
       </span>
     </button>
   );

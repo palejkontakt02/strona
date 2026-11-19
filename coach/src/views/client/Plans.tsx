@@ -12,7 +12,7 @@ import { fmtDate, fmtShort, plural, uid } from '../../format';
 import { daysBetween, todayISO, weekStart } from '../../lib/dates';
 import { isTemplate, nextMonday, planFromTemplate, templateFromPlan, templatesOf } from '../../lib/analytics';
 import { doneInPass, nextDate, nextWorkout, planCompleted, planStatus, workoutDate } from '../../lib/plan';
-import { Sheet } from '../../components/Sheet';
+import { MenuButton, useMedia, type MenuItem } from '../../components/MenuButton';
 import { fmtWeekdayDate } from '../../lib/planGrid';
 import { useNav } from '../../nav';
 import { PlanTable, WorkoutTable } from '../../components/PlanTable';
@@ -63,6 +63,8 @@ export function ClientPlans({ client }: { client: Client }) {
   // „Termin” jednostki planu: dzień + godzina wizyty
   const [sched, setSched] = useState<{ plan: Plan; k: PlanWorkout; date: string; time: string; from?: string } | null>(null);
   const [importing, setImporting] = useState(false);
+  /** Okno „Nowy plan”: od zera, z szablonu / od innego podopiecznego, z arkusza. */
+  const [starting, setStarting] = useState(false);
   /** Plan, do którego wczytujemy zmiany z arkusza. */
   const [syncing, setSyncing] = useState<Plan | null>(null);
   /** Plan w oknie „Arkusz Google”. */
@@ -79,8 +81,7 @@ export function ClientPlans({ client }: { client: Client }) {
   };
 
   const activePlan = plans.find((x) => x.active && !x.extra);
-  const [menu, setMenu] = useState<string | null>(null);
-  const menuPlan = plans.find((x) => x.id === menu);
+  const phone = useMedia('(max-width: 640px)');
 
   // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
   const dupPlan = (p: Plan) => {
@@ -120,66 +121,30 @@ export function ClientPlans({ client }: { client: Client }) {
     });
   };
 
+  // menu „Eksport i import”: druk, pliki i arkusz tego planu
+  const exportItems = (p: Plan): MenuItem[] => [
+    { icon: 'print', text: 'Drukuj', run: () => printPlan(p, client, sessions) },
+    ...(p.active ? [{ icon: 'print', text: 'Drukuj następny tydzień', hint: 'z pustą kolumną „Zrobiono”', run: () => printPlan(p, client, sessions, { nextWeek: true }) }] : []),
+    { icon: 'download', text: 'Excel (.xlsx)', hint: 'plan i wykonanie, arkusz do importu', run: () => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client, sessions)) },
+    { icon: 'download', text: 'Do edycji (szablon .xlsx)', hint: 'zmień w arkuszu i wczytaj z powrotem', run: () => void downloadXlsx(xlsxName('plan', p.name, 'do-edycji'), templateWorkbook(p, client)) },
+    { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(p), planToCsv(p)) },
+    ...(gs ? [{ icon: 'link', text: p.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(p.id) }] : []),
+    { icon: 'up', text: 'Wczytaj zmiany z arkusza', hint: 'Excel albo CSV tego planu, z podglądem', run: () => setSyncing(p) },
+  ];
+  // rzadkie akcje pod „⋯”
+  const rareItems = (p: Plan): MenuItem[] => [
+    { icon: 'copy', text: `Duplikuj jako „${nextBlockName(p.name)}”`, run: () => dupPlan(p) },
+    { icon: 'lib', text: 'Zapisz jako szablon', run: () => saveTemplate(p) },
+    { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(p), danger: true },
+  ];
+
   return (
     <>
       <div className="toolbar">
         <h3>Plany treningowe</h3>
         <div className="actions">
-          {(() => {
-            // plan z szablonu: start od najbliższego poniedziałku, szablon bez zmian
-            const tpls = templatesOf(db.plans);
-            if (!tpls.length) return null;
-            return (
-              <select
-                className="input input-sm plan-src-select"
-                value=""
-                aria-label="Nowy plan z szablonu"
-                onChange={(e) => {
-                  const src = tpls.find((x) => x.id === e.target.value);
-                  if (!src) return;
-                  void apply(savePlan(db, planFromTemplate(src, client.id, todayISO(), plans.length === 0)), `Plan „${src.name}” z szablonu — start ${fmtDate(nextMonday(todayISO()))}. Możesz go dopasować.`);
-                }}
-              >
-                <option value="">Nowy plan z szablonu…</option>
-                {tpls.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name} · {x.weeks.length} tyg.
-                  </option>
-                ))}
-              </select>
-            );
-          })()}
-          {(() => {
-            // gotowy plan innego podopiecznego jako szablon (kopia — oryginał zostaje bez zmian)
-            const who = (x: Plan) => db.clients.find((c) => c.id === x.clientId)?.name ?? '';
-            const others = db.plans.filter((x) => x.clientId !== client.id && !x.extra && !isTemplate(x) && db.clients.some((c) => c.id === x.clientId)).sort((a, b) => who(a).localeCompare(who(b), 'pl') || a.name.localeCompare(b.name, 'pl'));
-            if (!others.length) return null;
-            return (
-              <select
-                className="input input-sm plan-src-select"
-                value=""
-                aria-label="Skopiuj plan od innego podopiecznego"
-                onChange={(e) => {
-                  const src = others.find((x) => x.id === e.target.value);
-                  if (!src) return;
-                  // start od najbliższego poniedziałku (nie data innego podopiecznego); daty jednostek przesunięte o tyle samo
-                  void apply(savePlan(db, planFromTemplate(src, client.id, todayISO(), plans.length === 0)), `Skopiowano plan „${src.name}” — możesz go dopasować.`);
-                }}
-              >
-                <option value="">Plan od innego podopiecznego…</option>
-                {others.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {who(x)} — {x.name}
-                  </option>
-                ))}
-              </select>
-            );
-          })()}
-          <button className="btn btn-secondary pl-import-btn" onClick={() => setImporting(true)} title="Wklej zakres z Excela / Arkuszy Google albo wybierz plik CSV / XLSX">
-            <Icon name="download" size={16} /> Import z arkusza
-          </button>
-          <button className="btn btn-primary" onClick={() => openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true })}>
-            + Nowy plan
+          <button className="btn btn-secondary" onClick={() => setStarting(true)} aria-haspopup="dialog">
+            <Icon name="plus" size={16} /> Nowy plan
           </button>
         </div>
       </div>
@@ -206,48 +171,21 @@ export function ClientPlans({ client }: { client: Client }) {
                       Ustaw aktywny
                     </button>
                   )}
-                  <IconBtn icon="edit" label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })} />
+                  <button className="btn btn-ghost btn-sm pl-edit" aria-label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })}>
+                    <Icon name="edit" size={16} /> <span className="pl-btn-text">Edytuj</span>
+                  </button>
                   {p.active && (
                     <button className="btn btn-ghost btn-sm" aria-expanded={shift?.planId === p.id} onClick={() => setShift(shift?.planId === p.id ? null : { planId: p.id })} title="Przesuń daty jednostek od wybranego dnia (np. choroba, urlop)">
                       <Icon name="cal" size={16} /> Przesuń plan
                     </button>
                   )}
-                  {/* rzadsze akcje: na komputerze w rzędzie, na telefonie w arkuszu „⋯” */}
-                  <span className="pl-rare">
-                    <IconBtn icon="copy" label="Duplikuj plan" onClick={() => dupPlan(p)} />
-                    <button className="btn btn-ghost btn-sm" title="Kopia planu do biblioteki szablonów — przypiszesz ją innym podopiecznym" onClick={() => saveTemplate(p)}>
-                      Zapisz jako szablon
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions)} title="Drukuj albo zapisz jako PDF">
-                      <Icon name="print" size={16} /> Drukuj
-                    </button>
-                    {p.active && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => printPlan(p, client, sessions, { nextWeek: true })} title="Tylko tydzień następnej jednostki, z pustą kolumną „Zrobiono” do wpisania wykonania">
-                        <Icon name="print" size={16} /> Następny tydzień
-                      </button>
-                    )}
-                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client, sessions))} title="Plik Excel (.xlsx): każdy trening z tygodniami obok siebie (plan i wykonanie) oraz arkusz „Do importu” (wczytasz go z powrotem)">
-                      <Icon name="download" size={16} /> Excel
-                    </button>
-                    {gs && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => setGsPlan(p.id)} title="Plan w Arkuszach Google: utwórz arkusz, pobierz zmiany z arkusza albo wyślij plan do arkusza">
-                        <Icon name="link" size={16} /> {p.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google'}
-                      </button>
-                    )}
-                    <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('plan', p.name, 'do-edycji'), templateWorkbook(p, client))} title="Plan w stałym szablonie Fitowej (zakładka = dzień, tygodnie obok siebie) — zmień w Excelu / Arkuszach Google i wczytaj przyciskiem „Wczytaj zmiany”">
-                      <Icon name="download" size={16} /> Do edycji
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setSyncing(p)} title="Wczytaj plik Excel / CSV tego planu po zmianach — aktualizuje ten sam plan (z podglądem zmian)">
-                      <Icon name="up" size={16} /> Wczytaj zmiany
-                    </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(csvFileName(p), planToCsv(p))} title="Plik CSV do Excela / Arkuszy Google (średnik, przecinek dziesiętny) — da się go wczytać z powrotem">
-                      <Icon name="download" size={16} /> CSV
-                    </button>
-                    <IconBtn icon="trash" label="Usuń plan" danger onClick={() => void removePlan(p)} />
-                  </span>
-                  <button type="button" className="icon-btn pl-more" aria-label="Więcej akcji planu" title="Więcej: duplikuj, szablon, druk, CSV, usuń" aria-haspopup="dialog" onClick={() => setMenu(p.id)}>
-                    <Icon name="more" size={18} />
-                  </button>
+                  {/* komputer: „Eksport i import” + „⋯”; telefon: wszystko w jednym arkuszu „⋯” */}
+                  {!phone && (
+                    <MenuButton label="Eksport i import" items={exportItems(p)}>
+                      <Icon name="download" size={16} /> Eksport i import <Icon name="chevD" size={14} />
+                    </MenuButton>
+                  )}
+                  <MenuButton label="Więcej akcji planu" title={p.name} items={phone ? [...exportItems(p), ...rareItems(p)] : rareItems(p)} className="icon-btn pl-more" />
                 </div>
               }
             >
@@ -342,37 +280,13 @@ export function ClientPlans({ client }: { client: Client }) {
           </div>
         </Modal>
       )}
-      {menuPlan && (
-        <Sheet label={`Plan „${menuPlan.name}” — więcej`} onClose={() => setMenu(null)}>
-          <strong className="pl-sheet-title">{menuPlan.name}</strong>
-          <div className="pl-sheet-list">
-            {[
-              { icon: 'copy', text: `Duplikuj jako „${nextBlockName(menuPlan.name)}”`, run: () => dupPlan(menuPlan) },
-              { icon: 'lib', text: 'Zapisz jako szablon', run: () => saveTemplate(menuPlan) },
-              { icon: 'print', text: 'Drukuj', run: () => printPlan(menuPlan, client, sessions) },
-              ...(menuPlan.active ? [{ icon: 'print', text: 'Drukuj tylko następny tydzień', run: () => printPlan(menuPlan, client, sessions, { nextWeek: true }) }] : []),
-              { icon: 'download', text: 'Excel (.xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name), planWorkbook(menuPlan, client, sessions)) },
-              { icon: 'download', text: 'Do edycji (szablon .xlsx)', run: () => void downloadXlsx(xlsxName('plan', menuPlan.name, 'do-edycji'), templateWorkbook(menuPlan, client)) },
-              { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(menuPlan), planToCsv(menuPlan)) },
-              ...(gs ? [{ icon: 'link', text: menuPlan.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(menuPlan.id) }] : []),
-              { icon: 'up', text: 'Wczytaj zmiany z arkusza', run: () => setSyncing(menuPlan) },
-              { icon: 'download', text: 'Import z arkusza', run: () => setImporting(true) },
-              { icon: 'trash', text: 'Usuń plan', run: () => void removePlan(menuPlan), danger: true },
-            ].map((a) => (
-              <button
-                key={a.text}
-                type="button"
-                className={`btn btn-ghost pl-sheet-btn ${a.danger ? 'is-danger' : ''}`}
-                onClick={() => {
-                  setMenu(null);
-                  a.run();
-                }}
-              >
-                <Icon name={a.icon} size={18} /> {a.text}
-              </button>
-            ))}
-          </div>
-        </Sheet>
+      {starting && (
+        <NewPlanStart
+          client={client}
+          first={plans.length === 0}
+          onClose={() => setStarting(false)}
+          onImport={() => (setStarting(false), setImporting(true))}
+        />
       )}
       {gsPlan && plans.some((x) => x.id === gsPlan) && <PlanSheetSync plan={plans.find((x) => x.id === gsPlan)!} client={client} onClose={() => setGsPlan(null)} />}
       {syncing && (
@@ -404,7 +318,7 @@ export function ClientPlans({ client }: { client: Client }) {
         action={
           <div className="actions">
             {extra && extraWorkouts.length > 1 && <IconBtn icon="edit" label="Edytuj wszystkie treningi poza planem" onClick={() => openModal({ kind: 'plan', plan: extra })} />}
-            <button className="btn btn-primary btn-sm" onClick={addExtra}>
+            <button className="btn btn-secondary btn-sm" onClick={addExtra}>
               + Zadaj trening
             </button>
           </div>
@@ -425,10 +339,10 @@ export function ClientPlans({ client }: { client: Client }) {
                   </span>
                   {k.exercises.some((e) => e.name) ? (
                     <span className="plan-workout-actions">
-                      <button className="btn btn-primary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => startLive(client.id, undefined, undefined, { planId: extra!.id, workoutId: k.id })}>
                         <Icon name="play" size={14} /> Prowadź
                       </button>
-                      <button className="btn btn-secondary btn-sm" onClick={() => startAthlete(client.id, { planId: extra!.id, workoutId: k.id })}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => startAthlete(client.id, { planId: extra!.id, workoutId: k.id })}>
                         Jako zawodnik
                       </button>
                     </span>
@@ -457,4 +371,81 @@ export function ExtraTag({ st }: { st: ExtraState }) {
   if (st.state === 'overdue') return <Tag tone="warn">zaległy · był na {fmtDate(st.date!)}</Tag>;
   if (st.state === 'due') return <Tag tone="accent">na {fmtDate(st.date!)}</Tag>;
   return <Tag tone="muted">bez terminu{st.date ? ` · ostatnio ${fmtDate(st.date)}` : ''}</Tag>;
+}
+
+/**
+ * Start nowego planu w jednym oknie: od zera (edytor), z szablonu albo od innego podopiecznego (kopia od najbliższego
+ * poniedziałku, oryginał bez zmian), z arkusza (import z podglądem; tu też pusty szablon do pobrania).
+ */
+function NewPlanStart({ client, first, onClose, onImport }: { client: Client; first: boolean; onClose: () => void; onImport: () => void }) {
+  const { db, apply } = useStore();
+  const { openModal } = useNav();
+  const [mode, setMode] = useState<'copy' | null>(null);
+  const [src, setSrc] = useState('');
+  const tpls = templatesOf(db.plans);
+  const who = (x: Plan) => db.clients.find((c) => c.id === x.clientId)?.name ?? '';
+  const others = db.plans
+    .filter((x) => x.clientId !== client.id && !x.extra && !isTemplate(x) && db.clients.some((c) => c.id === x.clientId))
+    .sort((a, b) => who(a).localeCompare(who(b), 'pl') || a.name.localeCompare(b.name, 'pl'));
+  const canCopy = tpls.length + others.length > 0;
+  const create = async () => {
+    const t = tpls.find((x) => x.id === src);
+    const o = others.find((x) => x.id === src);
+    const from = t ?? o;
+    if (!from) return;
+    // start od najbliższego poniedziałku (nie data innego podopiecznego); daty jednostek przesunięte o tyle samo
+    const msg = t ? `Plan „${from.name}” z szablonu, start ${fmtDate(nextMonday(todayISO()))}. Możesz go dopasować.` : `Skopiowano plan „${from.name}”. Możesz go dopasować.`;
+    if (await apply(savePlan(db, planFromTemplate(from, client.id, todayISO(), first)), msg)) onClose();
+  };
+  return (
+    <Modal title="Nowy plan" onClose={onClose} onSubmit={mode === 'copy' ? () => void create() : undefined} submitLabel="Utwórz plan">
+      <div className="start-tiles" role="group" aria-label="Z czego plan">
+        <button type="button" className="start-tile" onClick={() => (onClose(), openModal({ kind: 'plan', plan: newPlan(client.id), isNew: true }))}>
+          <Icon name="plus" size={20} />
+          <b>Od zera</b>
+          <span className="start-tile-hint">pusty tydzień 1, ćwiczenia ułożysz w edytorze</span>
+        </button>
+        <button type="button" className={`start-tile ${mode === 'copy' ? 'on' : ''}`} aria-pressed={mode === 'copy'} disabled={!canCopy} onClick={() => setMode(mode === 'copy' ? null : 'copy')}>
+          <Icon name="copy" size={20} />
+          <b>Z szablonu lub od innego podopiecznego</b>
+          <span className="start-tile-hint">{canCopy ? 'kopia od najbliższego poniedziałku, oryginał bez zmian' : 'brak szablonów i planów innych osób'}</span>
+        </button>
+        <div className="start-tile start-tile-split">
+          <button type="button" className="start-tile-main" onClick={onImport}>
+            <Icon name="up" size={20} />
+            <b>Z arkusza</b>
+            <span className="start-tile-hint">wklej zakres z Excela lub Arkuszy Google albo wybierz plik</span>
+          </button>
+          <button type="button" className="link small start-tile-link" onClick={() => void downloadXlsx('szablon-planu-fitowa.xlsx', templateWorkbook(null))}>
+            <Icon name="download" size={14} /> Pobierz pusty szablon
+          </button>
+        </div>
+      </div>
+      {mode === 'copy' && (
+        <Field label="Plan źródłowy" wide>
+          <select className="input" value={src} onChange={(e) => setSrc(e.target.value)} aria-label="Plan źródłowy" autoFocus required>
+            <option value="">Wybierz plan…</option>
+            {tpls.length > 0 && (
+              <optgroup label="Szablony">
+                {tpls.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} · {x.weeks.length} tyg.
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {others.length > 0 && (
+              <optgroup label="Plany innych podopiecznych">
+                {others.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {who(x)}: {x.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Field>
+      )}
+    </Modal>
+  );
 }

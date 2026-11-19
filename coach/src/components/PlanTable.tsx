@@ -1,3 +1,4 @@
+import { SESSION_KIND_LABEL, sessionKind } from '../lib/dataColors';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Plan, PlanWorkout, RunProfile, TrainingSession } from '../domain';
 import { colActuals, type ColActual } from '../lib/planActuals';
@@ -102,6 +103,11 @@ export function PlanTable({
         return (
           <section key={slot} className="ptab">
             <div className="ptab-head">
+              {(() => {
+                // typ jednostki: cienki pasek w kolorze danych przy nazwie (siła, dwubój, bieg, rehab, inne)
+                const kind = sessionKind({ name: slot, exercises: cols.flatMap((c) => c.k.exercises) });
+                return <span className="ptab-kind" data-kind={kind} title={SESSION_KIND_LABEL[kind]} aria-label={`Typ: ${SESSION_KIND_LABEL[kind]}`} role="img" />;
+              })()}
               <strong>{slot}</strong>
               {hasWarm && (
                 <button
@@ -121,12 +127,12 @@ export function PlanTable({
                   </Tag>
                   {nextExtra}
                   {onLive && (
-                    <button className="btn btn-primary btn-sm" onClick={() => onLive(next.k.id)}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => onLive(next.k.id)}>
                       <Icon name="play" size={14} /> Prowadź
                     </button>
                   )}
                   {onAthlete && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => onAthlete(next.k.id)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => onAthlete(next.k.id)}>
                       Jako zawodnik
                     </button>
                   )}

@@ -4,7 +4,7 @@ import { Card, Empty, Icon, IconBtn, Tag } from '../../components/ui';
 import type { Client, Habit, HabitSchedule } from '../../domain';
 import { Chat } from '../../components/Chat';
 import { CoachTargets } from '../../components/DayLog';
-import { trainerUnread } from '../../lib/comms';
+import { chatThread, trainerUnread } from '../../lib/comms';
 import { useNav } from '../../nav';
 import { put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -224,17 +224,27 @@ function HabitStats({ habit, client, today }: { habit: Habit; client: Client; to
 export function ClientInbox({ client }: { client: Client }) {
   const { openModal } = useNav();
   const unread = trainerUnread(client);
+  // rozmowa zwinięta: na górze Przeglądu są liczby i sygnały, czat otwiera się na żądanie
+  const [open, setOpen] = useState(false);
+  const last = chatThread(client).at(-1);
   return (
-    <Card
-      className="chat-panel"
-      title={
-        <>
-          Rozmowa {unread > 0 && <Tag tone="warn">{unread} nowe</Tag>}
-        </>
-      }
-    >
-      <Chat client={client} side="coach" onOpenSession={(sessionId, exIndex) => openModal({ kind: 'review', sessionId, exIndex })} />
-    </Card>
+    <section className={`card chat-panel chat-fold ${open ? 'is-open' : ''}`}>
+      <button type="button" className="chat-fold-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <h4>
+          Rozmowa{unread > 0 && <span className="chat-fold-new"> ({unread} {unread === 1 ? 'nowa' : 'nowe'})</span>}
+        </h4>
+        {!open && last && (
+          <span className="chat-fold-last small muted ellipsis">
+            {last.from === 'coach' ? 'Ty: ' : ''}
+            {last.text}
+          </span>
+        )}
+        <span className="chat-fold-chev" aria-hidden>
+          <Icon name={open ? 'chevU' : 'chevD'} size={16} />
+        </span>
+      </button>
+      {open && <Chat client={client} side="coach" onOpenSession={(sessionId, exIndex) => openModal({ kind: 'review', sessionId, exIndex })} />}
+    </section>
   );
 }
 
