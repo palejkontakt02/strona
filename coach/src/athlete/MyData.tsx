@@ -64,7 +64,7 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
     if (!(await ask('Wycofać prośbę o usunięcie konta? Konto i dane zostaną bez zmian.', { confirm: 'Wycofaj prośbę', danger: false }))) return;
     setBusy(true);
     const ok = await saveClientEntry(client.id, 'consents', consentEntry(consentOf(client, 'erasure'), 'erasure', false), 'Prośba wycofana.');
-    if (ok) void sendClientNote(client.id, 'Wycofuję prośbę o usunięcie konta — zostaję w aplikacji.');
+    if (ok) void sendClientNote(client.id, 'Wycofuję prośbę o usunięcie konta. Zostaję w aplikacji.');
     setBusy(false);
   };
 
@@ -79,7 +79,7 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
 
       <h4 className="mydata-sub">Pobierz moje dane</h4>
       <p className="muted small">
-        Wszystko, co aplikacja o Tobie zapisała: profil, ankieta, treningi, pomiary, samopoczucie, wiadomości i wpisy dzienne — w jednym pliku JSON. Treningi także jako tabela CSV.
+        Wszystko, co aplikacja o Tobie zapisała, w jednym pliku JSON. Treningi także jako CSV.
       </p>
       <div className="mydata-actions">
         <button type="button" className="btn btn-secondary" onClick={getJson}>
@@ -96,7 +96,7 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
       <h4 className="mydata-sub">Usunięcie konta</h4>
       {er.state === 'none' ? (
         <>
-          <p className="muted small">Konto i dane usuwa trener — wyślemy mu Twoją prośbę. Zrobi to bez zbędnej zwłoki, najpóźniej w ciągu miesiąca.</p>
+          <p className="muted small">Konto i dane usuwa trener. Wyślemy mu Twoją prośbę; ma na to najwyżej miesiąc.</p>
           <button type="button" className="btn btn-ghost mydata-danger" onClick={() => void request()} disabled={readOnly || busy}>
             Poproś o usunięcie konta
           </button>
@@ -114,7 +114,7 @@ export function MyData({ client, readOnly }: { client: Client; /** Podgląd tren
           </button>
         </div>
       )}
-      {isArchived(client) && <p className="muted small">Współpraca zakończona — konto działa w trybie tylko do odczytu.</p>}
+      {isArchived(client) && <p className="muted small">Współpraca zakończona. Konto jest tylko do odczytu.</p>}
     </section>
   );
 }

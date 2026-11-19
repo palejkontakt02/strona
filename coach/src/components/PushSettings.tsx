@@ -32,9 +32,9 @@ export function PushSettings({ role }: { role: 'trainer' | 'client' }) {
     : support === 'ios-install'
       ? 'Na iPhonie powiadomienia działają tylko z ikony na ekranie początkowym: w Safari stuknij Udostępnij → „Do ekranu początkowego”, otwórz aplikację z tej ikony i włącz tutaj (iOS 16.4 lub nowszy).'
       : support === 'unsupported'
-        ? 'Ta przeglądarka nie obsługuje powiadomień. Na Androidzie użyj Chrome, na iPhonie — aplikacji dodanej do ekranu początkowego.'
+        ? 'Ta przeglądarka nie obsługuje powiadomień. Na Androidzie użyj Chrome, na iPhonie aplikacji dodanej do ekranu początkowego.'
         : blocked
-          ? 'Powiadomienia są zablokowane dla tej strony — odblokuj je w ustawieniach przeglądarki (ikona kłódki przy adresie) albo telefonu.'
+          ? 'Powiadomienia są zablokowane dla tej strony. Odblokuj je w ustawieniach przeglądarki (kłódka przy adresie) albo telefonu.'
           : '';
   const can = cloud && support === 'ok' && !blocked;
 
@@ -55,12 +55,12 @@ export function PushSettings({ role }: { role: 'trainer' | 'client' }) {
         } else
           setNote(
             r === 'denied'
-              ? 'Bez zgody na powiadomienia nie da się ich włączyć — zezwól, gdy przeglądarka zapyta.'
+              ? 'Bez zgody nie da się włączyć powiadomień. Zezwól, gdy przeglądarka zapyta.'
               : r === 'db'
                 ? 'Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 20 w hardening.sql).'
                 : r === 'no-sw'
-                  ? 'Aplikacja nie jest jeszcze gotowa do pracy w tle — odśwież stronę i spróbuj ponownie.'
-                  : 'Nie udało się włączyć powiadomień — sprawdź połączenie i spróbuj ponownie.',
+                  ? 'Aplikacja nie jest gotowa do pracy w tle. Odśwież stronę i spróbuj ponownie.'
+                  : 'Nie udało się włączyć powiadomień. Sprawdź połączenie i spróbuj ponownie.',
           );
       }
     } finally {

@@ -68,7 +68,7 @@ export function createSupabaseRepository(role: 'trainer' | 'client'): Repository
         // Klient zapisuje tylko swoje treningi (rozliczenie pilnuje baza: hardening.sql); wizyt nie zmienia.
         if (role === 'client' && ch.col !== 'sessions') continue;
         const { error } = await supabase.from(ch.col).upsert(row);
-        if (error && OPTIONAL.includes(ch.col) && /does not exist|schema cache|relation/i.test(error.message)) throw new Error('Brak tabeli trainer_notes — uruchom w Supabase sekcję 15 z hardening.sql.');
+        if (error && OPTIONAL.includes(ch.col) && /does not exist|schema cache|relation/i.test(error.message)) throw new Error('Brak tabeli trainer_notes. Uruchom w Supabase sekcję 15 z hardening.sql.');
         if (error) throw error;
       }
     },

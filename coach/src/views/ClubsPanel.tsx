@@ -17,7 +17,7 @@ export function ClubsPanel() {
   if (clubs.length === 0)
     return (
       <Card>
-        <Empty>Nie masz jeszcze żadnego klubu. Dodaj klub i ustaw stawkę, którą wypłaca Ci za trening — potem przy kliencie wybierz rozliczenie „przez klub”.</Empty>
+        <Empty>Brak klubów. Dodaj klub ze stawką za trening, potem przy kliencie wybierz rozliczenie „przez klub”.</Empty>
         <button className="btn btn-primary" onClick={() => openModal({ kind: 'location' })}>
           + Dodaj klub
         </button>

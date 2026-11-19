@@ -76,7 +76,7 @@ export function App() {
       cur = { ...cur, plans: cur.plans.map((p) => (p.clientId === b.clientId && !p.extra ? (p.id === b.id ? { ...b, active: true } : { ...p, active: false }) : p)) };
       return ch;
     });
-    void apply(changes, due.length === 1 ? `Włączono „${due[0].name}” — dziś zaczyna się ten blok.` : `Włączono ${due.length} przygotowane bloki — dziś ich start.`).finally(() => {
+    void apply(changes, due.length === 1 ? `Włączono „${due[0].name}”. Blok startuje dziś.` : `Włączono ${due.length} przygotowane bloki. Start dziś.`).finally(() => {
       activating.current = false;
     });
   }, [db, apply]);
@@ -152,7 +152,7 @@ export function App() {
           const cl = cur.clients.find((c) => c.id === clientId);
           const charge = own.charge === 'brak' && cl ? defaultCharge(cl, cur.sessions.filter((s) => s.clientId === clientId && s.id !== own.id)) : own.charge;
           const linked = { ...own, solo: false, charge };
-          const ok = await apply([put('appointments', { ...appt, status: 'done', sessionId: own.id }), put('sessions', linked)], 'Trening połączony z wizytą — sprawdź rozliczenie.');
+          const ok = await apply([put('appointments', { ...appt, status: 'done', sessionId: own.id }), put('sessions', linked)], 'Trening połączony z wizytą. Sprawdź rozliczenie.');
           if (ok) setModal({ kind: 'session', session: linked });
         });
       },

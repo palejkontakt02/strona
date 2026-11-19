@@ -82,7 +82,7 @@ export function acwrZone(a: number | null): { level: Level | null; label: string
   if (a == null) return { level: null, label: 'brak danych' };
   if (a < 0.8) return { level: 'yellow', label: 'niedociążenie' };
   if (a <= 1.3) return { level: 'green', label: 'strefa optymalna' };
-  if (a <= 1.5) return { level: 'yellow', label: 'uwaga – szybki wzrost' };
+  if (a <= 1.5) return { level: 'yellow', label: 'uwaga, szybki wzrost' };
   return { level: 'red', label: 'wysokie ryzyko przeciążenia' };
 }
 

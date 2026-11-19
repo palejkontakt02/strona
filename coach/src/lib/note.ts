@@ -169,9 +169,9 @@ export function parseWorkoutNote(text: string, opts: { plan?: boolean } = {}): P
     for (const s of list) {
       if (s.repsText.includes('+') && !complex) complex = s.repsText;
       if (s.timed && !timed) timed = s.repsText;
-      if (s.count > 15) out.warnings.push(`„${ex.name}”: ${s.count} serii — sprawdź zapis${s.count > 20 ? ' (wczytano 20)' : ''}.`);
-      if (!s.timed && s.reps > 60) out.warnings.push(`„${ex.name}”: ${s.reps} powtórzeń w serii — sprawdź zapis.`);
-      if (s.load != null && s.load > 400) out.warnings.push(`„${ex.name}”: ${String(s.load).replace('.', ',')} kg — sprawdź zapis.`);
+      if (s.count > 15) out.warnings.push(`„${ex.name}”: ${s.count} serii. Sprawdź zapis${s.count > 20 ? ' (wczytano 20)' : ''}.`);
+      if (!s.timed && s.reps > 60) out.warnings.push(`„${ex.name}”: ${s.reps} powtórzeń w serii. Sprawdź zapis.`);
+      if (s.load != null && s.load > 400) out.warnings.push(`„${ex.name}”: ${String(s.load).replace('.', ',')} kg. Sprawdź zapis.`);
       const unit = s.timed ? (/\bm$/.test(s.repsText) ? 'min' : 's') : undefined;
       for (let i = 0; i < Math.min(s.count, 20); i++)
         setsLog.push({

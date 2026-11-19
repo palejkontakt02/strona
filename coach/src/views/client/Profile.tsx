@@ -65,7 +65,7 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
       <Field label="Imię i nazwisko" wide={compact}>
         {inp('name', 'text', { required: true, autoFocus: compact })}
       </Field>
-      <Field label="Telefon" hint={d.phone?.trim() && !normalizePhone(d.phone) ? <span className="warn-text">Sprawdź numer — np. 600 100 200 albo +48 600 100 200.</span> : undefined}>
+      <Field label="Telefon" hint={d.phone?.trim() && !normalizePhone(d.phone) ? <span className="warn-text">Sprawdź numer, np. 600 100 200 albo +48 600 100 200.</span> : undefined}>
         {inp('phone', 'tel', {
           inputMode: 'tel',
           autoComplete: 'off',
@@ -78,7 +78,7 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
       </Field>
       <Field
         label="E-mail"
-        hint={d.email?.trim() && !isEmail(d.email) ? <span className="warn-text">Sprawdź adres e-mail — tym adresem podopieczny założy konto.</span> : compact ? 'Potrzebny do konta w aplikacji.' : undefined}
+        hint={d.email?.trim() && !isEmail(d.email) ? <span className="warn-text">Sprawdź adres e-mail. Tym adresem podopieczny założy konto.</span> : compact ? 'Potrzebny do konta w aplikacji.' : undefined}
       >
         {inp('email', 'email', { inputMode: 'email', autoComplete: 'off', autoCapitalize: 'none', spellCheck: false, placeholder: 'np. anna@gmail.com' })}
       </Field>
@@ -103,15 +103,15 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
           <Field label="Dni treningowe / tydz.">{inp('daysPerWeek', 'text', { inputMode: 'numeric' })}</Field>
           <Field label="Bieg: tętno maks.">
             {inp('runHrMax', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 192' })}
-            {d.runHrMax?.trim() && !((num(d.runHrMax) ?? 0) > 120 && (num(d.runHrMax) ?? 0) < 230) && <span className="small warn-text">Tętno maks. zwykle 121–229 — przy tej wartości strefy liczą się z wieku.</span>}
+            {d.runHrMax?.trim() && !((num(d.runHrMax) ?? 0) > 120 && (num(d.runHrMax) ?? 0) < 230) && <span className="small warn-text">Tętno maks. zwykle 121–229. Przy tej wartości strefy liczą się z wieku.</span>}
           </Field>
           <Field label="Tętno progowe (LTHR)" hint="Test: 30 min biegu solo na maksa, równym tempem; LTHR = średnie tętno z ostatnich 20 min. Gdy wpisane, strefy liczą się od progu.">
             {inp('runLthr', 'text', { inputMode: 'numeric', placeholder: 'z testu, np. 172' })}
-            {d.runLthr?.trim() && !((num(d.runLthr) ?? 0) >= 100 && (num(d.runLthr) ?? 0) <= 215) && <span className="small warn-text">Tętno progowe zwykle 100–215 — przy tej wartości strefy liczą się z tętna maks.</span>}
+            {d.runLthr?.trim() && !((num(d.runLthr) ?? 0) >= 100 && (num(d.runLthr) ?? 0) <= 215) && <span className="small warn-text">Tętno progowe zwykle 100–215. Przy tej wartości strefy liczą się z tętna maks.</span>}
           </Field>
           <Field label="Bieg: czas na 5 km">
             {inp('runT5k', 'text', { placeholder: 'np. 25:30' })}
-            {d.runT5k?.trim() && !((parseDur(d.runT5k) ?? 0) > 10 && (parseDur(d.runT5k) ?? 0) < 90) && <span className="small warn-text">Wpisz czas całych 5 km (np. 25:30), nie tempo na km — inaczej tempa stref się nie policzą.</span>}
+            {d.runT5k?.trim() && !((parseDur(d.runT5k) ?? 0) > 10 && (parseDur(d.runT5k) ?? 0) < 90) && <span className="small warn-text">Wpisz czas całych 5 km (np. 25:30), nie tempo na km. Inaczej tempa stref się nie policzą.</span>}
           </Field>
           <Field label="Najbliższy start / cel">{inp('targetDate', 'date')}</Field>
           <Field label="Początek współpracy">{inp('startDate', 'date')}</Field>
@@ -142,13 +142,13 @@ export function ClientFields({ d, set, compact }: { d: Draft; set: (k: string, v
       {!compact && (
         <>
           <Field label="Abonament (zł / mies.)">{inp('subRate', 'text', { inputMode: 'decimal' })}</Field>
-          <Field label="Pakiet – liczba sesji">{inp('pkgSize', 'text', { inputMode: 'numeric' })}</Field>
-          <Field label="Pakiet – cena (zł)">{inp('pkgPrice', 'text', { inputMode: 'decimal' })}</Field>
+          <Field label="Pakiet: liczba sesji">{inp('pkgSize', 'text', { inputMode: 'numeric' })}</Field>
+          <Field label="Pakiet: cena (zł)">{inp('pkgPrice', 'text', { inputMode: 'decimal' })}</Field>
           <Field label="Urazy (podsumowanie)" wide>
             {inp('injuries')}
           </Field>
           <Field
-            label="Notatki — widzi podopieczny"
+            label="Notatki (widzi podopieczny)"
             wide
             hint={
               <span className="warn-text notes-warn">
@@ -186,7 +186,7 @@ export function ClientProfile({ client }: { client: Client }) {
     const next = { ...base, ...(rp ? { payments: [...base.payments, rp] } : {}) };
     const changes: Change[] = [put('clients', next), ...ending.future.filter((a) => cancelIds.includes(a.id)).map((a) => put('appointments', cancelByTrainer(a)))];
     const parts = [cancelIds.length && `odwołano ${cancelIds.length} ${plural(cancelIds.length, 'wizytę', 'wizyty', 'wizyt')}`, rp && `zwrot ${pln(-rp.amount)}`].filter(Boolean);
-    if (await apply(changes, `Współpraca zakończona${parts.length ? ` — ${parts.join(', ')}` : ''}.`)) {
+    if (await apply(changes, `Współpraca zakończona${parts.length ? `: ${parts.join(', ')}` : ''}.`)) {
       setD((x) => ({ ...x, status: 'zakończony' }));
       setDirty(false);
       setEnding(null);
@@ -376,7 +376,7 @@ function EndClientModal({ client, s, onClose, onConfirm }: { client: Client; s: 
         </div>
       )}
       <p className="small coach-note-lite">
-        Konto podopiecznego ({first}) w aplikacji przejdzie w tryb tylko do odczytu — historia treningów, planów i wiadomości zostaje. Status możesz w każdej chwili zmienić z powrotem.
+        Konto podopiecznego ({first}) w aplikacji będzie tylko do odczytu. Historia zostaje, status zmienisz w każdej chwili.
       </p>
     </Modal>
   );

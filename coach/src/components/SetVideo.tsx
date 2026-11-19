@@ -32,7 +32,7 @@ export function ShrinkSheet({ progress }: { progress: number }) {
   return (
     <Sheet label="Przygotowanie nagrania" onClose={() => undefined}>
       <h3>Przygotowuję nagranie…</h3>
-      <p className="muted small">Film jest większy niż {VIDEO_MAX_MB} MB — zapisuję go w wysokiej jakości w limicie. Nie zamykaj aplikacji.</p>
+      <p className="muted small">Film ma ponad {VIDEO_MAX_MB} MB. Zmniejszam go do limitu, nie zamykaj aplikacji.</p>
       <div className="progress" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
         <span style={{ width: `${Math.round(progress * 100)}%` }} />
       </div>
@@ -70,7 +70,7 @@ export function VideoViewer({ video, title, onClose, onRemove, onReplace }: { vi
       {err ? (
         <p className="muted">Nie udało się wczytać nagrania: {err}</p>
       ) : src ? (
-        <video className="set-video" src={src} controls playsInline autoPlay muted onError={() => setErr('ten plik nie daje się odtworzyć — nagraj ponownie')} />
+        <video className="set-video" src={src} controls playsInline autoPlay muted onError={() => setErr('ten plik nie daje się odtworzyć, nagraj ponownie')} />
       ) : (
         <p className="muted">Wczytywanie nagrania…</p>
       )}
@@ -161,7 +161,7 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
                 setRecording(true);
               }}
             >
-              <Icon name="cam" /> Nagraj w aplikacji — najlepsza jakość
+              <Icon name="cam" /> Nagraj w aplikacji (najlepsza jakość)
             </button>
             <button
               className="btn btn-secondary btn-block"
@@ -173,7 +173,7 @@ export function SetVideoButton({ clientId, video, title, onChange }: { clientId:
               Wybierz z galerii / aparatu telefonu
             </button>
             <p className="muted small">
-              Film z galerii: jeśli w okienku wyboru na iPhonie widzisz u góry <b>Opcje</b>, wybierz tam <b>Bieżący</b> / oryginał zamiast „Najbardziej zgodny” — telefon nie zmniejszy jakości. Za duży film aplikacja sama zapisze w wysokiej jakości w limicie {VIDEO_MAX_MB} MB.
+              Film z galerii: jeśli w okienku wyboru na iPhonie widzisz u góry <b>Opcje</b>, wybierz tam <b>Bieżący</b> / oryginał zamiast „Najbardziej zgodny”. Telefon nie zmniejszy jakości. Za duży film aplikacja sama zapisze w wysokiej jakości w limicie {VIDEO_MAX_MB} MB.
             </p>
           </div>
         </Sheet>

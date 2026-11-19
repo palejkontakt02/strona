@@ -99,12 +99,12 @@ export function InviteModal({ clientId, onClose }: { clientId: string; onClose: 
   const phone = normalizePhone(client.phone);
 
   const markSent = async (how: string) => {
-    await apply([put('clients', { ...client, invitedAt: new Date().toISOString() })], `Zaproszenie ${how} — zapisano datę wysłania.`);
+    await apply([put('clients', { ...client, invitedAt: new Date().toISOString() })], `Zaproszenie ${how}. Data wysłania zapisana.`);
   };
   const saveEmail = async () => {
     const e = email.trim().toLowerCase();
     if (!isEmail(e)) return toast('Sprawdź adres e-mail (np. anna@gmail.com).');
-    if (db.clients.some((c) => c.id !== client.id && c.email?.trim().toLowerCase() === e)) return toast('Ten e-mail ma już inny podopieczny — jedno konto łączy się z jednym profilem.');
+    if (db.clients.some((c) => c.id !== client.id && c.email?.trim().toLowerCase() === e)) return toast('Ten e-mail ma już inny podopieczny. Jedno konto to jeden profil.');
     await apply([put('clients', { ...client, email: e })], 'Zapisano e-mail.');
   };
   const copy = async (what: 'link' | 'text') => {
@@ -112,7 +112,7 @@ export function InviteModal({ clientId, onClose }: { clientId: string; onClose: 
       await navigator.clipboard.writeText(what === 'link' ? link : text);
       await markSent(what === 'link' ? 'skopiowane' : 'skopiowane');
     } catch {
-      toast('Nie udało się skopiować — zaznacz link i skopiuj ręcznie.');
+      toast('Nie udało się skopiować. Zaznacz link i skopiuj ręcznie.');
     }
   };
 
@@ -126,7 +126,7 @@ export function InviteModal({ clientId, onClose }: { clientId: string; onClose: 
         {!hasEmail && (
           <div className="invite-warn" role="alert">
             <p>
-              <Icon name="alert" size={16} /> <strong>Brak e-maila w profilu.</strong> Bez niego podopieczny nie połączy konta — aplikacja łączy konto z profilem po adresie e-mail.
+              <Icon name="alert" size={16} /> <strong>Brak e-maila w profilu.</strong> Bez niego podopieczny nie połączy konta z profilem.
             </p>
             <div className="invite-email-row">
               <input
@@ -181,7 +181,7 @@ export function InviteModal({ clientId, onClose }: { clientId: string; onClose: 
         {showQr && (
           <div className="invite-qr">
             <QrSvg text={link} />
-            <p className="muted small">Podopieczny skanuje aparatem telefonu — otworzy się ekran zakładania konta.</p>
+            <p className="muted small">Podopieczny skanuje kod aparatem i zakłada konto.</p>
           </div>
         )}
         <details className="invite-preview">
@@ -190,7 +190,7 @@ export function InviteModal({ clientId, onClose }: { clientId: string; onClose: 
         </details>
         {!client.invitedAt && (
           <button type="button" className="link small" onClick={() => void markSent('oznaczone jako wysłane')}>
-            Wysłałem inaczej — oznacz jako wysłane
+            Oznacz jako wysłane
           </button>
         )}
       </div>

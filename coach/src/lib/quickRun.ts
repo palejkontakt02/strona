@@ -21,7 +21,7 @@ export function quickRunProblem(f: QuickRunInput): string | null {
   const min = runMinutes(f.time);
   if (min == null || min <= 0 || min > 48 * 60) return 'Wpisz czas: mm:ss (np. 32:15) albo h:mm:ss (np. 1:05:00).';
   const pace = min / km;
-  if (pace < 2 || pace > 30) return 'Dystans i czas się nie zgadzają (tempo poza 2–30 min/km) — sprawdź, czy km nie są w metrach.';
+  if (pace < 2 || pace > 30) return 'Dystans i czas się nie zgadzają (tempo poza 2–30 min/km). Sprawdź, czy km nie są w metrach.';
   if (numIn(f.effort, 1, 10) == null) return 'Zaznacz wysiłek od 1 do 10.';
   if (f.hr.trim() && numIn(f.hr, 30, 240) == null) return 'Tętno średnie: od 30 do 240 (albo zostaw puste).';
   return null;

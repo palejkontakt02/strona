@@ -151,10 +151,10 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
     // bez nagrań nie ma czego „obejrzeć” — zapisujemy tylko komentarz (o ile się zmienił)
     if (!hasVids) {
       if (coachNote === s.coachNote) return closeModal();
-      if (await apply([put('sessions', { ...s, coachNote })], coachNote ? 'Komentarz zapisany — podopieczny zobaczy go przy treningu.' : 'Komentarz usunięty.')) closeModal();
+      if (await apply([put('sessions', { ...s, coachNote })], coachNote ? 'Komentarz zapisany.' : 'Komentarz usunięty.')) closeModal();
       return;
     }
-    if (await apply([put('sessions', { ...s, reviewedAt: new Date().toISOString(), coachNote })], coachNote ? 'Obejrzane — komentarz widzi podopieczny.' : 'Oznaczono jako obejrzane.')) closeModal();
+    if (await apply([put('sessions', { ...s, reviewedAt: new Date().toISOString(), coachNote })], coachNote ? 'Obejrzane. Komentarz wysłany.' : 'Oznaczono jako obejrzane.')) closeModal();
   };
 
   return (
@@ -166,7 +166,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
       wide
       extraActions={
         <>
-          <button type="button" className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('trening', client?.name, s.date), sessionWorkbook(s, client, !isSolo(db, s)))} title="Ten trening do Excela — seria po serii">
+          <button type="button" className="btn btn-ghost" onClick={() => void downloadXlsx(xlsxName('trening', client?.name, s.date), sessionWorkbook(s, client, !isSolo(db, s)))} title="Ten trening do Excela, seria po serii">
             <Icon name="download" size={16} /> Excel
           </button>
           <button type="button" className="btn btn-ghost" onClick={() => openModal({ kind: 'session', session: s })}>
@@ -263,7 +263,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
                     {e.label && <span className="ex-label">{e.label}</span>} {e.name}
                   </b>
                   {hl && <span className="rv-hl-tag">Komentarz dotyczy tego ćwiczenia</span>}
-                  {stop && stop.exIndex === i && <span className="sb-stop small">tu przerwano — ból {stop.level}/10</span>}
+                  {stop && stop.exIndex === i && <span className="sb-stop small">tu przerwano, ból {stop.level}/10</span>}
                 </div>
                 <ExSets e={e} onVideo={hasVids ? showVideo : undefined} />
                 {e.notes && <p className="muted small">{e.notes}</p>}
@@ -276,7 +276,7 @@ export function ReviewModal({ m }: { m: { sessionId: string; exIndex?: number } 
       )}
       <label className="field">
         <span>Komentarz dla podopiecznego (zobaczy go przy tym treningu)</span>
-        <textarea className="input" rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Np. seria 2: kolana uciekają do środka — w następnym tygodniu 5 kg mniej i pauza na dole." />
+        <textarea className="input" rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Np. seria 2: kolana uciekają do środka. W następnym tygodniu 5 kg mniej i pauza na dole." />
       </label>
       {hasVids && s.reviewedAt && <p className="muted small">Obejrzane {fmtDay(s.reviewedAt.slice(0, 10))}.</p>}
     </Modal>

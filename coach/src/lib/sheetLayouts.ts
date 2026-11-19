@@ -141,7 +141,7 @@ function blockLayout(sheets: LayoutSheet[]): LayoutResult | null {
     out.push(line({ week: cur.week, workout: cur.workout, exercise: exName(a), sets: cell(r, col.sets), reps, load: kg || (pct ? `${pct}%` : ''), rpe, rest: /^[—–-]$/.test(rest) ? '' : rest, notes }));
   }
   if (out.length < 2) return null;
-  if (![...out.slice(1)].some((r) => r[1])) warnings.push('Arkusz ma „dzień 1/2/3” bez dni tygodnia — dni ustawione domyślnie, popraw je w edytorze.');
+  if (![...out.slice(1)].some((r) => r[1])) warnings.push('Arkusz ma „dzień 1/2/3” bez dni tygodnia. Dni ustawione domyślnie, popraw je w edytorze.');
   return { rows: out, info: `Układ „bloki” z arkusza „${sheet.name}”: ${weeks.size} ${weeks.size === 1 ? 'tydzień' : weeks.size < 5 ? 'tygodnie' : 'tygodni'}, ${units} jednostek. Ciężar: kg orientacyjne (% 1RM w uwagach).`, warnings };
 }
 
@@ -264,8 +264,8 @@ function weeksLayout(sheets: LayoutSheet[]): LayoutResult | null {
   for (const r of out.slice(1)) (exs.get(r[0]) ?? exs.set(r[0], new Set()).get(r[0])!).add(r[3]);
   const per = new Map([...exs].map(([w, x]) => [w, x.size]));
   const max = Math.max(...per.values());
-  for (const [w, n] of per) if (n < max / 2) warnings.push(`${w}: wypełnione tylko ${n} z ${max} pozycji — uzupełnij w edytorze albo usuń tydzień.`);
-  return { rows: out, info: `Układ „tygodnie obok siebie”: ${used.map((x) => `„${x}”`).join(', ')} — ${weekCount} tyg. Kolumny wykonania (Ciężar / Powt. / RPE) pominięte.`, warnings };
+  for (const [w, n] of per) if (n < max / 2) warnings.push(`${w}: wypełnione tylko ${n} z ${max} pozycji. Uzupełnij w edytorze albo usuń tydzień.`);
+  return { rows: out, info: `Układ „tygodnie obok siebie”: ${used.map((x) => `„${x}”`).join(', ')}, ${weekCount} tyg. Kolumny wykonania (Ciężar / Powt. / RPE) pominięte.`, warnings };
 }
 
 /** Rozpoznany układ trenera → płaska tabela do importu; null — zwykła tabela (bez zmian). */

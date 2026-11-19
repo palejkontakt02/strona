@@ -412,7 +412,7 @@ export function parseActivity(name: string, data: ArrayBuffer): Activity {
   const xml = new TextDecoder('utf-8').decode(u8);
   if (/<(?:[\w-]+:)?TrainingCenterDatabase/i.test(xml) || ext === 'tcx') return parseTcx(xml);
   if (/<gpx[\s>]/i.test(xml) || ext === 'gpx') return parseGpx(xml);
-  throw new Error('Nieznany format — wybierz plik GPX, TCX albo FIT.');
+  throw new Error('Nieznany format. Wybierz plik GPX, TCX albo FIT.');
 }
 
 /**

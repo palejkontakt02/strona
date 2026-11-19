@@ -27,7 +27,7 @@ export function AbsenceNotice({ client, plan, sessions, onShift }: { client: Cli
       <Icon name="alert" size={16} />
       <span className="pt-absence-text">
         Nieobecność {range}
-        {a.reason ? ` (${a.reason})` : ''} — przesunąć plan o {nDays(days)}?
+        {a.reason ? ` (${a.reason})` : ''}. Przesunąć plan o {nDays(days)}?
       </span>
       <button type="button" className="btn btn-secondary btn-sm" onClick={() => onShift(from, days)}>
         Przesuń o {nDays(days)}
@@ -93,7 +93,7 @@ export function ShiftPanel({ plan, sessions, preset, onClose }: { plan: Plan; se
   if (!weeks.length) {
     return (
       <div className="pt-panel">
-        <p className="muted small">Jednostki planu nie mają dni ani dat — ustaw je w edytorze planu, wtedy da się przesunąć plan.</p>
+        <p className="muted small">Jednostki planu nie mają dni ani dat. Ustaw je w edytorze, wtedy przesuniesz plan.</p>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
           Zamknij
         </button>
@@ -303,7 +303,7 @@ export function LoadSuggestPanel({ plan, sessions }: { plan: Plan; sessions: Tra
                   <p className="ls-why small">
                     {s.why}
                     {s.already && s.kind !== 'hold' && s.planned != null && <span className="muted"> W planie na ten tydzień już {kg(s.planned)}.</span>}
-                    {!s.applicable && <span className="muted"> Ciężar w planie liczony z % — zmień w edytorze.</span>}
+                    {!s.applicable && <span className="muted"> Ciężar w planie liczony z %. Zmień w edytorze.</span>}
                   </p>
                 </li>
               );

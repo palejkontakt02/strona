@@ -27,7 +27,7 @@ export function AccountStatusCard({ client }: { client: Client }) {
   let body: React.ReactNode;
   if (state.status === 'off') body = <InviteStatusTag client={client} state={inviteState(client, 'unknown')} />;
   else if (state.status === 'loading') body = <span className="muted small">Sprawdzam…</span>;
-  else if (state.status !== 'ok') body = <span className="muted small">Lista kont niedostępna — zobacz Ustawienia → Konta w aplikacji.</span>;
+  else if (state.status !== 'ok') body = <span className="muted small">Lista kont niedostępna. Zobacz Ustawienia (Konta w aplikacji).</span>;
   else {
     const { status, account } = accountOf(client, state.list);
     body = (
@@ -35,9 +35,9 @@ export function AccountStatusCard({ client }: { client: Client }) {
         <Tag tone={TONE[status]}>{ACCOUNT_LABEL[status]}</Tag>
         <span className="muted small">
           {status === 'active' && `założone ${day(account!.created_at)} · ostatnie logowanie ${day(account!.last_sign_in_at)}`}
-          {status === 'unconfirmed' && `założone ${day(account!.created_at)} — podopieczny musi kliknąć link w mailu, inaczej nie zobaczy swoich danych.`}
-          {status === 'none' && (client.invitedAt ? `Zaproszenie wysłane ${day(client.invitedAt)} — nikt jeszcze nie założył konta na ${client.email}.` : `Nikt nie założył konta na ${client.email}. Wyślij zaproszenie — link sam wpisze ten e-mail na ekranie „Nowe konto”.`)}
-          {status === 'no-email' && 'Wpisz e-mail podopiecznego poniżej — tym adresem założy konto i zobaczy swoje treningi.'}
+          {status === 'unconfirmed' && `założone ${day(account!.created_at)}. Podopieczny musi kliknąć link w mailu, inaczej nie zobaczy swoich danych.`}
+          {status === 'none' && (client.invitedAt ? `Zaproszenie wysłane ${day(client.invitedAt)}. Konto na ${client.email} jeszcze nie istnieje.` : `Nikt nie założył konta na ${client.email}. Wyślij zaproszenie: link sam wpisze ten e-mail na ekranie „Nowe konto”.`)}
+          {status === 'no-email' && 'Wpisz e-mail podopiecznego poniżej. Tym adresem założy konto.'}
         </span>
       </>
     );
@@ -62,7 +62,7 @@ export function AccountsPanel() {
   if (state.status === 'missing')
     return (
       <p className="small">
-        Żeby widzieć konta, uruchom w Supabase (SQL Editor) ostatnią część pliku <code>supabase/hardening.sql</code> — funkcję <code>trainer_accounts</code>.
+        Żeby widzieć konta, uruchom w Supabase (SQL Editor) ostatnią część pliku <code>supabase/hardening.sql</code> (funkcja <code>trainer_accounts</code>).
       </p>
     );
   if (state.status === 'error') return <p className="small text-danger">Nie udało się wczytać kont: {state.message}</p>;

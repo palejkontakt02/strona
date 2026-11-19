@@ -46,7 +46,7 @@ function ReportForm({ client, onClose }: { client: Client; onClose: () => void }
       ...(r.comment?.trim() ? { comment: r.comment.trim().slice(0, 2000) } : {}),
       ...(photoIds.length ? { photoIds } : {}),
     };
-    const ok = await saveClientEntry(client.id, 'weeklyReports', rep, 'Raport wysłany — dzięki! Trener odpisze w aplikacji.');
+    const ok = await saveClientEntry(client.id, 'weeklyReports', rep, 'Raport wysłany. Trener odpisze w aplikacji.');
     setBusy(false);
     if (ok) onClose();
   };
@@ -125,7 +125,7 @@ export function WeeklyReportCard({ client }: { client: Client }) {
         <section className="acard wr-card">
           <span className="eyebrow">Raport tygodnia · {weekLabel(reportWeek(today))}</span>
           <h3>Jak minął tydzień?</h3>
-          <p className="muted small">Waga, sen, stres, energia, kroki — 2 minuty. Trener na tej podstawie ustawi kolejny tydzień.</p>
+          <p className="muted small">Waga, sen, stres, energia, kroki. 2 minuty.</p>
           <button className="btn btn-primary btn-block" onClick={() => setOpen(true)}>
             Wypełnij raport
           </button>
@@ -207,7 +207,7 @@ function ReportRow({ client, r, prev }: { client: Client; r: WeeklyReport; prev?
             className="btn btn-primary btn-sm"
             disabled={!note.trim() && !!r.seenAt}
             onClick={async () => {
-              if (await saveR({ seenAt: r.seenAt ?? new Date().toISOString(), coachNote: note.trim() || undefined }, note.trim() ? 'Odpowiedź zapisana — podopieczny zobaczy ją w aplikacji.' : 'Oznaczono jako przeczytany.')) setEdit(!note.trim());
+              if (await saveR({ seenAt: r.seenAt ?? new Date().toISOString(), coachNote: note.trim() || undefined }, note.trim() ? 'Odpowiedź zapisana.' : 'Oznaczono jako przeczytany.')) setEdit(!note.trim());
             }}
           >
             {note.trim() ? 'Odpowiedz' : 'Przeczytany'}
@@ -234,7 +234,7 @@ export function CoachReports({ client }: { client: Client }) {
   return (
     <>
       <label className="wr-switch">
-        <input type="checkbox" role="switch" checked={on} onChange={() => void apply([put('clients', { ...client, weeklyReport: !on })], on ? 'Raport tygodniowy wyłączony.' : 'Raport tygodniowy włączony — podopieczny zobaczy kartę od piątku do poniedziałku.')} />
+        <input type="checkbox" role="switch" checked={on} onChange={() => void apply([put('clients', { ...client, weeklyReport: !on })], on ? 'Raport tygodniowy wyłączony.' : 'Raport tygodniowy włączony (karta od piątku do poniedziałku).')} />
         <span>Raport tygodniowy: {on ? 'wymagany' : 'niewymagany'}</span>
       </label>
       {reps.length === 0 ? (

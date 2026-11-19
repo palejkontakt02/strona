@@ -222,18 +222,18 @@ export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISO
       } else if (vc.top && !vc.missed && !vc.rpeOver) {
         kind = 'add';
         const r = vc.topRange!;
-        why = `Wszystkie serie z górnym zakresem (${r[1]} powt.)${vc.maxRpe != null ? ` przy RPE do ${fmt(vc.maxRpe)}` : ''} — czas na więcej.`;
+        why = `Wszystkie serie z górnym zakresem (${r[1]} powt.)${vc.maxRpe != null ? ` przy RPE do ${fmt(vc.maxRpe)}` : ''}. Czas na więcej.`;
       } else if (vc.missed) {
-        why = `Raz zabrakło powtórzeń (${vc.missed.reps} z ${vc.missed.min}) — jeszcze tydzień na tym ciężarze.`;
+        why = `Raz zabrakło powtórzeń (${vc.missed.reps} z ${vc.missed.min}). Jeszcze tydzień na tym ciężarze.`;
       } else if (vc.rpeOver) {
-        why = `RPE ${fmt(vc.rpeOver.rpe)} przy celu ${fmt(vc.rpeOver.target)} — utrzymaj, aż będzie lżej.`;
+        why = `RPE ${fmt(vc.rpeOver.rpe)} przy celu ${fmt(vc.rpeOver.target)}. Utrzymaj, aż będzie lżej.`;
       } else {
-        why = vc.topRange ? `Powtórzenia w zakresie, jeszcze nie górna granica (${vc.topRange[1]}) — utrzymaj.` : 'Brak celu powtórzeń w planie — utrzymaj.';
+        why = vc.topRange ? `Powtórzenia w zakresie, jeszcze nie górna granica (${vc.topRange[1]}). Utrzymaj.` : 'Brak celu powtórzeń w planie. Utrzymaj.';
       }
       if (kind === 'add' && pain != null) {
         kind = 'hold';
         reason = 'pain';
-        why = `Ból ${fmt(pain)}/10 w ostatnich treningach — utrzymaj ciężar, bez progresji.`;
+        why = `Ból ${fmt(pain)}/10 w ostatnich treningach. Utrzymaj ciężar, bez progresji.`;
       } else if (kind === 'cut' && pain != null) {
         reason = 'pain';
         why = `${why} Do tego ból ${fmt(pain)}/10.`;
@@ -243,11 +243,11 @@ export function suggestLoads(plan: Plan, sessions: TrainingSession[], today: ISO
       if (deload && kind !== 'cut') {
         kind = 'hold';
         reason = 'deload';
-        why = `Tydzień deload — bez dokładania${planned != null && planned !== last ? `, w planie ${fmt(planned)} kg` : ''}.`;
+        why = `Tydzień deload, bez dokładania${planned != null && planned !== last ? `, w planie ${fmt(planned)} kg` : ''}.`;
       }
       if (kind === 'add') {
         next = stepLoad(last, pe.name, per, 1);
-        why = why.replace(/ — czas na więcej\.$/, ` — czas na więcej (+${fmt(next - last)} kg).`);
+        why = why.replace(/\. Czas na więcej\.$/, `. Czas na więcej (+${fmt(next - last)} kg).`);
       }
       if (kind === 'cut') {
         next = round(last * 0.95);

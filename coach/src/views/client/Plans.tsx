@@ -86,11 +86,11 @@ export function ClientPlans({ client }: { client: Client }) {
   // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
   const dupPlan = (p: Plan) => {
     const b = nextBlock(p);
-    void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? ` — włączy się sam ${fmtDate(b.startDate)} (wcześniej: „Ustaw aktywny”)` : ''}.`);
+    void apply(savePlan(db, b), `Utworzono „${b.name}”${b.startDate ? `, włączy się sam ${fmtDate(b.startDate)}` : ''}.`);
   };
   const saveTemplate = (p: Plan) => {
     const taken = templatesOf(db.plans).some((t) => t.name === p.name);
-    void apply([put('plans', templateFromPlan(p, taken ? `${p.name} (${fmtDate(todayISO())})` : p.name))], `Zapisano szablon „${p.name}” — znajdziesz go w „Nowy plan z szablonu…” i w Ćwiczeniach.`);
+    void apply([put('plans', templateFromPlan(p, taken ? `${p.name} (${fmtDate(todayISO())})` : p.name))], `Zapisano szablon „${p.name}”.`);
   };
   const removePlan = async (p: Plan) => {
     if (await ask(`Usunąć plan „${p.name}”? Zapisane treningi zostaną.`)) await apply([del('plans', p.id)], 'Plan usunięty.');
@@ -99,7 +99,7 @@ export function ClientPlans({ client }: { client: Client }) {
   const nextBlockNow = async (p: Plan) => {
     const b: Plan = { ...nextBlock(p, today), active: true };
     if (!(await apply(savePlan(db, b)))) return;
-    toast(`Utworzono „${b.name}”${b.startDate ? ` — start ${fmtDate(b.startDate)}` : ''}. Teraz to plan aktywny.`, {
+    toast(`Utworzono „${b.name}”${b.startDate ? `, start ${fmtDate(b.startDate)}` : ''}. Teraz to plan aktywny.`, {
       label: 'Cofnij',
       run: () => void apply([del('plans', b.id), put('plans', p)], 'Cofnięto nowy blok.'),
     });
@@ -192,7 +192,7 @@ export function ClientPlans({ client }: { client: Client }) {
               <p className="muted small">
                 {p.startDate && `Start ${fmtDate(p.startDate)} · `}
                 {p.weeks.length} tyg. · {(() => { const n = p.weeks.reduce((a, w) => a + w.workouts.length, 0); return `${n} ${plural(n, 'jednostka', 'jednostki', 'jednostek')}`; })()}
-                {nx && p.active && (planCompleted(p, sessions) ? ' · plan ukończony — wszystkie jednostki zrobione (kolejny trening: od początku albo nowy blok)' : (() => {
+                {nx && p.active && (planCompleted(p, sessions) ? ' · plan ukończony, wszystkie jednostki zrobione' : (() => {
                   // ten sam opis co u podopiecznego: zaległy termin z planu i najbliższy dzień, kiedy go zrobić
                   const orig = workoutDate(p, p.weeks.indexOf(nx.week), nx.workout);
                   const late = orig && orig < today && (!p.startDate || orig >= p.startDate) && !sessions.some((s) => s.planId === p.id && s.date >= orig);
@@ -205,8 +205,8 @@ export function ClientPlans({ client }: { client: Client }) {
                 <div className="warn-box pl-ended" role="status">
                   <Icon name="alert" size={16} />
                   <span className="pl-ended-text">
-                    Plan zakończył się {fmtShort(st.endDate)} — {plans.some((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')) ? 'kolejny blok jest przygotowany.' : 'zaplanuj kolejny blok.'}
-                    {nx && <span className="muted small"> Podopieczny robi go dalej po kolei — następny: {nx.workout.name} ({nx.week.name}).</span>}
+                    Plan skończył się {fmtShort(st.endDate)}. {plans.some((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')) ? 'Kolejny blok czeka.' : 'Zaplanuj kolejny blok.'}
+                    {nx && <span className="muted small"> Następny w kolejce: {nx.workout.name} ({nx.week.name}).</span>}
                   </span>
                   <span className="pl-ended-actions">
                     {(() => {
@@ -217,7 +217,7 @@ export function ClientPlans({ client }: { client: Client }) {
                           Włącz „{prepared.name}”
                         </button>
                       ) : (
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku — od razu aktywna">
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void nextBlockNow(p)} title="Kopia planu jako kolejny blok od najbliższego poniedziałku, od razu aktywna">
                           Następny blok
                         </button>
                       );
@@ -259,22 +259,22 @@ export function ClientPlans({ client }: { client: Client }) {
       </div>
       {sched && (
         <Modal
-          title={`Termin — ${sched.k.name}`}
+          title={`Termin: ${sched.k.name}`}
           onClose={() => setSched(null)}
           submitLabel="Zapisz termin"
           onSubmit={async () => {
             if (!/^\d{4}-\d{2}-\d{2}$/.test(sched.date)) return toast('Wybierz dzień.');
             if (sched.time && !/^\d{1,2}:\d{2}$/.test(sched.time)) return toast('Godzina, np. 18:00.');
-            const ok = await apply(scheduleWorkout(db, sched.plan, sched.k.id, sched.date, sched.time, sched.from), `„${sched.k.name}” — ${fmtWeekdayDate(sched.date)}${sched.time ? `, ${sched.time.padStart(5, '0')}` : ''}${sched.time ? ' · wizyta w kalendarzu' : ''}.`);
+            const ok = await apply(scheduleWorkout(db, sched.plan, sched.k.id, sched.date, sched.time, sched.from), `„${sched.k.name}”: ${fmtWeekdayDate(sched.date)}${sched.time ? `, ${sched.time.padStart(5, '0')}` : ''}${sched.time ? ' · wizyta w kalendarzu' : ''}.`);
             if (ok) setSched(null);
           }}
         >
-          <p className="small muted">Trening przejdzie na ten dzień (podopieczny zobaczy nowy termin). Z godziną — także wizyta w kalendarzu; ponowna zmiana terminu przesuwa tę samą wizytę.</p>
+          <p className="small muted">Z godziną powstaje też wizyta w kalendarzu.</p>
           <div className="form-grid">
             <Field label="Dzień">
               <input className="input" type="date" value={sched.date} onChange={(e) => setSched({ ...sched, date: e.target.value })} aria-label="Dzień treningu" />
             </Field>
-            <Field label="Godzina (wizyta)" hint="puste — bez wizyty">
+            <Field label="Godzina (wizyta)" hint="puste: bez wizyty">
               <input className="input" type="time" value={sched.time} onChange={(e) => setSched({ ...sched, time: e.target.value })} aria-label="Godzina treningu" />
             </Field>
           </div>

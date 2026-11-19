@@ -273,7 +273,7 @@ export function readTemplate(sheets: { name: string; rows: string[][] }[]): Temp
       }
     }
     if (found) used.push(s.name);
-    if (found && !day) warnings.push(`„${s.name}”: brak dnia tygodnia — ustawiony domyślnie, popraw w edytorze.`);
+    if (found && !day) warnings.push(`„${s.name}”: brak dnia tygodnia. Ustawiony domyślnie, popraw w edytorze.`);
   }
   if (!used.length) return null;
   const rows = [OUT_HEAD, ...[...byWeek.values()].flat()];

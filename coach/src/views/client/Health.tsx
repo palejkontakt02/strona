@@ -28,11 +28,11 @@ export function trainerNotesOf(list: TrainerNotes[], clientId: string): TrainerN
 export function healthFlags(h: HealthIntake | undefined, intake?: Intake): { level: 'red' | 'yellow'; text: string }[] {
   const out: { level: 'red' | 'yellow'; text: string }[] = [];
   const yes = Math.max(PARQ.filter(([k]) => h?.parq?.[k]).length, parqYesCount(intake));
-  if (yes && !h?.clearanceDate) out.push({ level: 'red', text: `PAR-Q: ${yes}× „tak”${parqYesCount(intake) ? ' (ankieta podopiecznego)' : ''} — brak zgody lekarza w wywiadzie` });
+  if (yes && !h?.clearanceDate) out.push({ level: 'red', text: `PAR-Q: ${yes}× „tak”${parqYesCount(intake) ? ' (ankieta podopiecznego)' : ''}, brak zgody lekarza w wywiadzie` });
   // zgoda lekarza jest starsza niż zmiana ankiety z „tak” — trzeba sprawdzić, czy dalej obowiązuje
   else if (h?.clearanceDate && parqYesCount(intake) && (intake?.updatedAt ?? '').slice(0, 10) > h.clearanceDate)
-    out.push({ level: 'red', text: `PAR-Q: ankieta zmieniona ${fmtDay(intake!.updatedAt!.slice(0, 10))} (${parqYesCount(intake)}× „tak”) — po zgodzie lekarza z ${fmtDay(h.clearanceDate)}; sprawdź, czy zgoda jest aktualna` });
-  if (h?.updated && h.updated < addDays(todayISO(), -365)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok — zaktualizuj' });
+    out.push({ level: 'red', text: `PAR-Q: ankieta zmieniona ${fmtDay(intake!.updatedAt!.slice(0, 10))} (${parqYesCount(intake)}× „tak”) po zgodzie lekarza z ${fmtDay(h.clearanceDate)}. Sprawdź, czy zgoda jest aktualna` });
+  if (h?.updated && h.updated < addDays(todayISO(), -365)) out.push({ level: 'yellow', text: 'Wywiad zdrowotny starszy niż rok. Zaktualizuj' });
   return out;
 }
 
@@ -63,7 +63,7 @@ export function ClientIntakeCard({ client }: { client: Client }) {
         <p className="muted small">
           Podopieczny wypełnia ankietę po pierwszym zalogowaniu (zdrowie, styl życia, odżywianie, sport, cele). Możesz też uzupełnić ją z nim:{' '}
           <button className="link small" onClick={() => startAthlete(client.id)}>
-            Tryb zawodnika → „Ankieta podopiecznego”
+            w trybie zawodnika
           </button>
           .
         </p>
@@ -183,7 +183,7 @@ export function ClientHealth({ client }: { client: Client }) {
         </button>
       }
     >
-      <p className="muted small">Te dane są w osobnej tabeli — podopieczny ich nie widzi. Aplikacja nie stawia diagnoz: „tak” w PAR-Q = przed intensywnym treningiem zgoda lekarza.</p>
+      <p className="muted small">Podopieczny tych danych nie widzi. „Tak” w PAR-Q: przed intensywnym treningiem zgoda lekarza.</p>
       {(h.contraindications || h.restrictions) && (
         <div className="coach-note">
           <span className="eyebrow">Unikać / ograniczenia</span>
@@ -247,7 +247,7 @@ export function ClientHealth({ client }: { client: Client }) {
             </Field>
           </div>
           <div className="between save-row">
-            <span className="muted small">{rec.health?.updated ? `Wywiad z ${fmtDay(rec.health.updated)}` : 'Uzupełnij — zapisuje się samo'}</span>
+            <span className="muted small">{rec.health?.updated ? `Wywiad z ${fmtDay(rec.health.updated)}` : 'Uzupełnij, zapisuje się samo'}</span>
             {dirty ? (
               <button className="btn btn-primary btn-sm" onClick={() => void save()}>
                 Zapisz

@@ -117,7 +117,7 @@ export function WorkoutList({ client }: { client: Client }) {
                       {isNext && <Tag tone="accent">następny</Tag>}{' '}
                       {stopped ? (
                         <Tag tone="warn">
-                          <span title="Trening przerwany z powodu bólu — jednostka nie jest zaliczona">przerwany {fmtDate(stopped.date)}</span>
+                          <span title="Trening przerwany z powodu bólu. Jednostka niezaliczona">przerwany {fmtDate(stopped.date)}</span>
                         </Tag>
                       ) : dn && !isNext ? (
                         <Tag tone="ok"><Icon name="check" size={12} /> {fmtDate(dn)}</Tag>

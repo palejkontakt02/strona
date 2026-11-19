@@ -18,7 +18,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       <div className="center-screen">
         <div className="card auth-card">
           <h1>Coś poszło nie tak</h1>
-          <p className="muted">Ekran nie mógł się wyświetlić. Twoje dane są bezpieczne — spróbuj odświeżyć.</p>
+          <p className="muted">Ekran nie mógł się wyświetlić. Dane są bezpieczne. Odśwież stronę.</p>
           <p className="muted small">{this.state.error.message}</p>
           <button className="btn btn-primary btn-block" onClick={() => location.reload()}>
             Odśwież

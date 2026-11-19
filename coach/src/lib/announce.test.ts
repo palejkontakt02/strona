@@ -14,14 +14,14 @@ describe('zapowiedź następnej serii', () => {
   it('pierwsza niezaliczona w bieżącym bloku; numer bez rozgrzewki', () => {
     const x = nextSetInfo(r)!;
     expect([x.k, x.i, x.n, x.load]).toEqual([0, 3, 3, 62.5]);
-    expect(flashText(x)).toBe('Seria 3 — przysiad ze sztangą 62,5 kg × 8');
+    expect(flashText(x)).toBe('Seria 3: przysiad ze sztangą 62,5 kg × 8');
     expect(speechText(x)).toBe('Następna seria: przysiad ze sztangą, 62,5 kilograma, 8 powtórzeń');
   });
   it('blok zrobiony — kolejny; seria na czas', () => {
     const done = structuredClone(r);
     done.ex[0].sets[3].done = true;
     const x = nextSetInfo(done)!;
-    expect(flashText(x)).toBe('Seria 1 — deska 30 s');
+    expect(flashText(x)).toBe('Seria 1: deska 30 s');
     expect(speechText(x)).toBe('Następna seria: deska, 30 sekund');
     done.ex[1].sets[0].done = true;
     expect(nextSetInfo(done)).toBeNull();

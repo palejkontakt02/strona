@@ -65,7 +65,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
         if (l?.start) setStart(l.start);
         setFileRows(l?.rows ?? (sheets.find((x) => x.name === 'Do importu') ?? sheets[0]).rows);
       }
-      else if (/\.xls$/i.test(f.name)) throw new Error('Stary format .xls — zapisz arkusz jako .xlsx albo CSV.');
+      else if (/\.xls$/i.test(f.name)) throw new Error('Stary format .xls. Zapisz arkusz jako .xlsx albo CSV.');
       else {
         const raw = parseTable(await f.text());
         const l = normalizeLayout([{ name: f.name.replace(/\.[^.]+$/, ''), rows: raw }]);
@@ -85,13 +85,13 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
   return (
     <Modal
       wide
-      title={target ? `Wczytaj zmiany z arkusza — ${target.name}` : 'Import planu z arkusza'}
+      title={target ? `Wczytaj zmiany z arkusza: ${target.name}` : 'Import planu z arkusza'}
       onClose={onClose}
       submitLabel={target ? 'Zapisz zmiany w planie' : 'Otwórz w edytorze'}
       onSubmit={() => {
-        if (!result || !result.stats.exercises) return setErr('Nie rozpoznano żadnego ćwiczenia — sprawdź przypisanie kolumny „Ćwiczenie”.');
+        if (!result || !result.stats.exercises) return setErr('Nie rozpoznano żadnego ćwiczenia. Sprawdź przypisanie kolumny „Ćwiczenie”.');
         if (merged) {
-          if (!merged.diff.lines.length) return setErr('Arkusz nie różni się od planu — nie ma czego zapisać.');
+          if (!merged.diff.lines.length) return setErr('Arkusz nie różni się od planu.');
           return onDone(merged.plan);
         }
         onDone({ ...result.plan, active: makeActive });
@@ -104,14 +104,14 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
       )}
       {!initialRows && !target && (
         <p className="small pi-template">
-          Najprościej: pisz plany w stałym szablonie Fitowej (zakładka = dzień treningowy, tygodnie obok siebie) — wczyta się bez poprawiania.{' '}
+          Najprościej: pisz plany w stałym szablonie Fitowej (zakładka = dzień treningowy, tygodnie obok siebie). Wczyta się bez poprawiania.{' '}
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => void downloadXlsx('szablon-planu-fitowa.xlsx', templateWorkbook(null))}>
             Pobierz pusty szablon
           </button>
         </p>
       )}
       {!initialRows && <p className="muted small">
-        Skopiuj zakres w Excelu albo Arkuszach Google (z nagłówkami) i wklej poniżej, albo wybierz plik CSV / XLSX. Kolumny: Tydzień, Dzień, Trening, Ćwiczenie, Serie, Powt., Ciężar, RPE, Przerwa, Uwagi — w dowolnej kolejności. Wystarczy też jedna kolumna z zapisem „Przysiad 4x6 @RPE8 100kg”.
+        Skopiuj zakres w Excelu albo Arkuszach Google (z nagłówkami) i wklej poniżej, albo wybierz plik CSV / XLSX. Kolumny: Tydzień, Dzień, Trening, Ćwiczenie, Serie, Powt., Ciężar, RPE, Przerwa, Uwagi, w dowolnej kolejności. Wystarczy też jedna kolumna z zapisem „Przysiad 4x6 @RPE8 100kg”.
       </p>}
       {initialRows ? (
         <p className="muted small">Źródło: {source}</p>
@@ -217,7 +217,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
                 Zmiany: <span className="pt-num">{merged.diff.changed}</span> zmienione · <span className="pt-num">{merged.diff.added}</span> dodane · <span className="pt-num">{merged.diff.removed}</span> usunięte
               </>
             ) : (
-              'Bez zmian — arkusz jest taki sam jak plan.'
+              'Bez zmian: arkusz jest taki sam jak plan.'
             )}
           </p>
           {merged.diff.lines.length > 0 && (
@@ -228,7 +228,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
               {merged.diff.lines.length > 40 && <li className="muted">i {merged.diff.lines.length - 40} więcej</li>}
             </ul>
           )}
-          {merged.diff.removed > 0 && <p className="warn-box small">Usunięte ćwiczenia znikną z planu (zapisane treningi zostają). Jeśli to pomyłka — popraw arkusz i wczytaj ponownie.</p>}
+          {merged.diff.removed > 0 && <p className="warn-box small">Usunięte ćwiczenia znikną z planu (zapisane treningi zostają). Jeśli to pomyłka, popraw arkusz i wczytaj ponownie.</p>}
           {result!.warnings.map((w) => (
             <p key={w} className="warn-box small pi-warn">
               {w}
@@ -308,7 +308,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
           </div>
           <label className="check pi-active">
             <input type="checkbox" checked={makeActive} onChange={(e) => setMakeActive(e.target.checked)} /> Ustaw jako aktywny
-            <span className="muted small">{makeActive ? ' — podopieczny zobaczy go jako swój plan po zapisaniu' : ' — zapisze się obok obecnego planu'}</span>
+            <span className="muted small">{makeActive ? ' (podopieczny zobaczy go jako swój plan)' : ' (zapisze się obok obecnego planu)'}</span>
           </label>
           <p className="pi-stats">
             <span className="pt-num">{result.stats.weeks}</span> {plural(result.stats.weeks, 'tydzień', 'tygodnie', 'tygodni')} · <span className="pt-num">{result.stats.workouts}</span> {plural(result.stats.workouts, 'jednostka', 'jednostki', 'jednostek')} · <span className="pt-num">{result.stats.exercises}</span> {plural(result.stats.exercises, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')}
@@ -320,7 +320,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
           ))}
           {firstWeek && (
             <div className="pi-preview">
-              <span className="eyebrow">{firstWeek.name} — podgląd</span>
+              <span className="eyebrow">{firstWeek.name}: podgląd</span>
               {firstWeek.workouts.slice(0, 4).map((k) => (
                 <div key={k.id} className="pi-wo">
                   <strong>{k.name}</strong>
@@ -341,7 +341,7 @@ export function PlanImport({ clientId, active, onClose, onDone, target, initialR
               ))}
             </div>
           )}
-          <p className="muted small">Plan otworzy się w edytorze — popraw go i zapisz. Nic nie zapisze się, dopóki nie klikniesz „Zapisz”.</p>
+          <p className="muted small">Plan otworzy się w edytorze. Nic się nie zapisze, dopóki nie klikniesz „Zapisz”.</p>
         </>
       )}
     </Modal>

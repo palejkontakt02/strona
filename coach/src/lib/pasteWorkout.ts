@@ -34,7 +34,7 @@ export function pastedWorkout(text: string, today: string): PastedWorkout | null
           name: k.name && !/^trening\s*\d*$/i.test(k.name) ? k.name : undefined,
           exercises: k.exercises.filter((e) => e.name.trim()).map((e) => ({ ...e, id: uid() })),
           skipped: [],
-          warnings: [...r.warnings.filter((w) => !/dni tygodnia/i.test(w)), ...(more > 0 ? [`W zakresie jest więcej treningów (${more + 1}) — wzięty pierwszy. Cały plan wczytasz przez „Import z arkusza”.`] : [])],
+          warnings: [...r.warnings.filter((w) => !/dni tygodnia/i.test(w)), ...(more > 0 ? [`W zakresie jest więcej treningów (${more + 1}) ; wzięty pierwszy. Cały plan wczytasz przez „Import z arkusza”.`] : [])],
           from: 'sheet',
         };
       }

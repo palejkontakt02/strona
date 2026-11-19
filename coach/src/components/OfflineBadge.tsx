@@ -21,8 +21,8 @@ export function OfflineBadge() {
       type="button"
       className={`offline-badge ${online ? '' : 'is-offline'}`}
       onClick={sendPending}
-      title={online ? 'Stuknij, by wysłać teraz' : 'Brak internetu — wyślę automatycznie, gdy wróci połączenie'}
-      aria-label={`Czeka na wysłanie (${pending})${online ? ' — wyślij teraz' : ' — brak internetu'}`}
+      title={online ? 'Stuknij, by wysłać teraz' : 'Brak internetu. Wyślę, gdy wróci połączenie'}
+      aria-label={`Czeka na wysłanie (${pending})${online ? '. Wyślij teraz' : ', brak internetu'}`}
     >
       <i aria-hidden="true" />
       Czeka na wysłanie ({pending})

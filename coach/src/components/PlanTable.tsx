@@ -325,7 +325,7 @@ function GridTable({
               <tr key={`${r.name}-block`} className="ptab-blockhead">
                 <th colSpan={2 + (noRest ? 0 : 1) + cols.length * span} scope="rowgroup">
                   <span className="ptab-blockhead-txt">
-                    <span className="ex-label">{bk}</span> {size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : `Obwód`} — {size} ćwiczenia na zmianę{roundRest ? ` · przerwa po rundzie ${roundRest}` : ''}
+                    <span className="ex-label">{bk}</span> {size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : `Obwód`}: {size} ćwiczenia na zmianę{roundRest ? ` · przerwa po rundzie ${roundRest}` : ''}
                   </span>
                 </th>
               </tr>
@@ -416,7 +416,7 @@ function GridTable({
           })}
         </tbody>
       </table>
-      {actuals?.some(Boolean) && <p className="muted small ptab-legend">Tygodnie z ✓: <b>pogrubione</b> — to, co zrobił podopieczny; wyszarzone — seria z planu niezrobiona. Pozostałe tygodnie — plan.</p>}
+      {actuals?.some(Boolean) && <p className="muted small ptab-legend">Tydzień z ✓: <b>pogrubione</b> zrobione, szare niezrobione.</p>}
     </div>
   );
 }

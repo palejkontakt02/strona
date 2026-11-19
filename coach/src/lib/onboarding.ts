@@ -52,11 +52,11 @@ export function inviteText(client: Pick<Client, 'name' | 'email'>, coach = 'Seba
   const hi = firstName(client.name) ? `Cześć ${firstName(client.name)}!` : 'Cześć!';
   const email = client.email?.trim().toLowerCase();
   return [
-    `${hi} Zapraszam Cię do aplikacji treningowej — znajdziesz w niej plan, treningi seria po serii, wizyty i kontakt ze mną.`,
+    `${hi} Zapraszam Cię do aplikacji treningowej. Znajdziesz w niej plan, treningi seria po serii, wizyty i kontakt ze mną.`,
     '',
     `1. Otwórz link: ${inviteLink(email)}`,
     email ? `2. Załóż konto na adres ${email} (ten, który mam w Twoim profilu) i potwierdź go linkiem z maila.` : '2. Załóż konto na swój adres e-mail i potwierdź go linkiem z maila.',
-    '3. Dodaj aplikację do ekranu telefonu: iPhone — Safari → Udostępnij → „Do ekranu początkowego”; Android — Chrome → menu ⋮ → „Dodaj do ekranu głównego”.',
+    '3. Dodaj aplikację do ekranu telefonu. iPhone: Safari → Udostępnij → „Do ekranu początkowego”. Android: Chrome → menu ⋮ → „Dodaj do ekranu głównego”.',
     '',
     `Do zobaczenia na treningu! ${coach}`,
   ].join('\n');
@@ -139,7 +139,7 @@ export function onboardingSteps(i: OnboardingInput): Step[] {
       id: 'contact',
       label: 'Dane kontaktowe',
       done: isEmail(c.email),
-      note: isEmail(c.email) ? [c.email!.trim(), phone].filter(Boolean).join(' · ') : c.email?.trim() ? 'popraw adres e-mail' : 'brak e-maila — bez niego nie połączy konta',
+      note: isEmail(c.email) ? [c.email!.trim(), phone].filter(Boolean).join(' · ') : c.email?.trim() ? 'popraw adres e-mail' : 'brak e-maila, bez niego nie połączy konta',
     },
     {
       id: 'invite',

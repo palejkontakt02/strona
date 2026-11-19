@@ -317,7 +317,7 @@ export function AthleteApp({
           <TrainerTop />
           <span className="row-inline">
             <OfflineBadge />
-            <button className="icon-btn ath-gear" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
+            <button className="icon-btn ath-gear" onClick={() => setLook(true)} aria-label="Ustawienia: powiadomienia i kolory">
               <Icon name="settings" size={20} />
             </button>
           </span>
@@ -326,7 +326,7 @@ export function AthleteApp({
         <div className="ath-preview">
           <span>Podgląd trybu zawodnika · {client.name}</span>
           <span className="row-inline">
-            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Ustawienia — powiadomienia i kolory">
+            <button className="btn btn-ghost btn-sm" onClick={() => setLook(true)} aria-label="Ustawienia: powiadomienia i kolory">
               <Icon name="settings" size={16} />
             </button>
             <button className="btn btn-ghost btn-sm" onClick={onExit}>
@@ -586,7 +586,7 @@ function TodayTab({
           <div>
             <b>Trener prowadzi teraz Twój trening</b>
             <span>
-              „{client.liveBy.name}” od {new Date(client.liveBy.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Trener zapisze go u siebie — nie zaczynaj go tutaj, bo powstaną dwa zapisy.
+              „{client.liveBy.name}” od {new Date(client.liveBy.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Trener zapisze go u siebie. Nie zaczynaj go tutaj, bo powstaną dwa zapisy.
             </span>
           </div>
         </div>
@@ -637,7 +637,7 @@ function TodayTab({
           <span className="eyebrow">W trakcie</span>
           <h2>{run.name}</h2>
           {run.workoutId && sessions.some((x) => x.planId === run.planId && x.workoutId === run.workoutId && x.date === run.date) && (
-            <p className="small warn-text">Ten trening jest już zapisany dziś (np. z trenerem). Jeśli to ten sam — porzuć ten, żeby nie było dwóch zapisów.</p>
+            <p className="small warn-text">Ten trening jest już zapisany dziś (np. z trenerem). Jeśli to ten sam, porzuć ten, żeby nie było dwóch zapisów.</p>
           )}
           {(() => {
             // trener zmienił ten trening w planie po rozpoczęciu (nazwa, ćwiczenia, kolejność) — rozpoczęty jest w starej wersji
@@ -723,7 +723,7 @@ function TodayTab({
             const soon = !due && plan ? nextDate(plan, nx, today) : undefined;
             return (
               <>
-                {ended && <p className="small muted">Plan {st?.endDate && st.ended ? `skończył się ${fmtDay(st.endDate)}` : 'jest przerobiony do końca'} — trener przygotuje kolejny blok. Do tego czasu robisz go od nowa.</p>}
+                {ended && <p className="small muted">Plan {st?.endDate && st.ended ? `skończył się ${fmtDay(st.endDate)}` : 'jest przerobiony do końca'}. Trener przygotuje kolejny blok, do tego czasu robisz go od nowa.</p>}
                 {/* termin w przyszłości mówi już nagłówek („Dziś” / „Następny trening: …”); tu tylko zaległy */}
                 {d && due === 'overdue' && (
                   <p className="small warn-text">{`Zaległy z ${fmtDay(d)}.${plan && nextDate(plan, nx, today) ? ` Najbliżej: ${dayWord(nextDate(plan, nx, today)!, today)}.` : ''}`}</p>
@@ -755,13 +755,13 @@ function TodayTab({
               <Icon name="cal" size={16} />
               <span>
                 <b>Wizyta z trenerem: {visitText}</b>
-                {loc ? ` · ${loc}` : ''}. Zrobicie ten trening razem — Start tylko, jeśli ćwiczysz sam(a).
+                {loc ? ` · ${loc}` : ''}. Robicie ten trening razem. Start tylko, jeśli ćwiczysz sam(a).
               </span>
             </p>
           )}
           {advice?.lighter && (
             <p className="small warn-text">
-              Samopoczucie {fx(readiness(ci)!, 1)}/5 — {advice.text}
+              Samopoczucie {fx(readiness(ci)!, 1)}/5. {advice.text}
             </p>
           )}
           <button className="btn btn-primary btn-lg" onClick={() => onStart(nx.workout.id)}>
@@ -789,10 +789,10 @@ function TodayTab({
         <section className="acard acard-hero">
           <span className="eyebrow">Trening własny</span>
           <h2>Zacznij trening</h2>
-          <p className="muted small">{extra?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name))) ? 'Dodawaj ćwiczenia w trakcie — trener zobaczy zapis.' : 'Plan od trenera jeszcze się przygotowuje. Dodawaj ćwiczenia w trakcie — trener zobaczy zapis.'}</p>
+          <p className="muted small">{extra?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name))) ? 'Dodawaj ćwiczenia w trakcie. Trener zobaczy zapis.' : 'Plan od trenera jeszcze się przygotowuje. Dodawaj ćwiczenia w trakcie, trener zobaczy zapis.'}</p>
           {advice?.lighter && (
             <p className="small warn-text">
-              Samopoczucie {fx(readiness(ci)!, 1)}/5 — {advice.text}
+              Samopoczucie {fx(readiness(ci)!, 1)}/5. {advice.text}
             </p>
           )}
           <button className="btn btn-primary btn-lg" onClick={onOwn}>
@@ -803,12 +803,12 @@ function TodayTab({
       {!run && !away && (nx || sessions[0]) && (
         <div className={`ath-quick ${nx && sessions[0] ? 'two' : ''}`}>
           {nx && (
-            <button className="btn btn-secondary own-btn" onClick={onOwn} title="Trening poza planem — dodajesz ćwiczenia w trakcie">
+            <button className="btn btn-secondary own-btn" onClick={onOwn} title="Trening poza planem: dodajesz ćwiczenia w trakcie">
               <Icon name="plus" size={18} /> Trening własny
             </button>
           )}
           {sessions[0] && (
-            <button className="btn btn-secondary repeat-btn" onClick={() => onRepeat(sessions[0])} title={`${sessions[0].workoutName || 'Trening'} z ${fmtDay(sessions[0].date)} — te same ćwiczenia, ciężary z ostatniego razu`}>
+            <button className="btn btn-secondary repeat-btn" onClick={() => onRepeat(sessions[0])} title={`${sessions[0].workoutName || 'Trening'} z ${fmtDay(sessions[0].date)}: te same ćwiczenia, ciężary z ostatniego razu`}>
               <Glyph name="repeat" size={18} /> Powtórz ostatni
             </button>
           )}
@@ -1070,7 +1070,7 @@ function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, p
     );
   }
   for (const k of extra?.weeks.flatMap((w) => w.workouts) ?? [])
-    if (k.date && k.exercises.some((e) => e.name) && extraState(k, extra!.id, sessions, today).state !== 'done') add(k.date, { kind: 'extra', text: `${k.name} — od trenera`, run: isRunWorkout(k) });
+    if (k.date && k.exercises.some((e) => e.name) && extraState(k, extra!.id, sessions, today).state !== 'done') add(k.date, { kind: 'extra', text: `${k.name} (od trenera)`, run: isRunWorkout(k) });
   for (const a of db.appointments.filter((x) => x.clientId === clientId && x.status === 'planned')) add(a.date, { kind: 'visit', text: `Wizyta z trenerem ${a.time}` });
   return out;
 }
@@ -1146,7 +1146,7 @@ function MonthCalendar({ done, today, planned }: { done: Map<string, string[]>; 
           {items.map((x, i) => (
             <li key={i} className={x.kind}>
               <Icon name={x.kind === 'visit' ? 'cal' : pick < today ? 'alert' : x.run ? 'run' : 'dumbbell'} size={15} /> {x.text}
-              {x.kind !== 'visit' && pick < today ? ' — zaległy' : ''}
+              {x.kind !== 'visit' && pick < today ? ', zaległy' : ''}
             </li>
           ))}
         </ul>
@@ -1166,7 +1166,7 @@ function BodyProgress({ client }: { client: Client }) {
   return (
     <section className="acard ath-body" aria-label="Pomiary">
       {!field || !vals.length ? (
-        <p className="muted small">Waga i obwody raz w tygodniu, rano na czczo — zobaczysz tu zmianę.</p>
+        <p className="muted small">Waga i obwody raz w tygodniu, rano na czczo.</p>
       ) : (
         <>
           <div className="body-kpis">
@@ -1196,7 +1196,7 @@ function BodyProgress({ client }: { client: Client }) {
                 <>
                   <p className="wt-summary">{weightTrendText(t)}</p>
                   <WeightTrendChart daily={t.daily} avg={t.avg} />
-                  <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie — patrz na średnią z 7 dni.</p>
+                  <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie. Patrz na średnią z 7 dni.</p>
                 </>
               );
             })()
@@ -1451,7 +1451,7 @@ function Workouts({
         )}
       </div>
       {plan && (
-        <button type="button" className="btn btn-ghost btn-sm ath-plan-xlsx" onClick={() => void downloadXlsx(xlsxName('plan', plan.name), planWorkbook(plan, undefined, sessions))} title="Plan do Excela: każdy trening z tygodniami obok siebie — plan i to, co już zrobiłeś">
+        <button type="button" className="btn btn-ghost btn-sm ath-plan-xlsx" onClick={() => void downloadXlsx(xlsxName('plan', plan.name), planWorkbook(plan, undefined, sessions))} title="Plan do Excela: każdy trening z tygodniami obok siebie, plan i to, co już zrobiłeś">
           <Icon name="download" size={16} /> Pobierz plan (Excel)
         </button>
       )}
@@ -1483,7 +1483,7 @@ function Workouts({
           {extraWorkouts.map((k) => (
             <div key={k.id}>
               {item(k, extra.id, false)}
-              {k.date && <span className={`muted small wo-due ${k.date < todayISO() ? 'warn-text' : ''}`}>{k.date < todayISO() ? `zaległy — był na ${fmtDay(k.date)}` : `na ${fmtDay(k.date)}`}</span>}
+              {k.date && <span className={`muted small wo-due ${k.date < todayISO() ? 'warn-text' : ''}`}>{k.date < todayISO() ? `zaległy, był na ${fmtDay(k.date)}` : `na ${fmtDay(k.date)}`}</span>}
             </div>
           ))}
         </div>
@@ -1523,7 +1523,7 @@ function MoveWorkoutSheet({ name, current, today, onClose, onPick }: { name: str
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
   return (
     <Sheet label={`Przenieś „${name}”`} onClose={onClose}>
-      <p className="muted small">Wybierz dzień, w którym zrobisz ten trening. Kolejne treningi z planu zostają na swoich dniach — trener zobaczy zmianę.</p>
+      <p className="muted small">Wybierz dzień na ten trening. Kolejne treningi zostają na swoich dniach.</p>
       <div className="move-days">
         {days.map((d) => (
           <button key={d} type="button" className={`btn btn-secondary move-day ${d === current ? 'is-current' : ''}`} disabled={d === current} onClick={() => onPick(d)}>

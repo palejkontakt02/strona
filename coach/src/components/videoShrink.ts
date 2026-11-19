@@ -21,7 +21,7 @@ export async function shrinkVideo(file: File, maxBytes: number, onProgress: (p: 
     if (!Number.isFinite(dur) || dur <= 0) return null;
     // budżet bitów na sekundę (zapas 8% na kontener i dźwięk), maks. 12 Mb/s
     const vbr = Math.min(12_000_000, Math.floor((maxBytes * 8 * 0.92) / dur) - 128_000);
-    if (vbr < 1_200_000) throw new Error(`film jest za długi (${Math.round(dur)} s) — przytnij go do samej serii`);
+    if (vbr < 1_200_000) throw new Error(`film jest za długi (${Math.round(dur)} s). Przytnij go do samej serii`);
     const scale = Math.min(1, 1920 / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round((video.videoWidth * scale) / 2) * 2;

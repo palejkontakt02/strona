@@ -423,7 +423,7 @@ export function planTableSheet(plan: Plan, client?: Pick<Client, 'name'>): XShee
   g.info(
     [...(client ? ([['Podopieczny', client.name]] as [string, string][]) : []), ...(plan.startDate ? ([['Start', dmy(plan.startDate)]] as [string, string][]) : [])],
     plan.name,
-    'Jak czytać: przy każdej serii KG, REP i RPE. KG (szare pole) — ciężar z planu, wpisz ten, który zrobiłeś; −10% = o 10% lżej niż seria główna; REP — wpisz powtórzenia; RPE — cel z planu (kursywą), wpisz, jak ciężka była seria 1–10 (10 = nie dało się więcej); — = brak tej serii.',
+    'Jak czytać: przy każdej serii KG, REP i RPE. KG (szare pole): ciężar z planu, wpisz ten, który zrobiłeś; −10% = o 10% lżej niż seria główna; REP: wpisz powtórzenia; RPE: cel z planu (kursywą), wpisz, jak ciężka była seria 1–10 (10 = nie dało się więcej); „—” = brak tej serii.',
   );
   for (const blocks of weeks) {
     // cały tydzień na jednej kartce, jeśli się mieści
@@ -480,7 +480,7 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
   if (plan.startDate) rows.push([cell('Start', { bold: true, align: 'left' }), cell(dmy(plan.startDate), { align: 'left' })]);
   {
     const r = rows.length;
-    merge(r, 0, r, noteCol, 'Jak czytać: każda tabela to jeden trening (np. poniedziałek), tygodnie obok siebie. Przy każdej serii KG | REP | RPE. Szara kursywa — plan; pogrubione — to, co zostało zrobione (tydzień z ✓). — = brak tej serii w danym tygodniu.', { align: 'left', valign: 'center', wrap: true, size: 9, italic: true, color: C.hint });
+    merge(r, 0, r, noteCol, 'Jak czytać: każda tabela to jeden trening (np. poniedziałek), tygodnie obok siebie. Przy każdej serii KG | REP | RPE. Szara kursywa: plan; pogrubione: zrobione (tydzień z ✓). „—” = brak tej serii w danym tygodniu.', { align: 'left', valign: 'center', wrap: true, size: 9, italic: true, color: C.hint });
     heights[r] = 26;
   }
   rows.push([]);
@@ -543,7 +543,7 @@ export function planCompareSheet(plan: Plan, client?: Pick<Client, 'name'>, sess
         if (bk && (ri === 0 || bKey(slot.rows[ri - 1]) !== bk)) {
           const size = slot.rows.filter((x) => bKey(x) === bk).length;
           const lastIn = [...slot.rows].reverse().find((x) => bKey(x) === bk);
-          merge(r, 0, r, noteCol, `${bk} · ${size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : 'Obwód'} — ${size} ćwiczenia na zmianę${lastIn?.rest ? ` · przerwa po rundzie ${mmss(lastIn.rest)}` : ''}`, st(C.note, { bold: true, size: 9, align: 'left', indent: 1, edge: { l: true, r: true, t: true } }));
+          merge(r, 0, r, noteCol, `${bk} · ${size === 2 ? 'Superseria' : size === 3 ? 'Triseria' : 'Obwód'}: ${size} ćwiczenia na zmianę${lastIn?.rest ? ` · przerwa po rundzie ${mmss(lastIn.rest)}` : ''}`, st(C.note, { bold: true, size: 9, align: 'left', indent: 1, edge: { l: true, r: true, t: true } }));
           heights[r] = 16;
           r++;
         }
@@ -622,7 +622,7 @@ export function planWorkbook(plan: Plan, client?: Pick<Client, 'name'>, sessions
   );
   return [
     planCompareSheet(plan, client, sessions),
-    { name: 'Do importu', rows: imp, header: true, noGrid: true, fitWidth: true, landscape: true, printTitleRows: '$1:$1', pageFooter: '&LArkusz do ponownego wczytania w aplikacji — nie zmieniaj nagłówków&RStrona &P z &N' },
+    { name: 'Do importu', rows: imp, header: true, noGrid: true, fitWidth: true, landscape: true, printTitleRows: '$1:$1', pageFooter: '&LArkusz do ponownego wczytania w aplikacji. Nie zmieniaj nagłówków&RStrona &P z &N' },
   ];
 }
 

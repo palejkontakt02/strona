@@ -98,7 +98,7 @@ function RefCommentSheet({ clientId, sessionId, exIndex, label, onClose }: { cli
             </button>
           </div>
         )}
-        <p className="muted small">{draft ? 'Trener obejrzy nagranie i odpowie w rozmowie — może wskazać konkretny moment filmu.' : 'Wiadomość trafi do rozmowy z trenerem z informacją, którego treningu dotyczy.'}</p>
+        <p className="muted small">{draft ? 'Trener obejrzy nagranie i odpowie w rozmowie.' : 'Wiadomość trafi do rozmowy z trenerem, z odnośnikiem do treningu.'}</p>
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || (!text.trim() && !draft)}>
           {busy ? 'Wysyłam…' : draft ? 'Wyślij do oceny' : 'Wyślij komentarz'}
         </button>
@@ -129,14 +129,14 @@ export function RefThread({ clientId, sessionId, side = 'coach' }: { clientId: s
   const submit = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
-    const ok = await send(text, { ref: target?.ref ?? { sessionId }, replyTo: target?.id, okMessage: 'Odpowiedź wysłana — podopieczny zobaczy ją w rozmowie.' });
+    const ok = await send(text, { ref: target?.ref ?? { sessionId }, replyTo: target?.id, okMessage: 'Wysłane.' });
     setBusy(false);
     if (ok) setText('');
   };
   const insertTime = () => {
     const v = wrap.current?.querySelector<HTMLVideoElement>('.chat-media-video video');
     if (!v) return;
-    const stamp = `${fmtClock(v.currentTime)} — `;
+    const stamp = `${fmtClock(v.currentTime)} `;
     setText((t) => (t && !t.endsWith('\n') ? `${t}\n${stamp}` : `${t}${stamp}`));
   };
   return (
@@ -145,7 +145,7 @@ export function RefThread({ clientId, sessionId, side = 'coach' }: { clientId: s
       <MiniThread client={client} msgs={msgs} coachView={coach}>
         {coach && target && (
           <div className="ref-reply">
-            <textarea className="input" rows={2} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={videoOf(target) ? 'Np. 0:07 — kolana do środka' : 'Odpowiedz…'} aria-label="Odpowiedź na komentarz" />
+            <textarea className="input" rows={2} maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder={videoOf(target) ? 'Np. 0:07 kolana do środka' : 'Odpowiedz…'} aria-label="Odpowiedź na komentarz" />
             <div className="ref-reply-actions">
               {videoOf(target) && (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={insertTime} title="Wstaw aktualny czas nagrania">

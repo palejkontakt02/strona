@@ -51,7 +51,7 @@ export function TrainerProfileSummary() {
       <TrainerAvatar profile={profile} size={44} />
       <div className="grow">
         <strong>{profile.name || (loaded ? 'Uzupełnij swój profil' : 'Wczytuję…')}</strong>
-        <div className="muted small">{[profile.phone, pricesLine(profile)].filter(Boolean).join(' · ') || 'Imię, zdjęcie, telefon, dane do przelewu i cennik — podopieczni widzą je w aplikacji.'}</div>
+        <div className="muted small">{[profile.phone, pricesLine(profile)].filter(Boolean).join(' · ') || 'Imię, zdjęcie, telefon, dane do przelewu i cennik.'}</div>
         {vac && vac.to >= todayISO() && (
           <div className="small warn-text">
             {onVacation(profile) ? 'Na urlopie' : 'Urlop'} {fmtDay(vac.from)} – {fmtDay(vac.to)}
@@ -151,7 +151,7 @@ export function TrainerProfileModal() {
       touched.current = true;
       setPhoto(r.ref);
     } catch (e) {
-      toast((e as Error).message === 'BUCKET' ? 'Brak koszyka plików — uruchom w Supabase sekcję 18 z hardening.sql.' : 'Nie udało się wgrać zdjęcia — sprawdź połączenie.');
+      toast((e as Error).message === 'BUCKET' ? 'Brak koszyka plików. Uruchom w Supabase sekcję 18 z hardening.sql.' : 'Nie udało się wgrać zdjęcia. Sprawdź połączenie.');
     }
     setBusy(false);
   };
@@ -175,7 +175,7 @@ export function TrainerProfileModal() {
       toast('Zapisano profil.');
       return;
     }
-    toast('Zapisano profil — podopieczni widzą zmiany w aplikacji.');
+    toast('Profil zapisany.');
     closeModal();
   };
 
@@ -270,8 +270,8 @@ export function TrainerProfileModal() {
       <p className="muted small">Podpowiada stawki przy dodawaniu nowego podopiecznego.</p>
       <div className="form-grid tp-prices">
         <Field label="Sesja (zł)">{inp('single', { inputMode: 'decimal' })}</Field>
-        <Field label="Pakiet – sesji">{inp('pkgN', { inputMode: 'numeric', placeholder: 'np. 10' })}</Field>
-        <Field label="Pakiet – cena (zł)">{inp('pkgPrice', { inputMode: 'decimal' })}</Field>
+        <Field label="Pakiet: liczba sesji">{inp('pkgN', { inputMode: 'numeric', placeholder: 'np. 10' })}</Field>
+        <Field label="Pakiet: cena (zł)">{inp('pkgPrice', { inputMode: 'decimal' })}</Field>
         <Field label="Abonament (zł / mies.)">{inp('sub', { inputMode: 'decimal' })}</Field>
       </div>
 
@@ -304,7 +304,7 @@ export function TrainerProfileModal() {
         <Field label="Od">{inp('vacFrom', { type: 'date' })}</Field>
         <Field label="Do">{inp('vacTo', { type: 'date', min: d.vacFrom || undefined })}</Field>
         <Field label="Automatyczna odpowiedź" wide hint={draft.vacation ? `Podopieczny dostanie: „${vacationReplyText(draft)}”` : undefined}>
-          <textarea className="input" rows={2} maxLength={500} value={d.vacMsg} onChange={(e) => set('vacMsg', e.target.value)} placeholder="np. Jestem na urlopie do 15.11 — odpiszę po powrocie. W pilnej sprawie: SMS." />
+          <textarea className="input" rows={2} maxLength={500} value={d.vacMsg} onChange={(e) => set('vacMsg', e.target.value)} placeholder="np. Jestem na urlopie do 15.11, odpiszę po powrocie. W pilnej sprawie: SMS." />
         </Field>
       </div>
       {(d.vacFrom || d.vacTo) && (

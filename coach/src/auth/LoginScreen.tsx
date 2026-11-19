@@ -9,8 +9,8 @@ const REDIRECT = () => `${location.origin}/app/`;
 function plError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes('invalid login')) return 'Nieprawidłowy e-mail lub hasło.';
-  if (m.includes('email not confirmed')) return 'Najpierw potwierdź adres e-mail — kliknij link w wiadomości, którą wysłaliśmy.';
-  if (m.includes('already registered') || m.includes('already been registered')) return 'Konto z tym adresem już istnieje — zaloguj się.';
+  if (m.includes('email not confirmed')) return 'Najpierw potwierdź adres e-mail linkiem z wiadomości, którą wysłaliśmy.';
+  if (m.includes('already registered') || m.includes('already been registered')) return 'Konto z tym adresem już istnieje. Zaloguj się.';
   if (m.includes('password should be') || m.includes('at least')) return 'Hasło musi mieć co najmniej 8 znaków.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.';
   if (m.includes('invalid email') || m.includes('unable to validate email')) return 'Sprawdź adres e-mail.';
@@ -67,7 +67,7 @@ export function LoginScreen() {
       )}
       {invited && mode === 'signup' && (
         <p className="auth-info auth-invite">
-          Zaproszenie od trenera. Załóż konto na adres <strong>{invited}</strong> — ten jest w Twoim profilu, więc od razu zobaczysz swój plan. Masz już konto? Stuknij „Logowanie”.
+          Zaproszenie od trenera. Załóż konto na adres <strong>{invited}</strong>, wtedy od razu zobaczysz swój plan. Masz już konto? Stuknij „Logowanie”.
         </p>
       )}
       <form

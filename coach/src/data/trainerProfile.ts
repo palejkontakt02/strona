@@ -135,7 +135,7 @@ export async function saveTrainerProfile(p: TrainerProfile): Promise<{ ok: boole
     return { ok: true };
   } catch (e) {
     if (prev) emit(prev);
-    return { ok: false, error: (e as Error).message === 'DB_OUTDATED_29' ? 'Profil nie zapisał się — uruchom w Supabase sekcję 29 z hardening.sql.' : 'Nie udało się zapisać profilu — sprawdź połączenie.' };
+    return { ok: false, error: (e as Error).message === 'DB_OUTDATED_29' ? 'Profil nie zapisał się. Uruchom w Supabase sekcję 29 z hardening.sql.' : 'Nie udało się zapisać profilu. Sprawdź połączenie.' };
   }
 }
 

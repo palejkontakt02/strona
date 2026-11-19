@@ -888,7 +888,7 @@ function DayAxis({
   if (!timed.length && off && !shared)
     return (
       <p className="muted small day-off">
-        Dzień wolny — poza godzinami pracy. Wizytę dodasz przyciskiem „+”.
+        Dzień wolny. Wizytę dodasz przyciskiem „+”.
       </p>
     );
   const range = shared ?? axisRange(timed, date, profile.workHours);
@@ -986,8 +986,8 @@ function AssignedTile({ x }: { x: Assigned }) {
       }
       title={
         x.fromPlan
-          ? "Trening z planu na ten dzień — kliknij, by zmienić plan"
-          : "Trening zadany poza planem — kliknij, by zmienić"
+          ? "Trening z planu na ten dzień. Kliknij, by zmienić plan"
+          : "Trening zadany poza planem. Kliknij, by zmienić"
       }
     >
       <span className="tile-time">

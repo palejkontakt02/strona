@@ -154,7 +154,7 @@ export function LineChart({
 /**
  * Waga: punkty dzienne (jasnoszare) i średnia krocząca 7 dni (gruba linia w kolorze tekstu) — lib/progress `weightTrend`.
  */
-export function WeightTrendChart({ daily, avg, height = 190, label = 'Waga — średnia 7 dni' }: { daily: Pt[]; avg: Pt[]; height?: number; label?: string }) {
+export function WeightTrendChart({ daily, avg, height = 190, label = 'Waga, średnia 7 dni' }: { daily: Pt[]; avg: Pt[]; height?: number; label?: string }) {
   const ok = (p: Pt) => /^\d{4}-\d{2}-\d{2}/.test(p.x) && Number.isFinite(p.y);
   const d = daily.filter(ok);
   const a = avg.filter(ok);

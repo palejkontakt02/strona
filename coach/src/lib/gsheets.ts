@@ -38,7 +38,7 @@ function loadGis(): Promise<Gis> {
     s.onload = () => (w.google?.accounts?.oauth2 ? resolve(w.google) : reject(new Error('Nie udało się wczytać logowania Google.')));
     s.onerror = () => {
       gisLoad = null;
-      reject(new Error('Brak połączenia z Google — sprawdź internet.'));
+      reject(new Error('Brak połączenia z Google. Sprawdź internet.'));
     };
     document.head.appendChild(s);
   });
@@ -58,7 +58,7 @@ async function accessToken(): Promise<string> {
         token = { value: r.access_token, until: Date.now() + Math.max(60, (r.expires_in ?? 3600) - 120) * 1000 };
         resolve(r.access_token);
       },
-      error_callback: (e) => reject(new Error(e?.type === 'popup_closed' ? 'Zamknięto okno logowania Google.' : e?.type === 'popup_failed_to_open' ? 'Przeglądarka zablokowała okno logowania Google — zezwól na wyskakujące okna.' : 'Logowanie Google nie powiodło się.')),
+      error_callback: (e) => reject(new Error(e?.type === 'popup_closed' ? 'Zamknięto okno logowania Google.' : e?.type === 'popup_failed_to_open' ? 'Przeglądarka zablokowała okno logowania Google. Zezwól na wyskakujące okna.' : 'Logowanie Google nie powiodło się.')),
     });
     client.requestAccessToken({ prompt: token ? '' : undefined });
   });
@@ -72,8 +72,8 @@ async function api<T>(url: string, init: RequestInit = {}, retry = true): Promis
     return api<T>(url, init, false);
   }
   if (!res.ok) {
-    if (res.status === 404) throw new Error('Arkusz nie istnieje albo został usunięty — odłącz go i utwórz nowy.');
-    if (res.status === 403) throw new Error('Brak dostępu do arkusza — aplikacja widzi tylko arkusze, które sama utworzyła (zaloguj się tym samym kontem Google).');
+    if (res.status === 404) throw new Error('Arkusz nie istnieje albo został usunięty. Odłącz go i utwórz nowy.');
+    if (res.status === 403) throw new Error('Brak dostępu do arkusza. Aplikacja widzi tylko arkusze, które sama utworzyła (zaloguj się tym samym kontem Google).');
     throw new Error(`Arkusze Google: błąd ${res.status}.`);
   }
   return (await res.json()) as T;
@@ -98,7 +98,7 @@ const SHEETS = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 /** Nowy arkusz z planem (wygląd: pogrubiony, zamrożony nagłówek, szerokości kolumn). Zwraca id pliku. */
 export async function createPlanSheet(plan: Plan, client?: string): Promise<string> {
-  const title = `${plan.name}${client ? ` — ${client}` : ''} (Fitowa)`;
+  const title = `${plan.name}${client ? ` · ${client}` : ''} (Fitowa)`;
   const made = await api<{ spreadsheetId: string; sheets: { properties: { sheetId: number } }[] }>(SHEETS, {
     method: 'POST',
     body: JSON.stringify({ properties: { title, locale: 'pl_PL' }, sheets: [{ properties: { title: SHEET_TAB, gridProperties: { frozenRowCount: 1 } } }] }),

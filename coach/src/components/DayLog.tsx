@@ -146,7 +146,7 @@ export function CoachTargets({ client }: { client: Client }) {
       if (n == null) return toast(`${label}: wpisz liczbę od 0 do ${max.toLocaleString('pl-PL')} ${unit}.`);
       if (n > 0) next[k] = n;
     }
-    if (await apply([put('clients', { ...client, targets: anyTarget(next) ? next : undefined })], anyTarget(next) ? 'Cele zapisane — podopieczny zobaczy je w karcie „Dziś”.' : 'Cele usunięte.')) setEdit(false);
+    if (await apply([put('clients', { ...client, targets: anyTarget(next) ? next : undefined })], anyTarget(next) ? 'Cele zapisane.' : 'Cele usunięte.')) setEdit(false);
   };
   const a = adherence(client.dayLog, client.targets, todayISO(), range);
   return (

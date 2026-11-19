@@ -20,7 +20,7 @@ export const ADMIN = {
   /** Jak długo trzymasz dane po zakończeniu współpracy (Twoja decyzja — wpisz konkretny okres). */
   retention: '[UZUPEŁNIJ: np. 3 lata]',
   /** Region bazy Supabase (Project Settings → General → Region), np. „UE (Frankfurt)”. */
-  hostingRegion: '[UZUPEŁNIJ: region serwera, np. UE — Frankfurt]',
+  hostingRegion: '[UZUPEŁNIJ: region serwera, np. UE, Frankfurt]',
 };
 
 /** Wersja klauzuli informacyjnej — zwiększ, gdy zmienisz jej treść (zapisuje się przy zgodzie). */
@@ -29,12 +29,12 @@ export const CLAUSE_VERSION = 2;
 export const CONSENT_TEXT: Record<ConsentKind, { title: string; short: string; needed: string }> = {
   health: {
     title: 'Dane o zdrowiu',
-    short: 'Urazy, choroby, ból, ankieta PAR-Q i samopoczucie — trener używa ich tylko do bezpiecznego planowania Twoich treningów.',
+    short: 'Urazy, choroby, ból, ankieta PAR-Q i samopoczucie. Trener używa ich tylko do bezpiecznego planowania Twoich treningów.',
     needed: 'Bez tej zgody nie wypełnisz ankiety zdrowotnej ani nie zapiszesz bólu i samopoczucia.',
   },
   media: {
     title: 'Zdjęcia sylwetki i nagrania techniki',
-    short: 'Zdjęcia postępów i filmy z serii — widzi je tylko Twój trener, do oceny techniki i postępów.',
+    short: 'Zdjęcia postępów i filmy z serii. Widzi je tylko Twój trener, do oceny techniki i postępów.',
     needed: 'Bez tej zgody zdjęcia i nagrania są wyłączone. Reszta aplikacji działa normalnie.',
   },
 };
@@ -141,7 +141,7 @@ export function exportData(db: Db, clientId: string, now = new Date()) {
     version: 1,
     exportedAt: now.toISOString(),
     administrator: { name: ADMIN.name, email: ADMIN.email },
-    note: 'Twoje dane z aplikacji Fitowa (art. 15 i 20 RODO). Zdjęcia, nagrania i pliki z ankiety są tu jako odnośniki — same pliki pobierzesz w aplikacji albo poprosisz o nie trenera.',
+    note: 'Twoje dane z aplikacji Fitowa (art. 15 i 20 RODO). Zdjęcia, nagrania i pliki z ankiety są tu jako odnośniki; same pliki pobierzesz w aplikacji albo poprosisz o nie trenera.',
     profile: client,
     plans,
     sessions,

@@ -44,7 +44,7 @@ describe('nutritionOcr', () => {
     expect(r.carbs).toBeUndefined();
     expect(r.protein).toBe(120);
     expect(r.confidence).toBe('low');
-    expect(r.note).toMatch(/sprawdź/);
+    expect(r.note).toMatch(/sprawdź/i);
   });
 
   it('macro over 1000 g is rejected (range from the brief)', () => {
@@ -80,7 +80,7 @@ describe('nutritionOcr', () => {
 
   it('error messages in Polish', () => {
     expect(ocrErrorMessage(503, { error: 'Odczyt AI nie jest skonfigurowany.' })).toBe('Odczyt AI nie jest skonfigurowany.');
-    expect(ocrErrorMessage(404, null)).toMatch(/nie jest jeszcze włączony/);
+    expect(ocrErrorMessage(404, null)).toMatch(/nie jest włączony/);
     expect(ocrErrorMessage(429, {})).toMatch(/limit/);
     expect(ocrErrorMessage(500, 'x')).toMatch(/ręcznie/);
   });

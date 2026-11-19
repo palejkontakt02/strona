@@ -102,7 +102,7 @@ export function History({ clientId, onEdit, onRepeat, onTrainer, onUndo, canUndo
     <section className="acard">
       <h3>Historia treningów</h3>
       {sessions.length === 0 ? (
-        <p className="muted small">Tu pojawią się Twoje treningi — zarówno te z trenerem, jak i zrobione samodzielnie.</p>
+        <p className="muted small">Tu pojawią się Twoje treningi: z trenerem i samodzielne.</p>
       ) : (
         <ul className="hist-list">
           {sessions.slice(0, limit).map((s) => (
@@ -190,7 +190,7 @@ export function SessionSheet({
             {s.repeatOf && <p className="muted small">Powtórka treningu z {fmtDay(s.repeatOf.date)}</p>}
           </div>
           <span className="actions">
-            <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('trening', s.workoutName, s.date), sessionWorkbook(s))} title="Ten trening do Excela — seria po serii">
+            <button className="btn btn-ghost btn-sm" onClick={() => void downloadXlsx(xlsxName('trening', s.workoutName, s.date), sessionWorkbook(s))} title="Ten trening do Excela, seria po serii">
               <Icon name="download" size={16} /> Excel
             </button>
             <button className="btn btn-primary btn-sm" onClick={onClose}>

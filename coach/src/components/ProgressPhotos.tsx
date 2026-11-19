@@ -113,7 +113,7 @@ export async function uploadPoses(client: Client, files: PoseFiles, date: string
       if (!(await save(client.id, 'progressPhotos', ph))) return null;
       ids.push(ph.id);
     } catch (e) {
-      toast(e instanceof Error && e.message === 'BUCKET' ? 'Magazyn plików nie jest jeszcze włączony — trener musi go dodać w Supabase.' : 'Nie udało się wysłać zdjęcia — sprawdź połączenie.');
+      toast(e instanceof Error && e.message === 'BUCKET' ? 'Magazyn plików nie jest włączony. Trener musi go dodać w Supabase.' : 'Nie udało się wysłać zdjęcia. Sprawdź połączenie.');
       return null;
     }
   }
@@ -245,7 +245,7 @@ export function AthletePhotos({ client }: { client: Client }) {
           + Dodaj zdjęcia
         </button>
       </div>
-      <p className="muted small">{last ? `Ostatnie: ${fmtDay(last)} · ${visible.length} ${plural(visible.length, 'zdjęcie', 'zdjęcia', 'zdjęć')}` : 'Raz na 2–4 tygodnie: przód, bok, tył. Zmiany w lustrze widać słabo — na zdjęciach obok siebie dużo lepiej.'}</p>
+      <p className="muted small">{last ? `Ostatnie: ${fmtDay(last)} · ${visible.length} ${plural(visible.length, 'zdjęcie', 'zdjęcia', 'zdjęć')}` : 'Raz na 2–4 tygodnie: przód, bok, tył.'}</p>
       {new Set(visible.map((p) => p.date)).size >= 2 && (
         <button className="btn btn-ghost btn-block" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? 'Zwiń porównanie' : 'Porównaj dwie daty'}
@@ -265,7 +265,7 @@ export function CoachPhotos({ client }: { client: Client }) {
   const [all, setAll] = useState(false);
   if (!photos.length) return <p className="empty">Podopieczny nie dodał jeszcze zdjęć sylwetki (dodaje je w aplikacji albo w raporcie tygodniowym).</p>;
   const toggle = (p: ProgressPhoto) =>
-    apply([put('clients', { ...client, progressPhotos: (client.progressPhotos ?? []).map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x)) })], p.hidden ? 'Zdjęcie znowu widoczne.' : 'Zdjęcie ukryte — podopieczny go nie zobaczy.');
+    apply([put('clients', { ...client, progressPhotos: (client.progressPhotos ?? []).map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x)) })], p.hidden ? 'Zdjęcie znowu widoczne.' : 'Zdjęcie ukryte przed podopiecznym.');
   return (
     <>
       {new Set(photos.map((p) => p.date)).size >= 2 && <PhotoCompare client={client} coach />}

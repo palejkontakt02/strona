@@ -78,7 +78,7 @@ export function useVoiceRecorder(onDone: (clip: VoiceClip) => void, onError: (ms
       cleanup();
       setState('idle');
       const err = e as Error;
-      onError(err.name === 'NotAllowedError' ? 'Brak zgody na mikrofon — zezwól w ustawieniach przeglądarki.' : `Nie udało się włączyć mikrofonu (${err.message}).`);
+      onError(err.name === 'NotAllowedError' ? 'Brak zgody na mikrofon. Zezwól w ustawieniach przeglądarki.' : `Nie udało się włączyć mikrofonu (${err.message}).`);
     }
   };
   const stop = () => {

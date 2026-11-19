@@ -68,7 +68,7 @@ export function ClientPayments({ client }: { client: Client }) {
               {club?.clubRate ? `${pln(club.clubRate)} za trening` : 'stawkę za trening'}.
             </p>
             <p className="muted small">
-              {club ? `W tym miesiącu: ${n} ${plural(n, 'trening', 'treningi', 'treningów')} = ${pln(n * (club.clubRate ?? 0))} od klubu.` : 'Wybierz klub w Profilu (Miejsce treningów).'} Rozliczenia z klubem: Płatności → Od klubów.
+              {club ? `W tym miesiącu: ${n} ${plural(n, 'trening', 'treningi', 'treningów')} = ${pln(n * (club.clubRate ?? 0))} od klubu.` : 'Wybierz klub w Profilu (Miejsce treningów).'} Rozliczenia z klubem: Płatności, zakładka Od klubów.
             </p>
           </Card>
         );

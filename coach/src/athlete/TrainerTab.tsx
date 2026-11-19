@@ -72,7 +72,7 @@ export function Visits({ client, preview }: { client: Client; preview?: boolean 
   const locName = (a: Appointment) => db.locations.find((l) => l.id === a.locationId)?.name ?? a.location;
   const confirm = async (a: Appointment) => {
     setBusy(a.id);
-    if (await respondAppointment(a.id, 'confirm')) toast(preview ? 'Potwierdzono (podgląd).' : 'Potwierdzone — trener dostał informację.');
+    if (await respondAppointment(a.id, 'confirm')) toast(preview ? 'Potwierdzono (podgląd).' : 'Potwierdzone. Trener wie.');
     setBusy(null);
   };
   return (
@@ -163,7 +163,7 @@ function CancelSheet({ a, preview, onClose }: { a: Appointment; preview?: boolea
     const ok = await respondAppointment(a.id, 'cancel', reason);
     setBusy(false);
     if (ok) {
-      toast(preview ? 'Wizyta odwołana (podgląd).' : 'Wizyta odwołana — trener dostał informację.');
+      toast(preview ? 'Wizyta odwołana (podgląd).' : 'Wizyta odwołana. Trener wie.');
       onClose();
     }
   };
@@ -182,11 +182,11 @@ function CancelSheet({ a, preview, onClose }: { a: Appointment; preview?: boolea
         <div className="visit-warn" role="alert">
           <Icon name="alert" size={18} />
           <p>
-            Do wizyty {h < 1 ? 'zostało mniej niż godzinę' : `zostało ok. ${h} h`} — to mniej niż {CANCEL_HOURS} h. Przy późnym odwołaniu trening może przepaść (zostać pobrany z pakietu). Trener zdecyduje.
+            Do wizyty {h < 1 ? 'zostało mniej niż godzinę' : `zostało ok. ${h} h`}, mniej niż {CANCEL_HOURS} h. Późno odwołany trening może zejść z pakietu. Zdecyduje trener.
           </p>
         </div>
       ) : (
-        <p className="muted small">Odwołanie co najmniej {CANCEL_HOURS} h przed wizytą — trening nie przepada.</p>
+        <p className="muted small">Odwołanie min. {CANCEL_HOURS} h przed wizytą: trening nie przepada.</p>
       )}
       <label className="field">
         <span className="small">Powód (trener go zobaczy)</span>

@@ -287,12 +287,12 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
     if (item.kind === 'report' && report) {
       // odpowiedź na raport = komentarz trenera pod raportem
       next = { ...next, weeklyReports: (next.weeklyReports ?? []).map((r) => (r.id === report.id ? { ...r, coachNote: body } : r)) };
-      msg = `Komentarz do raportu zapisany — ${first} zobaczy go w aplikacji.`;
+      msg = 'Komentarz zapisany.';
     } else {
       const ref = note?.ref ?? (session ? refFor(session) : undefined);
       const r: CoachReply = { id: uid(), at: new Date().toISOString(), text: body, ...(ref && Object.keys(ref).length ? { ref } : {}), ...(note ? { replyTo: note.id } : {}) };
       next = { ...next, inbox: (next.inbox ?? []).map((n) => ({ ...n, read: true })), replies: [...(next.replies ?? []), r].slice(-200) };
-      msg = `Wysłano — ${first} zobaczy wiadomość w aplikacji.`;
+      msg = 'Wysłane.';
     }
     const ok = await apply([put('clients', next), ...sessionChange()], msg);
     setBusy(false);
@@ -400,8 +400,8 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
         </div>
         <div className="review-charts">
           <figure>
-            <figcaption className="muted small">Waga — 8 tygodni</figcaption>
-            <LineChart series={[{ label: 'Waga', pts: ctx.weight }]} height={150} label={`Waga ${c.name} — 8 tygodni`} />
+            <figcaption className="muted small">Waga, 8 tygodni</figcaption>
+            <LineChart series={[{ label: 'Waga', pts: ctx.weight }]} height={150} label={`Waga ${c.name}, 8 tygodni`} />
           </figure>
           <figure>
             <figcaption className="muted small">Sen i energia (1–5)</figcaption>
@@ -412,12 +412,12 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
               ]}
               height={150}
               minY={1}
-              label={`Sen i energia ${c.name} — 8 tygodni`}
+              label={`Sen i energia ${c.name}, 8 tygodni`}
             />
           </figure>
           <figure>
-            <figcaption className="muted small">Objętość — serie robocze / tydzień</figcaption>
-            <BarChart pts={ctx.volume} height={150} label={`Serie robocze ${c.name} — 8 tygodni`} />
+            <figcaption className="muted small">Objętość: serie robocze / tydzień</figcaption>
+            <BarChart pts={ctx.volume} height={150} label={`Serie robocze ${c.name}, 8 tygodni`} />
           </figure>
         </div>
 

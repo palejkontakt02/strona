@@ -14,8 +14,8 @@ describe('sessionBadges', () => {
   });
   it('przerwany: poziom i najmocniejsze miejsce', () => {
     const s = sess({ stoppedForPain: { level: 7, spots: [{ area: 'odcinek lędźwiowy', level: 4 }, { area: 'kolano', side: 'P', level: 7 }] } });
-    expect(stoppedLabel(s)).toBe('przerwany — ból 7/10 · kolano P');
-    expect(stoppedLabel(sess({ stoppedForPain: { level: 5 } }))).toBe('przerwany — ból 5/10');
+    expect(stoppedLabel(s)).toBe('przerwany, ból 7/10 · kolano P');
+    expect(stoppedLabel(sess({ stoppedForPain: { level: 5 } }))).toBe('przerwany, ból 5/10');
     expect(stoppedLabel(sess({}))).toBeNull();
   });
   it('serie jednolicie: L/P, na stronę, na czas', () => {

@@ -52,7 +52,7 @@ export function ClientOverview({ client }: { client: Client }) {
       <div className="report-row">
         <button
           className="btn btn-ghost btn-sm"
-          title="Raport treningowy do druku / PDF — np. dla lekarza lub fizjoterapeuty"
+          title="Raport treningowy do druku / PDF, np. dla lekarza lub fizjoterapeuty"
           onClick={() => printReport(client, sessions, { plan: currentPlan(plansOf(db, client.id)) })}
         >
           <Icon name="print" size={16} /> Raport dla lekarza / fizjo
@@ -62,7 +62,7 @@ export function ClientOverview({ client }: { client: Client }) {
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
           label="ACWR"
-          hint="Obciążenie z ostatnich 7 dni względem średniej z 4 tygodni (obciążenie = RPE treningu × minuty). 0,8–1,3 — bezpiecznie, powyżej 1,5 — za szybki wzrost."
+          hint="Obciążenie z ostatnich 7 dni względem średniej z 4 tygodni (obciążenie = RPE treningu × minuty). 0,8–1,3: bezpiecznie, powyżej 1,5: za szybki wzrost."
           value={st.acwr != null ? fx(st.acwr, 2) : '—'}
           sub={zone.label}
           tone={zone.level === 'red' ? 'danger' : zone.level === 'yellow' ? 'warn' : zone.level === 'green' ? 'ok' : undefined}
@@ -167,7 +167,7 @@ export function ClientOverview({ client }: { client: Client }) {
                       {client.notes && <p className="small pre">{client.notes}</p>}
                     </>
                   ) : (
-                    <p className="small muted">Brak — dane zawodnika (Profil).</p>
+                    <p className="small muted">Brak. Uzupełnij w Profilu.</p>
                   )}
                 </section>
               </div>

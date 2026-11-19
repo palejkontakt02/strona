@@ -277,7 +277,7 @@ export function LiveSession({
               <span className="eyebrow">{client.name.split(' ')[0]} trenuje teraz u siebie</span>
               <h2>{client.athleteLive.name}</h2>
               <p className="muted small">
-                Rozpoczęty na telefonie podopiecznego o {new Date(client.athleteLive.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Jeśli poprowadzisz trening tutaj, powstaną dwa zapisy — poproś, żeby zakończył albo anulował go u siebie.
+                Rozpoczęty na telefonie podopiecznego o {new Date(client.athleteLive.at).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}. Jeśli poprowadzisz trening tutaj, powstaną dwa zapisy. Poproś, żeby zakończył albo anulował go u siebie.
               </p>
             </section>
           )}
@@ -291,7 +291,7 @@ export function LiveSession({
                 <section key={pid} className="acard">
                   <span className="eyebrow">W parze: {pc.name.split(' ')[0]}</span>
                   <h3>Ten sam trening: {pr.name}</h3>
-                  <p className="muted small">{nEx(pr.ex.length)} — ciężary dobrane z własnej historii ({client.name.split(' ')[0]}).</p>
+                  <p className="muted small">{nEx(pr.ex.length)}, ciężary z własnej historii ({client.name.split(' ')[0]}).</p>
                   <button
                     className="btn btn-secondary btn-lg"
                     onClick={() => {
@@ -299,7 +299,7 @@ export function LiveSession({
                       window.scrollTo(0, 0);
                     }}
                   >
-                    <Icon name="play" /> Start — ten sam co {pc.name.split(' ')[0]}
+                    <Icon name="play" /> Start: ten sam co {pc.name.split(' ')[0]}
                   </button>
                 </section>
               );
@@ -340,7 +340,7 @@ export function LiveSession({
                   {w.workouts.map((k) => (
                     <button key={k.id} className={`wo-item ${nx?.workout.id === k.id ? 'next' : ''} ${inPass.has(k.id) && nx?.workout.id !== k.id ? 'done' : ''}`} disabled={!k.exercises.length} onClick={async () => {
                       // spoza kolejki — plan pójdzie dalej od wybranego (pominie jednostki pomiędzy); pytamy jak u podopiecznego
-                      if (nx && plan.active && k.id !== nx.workout.id && !savedSameDay(db, clientId, plan.id, k.id, todayISO()) && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). ${inPass.has(k.id) ? 'Ten trening jest już zrobiony w tym przejściu planu — powtórka nie przesunie planu' : 'Po zapisie plan pójdzie dalej od wybranego'}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
+                      if (nx && plan.active && k.id !== nx.workout.id && !savedSameDay(db, clientId, plan.id, k.id, todayISO()) && !(await ask(`To nie jest następny trening z planu (następny: ${nx.workout.name}, ${nx.week.name}). ${inPass.has(k.id) ? 'Ten trening jest już zrobiony w tym przejściu planu. Powtórka nie przesunie planu' : 'Po zapisie plan pójdzie dalej od wybranego'}. Zacząć mimo to?`, { confirm: 'Zacznij ten', danger: false }))) return;
                       start(k.id);
                     }}>
                       <span className="wo-st">{nx?.workout.id === k.id ? <Icon name="play" size={14} /> : inPass.has(k.id) ? <Icon name="check" size={16} /> : ''}</span>
@@ -477,7 +477,7 @@ export function PairLive({ people: initial, onExit }: { people: { clientId: stri
         <button
           className="btn btn-ghost btn-sm"
           onClick={async () => {
-            if (left.length && left.some((id) => progress(id)?.d) && !(await ask('Wyjść do panelu? Treningi w toku zostaną — wrócisz do nich z paska „W toku”.', { confirm: 'Wyjdź', danger: false }))) return;
+            if (left.length && left.some((id) => progress(id)?.d) && !(await ask('Wyjść do panelu? Treningi w toku zostaną na pasku „W toku”.', { confirm: 'Wyjdź', danger: false }))) return;
             onExit();
           }}
         >

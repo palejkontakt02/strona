@@ -47,7 +47,7 @@ export function absenceProblem(from: string, to: string, today: ISODate): string
   const re = /^\d{4}-\d{2}-\d{2}$/;
   if (!re.test(from) || !re.test(to)) return 'Wybierz daty od i do.';
   if (to < from) return 'Data „do” jest przed datą „od”.';
-  if (to < today) return 'Ta nieobecność już minęła — wybierz dzisiejszą albo przyszłą datę „do”.';
+  if (to < today) return 'Ta nieobecność już minęła. Wybierz dzisiejszą albo przyszłą datę „do”.';
   if (from < addDays(today, -60)) return 'Data „od” najwyżej 60 dni wstecz.';
   if (daysBetween(from, to) > 365) return 'Najwyżej rok naraz.';
   return null;
@@ -68,20 +68,20 @@ export function returnWord(a: Absence, today: ISODate): string {
 /** Tekst wiadomości do trenera: „Nieobecność: urlop 01.11–07.11 — notatka”. */
 export function absenceMessage(a: Absence): string {
   const range = a.from === a.to ? dm(a.from) : `${dm(a.from)}–${dm(a.to)}`;
-  return `Nieobecność: ${reasonLabel(a.reason).toLowerCase()} ${range}${a.note?.trim() ? ` — ${a.note.trim()}` : ''}`;
+  return `Nieobecność: ${reasonLabel(a.reason).toLowerCase()} ${range}${a.note?.trim() ? ` (${a.note.trim()})` : ''}`;
 }
 
 /** Wiadomość do trenera po skróceniu („Wracam wcześniej”). */
 export function returnMessage(a: Absence, today: ISODate): string {
-  return `Wracam wcześniej — ${reasonLabel(a.reason).toLowerCase()} skończony(-a) ${dm(addDays(today, -1))} (było do ${dm(a.to)}). Od dziś trenuję.`;
+  return `Wracam wcześniej: ${reasonLabel(a.reason).toLowerCase()} skończony(-a) ${dm(addDays(today, -1))} (było do ${dm(a.to)}). Od dziś trenuję.`;
 }
 
 /** Karta na Dziś w czasie nieobecności: tytuł i podtytuł. */
 export function absenceCard(a: Absence, today: ISODate): { title: string; text: string } {
   const back = returnWord(a, today);
   const title = `${reasonLabel(a.reason)} do ${dm(a.to)}`;
-  const rest = a.reason === 'choroba' ? 'wracaj do zdrowia' : a.reason === 'kontuzja' ? 'oszczędzaj się' : 'odpocznij';
-  return { title, text: `${title} — ${rest}. Wracasz ${back}.` };
+  const rest = a.reason === 'choroba' ? 'Wracaj do zdrowia' : a.reason === 'kontuzja' ? 'Oszczędzaj się' : 'Odpocznij';
+  return { title, text: `${title}. ${rest}. Wracasz ${back}.` };
 }
 
 /** „Wracam wcześniej”: nieobecność kończy się wczoraj (start dziś → odwołana: to < from). */

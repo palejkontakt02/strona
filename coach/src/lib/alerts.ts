@@ -22,11 +22,11 @@ const fmtD = (iso: ISODate) =>
 export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO(), extra: Alert[] = []): Alert[] {
   const a: Alert[] = [...extra];
   const st = loadStats(sessions, today);
-  if (st.acwr != null && st.acwr > 1.5) a.push({ level: 'red', text: `ACWR ${fx(st.acwr, 2)} – gwałtowny wzrost obciążeń` });
+  if (st.acwr != null && st.acwr > 1.5) a.push({ level: 'red', text: `ACWR ${fx(st.acwr, 2)}: gwałtowny wzrost obciążeń` });
   else if (st.acwr != null && st.acwr > 1.3)
-    a.push({ level: 'yellow', text: `ACWR ${fx(st.acwr, 2)} – obciążenie rośnie szybko` });
+    a.push({ level: 'yellow', text: `ACWR ${fx(st.acwr, 2)}: obciążenie rośnie szybko` });
   if (st.monotony != null && st.monotony > 2)
-    a.push({ level: 'yellow', text: `Monotonia ${fx(st.monotony, 1)} – mało zróżnicowane obciążenia` });
+    a.push({ level: 'yellow', text: `Monotonia ${fx(st.monotony, 1)}: mało zróżnicowane obciążenia` });
   const km = kmSpike(sessions, today);
   if (km) a.push({ level: km.level, text: `Kilometraż +${Math.round(km.pct * 100)}% (${Math.round(km.from)} → ${Math.round(km.to)} km)` });
 
@@ -52,7 +52,7 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
     const prev = ci.slice(1, 8).map((c) => wellnessTotal(c)!);
     const avg = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
     if (v <= 12) a.push({ level: 'red', text: `Samopoczucie ${v}/25 (check-in ${fmtD(lastCi.date)})` });
-    else if (avg && v < avg * 0.8) a.push({ level: 'yellow', text: `Samopoczucie spadło do ${v}/25 (zwykle ${Math.round(avg)}) — check-in ${fmtD(lastCi.date)}` });
+    else if (avg && v < avg * 0.8) a.push({ level: 'yellow', text: `Samopoczucie spadło do ${v}/25 (zwykle ${Math.round(avg)}), check-in ${fmtD(lastCi.date)}` });
   }
 
   // najwyższy ból z 7 dni (dzień bez bólu po treningu z bólem 7/10 nie gasi sygnału), inaczej ostatni zapisany
@@ -63,7 +63,7 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
   if (stop) {
     const sp = stop.stoppedForPain!;
     const where = (sp.spots ?? []).map((p) => (p.side ? `${p.area} ${p.side}` : p.area)).join(', ');
-    a.push({ level: sp.level >= 6 ? 'red' : 'yellow', text: `Przerwany trening z bólem ${sp.level}/10${where ? ` (${where})` : ''}${sp.exName ? ` — ${sp.exName}` : ''}, ${fmtD(stop.date)}` });
+    a.push({ level: sp.level >= 6 ? 'red' : 'yellow', text: `Przerwany trening z bólem ${sp.level}/10${where ? ` (${where})` : ''}${sp.exName ? `, ${sp.exName}` : ''}, ${fmtD(stop.date)}` });
   }
   if (lp && lp.pain! >= 4 && lp !== stop)
     a.push({ level: lp.pain! >= 6 ? 'red' : 'yellow', text: `Ból ${lp.pain}/10 na treningu ${fmtD(lp.date)}` });

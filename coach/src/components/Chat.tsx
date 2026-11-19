@@ -88,7 +88,7 @@ export function useMediaUrl(m: MsgMedia | undefined): { src: string | null; err:
 export function MediaItem({ m, videoRef }: { m: MsgMedia; videoRef?: (el: HTMLVideoElement | null) => void }) {
   const { src, err } = useMediaUrl(m);
   const [big, setBig] = useState(false);
-  if (err) return <p className="chat-media-err small">{mediaLabel(m.kind)} — nie da się wczytać ({err})</p>;
+  if (err) return <p className="chat-media-err small">{mediaLabel(m.kind)}: nie da się wczytać ({err})</p>;
   if (m.kind === 'audio') return <VoicePlayer src={src} dur={m.dur} />;
   if (!src) return <div className={`chat-media chat-media-${m.kind} loading`} aria-label={`Wczytywanie: ${mediaLabel(m.kind).toLowerCase()}`} />;
   if (m.kind === 'video')
@@ -253,7 +253,6 @@ export function DraftPreview({ d, onRemove }: { d: Draft; onRemove: () => void }
 /** Wysyła wiadomość: jako trener (odpowiedź w `replies`) albo jako podopieczny (funkcja w bazie + e-mail). */
 export function useSendMessage(client: Client, asCoach: boolean) {
   const { apply, toast, sendClientMessage } = useStore();
-  const first = client.name.split(' ')[0];
   return async (text: string, opts: { draft?: Draft | null; ref?: MsgRef; replyTo?: string; okMessage?: string } = {}): Promise<boolean> => {
     let body = text.trim().slice(0, 2000);
     let media: MsgMedia[] | undefined;
@@ -272,7 +271,7 @@ export function useSendMessage(client: Client, asCoach: boolean) {
     if (asCoach) {
       const r: CoachReply = { id: uid(), at: new Date().toISOString(), text: body, ...(ref ? { ref } : {}), ...(media ? { media } : {}), ...(textAuto ? { textAuto } : {}), ...(opts.replyTo ? { replyTo: opts.replyTo } : {}) };
       const inbox = (client.inbox ?? []).map((n) => ({ ...n, read: true }));
-      return apply([put('clients', { ...client, inbox, replies: [...(client.replies ?? []), r].slice(-200) })], opts.okMessage ?? `Wysłano — ${first} zobaczy wiadomość w aplikacji.`);
+      return apply([put('clients', { ...client, inbox, replies: [...(client.replies ?? []), r].slice(-200) })], opts.okMessage ?? 'Wysłane.');
     }
     return sendClientMessage(client.id, body, { ...(ref ? { ref, sessionId: ref.sessionId } : {}), ...(media ? { media } : {}), ...(textAuto ? { textAuto } : {}) });
   };
@@ -399,7 +398,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
       draft,
       ref: reply?.ref,
       replyTo: writeAsCoach && reply ? (replyVideo ?? reply.id) : undefined,
-      okMessage: coachView ? 'Odpowiedź wysłana — podopieczny zobaczy ją w aplikacji.' : undefined,
+      okMessage: coachView ? 'Wysłane.' : undefined,
     });
     if (ok) {
       setText('');
@@ -433,7 +432,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
   const insertTime = () => {
     const v = reply && videos.current.get(reply.id);
     if (!v) return;
-    const stamp = `${fmtClock(v.currentTime)} — `;
+    const stamp = `${fmtClock(v.currentTime)} `;
     setText((t) => (t && !t.endsWith('\n') ? `${t}\n${stamp}` : `${t}${stamp}`));
     areaRef.current?.focus();
   };
@@ -465,7 +464,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
       <div className="chat-log" ref={logRef} role="log" aria-label={coachView ? `Rozmowa z ${first}` : 'Rozmowa z trenerem'} tabIndex={0}>
         {thread.length === 0 ? (
           <p className="chat-empty muted small">
-            {coachView ? `Brak wiadomości. Napisz do ${first} — zobaczy wiadomość w swojej aplikacji.` : asTrainer ? `To podgląd — piszesz jako trener. ${first} zobaczy wiadomość w swojej aplikacji.` : 'Jak się czujesz, co bolało, pytanie o ćwiczenie — trener dostanie wiadomość także na e-mail. Możesz dołączyć zdjęcie, film albo nagrać wiadomość głosową.'}
+            {coachView ? `Brak wiadomości. ${first} zobaczy je w swojej aplikacji.` : asTrainer ? `Podgląd: piszesz jako trener. ${first} zobaczy wiadomość w swojej aplikacji.` : 'Jak się czujesz, co bolało, pytanie o ćwiczenie. Trener dostanie też e-mail. Możesz dołączyć zdjęcie, film albo głosówkę.'}
           </p>
         ) : (
           byDay(thread).map((g) => (
@@ -496,17 +495,17 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
                         ))}
                         {!m.textAuto && <MsgText text={m.text} onSeek={seekable} />}
                         {m.sessionId && !m.ref && (
-                          <button type="button" className="chat-chip" disabled={!s} onClick={() => openSession(m.sessionId!)} title={s ? `${s.workoutName || 'Trening'} — otwórz` : 'Trening został usunięty'}>
+                          <button type="button" className="chat-chip" disabled={!s} onClick={() => openSession(m.sessionId!)} title={s ? `Otwórz: ${s.workoutName || 'trening'}` : 'Trening został usunięty'}>
                             <Icon name="play" size={12} /> {s ? `Trening ${fmtDay(s.date)}` : 'Trening (usunięty)'}
                           </button>
                         )}
                         <time className="chat-time" dateTime={m.at}>
-                          {coachView && m.auto && <span className="chat-auto" title="Wysłana automatycznie — reguła z Ustawień">automatyczna · </span>}
+                          {coachView && m.auto && <span className="chat-auto" title="Wysłana automatycznie (reguła z Ustawień)">automatyczna · </span>}
                           {time(m.at)}
                         </time>
                       </div>
                       {canReply && (
-                        <button type="button" className="chat-act" aria-label="Odpowiedz na tę wiadomość" title={videoOf(m) && writeAsCoach ? 'Odpowiedz — możesz wstawić czas z nagrania' : 'Odpowiedz'} onClick={() => (setReply(m), areaRef.current?.focus())}>
+                        <button type="button" className="chat-act" aria-label="Odpowiedz na tę wiadomość" title={videoOf(m) && writeAsCoach ? 'Odpowiedz. Możesz wstawić czas z nagrania' : 'Odpowiedz'} onClick={() => (setReply(m), areaRef.current?.focus())}>
                           <Icon name="chat" size={14} />
                         </button>
                       )}
@@ -548,7 +547,7 @@ export function Chat({ client, side, asTrainer, onOpenSession, full }: { client:
         )}
         {coachView && push === false && (
           <p className="chat-push-off small muted">
-            <Icon name="alert" size={14} /> {first} nie ma włączonych powiadomień — zobaczy wiadomość dopiero po otwarciu aplikacji. Poproś: Ustawienia → „Powiadomienia na tym telefonie”.
+            <Icon name="alert" size={14} /> {first} nie ma włączonych powiadomień i zobaczy wiadomość dopiero po otwarciu aplikacji. Poproś o włączenie w Ustawieniach („Powiadomienia na tym telefonie”).
           </p>
         )}
         {draft && <DraftPreview d={draft} onRemove={() => setDraftSafe(null)} />}

@@ -350,7 +350,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     if (!date) return toast('Podaj datę treningu.');
     if (durEff.trim() && numIn(durEff, 1, 600) == null) return toast('Czas trwania: od 1 do 600 minut.');
     const problem = chargeProblem(db, effCharge, locationId);
-    if (num(srpe) == null && rows.some((r) => r.name.trim()) && !(await ask('Nie zaznaczono, jak ciężki był trening (sRPE) — nie wliczy się do obciążenia (ACWR). Zapisać mimo to?', { confirm: 'Zapisz bez sRPE', danger: false })))
+    if (num(srpe) == null && rows.some((r) => r.name.trim()) && !(await ask('Brak sRPE: trening nie wliczy się do obciążenia (ACWR). Zapisać mimo to?', { confirm: 'Zapisz bez sRPE', danger: false })))
       return;
     if (problem) return toast(problem);
     const wellness: Wellness = {};
@@ -523,11 +523,11 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           <input className="input" value={workoutName} onChange={(e) => setWorkoutName(e.target.value)} placeholder="np. A – dół ciała" />
         </Field>
         {/* sRPE i czas wysoko — zapis bez przewijania całego formularza (na telefonie ~4000 px) */}
-        <Field label="Czas trwania (min)" hint={durAuto ? 'suma odcinków — wpisz, jeśli inny' : undefined}>
+        <Field label="Czas trwania (min)" hint={durAuto ? 'suma odcinków; wpisz, jeśli inny' : undefined}>
           <input className="input" inputMode="numeric" value={durEff} onChange={(e) => setDuration(e.target.value)} />
         </Field>
         <div className="field field-wide-2 sm-srpe">
-          <span>sRPE – ciężkość treningu (0–10){au != null && <strong className="text-accent"> · {fnum(au, 0)} AU</strong>}</span>
+          <span>sRPE: ciężkość treningu (0–10){au != null && <strong className="text-accent"> · {fnum(au, 0)} AU</strong>}</span>
           <Scale label="sRPE" value={srpe} onChange={setSrpe} max={10} />
         </div>
       </div>
@@ -569,7 +569,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
           <div className="sm-note-body">
             {noteInfo.plan && (
               <p className="small">
-                <Icon name="check" size={14} /> Pasuje do jednostki z planu: <strong>{noteInfo.plan}</strong> — podpięta (zmienisz wyżej).
+                <Icon name="check" size={14} /> Pasuje do jednostki z planu: <strong>{noteInfo.plan}</strong>. Podpięta, zmienisz wyżej.
               </p>
             )}
             {noteInfo.skipped.length > 0 && (
@@ -655,7 +655,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
             )}
             {!r.cardio && (optsOpen.has(r.key) || r.timed) && (
               <button type="button" className={`side-toggle ${r.timed ? 'on' : ''}`} aria-pressed={!!r.timed} onClick={() => setRow(i, { timed: !r.timed || undefined })}>
-                <Icon name="timer" size={14} /> {r.timed ? 'Na czas — sekundy w miejscu powtórzeń' : 'Na czas?'}
+                <Icon name="timer" size={14} /> {r.timed ? 'Na czas: sekundy zamiast powtórzeń' : 'Na czas?'}
               </button>
             )}
             {!r.cardio && (optsOpen.has(r.key) || r.perSide) && (
@@ -675,7 +675,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                 setRow(i, { cardio: !r.cardio || undefined, perSide: undefined, series: [{ key: uid(), load: '', reps: '', rpe: '' }] });
               }}
             >
-              <Icon name="heart" size={14} /> {r.cardio ? 'Cardio / bieg — czas, km, tętno' : 'Cardio / bieg?'}
+              <Icon name="heart" size={14} /> {r.cardio ? 'Cardio / bieg: czas, km, tętno' : 'Cardio / bieg?'}
             </button>}
             {r.series ? (
               <div className="set-edit">
@@ -709,7 +709,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
                       </div>
                     ) :
                     <div key={x.key} className={`set-edit-row ${x.warmup ? 'warm' : ''}`}>
-                      <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Seria ${k + 1}: rozgrzewka` : `Seria ${k + 1}: robocza`} title={x.warmup ? 'Rozgrzewka — kliknij, by zmienić na roboczą' : 'Seria robocza — kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
+                      <button type="button" className="set-no" aria-pressed={!!x.warmup} aria-label={x.warmup ? `Seria ${k + 1}: rozgrzewka` : `Seria ${k + 1}: robocza`} title={x.warmup ? 'Rozgrzewka. Kliknij, by zmienić na roboczą' : 'Seria robocza. Kliknij, by oznaczyć jako rozgrzewkę'} onClick={() => upd({ warmup: !x.warmup || undefined })}>
                         {x.warmup ? 'R' : workNo}
                       </button>
                       <input className="input" inputMode={r.timed ? 'text' : 'numeric'} value={x.reps} onChange={(e) => upd({ reps: e.target.value })} aria-label={`${r.timed ? 'Czas' : 'Powtórzenia'}, seria ${k + 1}`} placeholder={r.timed ? 's' : 'powt.'} />
@@ -805,7 +805,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
         )}
         {effCharge === 'pojedyncza' && existing && sessionPayment(db, existing) && (
           <p className="muted small field-wide-2 self-end">
-            {(() => { const sp = sessionPayment(db, existing)!; return `Płatność ${sp.payment.amount} zł — ${sp.payment.status === 'paid' ? 'opłacona' : 'do zapłaty'} (zmienisz ją w zakładce Płatności).`; })()}
+            {(() => { const sp = sessionPayment(db, existing)!; return `Płatność ${sp.payment.amount} zł, ${sp.payment.status === 'paid' ? 'opłacona' : 'do zapłaty'} (zmiana w zakładce Płatności).`; })()}
           </p>
         )}
         {effCharge === 'pojedyncza' && (!existing || !sessionPayment(db, existing)) && (

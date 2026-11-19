@@ -54,7 +54,7 @@ export function stoppedLabel(s: Pick<TrainingSession, 'stoppedForPain' | 'painMa
   const st = s.stoppedForPain;
   if (!st) return null;
   const where = stoppedSpot(s);
-  return `przerwany — ból ${st.level}/10${where ? ` · ${where}` : ''}`;
+  return `przerwany, ból ${st.level}/10${where ? ` · ${where}` : ''}`;
 }
 
 /** Czas serii: „45 s”, „1:30”, „3 min”. */
@@ -119,7 +119,7 @@ function mainRunPart(groups: SetGroup[]): string {
 /** Opis jednostki planu do listy: bieg „6 × 800 m Z5 · ~9 km · ~50 min”, inaczej „5 ćwiczeń”. */
 export function planWorkoutSummary(k: PlanWorkout, run?: RunProfile): string {
   const ex = k.exercises.filter((e) => e.name.trim());
-  if (!ex.length) return 'brak ćwiczeń — dodaj je w edycji';
+  if (!ex.length) return 'brak ćwiczeń, dodaj je w edycji';
   if (ex.every((e) => e.cardio ?? cardioByName(e.name))) {
     const groups = ex.flatMap((e) => e.groups);
     const t = planRunTotals(groups, run);

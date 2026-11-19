@@ -105,17 +105,17 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
           const bad = e.groups.findIndex((g) => (g.reps.trim() && parseDur(g.reps) == null) || (g.load.trim() && parseKm(g.load) == null));
           if (bad >= 0) {
             setOpen(new Set([w.id]));
-            return toast(`${k.name} · ${e.name}, odcinek ${bad + 1}: czas „${e.groups[bad].reps}” / dystans „${e.groups[bad].load}” — popraw (czas: 40, 3:05, 1:20:00; dystans: 5, 400 m).`);
+            return toast(`${k.name} · ${e.name}, odcinek ${bad + 1}: czas „${e.groups[bad].reps}” / dystans „${e.groups[bad].load}”. Popraw (czas: 40, 3:05, 1:20:00; dystans: 5, 400 m).`);
           }
         }
-    if (!clean.extra && !tpl && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu — od niej liczą się dni treningów.');
+    if (!clean.extra && !tpl && !clean.startDate && clean.weeks.some((w) => w.workouts.some((k) => k.day))) return toast('Ustaw datę startu planu. Od niej liczą się dni treningów.');
     // tydzień 1 = tydzień daty startu: start np. w sobotę, a treningi w pon./czw. — wypadłyby przed startem
     // (podopieczny widziałby „zaległy” pierwszego dnia planu). Plan jeszcze nie ruszył → proponujemy start od poniedziałku.
     if (!clean.extra && !tpl && clean.startDate && clean.startDate >= todayISO()) {
       const before = (clean.weeks[0]?.workouts ?? []).filter((k) => !k.date && k.day && k.exercises.some((e) => e.name.trim()) && (workoutDate(clean, 0, k) ?? '') < clean.startDate!);
       if (before.length) {
         const mon = addDays(clean.startDate, (8 - (new Date(`${clean.startDate}T12:00:00`).getDay() || 7)) % 7);
-        const ok = await ask(`Start planu: ${fmtDay(clean.startDate)}, a ${before.map((k) => `„${k.name}” (${WEEKDAYS[(k.day ?? 1) - 1]})`).join(', ')} z tygodnia 1 wypada przed startem — podopieczny zobaczy go jako zaległy. Zacząć plan od poniedziałku ${fmtDay(mon)}?`, { confirm: `Start od ${fmtDay(mon)}`, cancel: 'Zostaw', danger: false });
+        const ok = await ask(`Start planu: ${fmtDay(clean.startDate)}, a ${before.map((k) => `„${k.name}” (${WEEKDAYS[(k.day ?? 1) - 1]})`).join(', ')} z tygodnia 1 wypada przed startem, więc będzie zaległy. Zacząć plan od poniedziałku ${fmtDay(mon)}?`, { confirm: `Start od ${fmtDay(mon)}`, cancel: 'Zostaw', danger: false });
         if (ok) clean.startDate = mon;
       }
     }
@@ -141,7 +141,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
     <Modal wide title={p.extra ? (only ? 'Trening poza planem' : 'Treningi poza planem') : tpl ? 'Szablon planu' : m.isNew ? 'Nowy plan' : 'Edycja planu'} onClose={close} onSubmit={save} submitLabel="Zapisz">
       {p.extra && (
         <p className="muted small">
-          Poza planem — kolejność planu się nie zmienia. Z datą: podopieczny widzi trening na górze ekranu w tym dniu. Bez daty: na liście „poza planem”, do zrobienia w dowolnym momencie.
+          Plan i jego kolejność bez zmian. Z datą: trening na górze ekranu w tym dniu. Bez daty: na liście „poza planem”.
           {only && extraCount > 1 && (
             <>
               {' '}
@@ -172,8 +172,8 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
         <summary>Jak to działa?</summary>
         <p className="muted small">
           Ciężar w serii: <code>100</code> = kg · <code>75%</code> = % szacowanego 1RM · <code>-10%</code> / <code>+4%</code> = względem poprzedniej serii · puste = dobór z RPE na podstawie historii.
-          Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim” — ćwiczenia bloku (A1, A2, A3) robi się na zmianę, a przerwa liczy się po całej rundzie.
-          Bieg: „+ Bieg…” → własny (odcinki układasz sam) albo szablon do zmiany. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel — strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
+          Tempo wpisz w uwagach, np. <code>3-1-X-0</code>. Superseria / obwód: „+ połącz z poprzednim”: ćwiczenia bloku (A1, A2, A3) na zmianę, przerwa po całej rundzie.
+          Bieg: „+ Bieg…”, potem własny (odcinki układasz sam) albo szablon. Odcinek: czas (<code>40</code>, <code>3:00</code>) lub dystans (<code>800 m</code>), × powtórzeń, cel: strefa (<code>Z2</code>, <code>OWB1</code>), tempo (<code>5:30</code>, <code>5:20–5:40</code>), tętno (<code>140–150</code>) albo tempo startowe (<code>10K</code>, <code>HM</code>), przerwa po każdym (<code>2:00 trucht</code>, <code>200 m trucht</code>).
         </p>
       </details>
       <RunTargetList />
@@ -201,7 +201,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                 const name = nextWeekName(p.weeks, p.weeks[wi].name);
                 const copy = cloneWeek(p.weeks[wi], name, mode);
                 const same = JSON.stringify(cloneWeek(p.weeks[wi], name, 'none').workouts.map((k) => k.exercises.map((x) => x.groups))) === JSON.stringify(copy.workouts.map((k) => k.exercises.map((x) => x.groups)));
-                if (mode !== 'none' && same) toast(mode === 'load2' || mode === 'load5' ? 'Ciężary w tym tygodniu liczą się z RPE / „−10%” — progresja ciężaru nic nie zmieniła. Użyj „+0,5 RPE” albo wpisz kg.' : 'Ta progresja nic nie zmieniła w tym tygodniu.');
+                if (mode !== 'none' && same) toast(mode === 'load2' || mode === 'load5' ? 'Ciężary w tym tygodniu liczą się z RPE / „−10%”, progresja ciężaru nic nie zmieniła. Użyj „+0,5 RPE” albo wpisz kg.' : 'Ta progresja nic nie zmieniła w tym tygodniu.');
                 // „Tydzień N+1” na końcu planu; kopia bez numeru — zaraz za oryginałem
                 upd((d) => {
                   const at = name.endsWith('(kopia)') ? wi + 1 : d.weeks.length;
@@ -270,7 +270,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         {k.moved?.by === 'client' && <span className="muted small">przeniósł podopieczny{k.moved.from ? ` z ${fmtDay(k.moved.from)}` : ''}</span>}
                       </>
                     ) : (
-                      workoutDate(p, wi, k) && (p.startDate && workoutDate(p, wi, k)! < p.startDate ? <span className="small warn-text" title="Dzień wypada przed datą startu planu">{fmtDay(workoutDate(p, wi, k)!)} — przed startem</span> : <span className="muted small">{fmtDay(workoutDate(p, wi, k)!)}</span>)
+                      workoutDate(p, wi, k) && (p.startDate && workoutDate(p, wi, k)! < p.startDate ? <span className="small warn-text" title="Dzień wypada przed datą startu planu">{fmtDay(workoutDate(p, wi, k)!)}, przed startem</span> : <span className="muted small">{fmtDay(workoutDate(p, wi, k)!)}</span>)
                     )}
                   </span>
                 )}
@@ -392,7 +392,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                       // bieg: przerwy są przy odcinkach — domyślne „2:00” siłowe by się wliczało
                       if (x.cardio && x.rest === '2:00') x.rest = '';
                     })}>
-                      <Icon name="heart" size={14} /> {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg — odcinki na czas lub dystans' : 'Cardio / bieg?'}
+                      <Icon name="heart" size={14} /> {e.cardio ?? cardioByName(e.name) ? 'Cardio / bieg: odcinki na czas lub dystans' : 'Cardio / bieg?'}
                     </button>}
 {!(e.cardio ?? cardioByName(e.name)) && (optsOpen.has(e.id) || isTimed(e)) && (
                     <button
@@ -453,7 +453,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                             return (
                               <span className="pe-load">
                                 {input}
-                                <small className={`pe-pct ${r?.load ? '' : 'none'} ${empty ? 'pe-auto' : ''}`} title={r?.load ? `${r.why}${mx ? ` · max ${mx.label}` : ''}` : 'Brak testu 1RM i historii tego ćwiczenia — % policzy się po pierwszym treningu albo teście.'}>
+                                <small className={`pe-pct ${r?.load ? '' : 'none'} ${empty ? 'pe-auto' : ''}`} title={r?.load ? `${r.why}${mx ? ` · max ${mx.label}` : ''}` : 'Brak testu 1RM i historii tego ćwiczenia. % policzy się po pierwszym treningu albo teście.'}>
                                   {r?.load ? `≈ ${fnum(r.load, 2)} kg` : 'brak 1RM'}
                                 </small>
                               </span>
@@ -468,7 +468,7 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                         const mx = maxOf(e.name);
                         return (
                           <p className="muted small pe-max">
-                            {mx ? <>% liczone od maksa: {mx.label}</> : `Brak testu 1RM i historii „${e.name || 'ćwiczenia'}” — kg z % policzy odtwarzacz po pierwszym treningu.`}
+                            {mx ? <>% liczone od maksa: {mx.label}</> : `Brak testu 1RM i historii „${e.name || 'ćwiczenia'}”. Kg z % policzy odtwarzacz po pierwszym treningu.`}
                           </p>
                         );
                       })()}
@@ -507,10 +507,10 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
                   }}
                 >
                   <option value="">+ Bieg…</option>
-                  <option value="custom">Własny — ułożę odcinki</option>
+                  <option value="custom">Własny: ułożę odcinki</option>
                   {RUN_TEMPLATES.map((t) => (
                     <option key={t.id} value={t.id}>
-                      Szablon: {t.name} — {t.hint}
+                      Szablon: {t.name} ({t.hint})
                     </option>
                   ))}
                 </select>

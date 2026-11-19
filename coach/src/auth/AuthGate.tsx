@@ -113,7 +113,7 @@ function RoleGate({ email }: { email: string }) {
       return (
         <Screen title="Pierwsze uruchomienie">
           <p>
-            W aplikacji nie ma jeszcze trenera. Jeśli to Ty prowadzisz treningi, stuknij poniżej — konto <strong>{email}</strong> dostanie pełny dostęp do panelu.
+            W aplikacji nie ma jeszcze trenera. Jeśli to Ty prowadzisz treningi, stuknij poniżej. Konto <strong>{email}</strong> dostanie pełny dostęp do panelu.
           </p>
           <p className="muted small">Robi się to tylko raz. Każda kolejna osoba, która założy konto, będzie klientem.</p>
           <div className="actions">

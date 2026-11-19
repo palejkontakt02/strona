@@ -101,7 +101,7 @@ export function validateOcr(raw: unknown): OcrResult | null {
   if (typeof o.remaining === 'number' && Number.isFinite(o.remaining)) out.remaining = Math.max(0, Math.round(o.remaining));
   if (bad) {
     out.confidence = 'low';
-    out.note ??= 'Część liczb była nieczytelna — sprawdź je i popraw.';
+    out.note ??= 'Część liczb była nieczytelna. Sprawdź je i popraw.';
   }
   return out;
 }
@@ -124,10 +124,10 @@ export function fitBox(w: number, h: number, max = OCR_MAX_SIDE): { w: number; h
 export function ocrErrorMessage(status: number | undefined, body: unknown): string {
   const msg = body && typeof body === 'object' && typeof (body as { error?: unknown }).error === 'string' ? (body as { error: string }).error : '';
   if (msg) return msg;
-  if (status === 404) return 'Odczyt AI nie jest jeszcze włączony — trener musi wdrożyć funkcję w Supabase.';
-  if (status === 401) return 'Sesja wygasła — zaloguj się ponownie.';
-  if (status === 429) return 'Wykorzystano dzienny limit odczytów — wpisz liczby ręcznie.';
-  return 'Nie udało się odczytać zrzutu — wpisz liczby ręcznie.';
+  if (status === 404) return 'Odczyt AI nie jest włączony. Trener musi wdrożyć funkcję w Supabase.';
+  if (status === 401) return 'Sesja wygasła. Zaloguj się ponownie.';
+  if (status === 429) return 'Dzienny limit odczytów wykorzystany. Wpisz liczby ręcznie.';
+  return 'Nie udało się odczytać zrzutu. Wpisz liczby ręcznie.';
 }
 
 /** Zmniejsza zdjęcie do JPEG ~1200 px i zwraca base64 (bez prefiksu data:). */
@@ -136,7 +136,7 @@ export async function shrinkForOcr(file: Blob): Promise<string> {
   try {
     bmp = await createImageBitmap(file);
   } catch {
-    throw new Error('Nie udało się otworzyć zdjęcia — dodaj zrzut jako JPG albo PNG.');
+    throw new Error('Nie udało się otworzyć zdjęcia. Dodaj zrzut jako JPG albo PNG.');
   }
   const { w, h } = fitBox(bmp.width, bmp.height);
   const c = document.createElement('canvas');
@@ -172,12 +172,12 @@ export async function readScreenshot(file: Blob): Promise<OcrResult> {
       status = ctx.status;
       body = await ctx.json().catch(() => null);
     }
-    throw new Error(status == null ? 'Brak połączenia z odczytem AI — sprawdź internet.' : ocrErrorMessage(status, body));
+    throw new Error(status == null ? 'Brak połączenia z odczytem AI. Sprawdź internet.' : ocrErrorMessage(status, body));
   }
   const r = validateOcr(data);
   if (!r) {
     const note = data && typeof data === 'object' && typeof (data as { note?: unknown }).note === 'string' ? (data as { note: string }).note : '';
-    throw new Error(note ? `Nie odczytano liczb: ${note}` : 'Nie odczytano liczb ze zrzutu — wpisz je ręcznie.');
+    throw new Error(note ? `Nie odczytano liczb: ${note}` : 'Nie odczytano liczb ze zrzutu. Wpisz je ręcznie.');
   }
   return r;
 }

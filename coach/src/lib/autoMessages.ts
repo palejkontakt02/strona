@@ -65,18 +65,18 @@ export const AUTO_META: Record<AutoKind, { title: string; when: string; fields: 
   first: { title: 'Pierwszy trening', when: 'Po pierwszym zapisanym treningu podopiecznego.', fields: ['imię'] },
   inactive: { title: 'Przerwa w treningach', when: 'Po X dniach bez treningu. Nie idzie przy pauzie, zakończonej współpracy ani gdy w tym czasie była zgłoszona nieobecność.', fields: ['imię', 'dni'] },
   record: { title: 'Nowy rekord', when: 'Po treningu z rekordem (szacowany 1RM wyższy niż dotąd).', fields: ['imię', 'ćwiczenie', 'wynik'] },
-  package: { title: 'Kończy się pakiet', when: 'Gdy w pakiecie zostało N treningów lub mniej — raz na pakiet.', fields: ['imię', 'zostało'] },
+  package: { title: 'Kończy się pakiet', when: 'Gdy w pakiecie zostało N treningów lub mniej. Raz na pakiet.', fields: ['imię', 'zostało'] },
   birthday: { title: 'Urodziny', when: 'Rano w dniu urodzin (data urodzenia w profilu).', fields: ['imię'] },
   milestone: { title: 'Okrągła liczba treningów', when: 'Po 10., 25., 50., 100. treningu (liczby do zmiany).', fields: ['imię', 'liczba'] },
 };
 
 export const DEFAULT_TEXT: Record<AutoKind, string> = {
   first: '{imię}, pierwszy trening za Tobą. Dobra robota! Daj znać, jak się czujesz i czy coś było niejasne.',
-  inactive: '{imię}, minęło {dni} dni od ostatniego treningu. Wszystko w porządku? Napisz, jeśli coś się zmieniło — razem ustalimy, jak wrócić do rytmu.',
-  record: '{imię}, nowy rekord: {ćwiczenie} — {wynik}. Świetna robota, tak trzymaj.',
-  package: '{imię}, w pakiecie masz jeszcze {zostało}. Jeśli chcesz trenować dalej bez przerwy, daj znać — przygotuję kolejny.',
-  birthday: '{imię}, wszystkiego najlepszego z okazji urodzin! Dużo zdrowia i siły — na treningu i poza nim.',
-  milestone: '{imię}, to był Twój {liczba}. trening. Kawał solidnej pracy — tak trzymaj.',
+  inactive: '{imię}, minęło {dni} dni od ostatniego treningu. Wszystko w porządku? Napisz, jeśli coś się zmieniło, razem ustalimy, jak wrócić do rytmu.',
+  record: '{imię}, nowy rekord: {ćwiczenie}, {wynik}. Świetna robota, tak trzymaj.',
+  package: '{imię}, w pakiecie masz jeszcze {zostało}. Jeśli chcesz trenować dalej bez przerwy, daj znać, przygotuję kolejny.',
+  birthday: '{imię}, wszystkiego najlepszego z okazji urodzin! Dużo zdrowia i siły, na treningu i poza nim.',
+  milestone: '{imię}, to był Twój {liczba}. trening. Kawał solidnej pracy, tak trzymaj.',
 };
 
 export const DEFAULT_RULES: AutoRules = {

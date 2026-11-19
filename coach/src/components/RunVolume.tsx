@@ -94,18 +94,18 @@ export function RunVolume({ client, compact }: { client: Client; compact?: boole
       </p>
       {spike && (
         <p className={`small rv-spike ${spike.level === 'red' ? 'rv-red' : 'warn-text'}`}>
-          Kilometraż +{Math.round(spike.pct * 100)}% ({Math.round(spike.from)} → {Math.round(spike.to)} km) — {compact ? 'zwiększaj stopniowo, ok. 10% na tydzień.' : 'ryzyko przeciążenia; bezpieczniej ok. 10% na tydzień.'}
+          Kilometraż +{Math.round(spike.pct * 100)}% ({Math.round(spike.from)} → {Math.round(spike.to)} km). {compact ? 'Zwiększaj o ok. 10% na tydzień.' : 'Ryzyko przeciążenia. Bezpieczniej ok. 10% na tydzień.'}
         </p>
       )}
     </>
   );
   return compact ? (
     <section className="acard rv-card">
-      <span className="eyebrow">Kilometraż — plan i wykonanie</span>
+      <span className="eyebrow">Kilometraż: plan i wykonanie</span>
       {body}
     </section>
   ) : (
-    <Card title="Bieganie — plan i wykonanie (km / tydz.)" className="rv-card">
+    <Card title="Bieganie: plan i wykonanie (km / tydz.)" className="rv-card">
       {body}
     </Card>
   );

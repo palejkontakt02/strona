@@ -99,7 +99,7 @@ export function PaymentsReport() {
         <div className="pay-rep-grid">
           <Card title="Wg formy">
             <Buckets list={r.byMethod} total={r.total} />
-            {r.byMethod.some((b) => b.key === 'brak') && <p className="muted small">„Bez formy” — uzupełnij formę w edycji płatności.</p>}
+            {r.byMethod.some((b) => b.key === 'brak') && <p className="muted small">„Bez formy”: uzupełnij formę w edycji płatności.</p>}
           </Card>
           <Card title="Wg rodzaju">
             <Buckets list={r.byKind} total={r.total} />
@@ -109,7 +109,7 @@ export function PaymentsReport() {
           </Card>
         </div>
       )}
-      <p className="muted small">Eksport CSV: wpłaty z miesiąca i nieopłacone płatności wystawione w tym miesiącu (średnik, przecinek dziesiętny — otwiera się w Excelu).</p>
+      <p className="muted small">Eksport CSV: wpłaty i nieopłacone płatności z tego miesiąca. Otwiera się w Excelu.</p>
     </div>
   );
 }

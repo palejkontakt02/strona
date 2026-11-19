@@ -305,7 +305,7 @@ export const RUN_TEMPLATES: RunTemplate[] = [
     id: 'strides',
     name: 'Rozbieganie + przebieżki',
     hint: '30 min Z2, potem 6 × 100 m szybko i luźno',
-    make: () => ({ id: uid(), name: 'Rozbieganie + przebieżki (RT)', cardio: true, rest: '', notes: 'Przebieżki: szybko, ale luźno — bez sprintu.', groups: [g('Rozgrzewka', '1', '30', '', 'Z2'), { ...g('Robocze', '6', '', '100 m', 'szybko, luźno'), rest: '1:00 trucht' }] }),
+    make: () => ({ id: uid(), name: 'Rozbieganie + przebieżki (RT)', cardio: true, rest: '', notes: 'Przebieżki: szybko, ale luźno, bez sprintu.', groups: [g('Rozgrzewka', '1', '30', '', 'Z2'), { ...g('Robocze', '6', '', '100 m', 'szybko, luźno'), rest: '1:00 trucht' }] }),
   },
   {
     id: 'hills',
@@ -319,7 +319,7 @@ export const RUN_TEMPLATES: RunTemplate[] = [
     hint: '8 × 1 min mocniej / 1 min trucht',
     make: () => ({ id: uid(), name: 'Fartlek', cardio: true, rest: '', notes: '', groups: [g('Rozgrzewka', '1', '10', '', 'Z2'), { ...g('Robocze', '8', '1:00', '', 'Z4', '7'), rest: '1:00 trucht' }, g('Schłodzenie', '1', '10', '', 'Z1')] }),
   },
-  { id: 'bnp', name: 'Bieg z narastającą prędkością (BNP)', hint: '3 × 10 min: Z2 → Z3 → Z4', make: () => ({ id: uid(), name: 'BNP', cardio: true, rest: '', notes: 'Bez przerw — każdy odcinek szybciej.', groups: [g('Robocze', '1', '10', '', 'Z2', '4'), g('Robocze', '1', '10', '', 'Z3', '6'), g('Robocze', '1', '10', '', 'Z4', '7')] }) },
+  { id: 'bnp', name: 'Bieg z narastającą prędkością (BNP)', hint: '3 × 10 min: Z2 → Z3 → Z4', make: () => ({ id: uid(), name: 'BNP', cardio: true, rest: '', notes: 'Bez przerw, każdy odcinek szybciej.', groups: [g('Robocze', '1', '10', '', 'Z2', '4'), g('Robocze', '1', '10', '', 'Z3', '6'), g('Robocze', '1', '10', '', 'Z4', '7')] }) },
 ];
 
 /* ---------- Kilometraż tygodniowy: plan vs wykonanie ---------- */

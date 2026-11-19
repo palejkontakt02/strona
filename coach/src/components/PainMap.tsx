@@ -121,7 +121,7 @@ export function PainMap({ spots, onChange, readOnly }: { spots: PainSpot[]; onCh
         }}
         viewBox="0 0 120 276"
         role="group"
-        aria-label={view === 'front' ? 'Sylwetka – przód' : 'Sylwetka – tył'}
+        aria-label={view === 'front' ? 'Sylwetka, przód' : 'Sylwetka, tył'}
         onClick={onSvgClick(view)}
       >
         <Body />

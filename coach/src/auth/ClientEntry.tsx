@@ -71,7 +71,7 @@ function TopBar({ onExit, onSettings }: { onExit: () => void; onSettings?: () =>
       <span className="row-inline">
         <OfflineBadge />
         {onSettings && (
-          <button className="btn btn-ghost btn-sm" onClick={onSettings} aria-label="Ustawienia — moje dane i kolory">
+          <button className="btn btn-ghost btn-sm" onClick={onSettings} aria-label="Ustawienia: moje dane i kolory">
             <Icon name="settings" size={16} /> Ustawienia
           </button>
         )}
@@ -135,7 +135,7 @@ export function ArchivedHome({ client, onExit }: { client: Client; onExit: () =>
           <div>
             <b>Twoja historia zostaje dostępna</b>
             <p className="muted small">
-              Możesz przeglądać {n ? <span className="num">{n}</span> : 'swoje'} {n ? plural(n, 'trening', 'treningi', 'treningów') : 'treningi'} i pobrać swoje dane. Nowe treningi z planu są wyłączone — jeśli chcesz wrócić, napisz do trenera.
+              Możesz przeglądać {n ? <span className="num">{n}</span> : 'swoje'} {n ? plural(n, 'trening', 'treningi', 'treningów') : 'treningi'} i pobrać swoje dane. Nowe treningi z planu są wyłączone. Chcesz wrócić? Napisz do trenera.
             </p>
           </div>
         </section>

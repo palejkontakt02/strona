@@ -49,10 +49,10 @@ export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> 
       onClose={closeModal}
       onSubmit={async () => {
         if (!d.name.trim()) return;
-        if (d.email.trim() && !isEmail(d.email)) return toast('Sprawdź adres e-mail — tym adresem podopieczny założy konto w aplikacji.');
-        if (d.phone.trim() && !normalizePhone(d.phone)) return toast('Sprawdź numer telefonu — np. 600 100 200 albo +48 600 100 200.');
+        if (d.email.trim() && !isEmail(d.email)) return toast('Sprawdź adres e-mail. Tym adresem podopieczny założy konto.');
+        if (d.phone.trim() && !normalizePhone(d.phone)) return toast('Sprawdź numer telefonu, np. 600 100 200 albo +48 600 100 200.');
         const em = d.email.trim().toLowerCase();
-        if (em && db.clients.some((x) => x.id !== m.client?.id && x.email?.trim().toLowerCase() === em)) return toast('Ten e-mail ma już inny podopieczny — jedno konto łączy się z jednym profilem.');
+        if (em && db.clients.some((x) => x.id !== m.client?.id && x.email?.trim().toLowerCase() === em)) return toast('Ten e-mail ma już inny podopieczny. Jedno konto to jeden profil.');
         const base: Client = m.client ?? { id: uid(), name: '', status: 'aktywny', startDate: todayISO(), createdAt: new Date().toISOString(), payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] };
         const c = fromDraft(base, d);
         if (!m.client && !c.startDate) c.startDate = todayISO();
@@ -64,7 +64,7 @@ export function ClientModal({ m }: { m: Extract<ModalState, { kind: 'client' }> 
       }}
     >
       <ClientFields d={d} set={set} compact />
-      {!m.client && profile.prices && <p className="muted small">Stawki z Twojego cennika ({pricesLine(profile)}) — zmienisz je tutaj albo w Ustawieniach → Mój profil.</p>}
+      {!m.client && profile.prices && <p className="muted small">Stawki z cennika: {pricesLine(profile)}.</p>}
       {!m.client && <p className="muted small">Pozostałe dane (data urodzenia, staż, urazy…) uzupełnisz w zakładce Profil.</p>}
     </Modal>
   );
@@ -91,7 +91,7 @@ export function MeasurementModal({ m }: { m: Extract<ModalState, { kind: 'measur
       onClose={closeModal}
       onSubmit={async () => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return toast('Wybierz datę pomiaru.');
-        if (date > todayISO()) return toast('Data pomiaru jest w przyszłości — sprawdź datę.');
+        if (date > todayISO()) return toast('Data pomiaru jest w przyszłości.');
         const meas: Measurement = { id: editing?.id ?? uid(), date, note: note.trim() || undefined };
         let any = false;
         for (const [k, label, unit, min, max] of MEASURE_FIELDS) {
@@ -207,7 +207,7 @@ export function TestModal({ m }: { m: Extract<ModalState, { kind: 'test' }> }) {
           </label>
         </div>
         <p className="muted small field-wide">
-          Wpisz wynik ogólny albo lewa/prawa — LSI policzy się automatycznie.
+          Wynik ogólny albo lewa/prawa; LSI liczy się samo.
           {lsi != null && (
             <strong className={lsi >= 90 ? 'text-ok' : lsi >= 80 ? 'text-warn' : 'text-danger'}> LSI: {fnum(lsi)}%</strong>
           )}
@@ -245,7 +245,7 @@ export function PaymentModal({ m }: { m: Extract<ModalState, { kind: 'payment' }
 
   return (
     <Modal
-      title={`${p ? 'Edytuj' : 'Nowa płatność'} – ${PAY_TITLE[m.type]}`}
+      title={`${p ? 'Edytuj' : 'Nowa płatność'}: ${PAY_TITLE[m.type]}`}
       onClose={closeModal}
       onSubmit={async () => {
         if (!client) return toast('Wybierz podopiecznego.');
@@ -499,7 +499,7 @@ export function DataModal() {
       closeModal();
       go('Pulpit');
     } catch {
-      toast('Nie udało się wczytać pliku — to nie jest kopia z tej aplikacji.');
+      toast('To nie jest kopia z tej aplikacji.');
     }
   };
 
@@ -518,14 +518,14 @@ export function DataModal() {
         Miejsca i kluby…
       </button>
       <h4 className="form-section">Automatyczne wiadomości</h4>
-      <p className="muted small">Gratulacje po pierwszym treningu i rekordzie, przypomnienie po przerwie, koniec pakietu, urodziny — wysyłane same, raz.</p>
+      <p className="muted small">Rekord, przerwa w treningach, koniec pakietu, urodziny. Wysyłane same, raz.</p>
       <button type="button" className="btn btn-secondary" onClick={() => openModal({ kind: 'autoMessages' })}>
         Automatyczne wiadomości…
       </button>
       <h4 className="form-section">Dane</h4>
       {cloud ? (
         <p className="small">
-          Dane są zapisane <strong>w chmurze</strong> — widzisz je na każdym urządzeniu po zalogowaniu, a klienci widzą tylko swoje treningi i plany.
+          Dane są <strong>w chmurze</strong>. Klienci widzą tylko swoje treningi i plany.
         </p>
       ) : (
         <p className="small">

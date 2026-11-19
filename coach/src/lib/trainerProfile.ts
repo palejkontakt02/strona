@@ -98,7 +98,7 @@ export function vacationReplyText(p: TrainerProfile): string {
   const v = p.vacation;
   if (!v) return '';
   if (v.message?.trim()) return v.message.trim().slice(0, 500);
-  return `Dzięki za wiadomość! Jestem na urlopie do ${dm(v.to)} — odpiszę po powrocie.`;
+  return `Dzięki za wiadomość. Jestem na urlopie do ${dm(v.to)}, odpiszę po powrocie.`;
 }
 
 /** Id automatycznej odpowiedzi — jedna dziennie na podopiecznego (to samo id w bazie, sekcja 29). */

@@ -86,8 +86,8 @@ export function ClientMeasurements({ client }: { client: Client }) {
                 return (
                   <>
                     <p className="wt-summary">{weightTrendText(t)}</p>
-                    <WeightTrendChart daily={t.daily} avg={t.avg} label="Masa — średnia 7 dni" />
-                    <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie — oceniaj trend średniej z 7 dni.</p>
+                    <WeightTrendChart daily={t.daily} avg={t.avg} label="Masa, średnia 7 dni" />
+                    <p className="muted small wt-help">Dzienne wahania 1–2 kg to woda i jedzenie. Oceniaj średnią z 7 dni.</p>
                   </>
                 );
               })()

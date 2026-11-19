@@ -17,10 +17,10 @@ export function LibraryView() {
   const missing = atlasToAdd(db.library.map((e) => e.name));
   const addAtlas = async () => {
     const n = missing.length;
-    if (!(await ask(`Dodać ${nEx(n)} z atlasu (nazwy po angielsku)? Ćwiczenia, które już masz — także pod polską nazwą (np. Przysiad ze sztangą = Back Squat) — zostaną pominięte.`, { confirm: `Dodaj ${n}`, danger: false }))) return;
+    if (!(await ask(`Dodać ${nEx(n)} z atlasu (nazwy po angielsku)? Ćwiczenia, które już masz (także pod polską nazwą, np. Przysiad ze sztangą = Back Squat), zostaną pominięte.`, { confirm: `Dodaj ${n}`, danger: false }))) return;
     const items = missing.map(([name, cat]) => ({ id: uid(), name, cat }));
     if (!(await apply(items.map((x) => put('library', x))))) return;
-    toast(`Dodano ${nEx(n)} z atlasu.`, { label: 'Cofnij', run: () => void apply(items.map((x) => del('library', x.id)), `Cofnięto — usunięto ${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')} z atlasu.`) });
+    toast(`Dodano ${nEx(n)} z atlasu.`, { label: 'Cofnij', run: () => void apply(items.map((x) => del('library', x.id)), `Cofnięto. Usunięto ${n} ${plural(n, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń')} z atlasu.`) });
   };
   const { openModal } = useNav();
   const [q, setQ] = useState('');
@@ -42,7 +42,7 @@ export function LibraryView() {
             <button
               className="btn btn-secondary"
               onClick={() => void addAtlas()}
-              title="Ćwiczenia siłowe, dwubojowe, plyometryczne, kondycyjne i rehabilitacyjne — nazwy po angielsku"
+              title="Ćwiczenia siłowe, dwubojowe, plyometryczne, kondycyjne i rehabilitacyjne, nazwy po angielsku"
             >
               + Atlas ćwiczeń ({missing.length})
             </button>

@@ -60,7 +60,7 @@ export async function saveChatMedia(blob: Blob, kind: MsgMedia['kind'], clientId
   if (cloudMode()) {
     const path = `${clientId}/${kind === 'audio' ? 'glos' : 'czat'}-${rid()}.${extFor(mime)}`;
     const { error } = await supabase.storage.from(FILE_BUCKET).upload(path, data, { contentType: mime, upsert: false });
-    if (error) throw new Error(/mime|not supported|invalid.*type/i.test(error.message) ? 'Baza wymaga aktualizacji (sekcja 23 w hardening.sql) — wiadomości głosowe nie są jeszcze włączone.' : error.message);
+    if (error) throw new Error(/mime|not supported|invalid.*type/i.test(error.message) ? 'Baza wymaga aktualizacji (sekcja 23 w hardening.sql). Wiadomości głosowe nie są jeszcze włączone.' : error.message);
     return { kind, ref: `sb:${path}`, mime, ...extra };
   }
   const id = rid();

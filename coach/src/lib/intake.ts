@@ -19,7 +19,7 @@ export const INTAKE: IntakeSection[] = [
   {
     id: 'health',
     title: 'Zdrowie',
-    intro: 'Odpowiedz szczerze — to dla Twojego bezpieczeństwa. Widzi to tylko Twój trener.',
+    intro: 'Odpowiedz szczerze, to dla Twojego bezpieczeństwa. Widzi to tylko Twój trener.',
     fields: [
       { key: 'parq_heart', label: 'Czy lekarz stwierdził u Ciebie chorobę serca lub nadciśnienie?', type: 'yesno' },
       { key: 'parq_chest', label: 'Czy odczuwasz ból w klatce piersiowej w spoczynku, w codziennych czynnościach lub przy wysiłku?', type: 'yesno' },

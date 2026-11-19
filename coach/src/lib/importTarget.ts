@@ -114,5 +114,5 @@ export function importTargetText(rows: DraftRow[], sport: string, segs: number):
     const m = mapLaps(kept[t.fill].series ?? [], Array.from({ length: segs }, () => ({}) as DraftSeg));
     return `Zastąpi wartości planu w ${what} kolejnymi okrążeniami (${n(segs)}): ${m?.text}.`;
   }
-  return `Zastąpi odcinki z planu: ${what} (${n(planned.length)}${km ? `, ${fnum(km, 2)} km` : ''}) — ${n(segs)} z pliku.`;
+  return `Zastąpi odcinki z planu: ${what} (${n(planned.length)}${km ? `, ${fnum(km, 2)} km` : ''}). Z pliku: ${n(segs)}.`;
 }

@@ -440,7 +440,7 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     let ex: PlanExercise | null = !inline.name || (lastEx && fold(lastEx.name) === fold(inline.name) && (!label || tag === lastExTag)) ? lastEx : null;
     if (!ex) {
       if (!inline.name) {
-        warnings.push(`Wiersz ${ri + 1}: brak nazwy ćwiczenia — pominięty.`);
+        warnings.push(`Wiersz ${ri + 1}: brak nazwy ćwiczenia, pominięty.`);
         return;
       }
       ex = { id: uid(), name: inline.name, rest: '', notes: '', groups: [] };
@@ -480,8 +480,8 @@ export function sheetToPlan(rows: string[][], map: SheetField[], headerRow: numb
     const nb = b.key.startsWith('#') ? Number(b.key.slice(1)) : NaN;
     return Number.isNaN(na) || Number.isNaN(nb) ? 0 : na - nb;
   });
-  if (defaulted) warnings.push('Dni tygodnia ustawione domyślnie (np. pon. i czw.) — popraw w edytorze, jeśli trzeba.');
-  if (odd.length) warnings.push(`Ciężar nierozpoznany (${odd.slice(0, 3).map((x) => `„${x}”`).join(', ')}) — przeniesiony do uwag ćwiczenia.`);
+  if (defaulted) warnings.push('Dni tygodnia ustawione domyślnie (np. pon. i czw.). Popraw w edytorze, jeśli trzeba.');
+  if (odd.length) warnings.push(`Ciężar nierozpoznany (${odd.slice(0, 3).map((x) => `„${x}”`).join(', ')}): przeniesiony do uwag ćwiczenia.`);
 
   // daty wpisane wprost: start planu w tygodniu pierwszej daty
   const firstDate = weeks.flatMap((w) => w.workouts.map((k) => k.date).filter(Boolean) as string[]).sort()[0];

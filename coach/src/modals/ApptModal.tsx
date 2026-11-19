@@ -86,12 +86,12 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     // wizyta z zapisanym treningiem: odwołanie / nieobecność rozjechałyby się z treningiem (pakiet, płatność)
     const linkedS = editing?.sessionId ? db.sessions.find((x) => x.id === editing.sessionId) : undefined;
     if (linkedS && (draft.status === 'cancel' || draft.status === 'noshow'))
-      return toast('Do tej wizyty jest zapisany trening. Najpierw usuń trening („Pokaż trening” → „Usuń trening”) — wtedy wizytę można odwołać.');
+      return toast('Do tej wizyty jest zapisany trening. Najpierw usuń trening („Pokaż trening”, potem „Usuń trening”), wtedy odwołasz wizytę.');
     const grouped = partners.length > 0 || !!editing?.groupId;
     const d2: Appointment = { ...draft, groupId: partners.length ? (editing?.groupId ?? uid()) : undefined };
     const main = grouped ? saveGroupAppointments(db, d2, partners, allNext ? 1 : n, editing) : saveAppointment(d2, n);
     const pairMsg = partners.length ? ` W parze z: ${partners.map((id) => clientById(db, id)?.name.split(' ')[0]).join(', ')}.` : '';
-    const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana — 1 trening pobrany z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
+    const msg = n > 1 ? `Dodano ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} (co tydzień).` : allNext ? 'Zmieniono tę i kolejne wizyty z serii.' : chargeNow && !wasCharged ? 'Wizyta zapisana. 1 trening z pakietu.' : editing ? 'Wizyta zapisana.' : 'Wizyta dodana.';
     // zmiana daty wizyty z zapisanym treningiem — trening przechodzi razem z nią (jedna para wizyta + trening)
     const moveSession = linkedS && editing && editing.date !== draft.date ? [put('sessions', { ...linkedS, date: draft.date })] : [];
     // wizyta umówiona na jednostkę planu („Termin” w planie) — jednostka przechodzi na nowy dzień
@@ -99,7 +99,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     if (!(await apply([...main, ...(allNext && editing ? seriesEdit(db, editing, d2) : []), ...chargeChange, ...moveSession], msg + pairMsg + (moveSession.length ? ' Zapisany trening przeniesiony na ten sam dzień.' : '')))) return;
     // „Odbyta” bez zapisanego treningu nie zejdzie z pakietu ani nie doliczy się klubowi
     if (draft.status === 'done' && !draft.sessionId && editing?.status !== 'done') {
-      if (await ask('Wizyta odbyta, ale bez zapisanego treningu — nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
+      if (await ask('Wizyta odbyta bez zapisanego treningu: nie zejdzie z pakietu ani nie doliczy się klubowi. Zapisać trening teraz?', { confirm: 'Zapisz trening', danger: false })) {
         openModal({ kind: 'session', appt: draft, clientId: draft.clientId, date: draft.date });
         return;
       }
@@ -276,7 +276,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           </div>
         )}
         {editing && (
-          <Field label={partners.length ? `Status — ${cl?.name.split(' ')[0] ?? ''}` : 'Status'} wide>
+          <Field label={partners.length ? `Status: ${cl?.name.split(' ')[0] ?? ''}` : 'Status'} wide>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as AppointmentStatus)}>
               {(Object.keys(APPT_STATUS) as AppointmentStatus[]).map((s) => (
                 <option key={s} value={s}>
@@ -292,7 +292,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
           </label>
         )}
         {!editing && repeat && pk && pk.left < repeatN && (
-          <p className="small warn-text field-wide">Pakiet: zostało {pk.left} {pk.left === 1 ? 'trening' : 'treningów'}, a dodajesz {repeatN} {plural(repeatN, 'wizytę', 'wizyty', 'wizyt')} — przypomnij o nowym pakiecie.</p>
+          <p className="small warn-text field-wide">Pakiet: zostało {pk.left} {pk.left === 1 ? 'trening' : 'treningów'}, a dodajesz {repeatN} {plural(repeatN, 'wizytę', 'wizyty', 'wizyt')}. Przypomnij o nowym pakiecie.</p>
         )}
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />

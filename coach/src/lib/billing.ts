@@ -68,7 +68,7 @@ export function singleSessionPayment(
 export function packageMessage(leftBefore: number): string {
   const left = leftBefore - 1;
   if (left === 0) return 'Zapisano. To był ostatni trening z pakietu.';
-  if (left < 0) return `Zapisano. ${overPackage(-left)} — czas na nowy pakiet.`;
+  if (left < 0) return `Zapisano. ${overPackage(-left)}. Czas na nowy pakiet.`;
   return `Zapisano. ${plural(left, 'Został', 'Zostały', 'Zostało')} ${left} ${plural(left, 'trening', 'treningi', 'treningów')} w pakiecie.`;
 }
 
@@ -84,7 +84,7 @@ export function overPackage(n: number): string {
 export function packageHint(left: number | null, consumes: boolean): string {
   if (left == null) return 'Klient nie ma wykupionego pakietu.';
   const after = left - (consumes ? 1 : 0);
-  if (after < 0) return `Pakiet wykorzystany — po zapisie: ${overPackage(-after)}.`;
+  if (after < 0) return `Pakiet wykorzystany. Po zapisie: ${overPackage(-after)}.`;
   return consumes ? `W pakiecie zostało ${left} (po zapisie: ${after}).` : `W pakiecie zostało ${left}.`;
 }
 

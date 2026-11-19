@@ -12,10 +12,10 @@ const COLS: { key: SortKey; label: string; title?: string }[] = [
   { key: 'name', label: 'Podopieczny' },
   { key: 'last', label: 'Ostatni trening', title: 'Dni od ostatniego treningu (bursztyn > 7, czerwony > 14)' },
   { key: 'next', label: 'Następna wizyta' },
-  { key: 'plan', label: 'Plan', title: 'Aktywny plan: tydzień i data końca (bursztyn — zakończony)' },
+  { key: 'plan', label: 'Plan', title: 'Aktywny plan: tydzień i data końca (bursztyn: zakończony)' },
   { key: 'pkg', label: 'Pakiet', title: 'Ile treningów zostało w pakiecie' },
   { key: 'overdue', label: 'Zaległość' },
-  { key: 'wellness', label: 'Samopoczucie', title: 'Ostatni odczyt (średnia 1–5); bursztyn — wyraźny spadek względem poprzednich' },
+  { key: 'wellness', label: 'Samopoczucie', title: 'Ostatni odczyt (średnia 1–5); bursztyn: wyraźny spadek' },
   { key: 'food', label: 'Jedzenie 7 dni', title: 'Średnio z dni z wpisem względem celu: kalorie i białko' },
   { key: 'habits', label: 'Nawyki 7 dni', title: 'Odhaczone zadania dzienne z 7 dni' },
   { key: 'report', label: 'Raport', title: 'Raport tygodniowy za ostatni pełny tydzień (wymagany od poniedziałku)' },
@@ -52,8 +52,7 @@ export function OverviewTable({ compact }: { compact?: boolean }) {
         {!compact && (
           <div>
             <h2>Wszyscy podopieczni</h2>
-            <p className="muted small">Kliknij nagłówek, by posortować, a wiersz — by otworzyć kartę podopiecznego.</p>
-          </div>
+                      </div>
         )}
         <Seg options={FILTERS} value={filter} onChange={setFilter} label="Filtr tabeli" />
         <span className="muted small ov-count">

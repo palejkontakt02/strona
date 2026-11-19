@@ -41,10 +41,10 @@ export type Advice = { tone: 'ok' | 'neutral' | 'warn'; tag: string; text: strin
 /** Krótka rada po check-inie: porównanie z normą (gdy jest) albo z progiem 2,5/5. */
 export function checkinAdvice(r: number | null, norm: number | null): Advice | null {
   if (r == null) return null;
-  if (r <= 2.5) return { tone: 'warn', tag: 'słabo', text: 'Zrób lżej: mniej serii albo ciężar o RPE niżej. Ból lub zawroty głowy — nie trenuj i napisz do trenera.', lighter: true };
+  if (r <= 2.5) return { tone: 'warn', tag: 'słabo', text: 'Zrób lżej: mniej serii albo ciężar o RPE niżej. Ból lub zawroty głowy: nie trenuj i napisz do trenera.', lighter: true };
   if (norm == null) return { tone: 'neutral', tag: 'zapisane', text: 'Porównanie z Twoją normą pojawi się po kilku dniach wpisów.', lighter: false };
   const d = r - norm;
-  if (d >= 0.25) return { tone: 'ok', tag: 'lepiej niż zwykle', text: 'Jesteś w formie — trenuj zgodnie z planem.', lighter: false };
+  if (d >= 0.25) return { tone: 'ok', tag: 'lepiej niż zwykle', text: 'Jesteś w formie. Trenuj zgodnie z planem.', lighter: false };
   if (d > -0.25) return { tone: 'neutral', tag: 'jak zwykle', text: 'Trenuj zgodnie z planem.', lighter: false };
   if (d > -0.5) return { tone: 'neutral', tag: 'trochę gorzej', text: 'Nie forsuj ciężarów, jeśli serie idą ciężko.', lighter: false };
   return { tone: 'warn', tag: 'gorzej niż zwykle', text: 'Zrób lżej: mniej serii albo ciężar o RPE niżej i daj znać trenerowi.', lighter: true };

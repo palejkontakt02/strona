@@ -37,8 +37,8 @@ export const isPdf = (type: string, name = '') => type === 'application/pdf' || 
 
 /** Sprawdza plik; zwraca komunikat błędu albo null. */
 export function fileProblem(file: File): string | null {
-  if (!isImage(file.type, file.name) && !isPdf(file.type, file.name)) return `„${file.name}” — dodaj zdjęcie (JPG, PNG, HEIC) albo PDF.`;
-  if (file.size > FILE_MAX_MB * 1024 * 1024) return `„${file.name}” ma ${Math.round(file.size / 1024 / 1024)} MB — limit to ${FILE_MAX_MB} MB.`;
+  if (!isImage(file.type, file.name) && !isPdf(file.type, file.name)) return `„${file.name}”: dodaj zdjęcie (JPG, PNG, HEIC) albo PDF.`;
+  if (file.size > FILE_MAX_MB * 1024 * 1024) return `„${file.name}” ma ${Math.round(file.size / 1024 / 1024)} MB, limit to ${FILE_MAX_MB} MB.`;
   return null;
 }
 

@@ -67,7 +67,7 @@ export function reminderText(clientName: string, p: Payment, label: string, t: R
   const late = daysOverdue(p, today);
   const due = p.dueDate ? (late > 0 ? `termin minął ${fmtDate(p.dueDate)}` : `termin: ${fmtDate(p.dueDate)}`) : '';
   const lines = [
-    `Cześć${first ? ` ${first}` : ''}! Przypominam o płatności: ${label} – ${pln(p.amount)}${due ? ` (${due})` : ''}.`,
+    `Cześć${first ? ` ${first}` : ''}! Przypominam o płatności: ${label}, ${pln(p.amount)}${due ? ` (${due})` : ''}.`,
   ];
   const pay: string[] = [];
   if (t.bankAccount?.trim()) {

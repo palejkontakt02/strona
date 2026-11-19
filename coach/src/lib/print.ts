@@ -186,13 +186,13 @@ export function printPlan(plan: Plan, client: Client, sessions: TrainingSession[
         const k = week.workouts.find((x) => x.id === id);
         return k ? nextDate(plan, { week: plan.weeks[Math.max(0, wi)], workout: k }, today) : undefined;
       };
-      openPrint(`${plan.name} — ${week.name} — ${client.name}`, `${GRID_CSS(false)}${head(` · ${week.name}`)}${legend}<p class="legend">Kolumna „Zrobiono”: wpisz wykonane ciężary / powtórzenia, uwagi, ból.</p>${gridTables(slots, { didit: true, dateOf })}${zoneLegend(slots, client)}`);
+      openPrint(`${plan.name} · ${week.name} · ${client.name}`, `${GRID_CSS(false)}${head(` · ${week.name}`)}${legend}<p class="legend">Kolumna „Zrobiono”: wpisz wykonane ciężary / powtórzenia, uwagi, ból.</p>${gridTables(slots, { didit: true, dateOf })}${zoneLegend(slots, client)}`);
       return;
     }
   }
   const slots = planGrid(p, () => true);
   const wide = Math.max(0, ...slots.map((s) => s.cols.length)) > 3;
-  openPrint(`${plan.name} — ${client.name}`, `${GRID_CSS(wide)}${head(`${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · ${plan.weeks.length} tyg.`)}${legend}${gridTables(slots)}${zoneLegend(slots, client)}`);
+  openPrint(`${plan.name} · ${client.name}`, `${GRID_CSS(wide)}${head(`${plan.startDate ? ` · start ${fmtD(plan.startDate)}` : ''} · ${plan.weeks.length} tyg.`)}${legend}${gridTables(slots)}${zoneLegend(slots, client)}`);
 }
 
 /**
@@ -212,9 +212,9 @@ export function printReport(client: Client, sessions: TrainingSession[], opts: {
   const body = `
     <h1>Raport z treningów</h1>
     <div class="muted">${esc(client.name)} · okres ${fmtD(recent.length ? firstDate : from)} – ${fmtD(todayISO())}</div>
-    <div class="box note">Raport treningowy przygotowany przez trenera — nie jest dokumentacją medyczną ani diagnozą.</div>
+    <div class="box note">Raport treningowy przygotowany przez trenera. Nie jest dokumentacją medyczną ani diagnozą.</div>
     ${client.goal ? `<p><b>Cel:</b> ${esc(client.goal)}</p>` : ''}
-    ${inj.length ? `<p><b>Urazy / stany:</b> ${inj.map((i) => `${esc(i.name)}${i.side ? ` (${esc(i.side)})` : ''} — ${esc(i.status)} od ${fmtD(i.date)}`).join('; ')}</p>` : ''}
+    ${inj.length ? `<p><b>Urazy / stany:</b> ${inj.map((i) => `${esc(i.name)}${i.side ? ` (${esc(i.side)})` : ''}: ${esc(i.status)} od ${fmtD(i.date)}`).join('; ')}</p>` : ''}
     ${opts.plan ? `<p><b>Aktualny plan:</b> ${esc(opts.plan.name)} (${opts.plan.weeks.length} tyg.)</p>` : ''}
     <h2>Regularność</h2>
     <p>${recent.length} treningów w ${pl(spanW)} tyg. (średnio ${pl(recent.length / spanW)} / tydz.)</p>
@@ -230,5 +230,5 @@ export function printReport(client: Client, sessions: TrainingSession[], opts: {
       .join('')}</table>
     ${opts.comment ? `<h2>Komentarz trenera</h2><div class="box">${esc(opts.comment)}</div>` : ''}
     <p class="muted" style="margin-top:24px">Trener: ____________________</p>`;
-  openPrint(`Raport — ${client.name}`, body);
+  openPrint(`Raport: ${client.name}`, body);
 }

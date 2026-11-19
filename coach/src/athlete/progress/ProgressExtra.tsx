@@ -144,7 +144,7 @@ function MuscleCard({ sessions, today }: { sessions: TrainingSession[]; today: s
   return (
     <section className="acard pg-card" aria-labelledby="pg-mus-h">
       <h3 id="pg-mus-h">Serie na partię mięśniową</h3>
-      <p className="muted small">Ten tydzień · kreska — poprzedni tydzień · mięśnie pomocnicze liczone jako ½ serii</p>
+      <p className="muted small">Kreska: poprzedni tydzień. Mięśnie pomocnicze liczone jako ½ serii.</p>
       {!any ? (
         <p className="muted small">Serie pojawią się po pierwszym treningu siłowym w tym albo poprzednim tygodniu.</p>
       ) : (

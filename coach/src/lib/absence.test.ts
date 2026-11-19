@@ -46,16 +46,16 @@ describe('nieobecność — zakresy', () => {
 describe('teksty', () => {
   it('wiadomość do trenera', () => {
     expect(absenceMessage(A('2026-11-01', '2026-11-07'))).toBe('Nieobecność: urlop 01.11–07.11');
-    expect(absenceMessage(A('2026-11-01', '2026-11-01', 'choroba', ' grypa '))).toBe('Nieobecność: choroba 01.11 — grypa');
+    expect(absenceMessage(A('2026-11-01', '2026-11-01', 'choroba', ' grypa '))).toBe('Nieobecność: choroba 01.11 (grypa)');
   });
   it('karta na Dziś: kiedy wraca', () => {
     // 07.11.2026 to sobota → powrót w niedzielę 08.11
     const a = A('2026-11-01', '2026-11-06');
     expect(returnWord(a, '2026-11-03')).toBe('w sobotę');
-    expect(absenceCard(a, '2026-11-03')).toEqual({ title: 'Urlop do 06.11', text: 'Urlop do 06.11 — odpocznij. Wracasz w sobotę.' });
+    expect(absenceCard(a, '2026-11-03')).toEqual({ title: 'Urlop do 06.11', text: 'Urlop do 06.11. Odpocznij. Wracasz w sobotę.' });
     expect(returnWord(a, '2026-11-06')).toBe('jutro');
     expect(returnWord(A('2026-11-01', '2026-11-30'), '2026-11-02')).toBe('01.12');
-    expect(absenceCard(A('2026-11-01', '2026-11-06', 'choroba'), '2026-11-03').text).toMatch(/wracaj do zdrowia/);
+    expect(absenceCard(A('2026-11-01', '2026-11-06', 'choroba'), '2026-11-03').text).toMatch(/Wracaj do zdrowia/);
   });
   it('„Wracam wcześniej” — koniec wczoraj; w dniu startu odwołana', () => {
     expect(endEarly(A('2026-11-01', '2026-11-07'), '2026-11-04').to).toBe('2026-11-03');

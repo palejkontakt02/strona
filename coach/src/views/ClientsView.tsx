@@ -180,7 +180,7 @@ export function ClientsView() {
                 </button>
                 <button
                   className="btn btn-secondary"
-                  title="Trening poza planem na wybrany dzień — podopieczny zobaczy go na górze ekranu"
+                  title="Trening poza planem na wybrany dzień"
                   onClick={() => openModal({ kind: 'assign', clientId: selected.id })}
                 >
                   + Zadaj trening
@@ -248,10 +248,10 @@ function ClientTabs({ value, onChange }: { value: (typeof CLIENT_TABS)[number]; 
 /** RODO: wycofane zgody / prośba o usunięcie konta — bursztynowa informacja dla trenera. */
 function ConsentAlerts({ client }: { client: RodoClient }) {
   const items: string[] = [];
-  if (consentWithdrawn(client, 'health')) items.push('Wycofał(a) zgodę na dane o zdrowiu — usuń urazy, ankietę i samopoczucie albo zakończ współpracę.');
-  if (consentWithdrawn(client, 'media')) items.push('Wycofał(a) zgodę na zdjęcia i nagrania — usuń zdjęcia sylwetki i nagrania techniki.');
+  if (consentWithdrawn(client, 'health')) items.push('Wycofał(a) zgodę na dane o zdrowiu. Usuń urazy, ankietę i samopoczucie albo zakończ współpracę.');
+  if (consentWithdrawn(client, 'media')) items.push('Wycofał(a) zgodę na zdjęcia i nagrania. Usuń zdjęcia sylwetki i nagrania techniki.');
   const er = erasureStatus(client);
-  if (er.state !== 'none') items.push('Prośba o usunięcie konta — usuń klienta w panelu, konto w Supabase (Authentication → Users) i jego pliki w Storage.');
+  if (er.state !== 'none') items.push('Prośba o usunięcie konta. Usuń klienta w panelu, konto w Supabase (Authentication, Users) i jego pliki w Storage.');
   if (!items.length) return null;
   return (
     <div className="consent-alert" role="status">

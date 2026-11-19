@@ -144,19 +144,18 @@ export function ReminderModal({ clientId, paymentId, onClose }: { clientId: stri
   const marked: Client | undefined = client && p ? { ...client, payments: client.payments.map((x) => (x.id === p.id ? { ...x, remindedAt: today } : x)) } : undefined;
   const send = useSendMessage(marked ?? ({ id: clientId, name: '' } as Client), true);
   if (!client || !p || !marked) return null;
-  const first = client.name.split(' ')[0];
   const markOnly = (msg: string) => apply([put('clients', marked)], msg);
   const noBank = !profile.bankAccount?.trim() && !profile.blikPhone?.trim();
 
   return (
     <Modal
-      title={`Przypomnienie – ${client.name}`}
+      title={`Przypomnienie: ${client.name}`}
       onClose={onClose}
       submitLabel={busy ? 'Wysyłanie…' : 'Wyślij w aplikacji'}
       onSubmit={async () => {
         if (busy || !body.trim()) return;
         setBusy(true);
-        const ok = await send(body, { okMessage: `Wysłano przypomnienie — ${first} zobaczy je w aplikacji.` });
+        const ok = await send(body, { okMessage: 'Przypomnienie wysłane.' });
         setBusy(false);
         if (ok) onClose();
       }}
@@ -172,12 +171,12 @@ export function ReminderModal({ clientId, paymentId, onClose }: { clientId: stri
                 area.current?.select();
                 document.execCommand?.('copy');
               }
-              void markOnly('Skopiowano — wklej w SMS albo komunikatorze.');
+              void markOnly('Skopiowano. Wklej w SMS albo komunikatorze.');
             }}
           >
             <Icon name="copy" size={16} /> Kopiuj
           </button>
-          <a className="btn btn-ghost" href={smsHref(client.phone, body)} onClick={() => void markOnly('Otwarto SMS — przypomnienie zapisane.')}>
+          <a className="btn btn-ghost" href={smsHref(client.phone, body)} onClick={() => void markOnly('Otwarto SMS. Przypomnienie zapisane.')}>
             <Icon name="chat" size={16} /> SMS
           </a>
         </span>
@@ -189,10 +188,10 @@ export function ReminderModal({ clientId, paymentId, onClose }: { clientId: stri
         {daysOverdue(p, today) > 0 ? ` · ${overdueText(daysOverdue(p, today))}` : ''}
         {p.remindedAt ? ` · ${remindedText(p.remindedAt, today)}` : ''}
       </p>
-      <Field label="Wiadomość" wide hint={noBank ? 'Dodaj numer konta i BLIK w profilu trenera — będą wstawiane automatycznie.' : undefined}>
+      <Field label="Wiadomość" wide hint={noBank ? 'Dodaj numer konta i BLIK w profilu trenera, będą wstawiane same.' : undefined}>
         <textarea ref={area} className="input pay-remind-text" rows={9} value={body} onChange={(e) => setText(e.target.value)} />
       </Field>
-      {!client.phone && <p className="muted small">Brak numeru telefonu klienta — SMS otworzy się bez odbiorcy.</p>}
+      {!client.phone && <p className="muted small">Brak numeru telefonu. SMS otworzy się bez odbiorcy.</p>}
     </Modal>
   );
 }
@@ -247,7 +246,7 @@ export function BulkSubsModal({ onClose, latest }: { onClose: () => void; latest
               const c = clientById(now, cid);
               return c ? [put('clients', { ...c, payments: c.payments.filter((x) => x.id !== pid) })] : [];
             });
-            void apply(undo, 'Cofnięto — abonamenty usunięte.');
+            void apply(undo, 'Cofnięto. Abonamenty usunięte.');
           },
         });
       }}
@@ -299,7 +298,7 @@ export function BulkSubsModal({ onClose, latest }: { onClose: () => void; latest
                     <input
                       className="input input-sm"
                       inputMode="decimal"
-                      aria-label={`Kwota – ${c.client.name}`}
+                      aria-label={`Kwota: ${c.client.name}`}
                       value={amountOf(c)}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -315,7 +314,7 @@ export function BulkSubsModal({ onClose, latest }: { onClose: () => void; latest
           })}
         </ul>
       )}
-      {list.length > 0 && skipped === list.length && <p className="small">Wszyscy mają już abonament za {fmtMonth(month)} — wybierz inny miesiąc.</p>}
+      {list.length > 0 && skipped === list.length && <p className="small">Wszyscy mają już abonament za {fmtMonth(month)}. Wybierz inny miesiąc.</p>}
       <p className="muted small">
         Razem {pln(sum)} · termin {fmtDate(due)}
         {skipped ? ` · pominięto ${skipped} (już ${plural(skipped, 'ma', 'mają', 'ma')} abonament za ten miesiąc)` : ''}

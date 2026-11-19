@@ -99,7 +99,7 @@ export function StoreProvider({
     } catch (e) {
       // gdy dane już są (np. chwilowy brak sieci) — zostają na ekranie, bez ekranu błędu
       if (hasDb.current) {
-        setToasts((t) => [...t, { id: ++toastId.current, text: 'Brak połączenia — pokazuję ostatnie dane.' }]);
+        setToasts((t) => [...t, { id: ++toastId.current, text: 'Brak połączenia. Pokazuję ostatnie dane.' }]);
         return;
       }
       setLoadError(e && typeof e === 'object' && 'message' in e ? [(e as { code?: string }).code, (e as { message: string }).message].filter(Boolean).join(' · ') : String(e));
@@ -169,7 +169,7 @@ export function StoreProvider({
     if (!box?.items.length) return;
     const r = await box.flush();
     if (r.failed.length) {
-      toast('Części zmian zapisanych bez internetu baza nie przyjęła — sprawdź je i zapisz ponownie.');
+      toast('Części zmian zapisanych bez internetu baza nie przyjęła. Sprawdź je i zapisz ponownie.');
       void load();
     }
     if (r.sent > 0 && !box.items.length) toast('Wysłano zapisane offline treningi.');
@@ -206,12 +206,12 @@ export function StoreProvider({
         // brak sieci: zmiana zostaje na ekranie i w kolejce na tym urządzeniu, wyśle się sama
         const had = outbox.current?.items.length ?? 0;
         const res = outbox.current ? await outbox.current.submit(changes) : (await repo.apply(changes), 'sent');
-        if (res === 'queued') toast('Brak internetu — zapisane na tym telefonie. Wyślę, gdy wróci połączenie.');
+        if (res === 'queued') toast('Brak internetu. Zapisane na tym telefonie, wyślę, gdy wróci połączenie.');
         else if (had > 0 && !outbox.current?.items.length) toast('Wysłano zapisane offline treningi.');
         if (res === 'sent' && message) toast(message);
         return true;
       } catch {
-        toast('Nie udało się zapisać — sprawdź połączenie z internetem i spróbuj ponownie.');
+        toast('Nie udało się zapisać. Sprawdź internet i spróbuj ponownie.');
         // cofamy podgląd zmiany, żeby ponowny zapis nie zdublował treningu
         if (before) setDb(before);
         if (typeof navigator === 'undefined' || navigator.onLine) void load();
@@ -230,9 +230,9 @@ export function StoreProvider({
       );
       try {
         await repo.saveCheckin(clientId, checkin);
-        toast('Dzięki! Zapisano samopoczucie.');
+        toast('Samopoczucie zapisane.');
       } catch (e) {
-        toast((e as Error).message === 'DB_OUTDATED' ? 'Samopoczucie nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 7 w hardening.sql).' : 'Nie udało się zapisać samopoczucia — sprawdź połączenie.');
+        toast((e as Error).message === 'DB_OUTDATED' ? 'Samopoczucie nie zapisało się. Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 7 w hardening.sql).' : 'Nie udało się zapisać samopoczucia. Sprawdź połączenie.');
         void load();
       }
     },
@@ -246,10 +246,10 @@ export function StoreProvider({
       setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, selfMeasurements: [...(c.selfMeasurements ?? []), item] } : c)) } : cur));
       try {
         await repo.addMeasurement(clientId, item);
-        toast('Pomiar zapisany — trener go zobaczy.');
+        toast('Pomiar zapisany.');
         return true;
       } catch {
-        toast('Nie udało się zapisać pomiaru — sprawdź połączenie.');
+        toast('Nie udało się zapisać pomiaru. Sprawdź połączenie.');
         void load();
         return false;
       }
@@ -267,7 +267,7 @@ export function StoreProvider({
         return true;
       } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, intake: prev } : c)) } : cur));
-        toast(e instanceof Error && e.message === 'DB_OUTDATED' ? 'Pliki w ankiecie się nie zapisały — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 18 w hardening.sql).' : 'Nie udało się zapisać ankiety — sprawdź połączenie i spróbuj ponownie.');
+        toast(e instanceof Error && e.message === 'DB_OUTDATED' ? 'Pliki w ankiecie się nie zapisały. Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 18 w hardening.sql).' : 'Nie udało się zapisać ankiety. Sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },
@@ -286,7 +286,7 @@ export function StoreProvider({
       } catch (e) {
         setDb((cur) => (cur ? { ...cur, clients: cur.clients.map((c) => (c.id === clientId ? { ...c, [kind]: prev } : c)) } : cur));
         const m = (e as Error).message;
-        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : kind === 'consents' ? '24' : kind === 'absences' || kind === 'exNotes' ? '26' : '19'} w hardening.sql).` : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        toast(m === 'DB_OUTDATED' || m === 'DB_OUTDATED_22' ? `Nie zapisało się. Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja ${m === 'DB_OUTDATED_22' ? '22' : kind === 'consents' ? '24' : kind === 'absences' || kind === 'exNotes' ? '26' : '19'} w hardening.sql).` : 'Nie udało się zapisać. Sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },
@@ -303,7 +303,7 @@ export function StoreProvider({
       try {
         await job;
       } catch (e) {
-        toast((e as Error).message === 'DB_OUTDATED' ? 'Odhaczenie nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 10 w hardening.sql).' : 'Nie udało się zapisać — sprawdź połączenie.');
+        toast((e as Error).message === 'DB_OUTDATED' ? 'Odhaczenie nie zapisało się. Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 10 w hardening.sql).' : 'Nie udało się zapisać. Sprawdź połączenie.');
         void load();
       }
     },
@@ -328,10 +328,10 @@ export function StoreProvider({
       }
       const mail = await emailTrainer(client?.name ?? 'Podopieczny', client?.email, note.text);
       if (!saved && mail !== 'sent') {
-        toast('Nie udało się wysłać — sprawdź połączenie i spróbuj ponownie.');
+        toast('Nie udało się wysłać. Sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
-      toast(saved && mail !== 'failed' ? 'Wysłano do trenera.' : saved ? 'Zapisano w aplikacji (e-mail nie wyszedł — trener zobaczy wiadomość w panelu).' : 'Wysłano e-mailem do trenera.');
+      toast(saved && mail !== 'failed' ? 'Wysłano do trenera.' : saved ? 'Zapisano w aplikacji (e-mail nie wyszedł, trener zobaczy wiadomość w panelu).' : 'Wysłano e-mailem do trenera.');
       return true;
     },
     [db, repo, toast, load],
@@ -350,7 +350,7 @@ export function StoreProvider({
         return true;
       } catch (e) {
         const m = (e as Error).message;
-        toast(m === 'DB_OUTDATED' ? 'Nie zapisało się — baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 23 w hardening.sql).' : /odbyła|zaplanowana/.test(m) ? m + '.' : 'Nie udało się zapisać — sprawdź połączenie i spróbuj ponownie.');
+        toast(m === 'DB_OUTDATED' ? 'Nie zapisało się. Baza wymaga aktualizacji po stronie trenera (Supabase, sekcja 23 w hardening.sql).' : /odbyła|zaplanowana/.test(m) ? m + '.' : 'Nie udało się zapisać. Sprawdź połączenie i spróbuj ponownie.');
         return false;
       }
     },
@@ -372,7 +372,7 @@ export function StoreProvider({
           (e as Error)?.message === 'DB_OUTDATED'
             ? 'Przenoszenie treningów wymaga aktualizacji bazy przez trenera (sekcja 32). Napisz do trenera, kiedy zrobisz trening.'
             : navigator.onLine === false
-              ? 'Brak internetu — trening nie został przeniesiony. Spróbuj, gdy będziesz online.'
+              ? 'Brak internetu. Trening nie został przeniesiony.'
               : `Nie udało się przenieść treningu: ${(e as Error)?.message ?? 'błąd'}`,
         );
         return false;

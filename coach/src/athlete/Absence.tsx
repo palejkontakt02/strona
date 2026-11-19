@@ -37,15 +37,15 @@ export function AbsenceSheet({ client, onClose, notify = true }: { client: Clien
       const late = clash.filter((x) => isLateCancel(x));
       const list = clash.map((x) => `${dm(x.date)} ${x.time}`).join(', ');
       const lateText = late.length
-        ? ` Uwaga: ${late.map((x) => `${dm(x.date)} ${x.time}`).join(', ')} — mniej niż ${CANCEL_HOURS} h do wizyty. Przy późnym odwołaniu trening może przepaść (zostać pobrany z pakietu) — trener zdecyduje.`
+        ? ` Uwaga: ${late.map((x) => `${dm(x.date)} ${x.time}`).join(', ')} : mniej niż ${CANCEL_HOURS} h do wizyty. Późno odwołany trening może zejść z pakietu. Zdecyduje trener.`
         : '';
       const n = clash.length;
-      const yes = await ask(`Masz ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} w tym czasie (${list}) — odwołać?${lateText}`, { confirm: n > 1 ? 'Odwołaj wizyty' : 'Odwołaj wizytę', cancel: 'Zostaw', danger: false });
+      const yes = await ask(`Masz ${n} ${plural(n, 'wizytę', 'wizyty', 'wizyt')} w tym czasie (${list}). Odwołać?${lateText}`, { confirm: n > 1 ? 'Odwołaj wizyty' : 'Odwołaj wizytę', cancel: 'Zostaw', danger: false });
       if (yes) {
         const why = `nieobecność: ${ABSENCE_REASONS.find(([k]) => k === reason)?.[1].toLowerCase() ?? 'inne'}`;
         let done = 0;
         for (const x of clash) if (await respondAppointment(x.id, 'cancel', why)) done++;
-        if (done) toast(`${done === n ? 'Odwołano' : `Odwołano ${done} z ${n}`} — trener dostał informację.`);
+        if (done) toast(`${done === n ? 'Odwołano' : `Odwołano ${done} z ${n}`}. Trener wie.`);
       }
     }
     onClose();
@@ -97,7 +97,7 @@ export function AbsenceToday({ client, absence, onOwn, notify = true }: { client
   const card = absenceCard(absence, today);
   const back = async () => {
     if (!(await ask('Wracasz wcześniej? Nieobecność skończy się wczoraj, a plan i przypomnienia wrócą od dziś.', { confirm: 'Wracam', danger: false }))) return;
-    const ok = await saveClientEntry(client.id, 'absences', endEarly(absence, today), 'Witaj z powrotem!');
+    const ok = await saveClientEntry(client.id, 'absences', endEarly(absence, today), 'Powrót zapisany. Od dziś trenujesz.');
     if (ok && notify) void sendClientNote(client.id, returnMessage(absence, today));
   };
   return (

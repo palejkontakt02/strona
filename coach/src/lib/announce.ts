@@ -44,12 +44,12 @@ export function nextSetInfo(run: Run, prefer?: { k: number; i: number } | null):
 const lowerFirst = (t: string) => (t && t[0] !== t[0].toLowerCase() && t[1] === t[1]?.toLowerCase() ? t[0].toLowerCase() + t.slice(1) : t);
 const nf = (v: number) => v.toLocaleString('pl-PL', { maximumFractionDigits: 2 });
 
-/** Duży napis: „Seria 3 — przysiad 60 kg × 8” (deska: „× 30 s”). */
+/** Duży napis: „Seria 3: przysiad 60 kg × 8” (deska: „× 30 s”). */
 export function flashText(x: NextSetInfo): string {
   const head = x.n == null ? 'Rozgrzewka' : `Seria ${x.n}`;
   const unit = x.unit === 's' ? ' s' : x.unit === 'min' ? ' min' : '';
   const what = [x.load != null && x.load > 0 && !x.cardio ? `${nf(x.load)} kg` : '', x.reps ? `${x.load != null && x.load > 0 && !x.cardio ? '× ' : ''}${x.reps}${unit}` : ''].filter(Boolean).join(' ');
-  return `${head} — ${lowerFirst(x.name)}${what ? ` ${what}` : ''}`;
+  return `${head}: ${lowerFirst(x.name)}${what ? ` ${what}` : ''}`;
 }
 
 /** Tekst do przeczytania: „Następna seria: przysiad, 60 kilogramów, 8 powtórzeń”. */

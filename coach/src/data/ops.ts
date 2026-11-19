@@ -130,7 +130,7 @@ export function saveSession(db: Db, s: SessionSave): { changes: Change[]; messag
     if (client && session.charge === 'pojedyncza' && s.amount && !sessionPayment(db, session)) {
       const pay = singleSessionPayment(uid(), session.date, s.amount, !!s.paidNow, `Sesja ${fmtDay(session.date)}`);
       session = { ...session, paymentId: pay.id };
-      return { changes: [put('sessions', session), put('clients', { ...client, payments: [...client.payments, pay] })], message: s.paidNow ? 'Zapisano — płatność dodana jako opłacona.' : 'Zapisano — płatność czeka w „Do zapłaty”.' };
+      return { changes: [put('sessions', session), put('clients', { ...client, payments: [...client.payments, pay] })], message: s.paidNow ? 'Zapisano. Płatność opłacona.' : 'Zapisano. Płatność czeka w „Do zapłaty”.' };
     }
     return { changes: [put('sessions', session)], message };
   }
@@ -175,7 +175,7 @@ export function savedSameDay(db: Db, clientId: string, planId: string | undefine
   if (!planId || !workoutId) return undefined;
   return db.sessions.find((s) => s.clientId === clientId && s.planId === planId && s.workoutId === workoutId && s.date === date);
 }
-const dupText = (s: TrainingSession) => `„${s.workoutName || 'Ten trening'}” jest już zapisany dziś${s.createdAt ? ` (o ${new Date(s.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })})` : ''}. Zapisać go drugi raz? Drugi zapis nie przesunie planu — żeby coś poprawić, otwórz zapisany trening w historii.`;
+const dupText = (s: TrainingSession) => `„${s.workoutName || 'Ten trening'}” jest już zapisany dziś${s.createdAt ? ` (o ${new Date(s.createdAt).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })})` : ''}. Zapisać go drugi raz? Drugi zapis nie przesunie planu. Żeby coś poprawić, otwórz zapisany trening w historii.`;
 export { dupText };
 
 /** Problem z rozliczeniem „przez klub”: miejsce musi być klubem. */

@@ -93,7 +93,7 @@ export function resolveLoad(
   if (pc) {
     return e1
       ? { load: round25((e1 * Number(pc[1])) / 100), why: `${pc[1]}% ${opts.maxLabel ?? 'szac. 1RM'}` }
-      : { load: null, why: `${pc[1]}% 1RM – brak historii, dobierz ciężar` };
+      : { load: null, why: `${pc[1]}% 1RM, brak historii. Dobierz ciężar` };
   }
   // zakres „6–8” — start od dolnej wartości, zakres w podpowiedzi
   const rg = String(spec || '').trim().match(/^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)$/);

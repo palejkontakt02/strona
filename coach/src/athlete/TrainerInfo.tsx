@@ -36,9 +36,9 @@ export function TrainerAvatar({ profile, size = 28 }: { profile: TrainerProfile;
 export function vacationState(v: TrainerProfile['vacation'], today = todayISO()): { now: boolean; text: string } | null {
   if (!v?.from || !v.to || v.to < v.from || v.to < today) return null;
   const msg = v.message?.trim();
-  if (v.from <= today) return { now: true, text: `Trener na urlopie do ${dm(v.to)}${msg ? ` — ${msg}` : ''}` };
+  if (v.from <= today) return { now: true, text: `Trener na urlopie do ${dm(v.to)}${msg ? `. ${msg}` : ''}` };
   const in7 = new Date(Date.parse(today) + 7 * 86_400_000).toISOString().slice(0, 10);
-  if (v.from <= in7) return { now: false, text: `Trener będzie na urlopie ${dm(v.from)}–${dm(v.to)}${msg ? ` — ${msg}` : ''}` };
+  if (v.from <= in7) return { now: false, text: `Trener będzie na urlopie ${dm(v.from)}–${dm(v.to)}${msg ? `. ${msg}` : ''}` };
   return null;
 }
 

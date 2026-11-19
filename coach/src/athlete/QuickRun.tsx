@@ -22,7 +22,7 @@ export function QuickRun({ client }: { client: Client }) {
       <span className="eyebrow">Bieg poza aplikacją</span>
       <div className="r7-qrun-row">
         <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
-          <Icon name="run" size={18} /> {word} — wpisz bieg
+          <Icon name="run" size={18} /> {word}: wpisz bieg
         </button>
         <ImportActivity clientId={client.id} small />
       </div>
@@ -52,13 +52,13 @@ function QuickRunSheet({ client, word, onClose }: { client: Client; word: string
     setBusy(true);
     // konto podopiecznego zapisuje tylko treningi — bez wizyty i płatności
     const { changes } = saveSession(db, { session, isNew: true, matchAppointment: false });
-    const ok = await apply(changes.filter((c) => c.col === 'sessions'), 'Bieg zapisany — trener go zobaczy.');
+    const ok = await apply(changes.filter((c) => c.col === 'sessions'), 'Bieg zapisany.');
     setBusy(false);
     if (ok) onClose();
   };
 
   return (
-    <Sheet label={`${word} — szybki wpis`} onClose={onClose}>
+    <Sheet label={`${word}: szybki wpis`} onClose={onClose}>
       <div className="between sheet-top">
         <h2>{word}</h2>
         <button className="icon-btn" aria-label="Zamknij" onClick={onClose}>

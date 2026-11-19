@@ -50,7 +50,7 @@ export function packageValidTo(payments: Payment[]): ISODate | undefined {
 export function packageLine(st: PackageStatus | null, validTo?: ISODate): string | null {
   if (!st) return null;
   const valid = validTo ? ` (ważny do ${dm(validTo)})` : '';
-  if (st.left <= 0) return `Pakiet wykorzystany${st.left < 0 ? ` — ${-st.left} ${plural(-st.left, 'trening', 'treningi', 'treningów')} ponad pakiet` : ''}`;
+  if (st.left <= 0) return `Pakiet wykorzystany${st.left < 0 ? `: ${-st.left} ${plural(-st.left, 'trening', 'treningi', 'treningów')} ponad pakiet` : ''}`;
   const of = st.left > st.size ? st.total : st.size;
   const verb = st.left === 1 ? 'został' : plural(st.left, 'został', 'zostały', 'zostało');
   return `Pakiet: ${verb} ${st.left} z ${of}${valid}`;

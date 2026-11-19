@@ -69,7 +69,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
   const prog = intakeProgress({ answers });
 
   const finish = async () => {
-    if (!consent && !asTrainer) return toast('Bez zgody na przetwarzanie danych o zdrowiu nie zapiszesz ankiety — zaznaczysz ją w Ustawieniach → Moje dane.');
+    if (!consent && !asTrainer) return toast('Bez zgody na przetwarzanie danych o zdrowiu nie zapiszesz ankiety. Zaznacz ją w Ustawieniach (Moje dane).');
     setBusy(true);
     const now = new Date().toISOString();
     const clean = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim().slice(0, 2000)]).filter(([, v]) => v));
@@ -85,12 +85,12 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     }
     // nowe „tak” w pytaniach zdrowotnych (PAR-Q) — wprost w wiadomości do trenera
     const newYes = INTAKE_PARQ.filter((k) => clean[k] === 'tak' && client.intake?.answers[k] !== 'tak').map((k) => INTAKE[0].fields.find((f) => f.key === k)?.label ?? k);
-    const warn = client.intake?.completedAt && newYes.length ? ` UWAGA — nowe „tak” w pytaniach o zdrowie: ${newYes.join(' · ')}` : '';
+    const warn = client.intake?.completedAt && newYes.length ? ` UWAGA: nowe „tak” w pytaniach o zdrowie: ${newYes.join(' · ')}` : '';
     // pierwsze wypełnienie: każde „tak” w PAR-Q wprost w wiadomości do trenera
-    const firstWarn = !client.intake?.completedAt && newYes.length ? ` UWAGA — PAR-Q: tak przy: ${newYes.join(' · ')}` : '';
+    const firstWarn = !client.intake?.completedAt && newYes.length ? ` UWAGA, PAR-Q: tak przy: ${newYes.join(' · ')}` : '';
     const added = files.filter((f) => !(client.intake?.files ?? []).some((x) => x.id === f.id)).length;
     const filesMsg = added ? ` Dołączone pliki: ${added}.` : '';
-    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}${filesMsg}` : `Wypełniłem(-am) ankietę startową — zdrowie, styl życia, odżywianie, sport i cele.${firstWarn}${filesMsg}`);
+    if (!asTrainer) void sendClientNote(client.id, client.intake?.completedAt ? `Zaktualizowałem(-am) ankietę (zdrowie / styl życia / cele).${warn}${filesMsg}` : `Wypełniłem(-am) ankietę startową (zdrowie, styl życia, odżywianie, sport i cele).${firstWarn}${filesMsg}`);
     else toast('Ankieta zapisana.');
     if (!asTrainer && newYes.length) {
       setParqAlert(newYes);
@@ -108,8 +108,8 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
           <h1>Zanim zaczniesz trenować</h1>
         </header>
         <section className="acard acard-warn r7-parq" role="alert">
-          <span className="eyebrow">Ważne — zdrowie</span>
-          <h3>Skonsultuj się z lekarzem przed rozpoczęciem treningów — trener dostał informację.</h3>
+          <span className="eyebrow">Zdrowie</span>
+          <h3>Przed treningami skonsultuj się z lekarzem. Trener wie.</h3>
           <p className="small">Zaznaczono „tak” przy: {parqAlert.join(' · ')}</p>
           <p className="muted small">Do czasu rozmowy z lekarzem i trenerem nie rób intensywnych treningów samodzielnie. Jeśli lekarz da zgodę, napisz o tym trenerowi.</p>
           <button className="btn btn-primary btn-block" onClick={onClose}>
@@ -124,9 +124,9 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     return (
       <div className="ath-home fade intake">
         <header className="ath-hello">
-          <span className="eyebrow">{first ? 'Witaj! Zacznijmy od krótkiej ankiety' : 'Moja ankieta'}</span>
+          <span className="eyebrow">{first ? 'Ankieta startowa' : 'Moja ankieta'}</span>
           <h1>Twoja zgoda</h1>
-          <p className="muted small">Ankieta pyta o zdrowie — urazy, choroby, ból. To dane szczególnie chronione, więc potrzebujemy Twojej wyraźnej zgody.</p>
+          <p className="muted small">Ankieta pyta o urazy, choroby i ból. To dane szczególnie chronione, potrzebna jest Twoja zgoda.</p>
         </header>
         <section className="acard">
           <Consents
@@ -150,7 +150,7 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
     <div className="ath-home fade intake">
       <header className="ath-hello">
         <span className="eyebrow">
-          {first ? 'Witaj! Zacznijmy od krótkiej ankiety' : 'Moja ankieta'} · krok {step + 1} z {steps}
+          {first ? 'Ankieta startowa' : 'Moja ankieta'} · krok {step + 1} z {steps}
         </span>
         <h1>{sec ? sec.title : filesStep ? 'Zdjęcia i dokumenty' : 'Zgoda i zapis'}</h1>
         <div className="progress" aria-label={`Odpowiedzi: ${prog.done} z ${prog.total}`}>
@@ -180,11 +180,11 @@ export function IntakeWizard({ client, onClose, first, asTrainer }: { client: Cl
             Odpowiedziano na <b>{prog.done}</b> z {prog.total} pytań{files.length ? `, dołączone pliki: ${files.length}` : ''}. Puste pola możesz uzupełnić później w „Moja ankieta”.
           </p>
           {!asTrainer && consent && (
-            <p className="muted small intake-consent">Zgoda na przetwarzanie danych o zdrowiu: udzielona. Wycofasz ją w każdej chwili w Ustawieniach → Moje dane.</p>
+            <p className="muted small intake-consent">Zgoda na przetwarzanie danych o zdrowiu: udzielona. Wycofasz ją w Ustawieniach (Moje dane).</p>
           )}
           {asTrainer && !consent && <p className="small warn-text">Podopieczny nie udzielił w aplikacji zgody na przetwarzanie danych o zdrowiu.</p>}
           {answers.parq_heart === 'tak' || answers.parq_chest === 'tak' || answers.parq_dizzy === 'tak' || answers.parq_supervised === 'tak' ? (
-            <p className="small warn-text">Zaznaczyłeś(-aś) „tak” przy pytaniu o serce, ból w klatce, omdlenia albo nadzór lekarza — przed intensywnym treningiem skonsultuj się z lekarzem. Trener o tym wie.</p>
+            <p className="small warn-text">Zaznaczyłeś(-aś) „tak” przy pytaniu o serce, ból w klatce, omdlenia albo nadzór lekarza. Przed intensywnym treningiem skonsultuj się z lekarzem. Trener o tym wie.</p>
           ) : null}
         </section>
       )}

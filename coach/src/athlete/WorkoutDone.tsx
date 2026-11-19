@@ -83,7 +83,7 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
         </p>
         {info.stoppedForPain && (
           <p className="wdone-pain" role="note">
-            Przerwany z powodu bólu — trener dostał informację.
+            Przerwany z powodu bólu. Trener wie.
           </p>
         )}
       </div>
@@ -129,7 +129,7 @@ export function WorkoutDone({ info, onDone }: { info: DoneInfo; onDone: () => vo
           </p>
         </div>
       ) : (
-        <p className="muted small wdone-cmp">Pierwsze wykonanie tego treningu — następnym razem zobaczysz porównanie.</p>
+        <p className="muted small wdone-cmp">Pierwszy raz. Następnym razem zobaczysz porównanie.</p>
       )}
       {info.records.length > 0 && (
         <div className="pr-summary">

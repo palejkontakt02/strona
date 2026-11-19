@@ -306,7 +306,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if ((s.hr ?? '').trim() && numIn(s.hr, 30, 240) == null) return toast('Tętno: od 30 do 240.');
       const km = parseKm(s.dist);
       // „1:20” przy 16 km to 1 min 20 s — tempo niemożliwe, prawie na pewno chodziło o godziny
-      if (d && km && km >= 0.8 && d / km < 2.4) return toast(`Tempo ${paceText(d, km)} to za szybko — „${s.reps.trim()}” to ${fmtDur(d)}. Dla godzin wpisz np. 1:20:00 albo 80.`);
+      if (d && km && km >= 0.8 && d / km < 2.4) return toast(`Tempo ${paceText(d, km)} to za szybko: „${s.reps.trim()}” to ${fmtDur(d)}. Dla godzin wpisz np. 1:20:00 albo 80.`);
       const next = update((r) => void (r.ex[k].sets[i].done = true));
       doneHaptic();
       // przerwa po powtórzeniu (z odcinka albo całego biegu) — tylko między powtórzeniami tego samego odcinka
@@ -328,7 +328,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       if (s.reps.trim() && !/\d/.test(s.reps)) return toast('Powtórzenia: wpisz liczbę.');
       if (s.reps.trim() && sumReps(s.reps) === 0) return toast('Powtórzenia: co najmniej 1.');
     }
-    if (s.load.trim() && !/^\s*-?\d+([.,]\d+)?\s*(kg)?\s*$/i.test(s.load)) return toast(`Ciężar „${s.load.trim()}” — wpisz samą liczbę, np. 42,5.`);
+    if (s.load.trim() && !/^\s*-?\d+([.,]\d+)?\s*(kg)?\s*$/i.test(s.load)) return toast(`Ciężar „${s.load.trim()}”: wpisz samą liczbę, np. 42,5.`);
     const load = num(s.load);
     if (load != null && load < 0) return toast('Ciężar nie może być ujemny.');
     const best = recentE1(sessionsOf(db, client.id), ex.name);
@@ -385,7 +385,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     }
     vibrate([200, 100, 200]);
     beep(880, 0.25);
-    toast('Koniec — zalicz serię ✓');
+    toast('Koniec. Zalicz serię ✓');
     setHold(null);
   };
 
@@ -439,7 +439,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       // ból podniesiony do ≥5 przy poprawce — trener dostaje informację tak samo jak przy pierwszym zapisie
       if (!trainer && updated.pain != null && updated.pain >= 5 && (editing.pain ?? 0) < 5) {
         void sendClientNote(client.id, `Ból ${updated.pain}/10${updated.painMap?.length ? ` (${painSummary(updated.painMap)})` : ''} po treningu „${updated.workoutName || 'Trening'}”${updated.notes ? `: ${updated.notes}` : ''}`, updated.id);
-        void ask(`Ból ${updated.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
+        void ask(`Ból ${updated.pain}/10. Trener wie. Do jego odpowiedzi nie zwiększaj ciężarów. Jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
       }
       setFinish(null);
       onSaved();
@@ -516,7 +516,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             stoppedForPain: !!session.stoppedForPain,
           };
         })();
-    if (!(await apply(changes, trainer ? message : 'Trening zapisany. Dobra robota!'))) return; // trening zostaje — można ponowić zapis
+    if (!(await apply(changes, trainer ? message : 'Trening zapisany.'))) return; // trening zostaje — można ponowić zapis
     // notatka z podsumowania trafia też do wiadomości trenera (z odnośnikiem do treningu)
     // zadanie dzienne o tej samej nazwie co trening (np. „Ćwiczenia na kręgosłup”) odhacza się samo
     if (!trainer) {
@@ -535,7 +535,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         `${hurt ? `Ból ${session.pain}/10${session.painMap?.length ? ` (${painSummary(session.painMap)})` : ''} po treningu` : 'Po treningu'} „${session.workoutName || 'Trening'}”${session.notes ? `: ${session.notes}` : ''}`,
         session.id,
       );
-    if (hurt) void ask(`Ból ${session.pain}/10 — trener dostał informację. Do czasu jego odpowiedzi: nie zwiększaj ciężarów, a jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
+    if (hurt) void ask(`Ból ${session.pain}/10. Trener wie. Do jego odpowiedzi nie zwiększaj ciężarów. Jeśli ból narasta albo nie mija do jutra, odpuść trening, który go wywołuje.`, { confirm: 'Rozumiem', danger: false, cancel: 'Zamknij' });
     setFinish(null);
     if (summary) {
       // ekran „Trening zakończony”; trening w toku przechodzi w poprawki zapisanego — zamknięcie aplikacji
@@ -563,7 +563,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     let added = 0;
     if (withVideo.length) {
       const yes = await ask(
-        `${withVideo.length === 1 ? 'Jedna seria z nagraniem nie jest zaliczona' : `${withVideo.length} serie z nagraniem nie są zaliczone`} (brak ✓). Zapisują się tylko zaliczone serie — zaliczyć ${withVideo.length === 1 ? 'ją' : 'je'}, żeby nagranie zostało?`,
+        `${withVideo.length === 1 ? 'Jedna seria z nagraniem nie jest zaliczona' : `${withVideo.length} serie z nagraniem nie są zaliczone`} (brak ✓). Zapisują się tylko zaliczone serie. Zaliczyć ${withVideo.length === 1 ? 'ją' : 'je'}, żeby nagranie zostało?`,
         { confirm: 'Zalicz z nagraniem' },
       );
       if (yes) {
@@ -729,7 +729,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       showTempo || showPlates ? (
         <span className="setx">
           {showTempo && (
-            <span className="tempo-chip" title="Tempo: opuszczanie – pauza w dole – podnoszenie – pauza w górze (s)">
+            <span className="tempo-chip" title="Tempo (s): opuszczanie, pauza w dole, podnoszenie, pauza w górze">
               tempo {e.tempoStr}
             </span>
           )}
@@ -783,7 +783,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         )}
         <div className={`sgrid ${run.ex[k].cardio ? 'cardio' : ''} ${bare && !e.cardio ? 'noload' : ''} ${blockNoLoad === undefined && e.perSide && !e.cardio && !bare && !sidesWide(e) ? 'sides' : ''} ${s.done ? 'done' : ''} ${s.warmup ? 'warm' : ''} ${isNext ? 'is-next' : ''} ${active ? 'is-active' : ''}`}>
           {trainer && run.ex[k].sets.length > 1 ? (
-            <button type="button" className="sn sn-btn" {...pressProps(k, i, num)} aria-label={`Seria ${num}, ${run.ex[k].name} — przytrzymaj, żeby usunąć`} title="Przytrzymaj, żeby usunąć tę serię">
+            <button type="button" className="sn sn-btn" {...pressProps(k, i, num)} aria-label={`Seria ${num}, ${run.ex[k].name}. Przytrzymaj, żeby usunąć`} title="Przytrzymaj, żeby usunąć tę serię">
               {snInner}
             </button>
           ) : (
@@ -819,7 +819,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 <button
                   type="button"
                   className="hold-btn"
-                  aria-label={`Odliczaj ${fmtHold(holdSec(s))} — ${run.ex[k].name}, seria ${num}`}
+                  aria-label={`Odliczaj ${fmtHold(holdSec(s))}: ${run.ex[k].name}, seria ${num}`}
                   title={`Odliczaj ${fmtHold(holdSec(s))}`}
                   onClick={() => setHold({ end: Date.now() + holdSec(s) * 1000, total: holdSec(s), what: `${label ?? run.ex[k].label ?? ''} ${run.ex[k].name.slice(0, 18)} · seria ${num}`.trim() })}
                 >
@@ -881,7 +881,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }}
           >
             <Icon name="timer" size={16} /> Odliczaj {run.ex[k].cardio ? fmtDur(parseDur(s.reps) ?? 0) : fmtHold(holdSec(s))}
-            {run.ex[k].perSide ? ' — jedna strona, potem druga' : ''}
+            {run.ex[k].perSide ? ', jedna strona, potem druga' : ''}
           </button>
         )}
         {trainer && s.warmup && !s.done && (
@@ -960,7 +960,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
   const removeAt = async (k: number, i: number, num: string) => {
     const s = run.ex[k].sets[i];
     const what = [s.reps && `${s.reps} powt.`, s.load && `${String(s.load).replace(".", ",")} kg`].filter(Boolean).join(' × ');
-    if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''} — ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}${s.video ? ' Jej nagranie też zniknie.' : ''}`, { confirm: 'Usuń serię' }))) return;
+    if (!(await ask(`Usunąć serię ${num}${what ? ` (${what})` : ''}: ${run.ex[k].name}?${s.done ? ' Jest już zaliczona.' : ''}${s.video ? ' Jej nagranie też zniknie.' : ''}`, { confirm: 'Usuń serię' }))) return;
     removeWarmup(k, i);
   };
 
@@ -1043,7 +1043,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }
             title="Cardio: czas, dystans i tętno zamiast powtórzeń i ciężaru"
           >
-            <Icon name="heart" size={14} /> {e.cardio ? 'Cardio — min / km / tętno' : 'Cardio?'}
+            <Icon name="heart" size={14} /> {e.cardio ? 'Cardio: min / km / tętno' : 'Cardio?'}
           </button>
         )}
         {!e.cardio && !e.timed && ((trainer && optsOpen.has(k)) || !!loadPerOf(e)) && <LoadPerToggle value={loadPerOf(e)} onChange={(v) => update((r) => void (r.ex[k].loadPer = v))} />}
@@ -1062,7 +1062,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             }
             title="Ćwiczenie na czas (deska, wall sit, zwis): wpisujesz sekundy zamiast powtórzeń"
           >
-            <Icon name="timer" size={14} /> {e.timed ? 'Na czas — sekundy zamiast powtórzeń' : 'Na czas?'}
+            <Icon name="timer" size={14} /> {e.timed ? 'Na czas: sekundy zamiast powtórzeń' : 'Na czas?'}
           </button>
         )}
         {trainer && !e.cardio && (optsOpen.has(k) || e.perSide) && (
@@ -1073,7 +1073,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
           onClick={() => update((r) => void (r.ex[k].perSide = !r.ex[k].perSide || undefined))}
           title="Ćwiczenie na jedną stronę: wpisuj powtórzenia na każdą stronę"
         >
-          ↔ {e.perSide ? (e.sets.some((x) => x.unit) ? 'Na każdą stronę — czas na stronę' : 'Na każdą stronę — powt. na stronę') : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
+          ↔ {e.perSide ? (e.sets.some((x) => x.unit) ? 'Na każdą stronę: czas na stronę' : 'Na każdą stronę: powt. na stronę') : 'Na stronę? (np. 8 na lewą i 8 na prawą)'}
         </button>
         )}
       </div>
@@ -1177,8 +1177,8 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
         {hintNext != null && block.includes(hintNext) && (
           <div className="sughint next-hint">
             {newRound && cur
-              ? `Runda ${cur.round + 1} z ${cur.rounds} — po przerwie ${run.ex[hintNext].label} · ${run.ex[hintNext].name}`
-              : `Teraz ${run.ex[hintNext].label} · ${run.ex[hintNext].name} — ${rest ? 'po krótkiej przerwie' : 'bez przerwy'}`}
+              ? `Runda ${cur.round + 1} z ${cur.rounds}. Po przerwie ${run.ex[hintNext].label} · ${run.ex[hintNext].name}`
+              : `Teraz ${run.ex[hintNext].label} · ${run.ex[hintNext].name}, ${rest ? 'po krótkiej przerwie' : 'bez przerwy'}`}
           </div>
         )}
       </>
@@ -1196,7 +1196,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     if (!run.editSessionId) painSidRef.current ??= uid();
     const sid = run.editSessionId ?? painSidRef.current ?? undefined;
     const where = painSummary(clean);
-    void sendClientMessage(client.id, `Ból ${level}/10${where ? ` (${where})` : ''} przy „${e.name}” — ${stop ? 'przerywam trening' : 'pomijam to ćwiczenie i ćwiczę dalej'}.`, {
+    void sendClientMessage(client.id, `Ból ${level}/10${where ? ` (${where})` : ''} przy „${e.name}”. ${stop ? 'Przerywam trening' : 'Pomijam to ćwiczenie i ćwiczę dalej'}.`, {
       sessionId: sid,
       ref: { sessionId: sid, exIndex: k, exName: e.name, workout: run.name, date: run.date },
     });
@@ -1210,7 +1210,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
     const kb = blocks.findIndex((b) => b.includes(k));
     const nb = blocks.findIndex((b, j) => j > kb && b.some((x) => run.ex[x].sets.some((st) => !st.done)));
     if (nb >= 0) go(nb);
-    else toast('To było ostatnie ćwiczenie — zakończ trening, kiedy chcesz.');
+    else toast('To było ostatnie ćwiczenie. Zakończ trening, kiedy chcesz.');
   };
   /** Powrót z podsumowania do ćwiczeń: przerwanie z bólu staje się zwykłym zgłoszeniem (trening trwa dalej). */
   const closeFinish = () => {
@@ -1599,12 +1599,12 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
                 const on = !voice;
                 setVoice(on);
                 setVoiceOn(on);
-                if (on && !speak('Zapowiedzi głosowe włączone', true)) toast('Ta przeglądarka nie ma syntezy mowy — zapowiedzi nie zabrzmią.');
+                if (on && !speak('Zapowiedzi głosowe włączone', true)) toast('Ta przeglądarka nie ma syntezy mowy. Zapowiedzi nie zabrzmią.');
               }}
             >
               <span>
                 <b>Zapowiedzi głosowe</b>
-                <span className="muted small">{canSpeak() ? '„Następna seria: przysiad, 60 kilogramów, 8 powtórzeń” — po przerwie i przy zmianie ćwiczenia.' : 'Ta przeglądarka nie ma syntezy mowy.'}</span>
+                <span className="muted small">{canSpeak() ? 'Po przerwie i przy zmianie ćwiczenia: „Następna seria: przysiad, 60 kilogramów, 8 powtórzeń”.' : 'Ta przeglądarka nie ma syntezy mowy.'}</span>
               </span>
               <span className="more-switch-state">{voice ? 'wł.' : 'wył.'}</span>
             </button>
@@ -1676,7 +1676,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
               ? 'Zmiana strony'
               : `${hold.side === 'L' ? 'Lewa strona' : hold.side === 'P' ? 'Prawa strona' : 'Trzymaj'}${hold.what ? ` · ${hold.what}` : ''}`
           }
-          endText="Koniec — zalicz serię ✓"
+          endText="Koniec. Zalicz serię ✓"
           onEnd={onHoldEnd}
         />
       )}
@@ -1701,7 +1701,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
             <h2>Podsumowanie</h2>
             {painStop?.stop && !editing && (
               <p className="pain-stop-note small" role="note">
-                Trening przerwany z powodu bólu — trener dostał informację. Zrobione serie zostaną zapisane.
+                Trening przerwany z powodu bólu. Trener wie. Zrobione serie zostaną zapisane.
               </p>
             )}
             {(() => {
@@ -1870,7 +1870,7 @@ function RestBar({
   rest,
   setRest,
   label = 'Przerwa',
-  endText = 'Koniec przerwy – następna seria!',
+  endText = 'Koniec przerwy. Następna seria.',
   note,
   next,
   onEnd,
@@ -1919,7 +1919,7 @@ function RestBar({
     <>
       <div className={`restbar ${label !== 'Przerwa' ? 'holdbar' : ''}`} role="timer" aria-label={label}>
         <div className="rb-fill" style={{ width: `${pct}%` }} />
-        <button type="button" className="rb-time" aria-label={`${label}: ${fmtSec(left)} — pokaż na cały ekran`} onClick={() => setFull(true)}>
+        <button type="button" className="rb-time" aria-label={`${label}: ${fmtSec(left)}. Pokaż na cały ekran`} onClick={() => setFull(true)}>
           <span className="rb-label">
             {label}
             {note && <small className="rb-note"> · {note}</small>}
@@ -2064,7 +2064,7 @@ function Tempo({ name, phases, reps: reps0, onClose }: { name: string; phases: [
       >
         {state.running ? 'Stop' : 'Start'}
       </button>
-      <p className="muted small">Fazy z planu – możesz je dostosować do tej serii. Nie zmienia to planu od trenera.</p>
+      <p className="muted small">Fazy z planu. Zmiana dotyczy tylko tej serii, plan zostaje.</p>
       {PHASES.map(([l], i) => (
         <label key={l} className="tempo-slider">
           <span className="between">
@@ -2318,7 +2318,7 @@ function LayoutSheet({ run, setRun, onClose, onAdd, canSavePlan }: { run: Run; s
             Gotowe
           </button>
         </div>
-        <p className="muted small"><Icon name="link" size={14} /> łączy ćwiczenie z poprzednim w superserię / obwód — robi się je na zmianę, przerwa po całej rundzie.</p>
+        <p className="muted small"><Icon name="link" size={14} /> łączy ćwiczenie z poprzednim w superserię lub obwód: na zmianę, przerwa po całej rundzie.</p>
         <ul className="layout-list">
           {run.ex.map((e, k) => (
             <li key={k} className={`layout-row ${e.linked ? 'linked' : ''}`}>
@@ -2402,7 +2402,7 @@ function PainStopSheet({
           <Icon name="x" />
         </button>
       </div>
-      <p className="muted small">Trener dostanie wiadomość od razu. Zrobione serie zostają — to nie porażka, tylko rozsądek.</p>
+      <p className="muted small">Trener dostanie wiadomość od razu. Zrobione serie zostają.</p>
       {run.ex.length > 1 && (
         <label className="field">
           <span>Przy którym ćwiczeniu?</span>
@@ -2461,7 +2461,7 @@ function ExNoteSheet({ name, text: initial, onClose, onSave }: { name: string; t
         </button>
       </div>
       <p className="muted small">
-        {name} — np. „siedzisko na 4”, „lewy kabel”. Pokaże się przy każdym treningu z tym ćwiczeniem. Trener też ją widzi.
+        {name}: np. „siedzisko na 4”, „lewy kabel”. Pokaże się przy każdym treningu z tym ćwiczeniem. Trener też ją widzi.
       </p>
       <label className="field">
         <span>Notatka</span>

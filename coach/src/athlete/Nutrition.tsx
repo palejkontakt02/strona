@@ -117,7 +117,7 @@ export function NutritionCard({ client }: { client: Client }) {
       setOcr({ ...r, forDay: day });
     } catch (e) {
       setOcr(null);
-      toast(e instanceof Error ? e.message : 'Nie udało się odczytać zrzutu — wpisz liczby ręcznie.');
+      toast(e instanceof Error ? e.message : 'Nie udało się odczytać zrzutu. Wpisz liczby ręcznie.');
     }
     setBusy(null);
   };
@@ -130,7 +130,7 @@ export function NutritionCard({ client }: { client: Client }) {
         .then((u) => fetch(u))
         .then((r) => r.blob())
         .catch(() => {
-          throw new Error('Nie udało się pobrać zrzutu — sprawdź połączenie.');
+          throw new Error('Nie udało się pobrać zrzutu. Sprawdź połączenie.');
         })
         .then(readScreenshot),
     );
@@ -150,7 +150,7 @@ export function NutritionCard({ client }: { client: Client }) {
         if (old && old !== ref) void deleteClientFile(old);
       } else void deleteClientFile(ref);
     } catch (e) {
-      toast(e instanceof Error && e.message === 'BUCKET' ? 'Magazyn plików nie jest jeszcze włączony — trener musi go dodać w Supabase.' : 'Nie udało się wysłać zrzutu — sprawdź połączenie.');
+      toast(e instanceof Error && e.message === 'BUCKET' ? 'Magazyn plików nie jest włączony. Trener musi go dodać w Supabase.' : 'Nie udało się wysłać zrzutu. Sprawdź połączenie.');
     }
     setBusy(null);
     if (read) await applyOcr(read);
@@ -203,7 +203,7 @@ export function NutritionCard({ client }: { client: Client }) {
           ))}
         </span>
       </div>
-      <p className="muted small">Przepisz podsumowanie dnia — wystarczą sumy. Możesz dodać zrzut ekranu.</p>
+      <p className="muted small">Wpisz sumy z dnia albo dodaj zrzut ekranu.</p>
 
       <div className="nu-grid">
         {MACROS.map(([k, label, , unit]) => {
@@ -246,7 +246,7 @@ export function NutritionCard({ client }: { client: Client }) {
           );
         })}
       </div>
-      {!hasT && <p className="muted small">Trener nie ustawił jeszcze celów — wpisy i tak zobaczy.</p>}
+      {!hasT && <p className="muted small">Bez celów od trenera. Wpisy i tak zobaczy.</p>}
 
       <div className="nu-shot-row">
         {saved?.shot ? (
@@ -297,18 +297,18 @@ export function NutritionCard({ client }: { client: Client }) {
       {ocr && ocr.forDay === day && (
         <div className={ocr.confidence === 'low' || (ocr.date && ocr.date !== day) ? 'warn-box small nu-ocr-note' : 'nu-ocr-note nu-ocr-ok small'} role="status">
           <b>
-            <Icon name={ocr.confidence === 'low' ? 'alert' : 'eye'} size={16} /> Sprawdź liczby — odczyt automatyczny
+            <Icon name={ocr.confidence === 'low' ? 'alert' : 'eye'} size={16} /> Sprawdź liczby: odczyt automatyczny
           </b>
-          {ocr.confidence === 'low' && <span>Odczyt niepewny{ocr.note ? ` — ${ocr.note.replace(/[.\s]+$/, '')}` : ''}. Popraw liczby przed zapisem.</span>}
+          {ocr.confidence === 'low' && <span>Odczyt niepewny{ocr.note ? `. ${ocr.note.replace(/[.\s]+$/, '')}` : ''}. Popraw liczby przed zapisem.</span>}
           {ocr.confidence !== 'low' && ocr.note && <span>{ocr.note}</span>}
-          {ocr.date && ocr.date !== day && <span>Zrzut wygląda na dzień {ocr.date.split('-').reverse().join('.')} — a zapisujesz {dayLabel}.</span>}
+          {ocr.date && ocr.date !== day && <span>Zrzut wygląda na dzień {ocr.date.split('-').reverse().join('.')}, a zapisujesz {dayLabel}.</span>}
           {MACROS.some(([k]) => ocr[k] == null) && (
             <span className="muted">
               Nie odczytano:{' '}
               {MACROS.filter(([k]) => ocr[k] == null)
                 .map(([, label]) => label.toLowerCase())
-                .join(', ')}{' '}
-              — sprawdź ręcznie.
+                .join(', ')}
+              . Sprawdź ręcznie.
             </span>
           )}
           <span className="muted">Nic nie jest zapisane, dopóki nie stukniesz „Zapisz jedzenie”.</span>

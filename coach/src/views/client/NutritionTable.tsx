@@ -23,7 +23,7 @@ export function NutritionTable({ client }: { client: Client }) {
   };
   return (
     <div className="nt">
-      <h4 className="nt-title">Jedzenie — ostatnie 14 dni</h4>
+      <h4 className="nt-title">Jedzenie, ostatnie 14 dni</h4>
       <div className="nt-avg" role="group" aria-label="Średnie tygodniowe">
         {weeks.map((w, i) => (
           <div key={w.from} className="nt-avg-box">
@@ -77,7 +77,7 @@ export function NutritionTable({ client }: { client: Client }) {
           </tbody>
         </table>
       </div>
-      <p className="muted small">Średnie liczone z dni z wpisem. Bursztyn — wyraźnie poniżej (&lt;80%) albo powyżej (&gt;120%) celu.</p>
+      <p className="muted small">Średnie z dni z wpisem. Bursztyn: poniżej 80% albo powyżej 120% celu.</p>
       {shot && <ShotSheet refId={shot.ref} title={`Zrzut z Fitatu, ${fmtDay(shot.date)}`} onClose={() => setShot(null)} />}
     </div>
   );

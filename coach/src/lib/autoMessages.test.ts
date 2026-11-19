@@ -108,7 +108,7 @@ describe('reguły', () => {
     const ev = clientEvents(C(), ses, only('record'), TODAY);
     expect(ev).toHaveLength(1);
     expect(ev[0].key).toBe(ses[1].id);
-    expect(ev[0].text).toContain('Przysiad — 100 kg × 5');
+    expect(ev[0].text).toContain('Przysiad, 100 kg × 5');
     const sent = [{ clientId: 'c1', kind: 'record' as const, key: 'x', at: '2026-10-25T09:00:00+01:00' }];
     expect(clientEvents(C(), ses, only('record'), TODAY, sent, NOW)).toEqual([]);
     // rozgrzewka i pierwszy wynik nie są rekordem

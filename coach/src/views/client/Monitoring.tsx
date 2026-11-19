@@ -58,7 +58,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
   const exRec = chosen ? exerciseRecords(sessions, chosen) : null;
   const pain = painHistory(sessions, today, 8);
 
-  if (sessions.length === 0) return <Empty>Brak treningów — monitoring pojawi się po pierwszych zapisach z sRPE i czasem trwania.</Empty>;
+  if (sessions.length === 0) return <Empty>Brak treningów. Monitoring pojawi się po pierwszych zapisach z sRPE i czasem.</Empty>;
 
   return (
     <>
@@ -106,7 +106,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
         {/* funkcje: bieg — km plan vs wykonanie (sam się ukrywa, gdy klient nie biega) */}
         <RunVolume client={client} />
         {hasRun && (
-          <Card title="Bieganie — kilometraż tygodniowy">
+          <Card title="Bieganie: kilometraż tygodniowy">
             <BarChart pts={weeklyKm} label="Kilometraż tygodniowy" format={(v) => fnum(v, 1)} />
             {(() => {
               // tydzień do tygodnia: skok powyżej ~10–30% zwiększa ryzyko przeciążenia
@@ -117,7 +117,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
               return (
                 <p className={`small ${jump > 0.3 ? 'warn-text' : 'muted'}`}>
                   Ten tydzień: <b>{fmtKm(b || 0)}</b> · poprzedni: {fmtKm(a || 0)} · średnia z 3 tyg.: {fmtKm(avg)}
-                  {jump > 0.3 ? ` — o ${Math.round(jump * 100)}% więcej niż zwykle; zwiększaj kilometraż stopniowo (ok. 10% na tydzień).` : ''}
+                  {jump > 0.3 ? `, o ${Math.round(jump * 100)}% więcej niż zwykle. Zwiększaj o ok. 10% na tydzień.` : ''}
                 </p>
               );
             })()}
@@ -198,7 +198,7 @@ export function ClientMonitoring({ client }: { client: Client }) {
                   </tbody>
                 </table>
               )}
-              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && <p className="muted small">1RM = najcięższa seria pojedyncza (1 powtórzenie; „—”, gdy cięższa była seria na więcej powtórzeń). 3RM / 5RM = najcięższa seria na co najmniej 3 / 5 powtórzeń. e1RM — szacowane maks. z serii (Epley z RPE).</p>}
+              {exRec && (exRec.e1 || RECORD_REPS.some((n) => exRec.rm[n])) && <p className="muted small">1RM = najcięższa seria pojedyncza (1 powtórzenie; „—”, gdy cięższa była seria na więcej powtórzeń). 3RM / 5RM = najcięższa seria na co najmniej 3 / 5 powtórzeń. e1RM: szacowane maks. z serii (Epley z RPE).</p>}
               {hist.length > 0 && (
                 <p className="muted small">
                   {hist.length} {hist.length === 1 ? 'trening' : hist.length < 5 ? 'treningi' : 'treningów'} z tym ćwiczeniem · ostatnio {fmtDay(hist[hist.length - 1].date)}: {fnum(hist[hist.length - 1].load)} kg × {hist[hist.length - 1].reps} (e1RM {fnum(hist[hist.length - 1].e1, 1)})
@@ -207,9 +207,9 @@ export function ClientMonitoring({ client }: { client: Client }) {
             </>
           )}
         </Card>
-        <Card title="Gdzie boli — ostatnie 8 tygodni" className="pain-history">
+        <Card title="Gdzie boli: ostatnie 8 tygodni" className="pain-history">
           {pain.length === 0 ? (
-            <Empty>Brak zaznaczonych miejsc bólu w ostatnich 8 tygodniach. Podopieczny zaznacza je po treningu (mapa ciała), trener — w edycji treningu.</Empty>
+            <Empty>Brak zaznaczonych miejsc bólu w ostatnich 8 tygodniach. Podopieczny zaznacza je po treningu, trener w edycji treningu.</Empty>
           ) : (
             <div className="pain-hist-grid">
               <PainMap spots={painSpotsOf(pain)} readOnly />

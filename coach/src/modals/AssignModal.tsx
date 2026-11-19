@@ -100,9 +100,9 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
   const build = (): PlanWorkout | null => {
     if (!client) return toast('Wybierz podopiecznego.'), null;
     if (when === 'Inny dzień' && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return toast('Wybierz dzień.'), null;
-    if (when === 'Inny dzień' && day < today) return toast('Ten dzień już minął — wybierz dziś albo później.'), null;
+    if (when === 'Inny dzień' && day < today) return toast('Ten dzień już minął. Wybierz dziś albo później.'), null;
     if (src !== 'empty' && !chosen) return toast('Wybierz, z czego ma być trening.'), null;
-    if (time && !date) return toast('Godzina wizyty — wybierz też dzień (nie „Kiedy chce”).'), null;
+    if (time && !date) return toast('Do godziny wizyty wybierz też dzień (nie „Kiedy chce”).'), null;
     if (time && !/^\d{1,2}:\d{2}$/.test(time)) return toast('Godzina wizyty, np. 9:00.'), null;
     const n = extraPlanOf(db, client.id)?.weeks.reduce((a, w) => a + w.workouts.length, 0) ?? 0;
     return { id: uid(), name: name.trim() || chosen?.name || (src === 'paste' && date ? `Trening ${date.slice(8, 10)}.${date.slice(5, 7)}` : `Trening dodatkowy ${n + 1}`), date, assignedAt: date ? today : undefined, exercises: chosen?.exercises ?? [] };
@@ -121,13 +121,13 @@ export function AssignModal({ m }: { m: Extract<ModalState, { kind: 'assign' }> 
     for (const c of rest) changes.push(...addExtraWorkout(db, c.id, { ...wo, id: uid(), exercises: exercisesFor(wo.exercises, false) }), ...apptFor(c.id, c.locationId));
     const who = rest.length ? `${rest.length + 1} osobom` : client.name.split(' ')[0];
     const msg = rest.length
-      ? `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyty ${time}` : ''} — ${who}.`
-      : `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyta ${time}` : ''} — ${who} zobaczy go w aplikacji.`;
+      ? `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyty ${time}` : ''} · ${who}.`
+      : `Zadano „${wo.name}”${date ? ` na ${fmtDay(date)}` : ''}${appt.length ? ` · wizyta ${time}` : ''}.`;
     if (await apply(changes, msg)) closeModal();
   };
   /** Do edytora: ułożenie albo dopasowanie ćwiczeń przed zapisem. */
   const edit = () => {
-    if (others.length) return toast('Kilka osób: najpierw wybierz trening (z planu, powtórkę albo bieg) — ćwiczenia zmienisz potem u każdej osoby.');
+    if (others.length) return toast('Kilka osób: najpierw wybierz trening (z planu, powtórkę albo bieg). Ćwiczenia zmienisz potem u każdej osoby.');
     const wo = build();
     if (!wo || !client) return;
     const extra = extraPlanOf(db, client.id);

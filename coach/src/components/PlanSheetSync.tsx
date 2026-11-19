@@ -40,7 +40,7 @@ export function PlanSheetSync({ plan, client, onClose }: { plan: Plan; client: C
   const push = () =>
     run('push', async () => {
       if (!id) return;
-      if (!(await ask('Wysłać plan do arkusza? Zakładka „Plan” w arkuszu zostanie zastąpiona planem z aplikacji — zmiany w arkuszu, których nie pobrałeś, przepadną.', { confirm: 'Wyślij do arkusza', danger: false }))) return;
+      if (!(await ask('Wysłać plan do arkusza? Zakładka „Plan” w arkuszu zostanie zastąpiona planem z aplikacji. Niepobrane zmiany z arkusza przepadną.', { confirm: 'Wyślij do arkusza', danger: false }))) return;
       await pushPlanSheet(id, plan);
       await apply([put('plans', { ...plan, gsheet: { id, at: new Date().toISOString() } })], 'Plan wysłany do arkusza.');
     });
@@ -77,13 +77,13 @@ export function PlanSheetSync({ plan, client, onClose }: { plan: Plan; client: C
     );
 
   return (
-    <Modal title={`Arkusz Google — ${plan.name}`} onClose={onClose}>
+    <Modal title={`Arkusz Google: ${plan.name}`} onClose={onClose}>
       {!id ? (
         <>
           <p className="small">
-            Utworzę na Twoim Dysku Google arkusz z tym planem (zakładka „Plan”: wiersz = ćwiczenie i jego serie). Edytujesz go w Arkuszach Google, a w aplikacji klikasz „Pobierz zmiany” — plan zaktualizuje się z podglądem różnic, wykonane treningi i notatki podopiecznego zostają.
+            Utworzę na Twoim Dysku Google arkusz z tym planem (zakładka „Plan”: wiersz = ćwiczenie i jego serie). Edytujesz go w Arkuszach Google, a w aplikacji klikasz „Pobierz zmiany”. Zobaczysz różnice przed zapisem; wykonane treningi i notatki zostają.
           </p>
-          <p className="muted small">Aplikacja dostaje dostęp tylko do arkuszy, które sama utworzy — nie do reszty Dysku. Przy pierwszym użyciu Google zapyta o zgodę.</p>
+          <p className="muted small">Aplikacja widzi tylko arkusze, które sama utworzy. Przy pierwszym użyciu Google zapyta o zgodę.</p>
           <button type="button" className="btn btn-primary" disabled={!!busy} onClick={() => void create()}>
             {busy === 'create' ? 'Tworzę arkusz…' : 'Utwórz arkusz Google'}
           </button>
@@ -104,7 +104,7 @@ export function PlanSheetSync({ plan, client, onClose }: { plan: Plan; client: C
               <Icon name="up" size={16} /> {busy === 'push' ? 'Wysyłam…' : 'Wyślij plan do arkusza'}
             </button>
           </div>
-          <p className="muted small">„Pobierz” — arkusz → aplikacja (najpierw zobaczysz, co się zmieni). „Wyślij” — aplikacja → arkusz (np. po zmianach w edytorze planu).</p>
+          <p className="muted small">„Pobierz”: z arkusza do aplikacji, z podglądem zmian. „Wyślij”: z aplikacji do arkusza.</p>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => void unlink()}>
             Odłącz arkusz
           </button>

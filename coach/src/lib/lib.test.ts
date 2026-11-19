@@ -256,8 +256,8 @@ describe('billing', () => {
     expect(packageMessage(2)).toBe('Zapisano. Został 1 trening w pakiecie.');
     expect(packageMessage(6)).toBe('Zapisano. Zostało 5 treningów w pakiecie.');
     expect(packageMessage(4)).toBe('Zapisano. Zostały 3 treningi w pakiecie.');
-    expect(packageMessage(0)).toBe('Zapisano. 1 trening ponad pakiet — czas na nowy pakiet.');
-    expect(packageMessage(-4)).toBe('Zapisano. 5 treningów ponad pakiet — czas na nowy pakiet.');
+    expect(packageMessage(0)).toBe('Zapisano. 1 trening ponad pakiet. Czas na nowy pakiet.');
+    expect(packageMessage(-4)).toBe('Zapisano. 5 treningów ponad pakiet. Czas na nowy pakiet.');
   });
 });
 

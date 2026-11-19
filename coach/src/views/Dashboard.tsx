@@ -238,7 +238,7 @@ export function Dashboard() {
         sub={`${db.clients.length} łącznie`}
       />
       <Kpi
-        label="Treningi – 7 dni"
+        label="Treningi, 7 dni"
         value={week}
         sub={plural(week, "trening", "treningi", "treningów")}
       />
@@ -643,8 +643,7 @@ export function Dashboard() {
         className="span-2 dash-overdue"
       >
         <p className="muted small">
-          Minione wizyty bez zapisanego treningu — zapisz trening (zejdzie z
-          pakietu / doliczy się klubowi) albo oznacz odwołanie.
+          Zapisz trening albo oznacz odwołanie.
         </p>
         <ul className="rows">
           {overdueAppts.slice(0, 8).map((a) => {
@@ -1182,7 +1181,7 @@ export function Dashboard() {
                 {s.srpe != null && s.duration != null && (
                   <span
                     className="small muted nowrap"
-                    title="Obciążenie treningu = RPE × minuty (AU — jednostki umowne)"
+                    title="Obciążenie treningu = RPE × minuty (AU, jednostki umowne)"
                   >
                     {s.srpe * s.duration} AU
                   </span>
@@ -1411,7 +1410,7 @@ function QuickReply({ client }: { client: Client }) {
     if (!text.trim() || busy) return;
     setBusy(true);
     const ok = await send(text, {
-      okMessage: `Wysłano — ${first} zobaczy odpowiedź w aplikacji.`,
+      okMessage: 'Wysłane.',
     });
     setBusy(false);
     if (ok) setText("");

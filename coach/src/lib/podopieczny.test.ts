@@ -24,7 +24,7 @@ describe('płatności podopiecznego', () => {
     expect(packageLine({ total: 10, used: 7, left: 3, size: 10 }, '2026-11-30')).toBe('Pakiet: zostały 3 z 10 (ważny do 30.11)');
     expect(packageLine({ total: 10, used: 9, left: 1, size: 10 })).toBe('Pakiet: został 1 z 10');
     expect(packageLine({ total: 10, used: 5, left: 5, size: 10 })).toBe('Pakiet: zostało 5 z 10');
-    expect(packageLine({ total: 10, used: 11, left: -1, size: 10 })).toBe('Pakiet wykorzystany — 1 trening ponad pakiet');
+    expect(packageLine({ total: 10, used: 11, left: -1, size: 10 })).toBe('Pakiet wykorzystany: 1 trening ponad pakiet');
     expect(packageLine(null)).toBeNull();
   });
   it('tytuł przelewu, konto, zgłoszona wpłata', () => {

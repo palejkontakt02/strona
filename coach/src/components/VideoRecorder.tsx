@@ -60,7 +60,7 @@ export function VideoRecorder({ title, onDone, onClose }: { title: string; onDon
       })
       .catch((e: Error) => {
         if (cancelled) return;
-        setErr(e.name === 'NotAllowedError' ? 'Brak zgody na kamerę — zezwól w ustawieniach przeglądarki albo wybierz film z galerii.' : `Nie udało się włączyć kamery (${e.message}).`);
+        setErr(e.name === 'NotAllowedError' ? 'Brak zgody na kamerę. Zezwól w ustawieniach przeglądarki albo wybierz film z galerii.' : `Nie udało się włączyć kamery (${e.message}).`);
         setState('error');
       });
     return () => {
@@ -149,7 +149,7 @@ export function VideoRecorder({ title, onDone, onClose }: { title: string; onDon
       )}
       {state !== 'error' && (
         <p className="muted small center">
-          {state === 'done' && result ? `Nagranie: ${(result.file.size / 1024 / 1024).toFixed(1).replace(".", ",")} MB — sprawdź i użyj.` : `Wysoka jakość${info ? ` (${info})` : ''} · do ok. ${Math.round((LIMIT * 8) / BITRATE)} s`}
+          {state === 'done' && result ? `Nagranie: ${(result.file.size / 1024 / 1024).toFixed(1).replace(".", ",")} MB. Sprawdź i użyj.` : `Wysoka jakość${info ? ` (${info})` : ''} · do ok. ${Math.round((LIMIT * 8) / BITRATE)} s`}
         </p>
       )}
       <div className="rec-actions">

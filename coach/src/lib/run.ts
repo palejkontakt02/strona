@@ -427,7 +427,7 @@ export function completeSet(ex: RunExercise, i: number): { sets: RunSet[]; rest:
       // bez wpisanego RPE porównujemy tylko do celu (nie zgadujemy „niżej / wyżej”)
       const got = num(s.rpe);
       const cmp = got == null ? null : got < num(tr)! ? 'niżej' : got > num(tr)! ? 'wyżej' : 'zgodne';
-      nxt.sug = diff === 0 ? (cmp ? 'Utrzymaj ciężar – RPE zgodne z celem' : `Utrzymaj ciężar (cel RPE ${tr})`) : `${diff > 0 ? '+' : ''}${diff}% vs poprzednia seria (${cmp ? `RPE ${cmp} / ` : 'wg '}cel ${tr})`;
+      nxt.sug = diff === 0 ? (cmp ? 'Utrzymaj ciężar, RPE zgodne z celem' : `Utrzymaj ciężar (cel RPE ${tr})`) : `${diff > 0 ? '+' : ''}${diff}% vs poprzednia seria (${cmp ? `RPE ${cmp} / ` : 'wg '}cel ${tr})`;
     }
   }
   return { sets, rest: parseRest(s.rest || ex.rest) || 120 };

@@ -39,7 +39,7 @@ function CopyRow({ label, value, copy }: { label: string; value: string; copy?: 
         <span className="muted small">{label}</span>
         <b className="r7-copy-val">{value}</b>
       </span>
-      <button type="button" className="btn btn-ghost btn-sm" aria-label={`Kopiuj: ${label}`} onClick={async () => toast((await copyText(copy ?? value)) ? `Skopiowano: ${label.toLowerCase()}.` : 'Nie udało się skopiować — przepisz ręcznie.')}>
+      <button type="button" className="btn btn-ghost btn-sm" aria-label={`Kopiuj: ${label}`} onClick={async () => toast((await copyText(copy ?? value)) ? `Skopiowano: ${label.toLowerCase()}.` : 'Nie udało się skopiować. Przepisz ręcznie.')}>
         <Icon name="copy" size={16} /> Kopiuj
       </button>
     </div>
@@ -65,7 +65,7 @@ export function AthletePayments({ client, preview }: { client: Client; preview?:
   const hasBlik = !!profile.blikPhone?.trim();
 
   const report = async (d: DueItem) => {
-    if (preview) return toast('Podgląd — u podopiecznego ten przycisk wysyła trenerowi wiadomość o wpłacie.');
+    if (preview) return toast('Podgląd. U podopiecznego ten przycisk wysyła trenerowi wiadomość o wpłacie.');
     setBusy(true);
     const ok = await sendClientMessage(client.id, paidMessage(d, via), {});
     setBusy(false);
@@ -84,11 +84,11 @@ export function AthletePayments({ client, preview }: { client: Client; preview?:
           <div key={d.id} className={`r7-due ${d.overdue ? 'over' : ''}`}>
             <p className={`r7-due-line ${d.overdue ? 'r7-bad' : 'warn-text'}`}>
               <Icon name="alert" size={16} /> {dueLine(d)}
-              {d.overdue ? ' — po terminie' : ''}
+              {d.overdue ? ', po terminie' : ''}
             </p>
             {sent ? (
               <p className="small ok-text">
-                <Icon name="check" size={14} /> Zgłoszone trenerowi {new Date(sent).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })} — czeka na potwierdzenie.
+                <Icon name="check" size={14} /> Zgłoszone trenerowi {new Date(sent).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })}. Czeka na potwierdzenie.
               </p>
             ) : open === d.id ? (
               <div className="r7-pay-how">
@@ -100,7 +100,7 @@ export function AthletePayments({ client, preview }: { client: Client; preview?:
                     {hasBlik && <CopyRow label="BLIK na telefon" value={profile.blikPhone!} copy={profile.blikPhone!.replace(/[^\d+]/g, '')} />}
                   </>
                 )}
-                {!hasBank && !hasBlik && <p className="muted small">Trener nie podał jeszcze danych do przelewu — zapytaj w rozmowie poniżej.</p>}
+                {!hasBank && !hasBlik && <p className="muted small">Trener nie podał danych do przelewu. Zapytaj w rozmowie poniżej.</p>}
                 <div className="seg r7-via" role="radiogroup" aria-label="Jak zapłacono">
                   {(['przelew', 'BLIK'] as PaidVia[]).map((v) => (
                     <button key={v} type="button" role="radio" aria-checked={via === v} className={via === v ? 'active' : ''} onClick={() => setVia(v)}>

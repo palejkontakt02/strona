@@ -103,7 +103,7 @@ function ConsentPrompt({
   return (
     <>
       <p className="muted small consent-lead">
-        Twoje dane widzi tylko Twój trener. Zaznacz, na co się zgadzasz — każdą zgodę wycofasz w każdej chwili w Ustawieniach → Moje dane.
+        Twoje dane widzi tylko Twój trener. Zaznacz, na co się zgadzasz. Każdą zgodę wycofasz w Ustawieniach (Moje dane).
       </p>
       <ul className="consent-list">
         {only.map((k) => (
@@ -115,7 +115,7 @@ function ConsentPrompt({
                 <span className="muted small">{CONSENT_TEXT[k].short}</span>
                 {k === 'health' && <span className="muted small">Podstawa: Twoja wyraźna zgoda (art. 9 ust. 2 lit. a RODO).</span>}
                 {k === 'health' && only.length > 1 && (
-                  <span className="small consent-why">Bez tej zgody ankieta zdrowotna nie zadziała — trener nie pozna Twoich urazów i chorób. Możesz ją włączyć później w Ustawieniach → Moje dane.</span>
+                  <span className="small consent-why">Bez tej zgody trener nie pozna Twoich urazów i chorób. Włączysz ją później w Ustawieniach (Moje dane).</span>
                 )}
               </span>
             </label>
@@ -124,13 +124,13 @@ function ConsentPrompt({
       </ul>
       {only.length > 1 && (
         <p className="muted small consent-push">
-          <Icon name="alert" size={14} /> Powiadomienia push włączasz osobno w Ustawieniach — telefon sam zapyta o zgodę.
+          <Icon name="alert" size={14} /> Powiadomienia push włączasz osobno w Ustawieniach. Telefon sam zapyta o zgodę.
         </p>
       )}
       <button type="button" className="link consent-more" onClick={onMore}>
-        Więcej — kto jest administratorem i jakie masz prawa
+        Kto jest administratorem i jakie masz prawa
       </button>
-      {readOnly && <p className="small warn-text">Podgląd trenera — zgody zaznacza i zmienia tylko podopieczny na swoim koncie.</p>}
+      {readOnly && <p className="small warn-text">Podgląd trenera. Zgody zmienia tylko podopieczny na swoim koncie.</p>}
       <div className="consent-actions">
         {onLater && (
           <button type="button" className="btn btn-ghost" onClick={onLater} disabled={busy}>
@@ -163,7 +163,7 @@ function ConsentSettings({ client, only, readOnly, onMore }: { client: Client; o
       if (!sure) return;
     }
     setBusy(k);
-    await save(k, !on, { note: on, message: on ? 'Zgoda wycofana — trener dostał wiadomość.' : 'Zgoda zapisana.' });
+    await save(k, !on, { note: on, message: on ? 'Zgoda wycofana. Trener wie.' : 'Zgoda zapisana.' });
     setBusy(null);
   };
 
@@ -181,7 +181,7 @@ function ConsentSettings({ client, only, readOnly, onMore }: { client: Client; o
               <span className="consent-text">
                 <b id={id}>{CONSENT_TEXT[k].title}</b>
                 <span className={`small ${st === 'on' ? 'ok-text' : withdrawn ? 'warn-text' : 'muted'}`}>
-                  {st === 'on' ? `Zgoda udzielona ${when}` : withdrawn ? `Brak zgody${when ? ` — wycofana ${when}` : ''}` : 'Nie udzielono'}
+                  {st === 'on' ? `Zgoda udzielona ${when}` : withdrawn ? `Brak zgody${when ? `, wycofana ${when}` : ''}` : 'Nie udzielono'}
                 </span>
                 {st !== 'on' && <span className="muted small">{CONSENT_TEXT[k].needed}</span>}
               </span>
@@ -202,7 +202,7 @@ function ConsentSettings({ client, only, readOnly, onMore }: { client: Client; o
         <li className="consent-row">
           <span className="consent-text">
             <b>Powiadomienia push</b>
-            <span className="muted small">Zgodę daje przeglądarka telefonu — włączasz i wyłączasz je przełącznikiem „Powiadomienia na tym telefonie”.</span>
+            <span className="muted small">Zgodę daje przeglądarka telefonu. Włączasz je przełącznikiem „Powiadomienia na tym telefonie”.</span>
           </span>
         </li>
       </ul>
@@ -219,7 +219,7 @@ export function ClauseSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet label="Klauzula informacyjna" onClose={onClose}>
       <div className="between">
-        <h2>Twoje dane — klauzula informacyjna</h2>
+        <h2>Twoje dane: klauzula informacyjna</h2>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>
           Zamknij
         </button>
@@ -232,33 +232,33 @@ export function ClauseSheet({ onClose }: { onClose: () => void }) {
         </p>
         <h4>Cel i podstawa prawna</h4>
         <ul>
-          <li>Prowadzenie treningów personalnych, plan, historia treningów, kontakt z trenerem i wizyty — wykonanie umowy (art. 6 ust. 1 lit. b RODO).</li>
-          <li>Dane o zdrowiu (urazy, choroby, ból, ankieta PAR-Q, samopoczucie) — Twoja wyraźna zgoda (art. 9 ust. 2 lit. a RODO), żeby bezpiecznie dobrać ćwiczenia i obciążenia.</li>
-          <li>Zdjęcia sylwetki i nagrania techniki — Twoja zgoda (art. 6 ust. 1 lit. a RODO).</li>
-          <li>Rozliczenia (płatności) — obowiązki podatkowe i rachunkowe (art. 6 ust. 1 lit. c RODO).</li>
+          <li>Prowadzenie treningów personalnych, plan, historia treningów, kontakt z trenerem i wizyty: wykonanie umowy (art. 6 ust. 1 lit. b RODO).</li>
+          <li>Dane o zdrowiu (urazy, choroby, ból, ankieta PAR-Q, samopoczucie): Twoja wyraźna zgoda (art. 9 ust. 2 lit. a RODO), żeby bezpiecznie dobrać ćwiczenia i obciążenia.</li>
+          <li>Zdjęcia sylwetki i nagrania techniki: Twoja zgoda (art. 6 ust. 1 lit. a RODO).</li>
+          <li>Rozliczenia (płatności): obowiązki podatkowe i rachunkowe (art. 6 ust. 1 lit. c RODO).</li>
         </ul>
         <h4>Odbiorcy</h4>
         <ul>
-          <li>Supabase (hosting bazy danych i plików aplikacji) — dostawca działa na podstawie umowy powierzenia; serwer: {ADMIN.hostingRegion}.</li>
-          <li>Anthropic (odczyt liczb ze zrzutu ekranu z aplikacji Fitatu przez AI, tylko gdy dodasz zrzut) — zrzut jest przetwarzany wyłącznie w celu odczytu i nie jest zapisywany.</li>
-          <li>FormSubmit — przekazuje Twoje wiadomości z aplikacji na e-mail trenera.</li>
-          <li>Usługi powiadomień przeglądarki (Google, Apple, Mozilla) — tylko gdy włączysz powiadomienia push.</li>
+          <li>Supabase (hosting bazy danych i plików aplikacji): dostawca działa na podstawie umowy powierzenia; serwer: {ADMIN.hostingRegion}.</li>
+          <li>Anthropic (odczyt liczb ze zrzutu ekranu z aplikacji Fitatu przez AI, tylko gdy dodasz zrzut): zrzut jest przetwarzany wyłącznie w celu odczytu i nie jest zapisywany.</li>
+          <li>FormSubmit: przekazuje Twoje wiadomości z aplikacji na e-mail trenera.</li>
+          <li>Usługi powiadomień przeglądarki (Google, Apple, Mozilla): tylko gdy włączysz powiadomienia push.</li>
         </ul>
         <p>Danych nie sprzedajemy ani nie udostępniamy w celach marketingowych.</p>
         <h4>Jak długo</h4>
         <p>
-          Przez czas współpracy, a po jej zakończeniu przez {ADMIN.retention} — żebyś miał(a) dostęp do swojej historii — albo krócej, jeśli poprosisz o usunięcie. Dane
-          z Twojej zgody — do jej wycofania. Dokumenty rozliczeniowe — 5 lat od końca roku podatkowego (przepisy podatkowe).
+          Przez czas współpracy, a po jej zakończeniu przez {ADMIN.retention} (żebyś miał(a) dostęp do swojej historii) albo krócej, jeśli poprosisz o usunięcie. Dane
+          z Twojej zgody: do jej wycofania. Dokumenty rozliczeniowe: 5 lat od końca roku podatkowego (przepisy podatkowe).
         </p>
         <h4>Twoje prawa</h4>
         <p>
-          Masz prawo do: dostępu do danych i ich kopii, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia (plik JSON w „Moje dane”), sprzeciwu oraz wycofania zgody w każdej chwili — bez wpływu na zgodność
+          Masz prawo do: dostępu do danych i ich kopii, sprostowania, usunięcia, ograniczenia przetwarzania, przenoszenia (plik JSON w „Moje dane”), sprzeciwu oraz wycofania zgody w każdej chwili, bez wpływu na zgodność
           z prawem przetwarzania przed wycofaniem. Możesz złożyć skargę do Prezesa Urzędu Ochrony Danych Osobowych (ul. Stawki 2, 00-193 Warszawa, uodo.gov.pl).
         </p>
         <h4>Dobrowolność</h4>
         <p>
           Podanie danych jest dobrowolne, ale bez danych kontaktowych i treningowych nie poprowadzimy treningów. Bez zgody na dane o zdrowiu trener nie zbierze ankiety zdrowotnej. Aplikacja liczy pomocnicze wskaźniki
-          (np. gotowość, obciążenie), ale decyzje podejmuje trener — nie ma decyzji wyłącznie zautomatyzowanych.
+          (np. gotowość, obciążenie), ale decyzje podejmuje trener. Nie ma decyzji wyłącznie zautomatyzowanych.
         </p>
       </div>
     </Sheet>

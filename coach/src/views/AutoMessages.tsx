@@ -74,7 +74,7 @@ export function AutoMessages() {
     if (cloud) {
       const { error } = await supabase.from('auto_message_rules').upsert({ id: 'rules', data: rulesPayload(next), updated_at: new Date().toISOString() });
       if (error) {
-        toast(/does not exist|schema cache|relation/i.test(error.message) ? 'Nie zapisano — uruchom w Supabase sekcję 25 z hardening.sql.' : `Nie zapisano (${error.message}).`);
+        toast(/does not exist|schema cache|relation/i.test(error.message) ? 'Nie zapisano. Uruchom w Supabase sekcję 25 z hardening.sql.' : `Nie zapisano (${error.message}).`);
         return false;
       }
     } else {
@@ -115,8 +115,7 @@ export function AutoMessages() {
     <Modal title="Automatyczne wiadomości" onClose={closeModal} wide>
       <div className="am">
         <p className="small am-intro">
-          Wiadomość idzie od Ciebie — jako zwykła wiadomość w rozmowie, z powiadomieniem na telefon podopiecznego. Treść zatwierdzasz raz, włączając regułę.
-          Sprawdzanie codziennie o 9:00; każde zdarzenie najwyżej raz, najwyżej jedna wiadomość dziennie na osobę. Tylko podopieczni z kontem w aplikacji.
+          Wiadomość idzie od Ciebie, jak zwykła wiadomość w rozmowie. Codziennie o 9:00, najwyżej jedna dziennie na osobę, tylko do osób z kontem.
         </p>
         {!cloud && (
           <p className="am-note small" role="status">
@@ -157,7 +156,7 @@ export function AutoMessages() {
           {!anyOn ? (
             <p className="muted small">Włącz regułę, żeby zobaczyć, do kogo pójdzie wiadomość.</p>
           ) : due.length === 0 ? (
-            <p className="muted small">Dziś nic — żadne zdarzenie nie pasuje albo wiadomość już poszła.</p>
+            <p className="muted small">Dziś nic.</p>
           ) : (
             <ul className="am-list">
               {due.map((m) => (

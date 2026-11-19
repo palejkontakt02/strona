@@ -27,7 +27,7 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
   const send = async () => {
     if (busy) return;
     if (!body) return toast('Wpisz treść wiadomości.');
-    if (!to.length) return toast('Brak odbiorców — wybierz inną grupę.');
+    if (!to.length) return toast('Brak odbiorców. Wybierz inną grupę.');
     if (!(await ask(`Wyślesz do ${osob(to.length)}: ${to.slice(0, 5).map((c) => c.name.split(' ')[0]).join(', ')}${to.length > 5 ? ` i ${to.length - 5} innych` : ''}. Każdy dostanie ją w swojej rozmowie (i powiadomienie na telefon, jeśli je włączył).`, { confirm: `Wyślij do ${osob(to.length)}`, danger: false }))) return;
     setBusy(true);
     const ok = await apply(broadcastClients(to, body).map((c) => put('clients', c)), `Wysłano do ${osob(to.length)}.`);
@@ -47,7 +47,7 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
       {kind === 'club' && (
         <Field label="Miejsce treningów (domyślne u podopiecznego)" wide>
           <select className="input" value={loc} onChange={(e) => setLoc(e.target.value)}>
-            {db.locations.length === 0 && <option value="">Brak miejsc — dodaj w Ustawieniach</option>}
+            {db.locations.length === 0 && <option value="">Brak miejsc (dodaj w Ustawieniach)</option>}
             {db.locations.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
@@ -98,7 +98,7 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
       </Field>
       {body && sample && (
         <div className="bc-preview">
-          <span className="eyebrow">Podgląd — {sample.name.split(' ')[0]}</span>
+          <span className="eyebrow">Podgląd: {sample.name.split(' ')[0]}</span>
           <p className="pre">{fillName(body, sample)}</p>
         </div>
       )}
