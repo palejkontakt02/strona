@@ -11,6 +11,7 @@ import { createSupabaseRepository } from '../data/supabaseRepository';
 import type { Db } from '../data/db';
 import { LoginScreen, NewPassword } from './LoginScreen';
 import { Icon } from '../components/ui';
+import { OAuthConsent, pendingAuthorizationId } from './OAuthConsent';
 
 /** Punkt wejścia: lokalnie (podgląd) bez logowania, na stronie — logowanie przez Supabase. */
 export function Root() {
@@ -35,6 +36,7 @@ export function Root() {
 function CloudGate() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [recovery, setRecovery] = useState(false);
+  const [oauthId, setOauthId] = useState(pendingAuthorizationId);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -47,7 +49,8 @@ function CloudGate() {
 
   if (session === undefined) return <div className="center-screen muted">Wczytywanie…</div>;
   if (recovery) return <NewPassword onDone={() => setRecovery(false)} />;
-  if (!session) return <LoginScreen />;
+  if (!session) return <LoginScreen connecting={!!oauthId} />;
+  if (oauthId) return <OAuthConsent authorizationId={oauthId} onDone={() => setOauthId(null)} />;
   return <RoleGate key={session.user.id} email={session.user.email ?? ''} />;
 }
 

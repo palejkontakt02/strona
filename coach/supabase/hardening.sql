@@ -2257,3 +2257,35 @@ end $$;
 revoke all on function public.move_plan_workout from public, anon;
 grant execute on function public.move_plan_workout to authenticated;
 notify pgrst, 'reload schema';
+
+-- 33. Łącznik dla Claude (OAuth 2.1, funkcja fitowa-mcp): tokeny wydane zewnętrznym aplikacjom mają claim
+--     client_id. Takie tokeny tylko czytają — każdy zapis (także przez funkcje RPC) jest odrzucany.
+create or replace function public.block_oauth_writes() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb ? 'client_id' then
+    raise exception 'Połączone aplikacje (np. Claude) mają dostęp tylko do odczytu' using errcode = '42501';
+  end if;
+  return coalesce(new, old);
+end $$;
+
+do $$
+declare t text;
+begin
+  for t in select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public' and c.relkind = 'r'
+  loop
+    execute format('drop trigger if exists zz_block_oauth_writes on public.%I', t);
+    execute format('create trigger zz_block_oauth_writes before insert or update or delete on public.%I for each row execute function public.block_oauth_writes()', t);
+  end loop;
+end $$;
+
+drop policy if exists oauth_no_insert on storage.objects;
+drop policy if exists oauth_no_update on storage.objects;
+drop policy if exists oauth_no_delete on storage.objects;
+create policy oauth_no_insert on storage.objects as restrictive for insert to authenticated
+  with check (not (coalesce(auth.jwt(), '{}'::jsonb) ? 'client_id'));
+create policy oauth_no_update on storage.objects as restrictive for update to authenticated
+  using (not (coalesce(auth.jwt(), '{}'::jsonb) ? 'client_id'));
+create policy oauth_no_delete on storage.objects as restrictive for delete to authenticated
+  using (not (coalesce(auth.jwt(), '{}'::jsonb) ? 'client_id'));

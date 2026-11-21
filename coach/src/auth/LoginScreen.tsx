@@ -17,7 +17,7 @@ function plError(message: string): string {
   return message;
 }
 
-export function LoginScreen() {
+export function LoginScreen({ connecting = false }: { connecting?: boolean }) {
   // link z zaproszenia trenera (?zaproszenie=<e-mail>): wpisany adres i od razu „Nowe konto”
   const [invited] = useState(() => readInviteEmail(location.search));
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(invited ? 'signup' : 'login');
@@ -55,6 +55,7 @@ export function LoginScreen() {
 
   return (
     <Screen title={mode === 'login' ? 'Zaloguj się' : mode === 'signup' ? 'Załóż konto' : 'Nowe hasło'}>
+      {connecting && <p className="muted small">Zaloguj się kontem Fitowej, żeby połączyć je z Claude. Na następnym ekranie zobaczysz, do czego dostanie dostęp.</p>}
       {mode !== 'reset' && (
         <div className="seg">
           <button type="button" className={mode === 'login' ? 'active' : ''} aria-pressed={mode === 'login'} onClick={() => setMode('login')}>
