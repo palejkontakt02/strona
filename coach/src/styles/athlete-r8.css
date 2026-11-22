@@ -533,3 +533,24 @@
   padding: 0;
   font-size: 22px;
 }
+
+/* Lista treningów planu zwinięta do nagłówka */
+.ath-plan-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.ath-plan-toggle h3 { margin: 0; }
+.ath-plan-toggle > svg { flex: none; }
+.ath-plan-toggle:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.ath .ath-plan > .ath-sel { max-width: 100%; width: 100%; margin-top: var(--space-2, 8px); }
+.ath .ath-plan > .between > .muted.small { text-align: right; max-width: 50%; }

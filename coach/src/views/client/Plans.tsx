@@ -49,7 +49,30 @@ export function newPlan(clientId: string): Plan {
 export function ClientPlans({ client }: { client: Client }) {
   const { db, apply, ask, toast } = useStore();
   const { openModal, startLive, startAthlete } = useNav();
-  const plans = [...plansOf(db, client.id), ...parallelPlansOf(db, client.id, false)].sort((a, b) => Number(b.active) - Number(a.active) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  // kolejność: aktywny główny, aktywne równoległe (np. bieganie), potem reszta od ostatnio zmienianych
+  const rank = (p: Plan) => (p.active ? (p.parallel ? 1 : 0) : 2);
+  const plans = [...plansOf(db, client.id), ...parallelPlansOf(db, client.id, false)].sort((a, b) => rank(a) - rank(b) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  // plany zwinięte do nagłówka; rozwinięte zapamiętane na tym urządzeniu
+  const openKey = `fitowa-plans-open-${client.id}`;
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(openKey) ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const setOpen = (id: string, on: boolean) =>
+    setOpenIds((cur) => {
+      const n = new Set(cur);
+      if (on) n.add(id);
+      else n.delete(id);
+      try {
+        localStorage.setItem(openKey, JSON.stringify([...n]));
+      } catch {
+        // brak pamięci przeglądarki — tylko do odświeżenia
+      }
+      return n;
+    });
   const sessions = sessionsOf(db, client.id);
   const extra = extraPlanOf(db, client.id);
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
@@ -155,14 +178,18 @@ export function ClientPlans({ client }: { client: Client }) {
           const done = doneInPass(p, sessions);
           const st = p.active && !p.extra ? planStatus(p, today) : null;
           const nd = nx && p.active ? nextDate(p, nx, today) : undefined;
+          const isOpen = openIds.has(p.id) || shift?.planId === p.id;
           return (
             <Card
               key={p.id}
-              className={`plan-card ${p.active ? 'is-active' : ''}`}
+              className={`plan-card ${p.active ? 'is-active' : ''} ${isOpen ? 'is-open' : 'is-closed'}`}
               title={
-                <>
-                  {p.name} {p.active && <Tag tone="accent">Aktywny</Tag>} {p.parallel && <Tag>Równoległy</Tag>}
-                </>
+                <button type="button" className="pl-toggle" aria-expanded={isOpen} onClick={() => setOpen(p.id, !isOpen)} title={isOpen ? 'Zwiń plan' : 'Rozwiń plan'}>
+                  <Icon name={isOpen ? 'chevU' : 'chevD'} size={16} />
+                  <span>
+                    {p.name} {p.active && <Tag tone="accent">Aktywny</Tag>} {p.parallel && <Tag>Równoległy</Tag>}
+                  </span>
+                </button>
               }
               action={
                 <div className="actions pl-actions">
@@ -233,11 +260,11 @@ export function ClientPlans({ client }: { client: Client }) {
                   </span>
                 </div>
               )}
-              {p.notes && <p className="small pre">{p.notes}</p>}
-              {p.active && <AbsenceNotice client={client} plan={p} sessions={sessions} onShift={(from, days) => setShift({ planId: p.id, preset: { from, days } })} />}
+              {isOpen && p.notes && <p className="small pre">{p.notes}</p>}
+              {isOpen && p.active && <AbsenceNotice client={client} plan={p} sessions={sessions} onShift={(from, days) => setShift({ planId: p.id, preset: { from, days } })} />}
               {p.active && shift?.planId === p.id && <ShiftPanel key={JSON.stringify(shift.preset ?? null)} plan={p} sessions={sessions} preset={shift.preset} onClose={() => setShift(null)} />}
-              {p.active && <LoadSuggestPanel plan={p} sessions={sessions} />}
-              {p.active && (
+              {isOpen && p.active && <LoadSuggestPanel plan={p} sessions={sessions} />}
+              {isOpen && (
                 <PlanTable
                   plan={p}
                   done={done}
