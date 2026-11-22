@@ -1,5 +1,5 @@
 import type { Client } from '../domain';
-import { extraPlanOf, plansOf, sessionsOf } from '../data/ops';
+import { extraPlanOf, parallelPlansOf, plansOf, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { Card } from './ui';
 import { ImportActivity } from './ImportActivity';
@@ -64,7 +64,7 @@ export function RunVolume({ client, compact }: { client: Client; compact?: boole
   const today = todayISO();
   const sessions = sessionsOf(db, client.id);
   const extra = extraPlanOf(db, client.id);
-  const weeks = runVolume([...plansOf(db, client.id), ...(extra ? [extra] : [])], sessions, client.run, compact ? 8 : 12, today);
+  const weeks = runVolume([...plansOf(db, client.id), ...parallelPlansOf(db, client.id), ...(extra ? [extra] : [])], sessions, client.run, compact ? 8 : 12, today);
   if (!isRunner(client, weeks) || (compact && !weeks.some((w) => w.planned > 0 || w.done > 0))) return null;
   const cur = weeks[weeks.length - 1];
   const prev = weeks[weeks.length - 2];
@@ -118,7 +118,7 @@ export function RunVolume({ client, compact }: { client: Client; compact?: boole
 export function AthleteRunCards({ client, canImport = true }: { client: Client; canImport?: boolean }) {
   const { db } = useStore();
   const extra = extraPlanOf(db, client.id);
-  const weeks = runVolume([...plansOf(db, client.id), ...(extra ? [extra] : [])], sessionsOf(db, client.id), client.run, 8);
+  const weeks = runVolume([...plansOf(db, client.id), ...parallelPlansOf(db, client.id), ...(extra ? [extra] : [])], sessionsOf(db, client.id), client.run, 8);
   if (!isRunner(client, weeks)) return null;
   return (
     <>

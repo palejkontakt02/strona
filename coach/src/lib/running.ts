@@ -347,14 +347,14 @@ export function runVolume(plans: Plan[], sessions: TrainingSession[], p: RunProf
   const weeks = Array.from({ length: n }, (_, i) => addDays(cur, -7 * (n - 1 - i)));
   const out = weeks.map((week) => ({ week, planned: 0, done: 0 }));
   const idx = (d: ISODate) => out.find((w) => d >= w.week && d <= addDays(w.week, 6));
-  const main = plans.filter((x) => !x.extra);
+  const main = plans.filter((x) => !x.extra && !x.parallel);
   const active = main.find((x) => x.active) ?? null;
   const activeStart = active?.startDate ? weekStart(active.startDate) : null;
   const newest = [...main].filter((x) => x.startDate).sort((a, b) => b.startDate!.localeCompare(a.startDate!))[0];
   // aktywny plan + starsze plany z datą startu (tylko tygodnie przed aktywnym); bez aktywnego — najnowszy z datą
-  const used: Plan[] = [...(active ? [active, ...(activeStart ? main.filter((x) => x !== active && x.startDate) : [])] : newest ? [newest] : []), ...plans.filter((x) => x.extra)];
+  const used: Plan[] = [...(active ? [active, ...(activeStart ? main.filter((x) => x !== active && x.startDate) : [])] : newest ? [newest] : []), ...plans.filter((x) => x.extra || (x.parallel && x.active))];
   for (const plan of used) {
-    const older = !plan.extra && plan !== active && !!activeStart;
+    const older = !plan.extra && !plan.parallel && plan !== active && !!activeStart;
     plan.weeks.forEach((w, wi) => {
       for (const k of w.workouts) {
         const d = workoutDate(plan, wi, k) ?? (!plan.extra && plan.startDate ? addDays(weekStart(plan.startDate), wi * 7) : undefined);

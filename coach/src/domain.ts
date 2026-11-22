@@ -445,6 +445,11 @@ export interface Plan {
   active: boolean;
   /** Dodatkowe treningi poza planem (osobna lista jednostek; nie wchodzi w kolejność planu). */
   extra?: boolean;
+  /**
+   * Plan równoległy (np. bieganie obok siłowni): aktywny razem z głównym planem, z własną kolejką jednostek.
+   * Nie wyłącza głównego planu i nie jest wyłączany przy włączeniu innego.
+   */
+  parallel?: boolean;
   /** Szablon planu (zapisany z `clientId: '__template__'`) — nie jest planem żadnego podopiecznego. */
   template?: boolean;
   notes?: string;

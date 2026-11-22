@@ -47,10 +47,10 @@ export function planSequence(plan: Plan): PlanStep[] {
 
 /** Przygotowany blok (`autoStart`), którego dzień startu już nadszedł i który zaczyna się później niż aktywny plan. */
 export function dueBlock(plans: Plan[], today: string = todayISO()): Plan | null {
-  const act = plans.find((p) => p.active && !p.extra);
+  const act = plans.find((p) => p.active && !p.extra && !p.parallel);
   return (
     plans
-      .filter((p) => !p.active && p.autoStart && !p.extra && !p.template && p.startDate && p.startDate <= today && (!act || (act.startDate ?? '') < p.startDate))
+      .filter((p) => !p.active && p.autoStart && !p.extra && !p.parallel && !p.template && p.startDate && p.startDate <= today && (!act || (act.startDate ?? '') < p.startDate))
       .sort((a, b) => b.startDate!.localeCompare(a.startDate!))[0] ?? null
   );
 }
@@ -60,7 +60,8 @@ export function dueBlock(plans: Plan[], today: string = todayISO()): Plan | null
  * Bez aktywnego planu — brak planu (nie pokazujemy po cichu nieaktywnego bloku); wyjątek: stare plany bez znacznika `active`.
  */
 export function currentPlan(plans: Plan[], today: string = todayISO()): Plan | null {
-  return dueBlock(plans, today) || plans.find((p) => p.active) || plans.find((p) => p.active === undefined && !p.extra && !p.template) || null;
+  const main = plans.filter((p) => !p.parallel);
+  return dueBlock(main, today) || main.find((p) => p.active) || main.find((p) => p.active === undefined && !p.extra && !p.template) || null;
 }
 
 /** Trening przerwany z powodu bólu nie zalicza jednostki planu (trener decyduje, co dalej). */

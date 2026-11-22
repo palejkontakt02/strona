@@ -4,7 +4,7 @@ import { templateWorkbook } from '../../lib/planTemplate';
 import { Card, Empty, Field, Icon, IconBtn, Modal, Tag } from '../../components/ui';
 import type { Client, Plan, PlanWorkout } from '../../domain';
 import { printPlan } from '../../lib/print';
-import { extraPlanOf, extraState, plansOf, savePlan, scheduleWorkout, sessionsOf, workoutAppointment, type ExtraState } from '../../data/ops';
+import { extraPlanOf, extraState, parallelPlansOf, plansOf, savePlan, scheduleWorkout, sessionsOf, workoutAppointment, type ExtraState } from '../../data/ops';
 import { useState } from 'react';
 import { del, put } from '../../data/db';
 import { useStore } from '../../data/store';
@@ -49,7 +49,7 @@ export function newPlan(clientId: string): Plan {
 export function ClientPlans({ client }: { client: Client }) {
   const { db, apply, ask, toast } = useStore();
   const { openModal, startLive, startAthlete } = useNav();
-  const plans = plansOf(db, client.id).sort((a, b) => Number(b.active) - Number(a.active) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const plans = [...plansOf(db, client.id), ...parallelPlansOf(db, client.id, false)].sort((a, b) => Number(b.active) - Number(a.active) || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   const sessions = sessionsOf(db, client.id);
   const extra = extraPlanOf(db, client.id);
   const extraWorkouts = extra?.weeks.flatMap((w) => w.workouts) ?? [];
@@ -80,7 +80,7 @@ export function ClientPlans({ client }: { client: Client }) {
     await apply(savePlan(db, { ...extra, weeks: extra.weeks.map((w) => ({ ...w, workouts: w.workouts.filter((k) => k.id !== id) })) }), `Usunięto „${name}”.`);
   };
 
-  const activePlan = plans.find((x) => x.active && !x.extra);
+  const activePlan = plans.find((x) => x.active && !x.extra && !x.parallel);
   const phone = useMedia('(max-width: 640px)');
 
   // kolejny blok: start od poniedziałku po końcu tego planu, nieaktywny do czasu „Ustaw aktywny”
@@ -161,14 +161,19 @@ export function ClientPlans({ client }: { client: Client }) {
               className={`plan-card ${p.active ? 'is-active' : ''}`}
               title={
                 <>
-                  {p.name} {p.active && <Tag tone="accent">Aktywny</Tag>}
+                  {p.name} {p.active && <Tag tone="accent">Aktywny</Tag>} {p.parallel && <Tag>Równoległy</Tag>}
                 </>
               }
               action={
                 <div className="actions pl-actions">
                   {!p.active && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => apply(savePlan(db, { ...p, active: true }), 'Plan ustawiony jako aktywny.')}>
-                      Ustaw aktywny
+                    <button className="btn btn-ghost btn-sm" onClick={() => apply(savePlan(db, { ...p, active: true }), p.parallel ? 'Plan równoległy włączony. Główny plan działa dalej.' : 'Plan ustawiony jako aktywny.')}>
+                      {p.parallel ? 'Włącz' : 'Ustaw aktywny'}
+                    </button>
+                  )}
+                  {p.active && p.parallel && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => apply(savePlan(db, { ...p, active: false }), 'Plan równoległy wyłączony.')}>
+                      Wyłącz
                     </button>
                   )}
                   <button className="btn btn-ghost btn-sm pl-edit" aria-label="Edytuj plan" onClick={() => openModal({ kind: 'plan', plan: p })}>
@@ -205,13 +210,13 @@ export function ClientPlans({ client }: { client: Client }) {
                 <div className="warn-box pl-ended" role="status">
                   <Icon name="alert" size={16} />
                   <span className="pl-ended-text">
-                    Plan skończył się {fmtShort(st.endDate)}. {plans.some((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')) ? 'Kolejny blok czeka.' : 'Zaplanuj kolejny blok.'}
+                    Plan skończył się {fmtShort(st.endDate)}. {plans.some((x) => !x.active && !x.extra && !!x.parallel === !!p.parallel && x.startDate && x.startDate > (p.startDate ?? '')) ? 'Kolejny blok czeka.' : 'Zaplanuj kolejny blok.'}
                     {nx && <span className="muted small"> Następny w kolejce: {nx.workout.name} ({nx.week.name}).</span>}
                   </span>
                   <span className="pl-ended-actions">
                     {(() => {
                       // przygotowany już kolejny blok — włączamy jego, zamiast robić drugą kopię
-                      const prepared = plans.filter((x) => !x.active && !x.extra && x.startDate && x.startDate > (p.startDate ?? '')).sort((a, b) => a.startDate!.localeCompare(b.startDate!))[0];
+                      const prepared = plans.filter((x) => !x.active && !x.extra && !!x.parallel === !!p.parallel && x.startDate && x.startDate > (p.startDate ?? '')).sort((a, b) => a.startDate!.localeCompare(b.startDate!))[0];
                       return prepared ? (
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => void apply(savePlan(db, { ...prepared, active: true }), `„${prepared.name}” jest teraz aktywny.`)} title={`Przygotowany blok „${prepared.name}” (start ${fmtDate(prepared.startDate!)})`}>
                           Włącz „{prepared.name}”

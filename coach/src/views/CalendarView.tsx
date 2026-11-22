@@ -740,7 +740,7 @@ function apptUnit(
     if (k) return { name: k.name, kind: sessionKind(k) };
   }
   if (a.status !== "planned") return null;
-  const plan = currentPlan(db.plans.filter((p) => p.clientId === a.clientId && !p.extra));
+  const plan = currentPlan(db.plans.filter((p) => p.clientId === a.clientId && !p.extra && !p.parallel));
   if (!plan) return null;
   const ss = db.sessions.filter((s) => s.clientId === a.clientId);
   const nx = nextWorkout(plan, ss);

@@ -66,14 +66,14 @@ export function App() {
     if (activating.current) return;
     const today = todayISO();
     const due = [...new Set(db.plans.filter((p) => p.autoStart && !p.active).map((p) => p.clientId))]
-      .map((cid) => dueBlock(db.plans.filter((p) => p.clientId === cid), today))
+      .map((cid) => dueBlock(db.plans.filter((p) => p.clientId === cid && !p.parallel), today))
       .filter((b): b is Plan => !!b);
     if (!due.length) return;
     activating.current = true;
     let cur = db;
     const changes = due.flatMap((b) => {
       const ch = savePlan(cur, { ...b, active: true });
-      cur = { ...cur, plans: cur.plans.map((p) => (p.clientId === b.clientId && !p.extra ? (p.id === b.id ? { ...b, active: true } : { ...p, active: false }) : p)) };
+      cur = { ...cur, plans: cur.plans.map((p) => (p.clientId === b.clientId && !p.extra && !p.parallel ? (p.id === b.id ? { ...b, active: true } : { ...p, active: false }) : p)) };
       return ch;
     });
     void apply(changes, due.length === 1 ? `Włączono „${due[0].name}”. Blok startuje dziś.` : `Włączono ${due.length} przygotowane bloki. Start dziś.`).finally(() => {

@@ -39,7 +39,12 @@ export function lastSessionDate(db: Db, clientId: string): string | null {
 
 /** Plany treningowe klienta (bez listy dodatkowych treningów). */
 export function plansOf(db: Db, clientId: string): Plan[] {
-  return db.plans.filter((p) => p.clientId === clientId && !p.extra);
+  return db.plans.filter((p) => p.clientId === clientId && !p.extra && !p.parallel);
+}
+
+/** Plany równoległe klienta (np. bieganie): działają obok głównego planu, każdy z własną kolejką jednostek. */
+export function parallelPlansOf(db: Pick<Db, 'plans'>, clientId: string, activeOnly = true): Plan[] {
+  return db.plans.filter((p) => p.clientId === clientId && p.parallel && !p.extra && !p.template && (!activeOnly || p.active));
 }
 
 /** Dodatkowe treningi klienta — jednostki poza planem, które trener może dopisywać w każdej chwili. */
@@ -380,12 +385,12 @@ export function deleteAppointment(db: Db, appt: Appointment, wholeSeries: boolea
 
 /* ---------- plany ---------- */
 
-/** Zapis planu; aktywny może być tylko jeden plan klienta. */
+/** Zapis planu; aktywny może być tylko jeden główny plan klienta (plany równoległe działają obok). */
 export function savePlan(db: Db, plan: Plan): Change[] {
   // włączony ręcznie albo w dniu startu — dalej zwykły aktywny plan
   const changes: Change[] = [put('plans', { ...plan, ...(plan.active ? { autoStart: undefined } : {}), updatedAt: new Date().toISOString() })];
-  if (plan.active && !plan.extra) {
-    for (const o of db.plans.filter((p) => p.clientId === plan.clientId && p.id !== plan.id && p.active && !p.extra)) {
+  if (plan.active && !plan.extra && !plan.parallel) {
+    for (const o of db.plans.filter((p) => p.clientId === plan.clientId && p.id !== plan.id && p.active && !p.extra && !p.parallel)) {
       changes.push(put('plans', { ...o, active: false }));
     }
   }

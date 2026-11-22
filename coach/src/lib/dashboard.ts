@@ -154,7 +154,7 @@ export function planLabel(
 /** Aktywny plan podopiecznego (bez treningów poza planem i szablonów). */
 export const activePlanOf = (plans: Plan[], clientId: string) =>
   plans.find(
-    (p) => p.clientId === clientId && p.active && !p.extra && !p.template,
+    (p) => p.clientId === clientId && p.active && !p.extra && !p.parallel && !p.template,
   ) ?? null;
 
 export interface RenewRow {
@@ -191,6 +191,7 @@ export function plansToRenew(
         p.id !== plan.id &&
         p.clientId === client.id &&
         !p.extra &&
+        !p.parallel &&
         !p.template &&
         !!p.startDate &&
         !!plan.startDate &&

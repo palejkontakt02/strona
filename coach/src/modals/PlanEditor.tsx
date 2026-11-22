@@ -164,6 +164,11 @@ export function PlanEditor({ m }: { m: Extract<ModalState, { kind: 'plan' }> }) 
             <input type="checkbox" checked={p.active} onChange={(e) => upd((d) => void (d.active = e.target.checked))} /> Plan aktywny
           </label>
         </div>}
+        {!tpl && <div className="field check-row self-end">
+          <label className="check" title="Np. bieganie obok siłowni: działa razem z głównym planem, ma własną kolejkę treningów i nie wyłącza głównego planu">
+            <input type="checkbox" checked={!!p.parallel} onChange={(e) => upd((d) => void (d.parallel = e.target.checked || undefined))} /> Plan równoległy (np. bieganie)
+          </label>
+        </div>}
         <Field label="Notatki do planu" wide>
           <input className="input" value={p.notes ?? ''} onChange={(e) => upd((d) => void (d.notes = e.target.value || undefined))} />
         </Field>

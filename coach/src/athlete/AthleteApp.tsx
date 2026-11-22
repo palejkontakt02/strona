@@ -13,7 +13,7 @@ import { refreshPush } from '../data/push';
 import { OfflineBadge } from '../components/OfflineBadge';
 import type { Checkin, Client, Measurement, Plan, PlanWorkout, TrainingSession, Wellness } from '../domain';
 import { dropUnsavedVideos } from '../data/videos';
-import { allMeasurements, clientById, dupText, savedSameDay, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, plansOf, sessionPayment, sessionsOf } from '../data/ops';
+import { allMeasurements, clientById, dupText, savedSameDay, deleteSession, extraPlanOf, extraState, undoSession, paymentLabel, parallelPlansOf, plansOf, sessionPayment, sessionsOf } from '../data/ops';
 import { useStore } from '../data/store';
 import { del, put } from '../data/db';
 import { fmtDay, fmtLong, fmtMonth, fnum, fx, plural, nEx, uid } from '../format';
@@ -450,6 +450,9 @@ export function AthleteApp({
                 onStart={(id, pid) => (pid === plan?.id ? void start(id) : startFrom({ planId: pid, workoutId: id }))}
                 onTrainer={onTrainer}
               />
+              {parallelPlansOf(db, clientId).map((pp) => (
+                <Workouts key={pp.id} plan={pp} sessions={sessions} nextId={nextWorkout(pp, sessions)?.workout.id} onStart={(id) => void startFrom({ planId: pp.id, workoutId: id })} onTrainer={onTrainer} />
+              ))}
             </div>
           )}
           {tab === 'trainer' && (
@@ -611,6 +614,31 @@ function TodayTab({
           </section>
         ));
       })()}
+      {!run &&
+        !away &&
+        parallelPlansOf(db, clientId).map((pp) => {
+          // plan równoległy (np. bieganie): jego następna jednostka obok głównego planu
+          const pnx = nextWorkout(pp, sessions);
+          if (!pnx || !pnx.workout.exercises.some((e) => e.name.trim())) return null;
+          const d = nextDate(pp, pnx, today);
+          if (d && d > addDays(today, 7)) return null;
+          const hero = !d || d <= today;
+          const when = !d ? 'następny' : d === today ? 'dziś' : d === addDays(today, 1) ? 'jutro' : d < today ? `zaległy z ${fmtDay(d)}` : fmtDay(d);
+          return (
+            <section key={pp.id} className={`acard ${hero ? 'acard-hero' : 'acard-extra'}`}>
+              <span className="eyebrow">
+                {pp.name} · {when}
+              </span>
+              <h2>{pnx.workout.name}</h2>
+              <p className="muted small">
+                {workoutSummary(pnx.workout, client)} · {pnx.week.name}
+              </p>
+              <button className={`btn ${hero ? 'btn-primary btn-lg' : 'btn-secondary'}`} onClick={() => onStartFrom({ planId: pp.id, workoutId: pnx.workout.id })}>
+                <Icon name="play" /> Start
+              </button>
+            </section>
+          );
+        })}
       {run?.editSessionId && (
         <section className="acard">
           <span className="eyebrow">Poprawki zapisanego treningu</span>
@@ -817,7 +845,7 @@ function TodayTab({
 
       {!away && !run && <AbsenceLink client={client} onOpen={onAbsence} />}
 
-      {!run && (isRunner(client, runVolume([...plansOf(db, clientId), ...(extra ? [extra] : [])], sessions, client.run, 8)) || /bieg/i.test(client.sport ?? '')) && <QuickRun client={client} />}
+      {!run && (isRunner(client, runVolume([...plansOf(db, clientId), ...parallelPlansOf(db, clientId), ...(extra ? [extra] : [])], sessions, client.run, 8)) || /bieg/i.test(client.sport ?? '')) && <QuickRun client={client} />}
 
       {!client.intake?.completedAt && (
         // drugi poziom: ankieta nie konkuruje ze Startem (przycisk drugorzędny, bez koloru uwagi)
@@ -994,7 +1022,7 @@ function ProgressTab({ client, canImport }: { client: Client; canImport: boolean
   const sessions = sessionsOf(db, client.id);
   const recs = records(sessions).slice(0, 5);
   const extra = extraPlanOf(db, client.id);
-  const runner = isRunner(client, runVolume([...plansOf(db, client.id), ...(extra ? [extra] : [])], sessions, client.run, 8));
+  const runner = isRunner(client, runVolume([...plansOf(db, client.id), ...parallelPlansOf(db, client.id), ...(extra ? [extra] : [])], sessions, client.run, 8));
   return (
     <div className="ath-page fade">
       <h1 className="ath-page-title">Postępy</h1>
@@ -1044,10 +1072,11 @@ interface DayItem {
 const isRunWorkout = (k: PlanWorkout) => k.exercises.some((e) => e.name) && k.exercises.filter((e) => e.name).every((e) => e.cardio ?? cardioByName(e.name));
 
 /** Co jest zaplanowane na dni: treningi z planu (dzień od trenera), zadane poza planem, wizyty z trenerem. */
-function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, plan: Plan | null | undefined, extra: Plan | undefined, sessions: TrainingSession[], today: string): Map<string, DayItem[]> {
+function plannedByDay(db: ReturnType<typeof useStore>['db'], clientId: string, plan0: Plan | null | undefined, extra: Plan | undefined, sessions: TrainingSession[], today: string): Map<string, DayItem[]> {
   const out = new Map<string, DayItem[]>();
   const add = (d: string, it: DayItem) => out.set(d, [...(out.get(d) ?? []), it]);
-  if (plan) {
+  // główny plan i plany równoległe (np. bieganie) — każdy z własną kolejką
+  for (const plan of [...(plan0 ? [plan0] : []), ...parallelPlansOf(db, clientId)]) {
     // jak u trenera (zakładka Plan, kalendarz): bieżące przejście planu, następny trening na najbliższej dacie,
     // jednostki przed następnym i inne minione daty pominięte; dni nieobecności („Wypadam z planu”) bez treningów
     const done = doneInPass(plan, sessions);
