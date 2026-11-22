@@ -126,6 +126,18 @@ describe('arkusz Fitowa z wykonaniem (prowadzony automatycznie)', () => {
     const { plan: out } = await back(fitowaWorkbook([plan], { name: 'Jan' }, [s]));
     expect(mergePlan(plan, out).diff.lines).toEqual([]);
   });
+  it('ćwiczenie spoza planu: pod tabelą „Poza planem”, plan wczytuje się bez zmian', async () => {
+    const plan = strength[0];
+    const k = plan.weeks[0].workouts[0];
+    const names = k.exercises.filter((e) => e.name.trim()).map((e) => ({ name: e.name, setsLog: [{ load: 20, reps: 10, rpe: 7 }] }));
+    const s = { id: 's3', clientId: plan.clientId, date: '2026-11-09', charge: 'brak', planId: plan.id, workoutId: k.id, exercises: [...names, { name: 'Plank', setsLog: [{ reps: 45, unit: 's' }, { reps: 40, unit: 's' }] }] } as TrainingSession;
+    const wb = fitowaWorkbook([plan], { name: 'Jan' }, [s]);
+    const sh = wb.find((x) => x.rows.some((r) => r.some((c) => c && typeof c === 'object' && c.v === 'Plank')))!;
+    expect(sh).toBeTruthy();
+    expect(sh.rows.flat().some((c) => c && typeof c === 'object' && c.v === '45 s')).toBe(true);
+    const { plan: out } = await back(wb);
+    expect(mergePlan(plan, out).diff.lines).toEqual([]);
+  });
   it('plan biegowy: osobna zakładka „Bieganie”', () => {
     const run = db.plans.find((p) => isRunPlan(p));
     if (!run) return;

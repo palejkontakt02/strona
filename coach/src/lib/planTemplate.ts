@@ -43,6 +43,7 @@ const S = {
   headDone: box('B6D7A8', { bold: true, wrap: true }),
   done: box('F4FAF1', { align: 'left', wrap: true, size: 9 }),
   doneNum: box('EAF4E4'),
+  extraHead: { bold: true, italic: true, align: 'left', color: '274E13' } as XStyle,
 };
 const c = (v: string | number | null | undefined, st: XStyle): XCell => ({ v: v === '' ? null : v, st });
 
@@ -256,6 +257,33 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
     }
   }
   if (withDone && done.some(Boolean)) {
+    // ćwiczenia zrobione w treningu, których nie ma w planie tego dnia (dodane w trakcie) — pod tabelą, tylko wykonanie
+    const extra: { key: string; name: string; perWeek: DoneSet[][] }[] = [];
+    weeks.forEach((_w, wi) => {
+      const sx = done[wi];
+      const k = unit!.wk[wi];
+      if (!sx || !k) return;
+      const used = new Set(k.exercises.filter((e) => e.name.trim()).map((e) => sessionEx(sx, k, e.name)).filter(Boolean));
+      for (const se of sx.exercises) {
+        if (used.has(se) || !se.name.trim()) continue;
+        const ds = doneSets(se);
+        if (!ds.length) continue;
+        let row = extra.find((x) => x.key === fold(se.name));
+        if (!row) extra.push((row = { key: fold(se.name), name: se.name.trim(), perWeek: [] }));
+        row.perWeek[wi] = ds;
+      }
+    });
+    if (extra.length) {
+      rows.push([null, c('Poza planem (dodane w trakcie treningu)', S.extraHead), null, null, null]);
+      for (const ex of extra) {
+        const n = Math.max(...weeks.map((_w, wi) => ex.perWeek[wi]?.length ?? 0));
+        for (let gi = 0; gi < n; gi++) {
+          const row: XCell[] = [null, c(gi === 0 ? ex.name : null, S.ex), c(gi === 0 ? 'poza planem' : null, S.fixed), null, null];
+          weeks.forEach((_w, wi) => row.push(...weekCells(undefined, undefined, false, wi, ex.perWeek[wi]?.[gi], gi + 1)));
+          rows.push(row);
+        }
+      }
+    }
     // podsumowanie treningu pod tabelą: czas, sRPE, ból, notatka
     const r: XCell[] = [null, c('Podsumowanie treningu', S.ex), null, null, null];
     const rn = rows.length + 1;
@@ -497,6 +525,8 @@ export function readTemplate(sheets: { name: string; rows: string[][] }[]): Temp
     let found = 0;
     for (const r of rows.slice(hi + 1)) {
       const exn = cell(r, eI);
+      // pod tabelą planu: wykonane poza planem i podsumowanie (arkusz prowadzony przez aplikację) — to nie plan
+      if (/^(poza planem|podsumowanie treningu)/.test(fold(exn))) break;
       if (exn) cur = { name: exn, label: cell(r, oI), type: '', rest: restText(cell(r, pI)), notes: cell(r, nI) };
       if (!cur) continue;
       const type = cell(r, tI);
