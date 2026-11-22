@@ -1,6 +1,6 @@
 import { downloadXlsx } from '../../lib/xlsxWrite';
 import { planWorkbook, xlsxName } from '../../lib/excelExport';
-import { templateWorkbook } from '../../lib/planTemplate';
+import { fitowaWorkbook, templateWorkbook } from '../../lib/planTemplate';
 import { Card, Empty, Field, Icon, IconBtn, Modal, Tag } from '../../components/ui';
 import type { Client, Plan, PlanWorkout } from '../../domain';
 import { printPlan } from '../../lib/print';
@@ -149,6 +149,7 @@ export function ClientPlans({ client }: { client: Client }) {
     { icon: 'print', text: 'Drukuj', run: () => printPlan(p, client, sessions) },
     ...(p.active ? [{ icon: 'print', text: 'Drukuj następny tydzień', hint: 'z pustą kolumną „Zrobiono”', run: () => printPlan(p, client, sessions, { nextWeek: true }) }] : []),
     { icon: 'download', text: 'Excel (.xlsx)', hint: 'plan i wykonanie, arkusz do importu', run: () => void downloadXlsx(xlsxName('plan', p.name), planWorkbook(p, client, sessions)) },
+    { icon: 'download', text: 'Arkusz Fitowa (.xlsx)', hint: 'wzór Fitowa z kolumną „Wykonano”, bieganie w układzie biegowym', run: () => void downloadXlsx(xlsxName('plan', p.name, 'fitowa'), fitowaWorkbook([p], client, sessions)) },
     { icon: 'download', text: 'Do edycji (szablon .xlsx)', hint: 'zmień w arkuszu i wczytaj z powrotem', run: () => void downloadXlsx(xlsxName('plan', p.name, 'do-edycji'), templateWorkbook(p, client)) },
     { icon: 'download', text: 'CSV', run: () => downloadCsv(csvFileName(p), planToCsv(p)) },
     ...(gs ? [{ icon: 'link', text: p.gsheet ? 'Arkusz Google' : 'Do Arkuszy Google', run: () => setGsPlan(p.id) }] : []),

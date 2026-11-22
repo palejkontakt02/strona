@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../data/seed';
 import { mergePlan } from './planMerge';
-import { readTemplate, templateWorkbook } from './planTemplate';
+import { doneText, fitowaWorkbook, isRunPlan, readTemplate, templateWorkbook } from './planTemplate';
 import { detectColumns, sheetToPlan } from './sheetImport';
 import { normalizeLayout } from './sheetLayouts';
 import { readXlsxSheets } from './xlsxRead';
 import { xlsx } from './xlsxWrite';
+import type { TrainingSession } from '../domain';
 
 const db = createSeed();
 const back = async (sheets: ReturnType<typeof templateWorkbook>, start = '2026-11-16') => {
@@ -88,5 +89,34 @@ describe('pusty szablon', () => {
     expect(wb.map((s) => s.name)).toEqual(['Dzień 1', 'Dzień 2', 'Dzień 3']);
     const read = await readXlsxSheets(xlsx(wb));
     expect(readTemplate(read)).toBeNull();
+  });
+});
+
+describe('arkusz Fitowa z wykonaniem (prowadzony automatycznie)', () => {
+  const strength = db.plans.filter((p) => p.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => e.name.trim() && !e.cardio))));
+  it.each(strength.map((p) => [p.name, p] as const))('%s: kolumna „Wykonano” nie psuje wczytania planu', async (_n, plan) => {
+    const sessions = db.sessions.filter((s) => s.planId === plan.id);
+    const wb = fitowaWorkbook([plan], { name: 'Jan' }, sessions);
+    const { plan: out } = await back(wb);
+    expect(mergePlan(plan, out).diff.lines).toEqual([]);
+  });
+  it('wykonanie: serie robocze bez rozgrzewki, kg×powt. @RPE', () => {
+    expect(doneText({ name: 'Przysiad', setsLog: [{ load: 40, reps: 6, warmup: true }, { load: 50, reps: 6, rpe: 7 }, { load: 52.5, reps: 6, rpe: 8.5 }, { reps: 25, unit: 's' }] })).toBe('50×6 @7 · 52,5×6 @8,5 · 25 s');
+  });
+  it('zapisany trening trafia do kolumny „Wykonano” swojego tygodnia', () => {
+    const plan = strength[0];
+    const k = plan.weeks[0].workouts[0];
+    const e0 = k.exercises.find((e) => e.name.trim())!;
+    const s = { id: 's1', clientId: plan.clientId, date: '2026-11-09', charge: 'brak', planId: plan.id, workoutId: k.id, exercises: [{ name: e0.name, setsLog: [{ load: 50, reps: 6, rpe: 7 }] }] } as TrainingSession;
+    const wb = fitowaWorkbook([plan], { name: 'Jan' }, [s]);
+    const flat = wb.flatMap((sh) => sh.rows.flat()).map((x) => (x && typeof x === 'object' && 'v' in x ? String(x.v ?? '') : ''));
+    expect(flat.some((v) => v.includes('×') && v.includes('@'))).toBe(true);
+    expect(flat.some((v) => v.includes('✓'))).toBe(true);
+  });
+  it('plan biegowy: osobna zakładka „Bieganie”', () => {
+    const run = db.plans.find((p) => isRunPlan(p));
+    if (!run) return;
+    const wb = fitowaWorkbook([run], { name: 'Jan' }, db.sessions);
+    expect(wb.map((x) => x.name)).toEqual(['Bieganie']);
   });
 });
