@@ -145,3 +145,16 @@ describe('arkusz Fitowa z wykonaniem (prowadzony automatycznie)', () => {
     expect(wb.map((x) => x.name)).toEqual(['Bieganie']);
   });
 });
+
+describe('zakładka Monitoring', () => {
+  it('tygodnie, treningi i e1RM ze wszystkich treningów podopiecznego', () => {
+    const client = db.clients.find((c) => db.sessions.filter((s) => s.clientId === c.id).length > 5)!;
+    const ss = db.sessions.filter((s) => s.clientId === client.id);
+    const plan = db.plans.find((p) => p.clientId === client.id && p.weeks.length)!;
+    const wb = fitowaWorkbook([plan], client, ss, { monitoring: client });
+    const mon = wb.find((x) => x.name === 'Monitoring')!;
+    const txt = mon.rows.flat().map((x) => (x && typeof x === 'object' ? String(x.v ?? '') : String(x ?? '')));
+    for (const t of ['Teraz', 'Tygodnie', 'Treningi', 'ACWR']) expect(txt).toContain(t);
+    expect(mon.rows.length).toBeGreaterThan(ss.length);
+  });
+});

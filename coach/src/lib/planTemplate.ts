@@ -1,6 +1,7 @@
 import type { Client, Plan, PlanExercise, PlanWorkout, SessionExercise, SetGroup, TrainingSession } from '../domain';
 import { fmtClock, planRunTotals, runTotals } from './running';
 import { cardioByName } from './run';
+import { monitoringSheet } from './monitoringSheet';
 import { exerciseLabels, mergeGroups } from './plan';
 import { fold, parseDay } from './sheetImport';
 import { colName, sheetName, type XCell, type XSheet, type XStyle } from './xlsxWrite';
@@ -435,7 +436,7 @@ function runSheet(plan: Plan, client: string, sessions: TrainingSession[], taken
  * Arkusz Fitowa podopiecznego (prowadzony automatycznie): wzór planu Fitowa z kolumną „Wykonano” przy każdym
  * tygodniu (zakładka = dzień treningowy), a plany biegowe w układzie biegowym (zakładka „Bieganie”).
  */
-export function fitowaWorkbook(plans: Plan[], client: Pick<Client, 'name'>, sessions: TrainingSession[]): XSheet[] {
+export function fitowaWorkbook(plans: Plan[], client: Pick<Client, 'name'>, sessions: TrainingSession[], opts: { monitoring?: Client; today?: string } = {}): XSheet[] {
   const taken: string[] = [];
   const out: XSheet[] = [];
   for (const plan of plans.filter((p) => p.weeks.length)) {
@@ -452,6 +453,8 @@ export function fitowaWorkbook(plans: Plan[], client: Pick<Client, 'name'>, sess
       out.push(sh);
     }
   }
+  // zakładka „Monitoring”: obciążenie, ACWR, ból, wellness, e1RM — ze wszystkich treningów podopiecznego
+  if (opts.monitoring) out.push(monitoringSheet(opts.monitoring, sessions, opts.today, sheetName('Monitoring', taken)));
   return out;
 }
 
