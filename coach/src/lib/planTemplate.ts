@@ -42,6 +42,7 @@ const S = {
   weekDone: box('274E13', { bold: true, color: 'FFFFFF', border: { l: 'medium', r: 'medium', t: 'medium', b: 'thin' } }),
   headDone: box('B6D7A8', { bold: true, wrap: true }),
   done: box('F4FAF1', { align: 'left', wrap: true, size: 9 }),
+  doneNum: box('EAF4E4'),
 };
 const c = (v: string | number | null | undefined, st: XStyle): XCell => ({ v: v === '' ? null : v, st });
 
@@ -98,6 +99,23 @@ function units(plan: Plan): Unit[] {
 const num = (v: number) => String(Math.round(v * 100) / 100).replace('.', ',');
 const shortDate = (d: string) => `${Number(d.slice(8))}.${Number(d.slice(5, 7))}`;
 
+interface DoneSet {
+  reps: string | number;
+  kg?: number;
+  rpe?: number;
+}
+
+/** Serie robocze z zapisu (bez rozgrzewki) — do kolumn wykonania. */
+function doneSets(e: SessionExercise | undefined): DoneSet[] {
+  return (e?.setsLog ?? [])
+    .filter((x) => !x.warmup && x.done !== false && (x.reps != null || x.load != null))
+    .map((x) => ({
+      reps: x.unit || x.repsR != null ? `${x.reps != null ? num(x.reps) : '?'}${x.repsR != null ? `/${num(x.repsR)}` : ''}${x.unit ? ` ${x.unit}` : ''}` : (x.reps ?? ''),
+      ...(x.load != null ? { kg: x.load } : {}),
+      ...(x.rpe != null ? { rpe: x.rpe } : {}),
+    }));
+}
+
 /** Serie robocze jednym tekstem: „50×6 @7 · 55×6 @8”; bez ciężaru „8 @7”, na czas „25 s”. */
 export function doneText(e: SessionExercise | undefined): string {
   const sets = (e?.setsLog ?? []).filter((x) => !x.warmup && x.done !== false && (x.reps != null || x.load != null));
@@ -138,8 +156,14 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
   const merges: string[] = [];
   const W0 = TEMPLATE_FIXED.length;
   const withDone = !!sessions && !!plan && !!unit;
-  const WEEK_COLS: readonly string[] = withDone ? [...TEMPLATE_WEEK, 'Wykonano'] : TEMPLATE_WEEK;
-  const PW = WEEK_COLS.length;
+  // % 1RM w arkuszu prowadzonym przez aplikację tylko, gdy plan jest rozpisany w procentach
+  const usesPct = !!plan?.weeks.some((w) => w.workouts.some((k) => k.exercises.some((e) => /1RM/i.test(e.notes ?? '') || e.groups.some((g) => pctOf(g.load)))));
+  type Col = 'sets' | 'reps' | 'pct' | 'kg' | 'rpe' | 'note' | 'dn' | 'dreps' | 'dkg' | 'drpe';
+  const LABEL: Record<Col, string> = { sets: 'Serie', reps: 'Powt.', pct: '% 1RM', kg: 'Kg', rpe: 'RPE', note: 'Uwagi tyg.', dn: 'Seria', dreps: 'Powt.', dkg: 'Kg', drpe: 'RPE' };
+  const WIDTH: Record<Col, number> = { sets: 6, reps: 8, pct: 7, kg: 8, rpe: 6, note: 16, dn: 6, dreps: 7, dkg: 7, drpe: 6 };
+  const COLS: Col[] = [...(['sets', 'reps', ...(!withDone || usesPct ? (['pct'] as const) : []), 'kg', 'rpe', 'note'] as Col[]), ...(withDone ? (['dn', 'dreps', 'dkg', 'drpe'] as Col[]) : [])];
+  const isDone = (k: Col) => k.startsWith('d');
+  const PW = COLS.length;
   const done = withDone ? unit!.wk.map((k) => sessionOf(plan!, k, sessions!)) : [];
   const last = W0 + weeks.length * PW - 1;
   const name = unit?.name ?? 'Dzień 1';
@@ -158,7 +182,7 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
   rows.push([
     c(
       withDone
-        ? 'Arkusz prowadzi aplikacja Fitowa: plan i kolumna „Wykonano” (serie robocze: kg×powtórzenia @RPE) uzupełniają się same po zapisaniu treningu. Zmiany planu rób w aplikacji. Własne notatki trzymaj w osobnej zakładce.'
+        ? 'Arkusz prowadzi aplikacja Fitowa. W każdym tygodniu niebieskie kolumny to plan, zielone to wykonanie (każda seria robocza w osobnym wierszu). Uzupełnia się samo po zapisaniu treningu. Zmiany planu rób w aplikacji, własne notatki trzymaj w osobnej zakładce.'
         : 'Wypełniaj żółte pola i tabelę. Wiersz bez nazwy ćwiczenia = kolejne serie ćwiczenia wyżej (np. back-off). Ozn. A1/A2 = superseria. Ciężar: Kg albo % 1RM (albo oba). Nie zmieniaj nazw nagłówków.',
       S.hint,
     ),
@@ -174,26 +198,37 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
   });
   rows.push(wr);
   const headRow = rows.length;
-  rows.push([...TEMPLATE_FIXED.map((h) => c(h, S.head)), ...weeks.flatMap(() => WEEK_COLS.map((h) => c(h, h === 'Wykonano' ? S.headDone : S.head)))]);
+  rows.push([...TEMPLATE_FIXED.map((h) => c(h, S.head)), ...weeks.flatMap(() => COLS.map((k) => c(LABEL[k], isDone(k) ? S.headDone : S.head)))]);
 
-  const weekCells = (g: SetGroup | undefined, e: PlanExercise | undefined, first: boolean, wi: number): XCell[] => {
+  /** Komórki tygodnia: plan (grupa serii) i wykonanie (jedna seria robocza). */
+  const weekCells = (g: SetGroup | undefined, e: PlanExercise | undefined, first: boolean, wi: number, d?: DoneSet, dn?: number): XCell[] => {
     const st = wi % 2 ? S.cellB : S.cellA;
-    if (!g || !e) return WEEK_COLS.map((h) => c(null, h === 'Uwagi tyg.' ? S.note : h === 'Wykonano' ? S.done : st));
-    const sp = splitPctNote(e.notes);
-    const pct = pctOf(g.load) || (first ? sp.pct : '');
-    const kg = pctOf(g.load) ? '' : g.load;
-    const reps = e.perSide && g.reps && !/\/\s*str/i.test(g.reps) ? `${g.reps}/str.` : g.reps;
-    const kgCell = kg && e.loadPer === 'one' ? `${kg.replace('.', ',')}/rękę` : numOr(kg);
-    const out = [c(numOr(g.sets || '1'), st), c(numOr(reps), st), c(pct ? numOr(pct) : null, st), c(kgCell, st), c(numOr(g.rpe), st), c(null, S.note)];
-    if (withDone) out.push(c(null, S.done));
-    return out;
+    const sp = g && e ? splitPctNote(e.notes) : null;
+    const pct = g && sp ? pctOf(g.load) || (first ? sp.pct : '') : '';
+    const kg = g && !pctOf(g.load) ? g.load : '';
+    const reps = g && e ? (e.perSide && g.reps && !/\/\s*str/i.test(g.reps) ? `${g.reps}/str.` : g.reps) : '';
+    const kgCell = kg && e?.loadPer === 'one' ? `${kg.replace('.', ',')}/rękę` : numOr(kg);
+    const v: Record<Col, XCell> = {
+      sets: c(g ? numOr(g.sets || '1') : null, st),
+      reps: c(g ? numOr(reps) : null, st),
+      pct: c(pct ? numOr(pct) : null, st),
+      kg: c(g ? kgCell : null, st),
+      rpe: c(g ? numOr(g.rpe) : null, st),
+      note: c(null, S.note),
+      dn: c(d ? dn! : null, S.doneNum),
+      dreps: c(d ? d.reps : null, S.doneNum),
+      dkg: c(d?.kg ?? null, S.doneNum),
+      drpe: c(d?.rpe ?? null, S.doneNum),
+    };
+    return COLS.map((k) => v[k]);
   };
 
   if (unit) {
     for (const ex of unit.ex) {
       const per = weeks.map((_w, wi) => ex.perWeek[wi]);
       const groups = per.map((e) => (e ? mergeGroups(structuredClone(e.groups)) : []));
-      const n = Math.max(1, ...groups.map((g) => g.length));
+      const dsets = weeks.map((_w, wi) => (withDone && done[wi] && per[wi] ? doneSets(sessionEx(done[wi], unit!.wk[wi], ex.name)) : []));
+      const n = Math.max(1, ...groups.map((g) => g.length), ...dsets.map((x) => x.length));
       // uwagi stałe: te same we wszystkich tygodniach (bez procentu 1RM) — inaczej w kolumnie tygodnia
       const notes = per.map((e) => (e ? splitPctNote(e.notes).notes : null));
       const present = notes.filter((x): x is string => x != null);
@@ -209,12 +244,11 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
           c(gi === 0 && same ? present[0] : null, S.note),
         ];
         weeks.forEach((_w, wi) => {
-          const cells = weekCells(groups[wi][gi], per[wi], gi === 0, wi);
-          const NI = WEEK_COLS.indexOf('Uwagi tyg.');
+          const cells = weekCells(groups[wi][gi], per[wi], gi === 0, wi, dsets[wi][gi], gi + 1);
+          const NI = COLS.indexOf('note');
           if (gi === 0 && !same && notes[wi]) cells[NI] = c(notes[wi], S.note);
-          if (withDone && gi === 0 && done[wi] && per[wi]) {
-            cells[PW - 1] = c(doneText(sessionEx(done[wi], unit!.wk[wi], ex.name)) || '—', S.done);
-          }
+          // zrobiony trening, a ćwiczenia nie ma w zapisie — „—” w pierwszym wierszu wykonania
+          if (gi === 0 && withDone && done[wi] && per[wi] && !dsets[wi].length) cells[COLS.indexOf('dn')] = c('—', S.doneNum);
           r.push(...cells);
         });
         rows.push(r);
@@ -223,11 +257,16 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
   }
   if (withDone && done.some(Boolean)) {
     // podsumowanie treningu pod tabelą: czas, sRPE, ból, notatka
-    const r: XCell[] = [null, c('Podsumowanie', S.ex), null, null, null];
+    const r: XCell[] = [null, c('Podsumowanie treningu', S.ex), null, null, null];
+    const rn = rows.length + 1;
+    const d0 = COLS.indexOf('dn');
     weeks.forEach((_w, wi) => {
       const sx = done[wi];
-      const cells: XCell[] = WEEK_COLS.map(() => null);
-      if (sx) cells[PW - 1] = c([sx.duration && `${sx.duration} min`, sx.srpe != null && `sRPE ${sx.srpe}`, sx.pain != null && `ból ${sx.pain}`, sx.solo === false ? 'z trenerem' : '', sx.notes].filter(Boolean).join(' · '), S.done);
+      const cells: XCell[] = COLS.map(() => null);
+      if (sx) {
+        cells[d0] = c([sx.duration && `${sx.duration} min`, sx.srpe != null && `sRPE ${sx.srpe}`, sx.pain != null && `ból ${sx.pain}`, sx.solo === false ? 'z trenerem' : '', sx.notes].filter(Boolean).join(' · '), S.done);
+        merges.push(`${colName(W0 + wi * PW + d0)}${rn}:${colName(W0 + wi * PW + PW - 1)}${rn}`);
+      }
       r.push(...cells);
     });
     rows.push(r);
@@ -237,7 +276,7 @@ function unitSheet(plan: Plan | null, unit: Unit | null, weeks: string[], client
     name: sheetName(name, taken),
     rows,
     merges,
-    widths: [6, 28, 10, 8, 28, ...weeks.flatMap(() => [6, 8, 7, 8, 6, 18, ...(withDone ? [26] : [])])],
+    widths: [6, 28, 10, 8, 28, ...weeks.flatMap(() => COLS.map((k) => WIDTH[k]))],
     heights: { [headRow]: 30 },
     freezeCols: 2,
     landscape: true,

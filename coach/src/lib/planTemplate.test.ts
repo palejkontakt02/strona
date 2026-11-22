@@ -110,8 +110,21 @@ describe('arkusz Fitowa z wykonaniem (prowadzony automatycznie)', () => {
     const s = { id: 's1', clientId: plan.clientId, date: '2026-11-09', charge: 'brak', planId: plan.id, workoutId: k.id, exercises: [{ name: e0.name, setsLog: [{ load: 50, reps: 6, rpe: 7 }] }] } as TrainingSession;
     const wb = fitowaWorkbook([plan], { name: 'Jan' }, [s]);
     const flat = wb.flatMap((sh) => sh.rows.flat()).map((x) => (x && typeof x === 'object' && 'v' in x ? String(x.v ?? '') : ''));
-    expect(flat.some((v) => v.includes('×') && v.includes('@'))).toBe(true);
     expect(flat.some((v) => v.includes('✓'))).toBe(true);
+    // wykonanie w osobnych kolumnach: Seria | Powt. | Kg | RPE
+    const sh = wb[0];
+    const head = sh.rows.find((r) => r.some((x) => x && typeof x === 'object' && x.v === 'Seria'))!;
+    const di = head.findIndex((x) => x && typeof x === 'object' && x.v === 'Seria');
+    const row = sh.rows.find((r) => { const x = r[di]; return !!x && typeof x === 'object' && x.v === 1; })!;
+    expect([row[di + 1], row[di + 2], row[di + 3]].map((x) => (x && typeof x === 'object' ? x.v : null))).toEqual([6, 50, 7]);
+  });
+  it('więcej zrobionych serii niż wierszy planu — plan wczytuje się bez zmian', async () => {
+    const plan = strength[0];
+    const k = plan.weeks[0].workouts[0];
+    const e0 = k.exercises.find((e) => e.name.trim())!;
+    const s = { id: 's2', clientId: plan.clientId, date: '2026-11-09', charge: 'brak', planId: plan.id, workoutId: k.id, exercises: [{ name: e0.name, setsLog: Array.from({ length: 9 }, (_x, i) => ({ load: 40 + i, reps: 5, rpe: 8 })) }] } as TrainingSession;
+    const { plan: out } = await back(fitowaWorkbook([plan], { name: 'Jan' }, [s]));
+    expect(mergePlan(plan, out).diff.lines).toEqual([]);
   });
   it('plan biegowy: osobna zakładka „Bieganie”', () => {
     const run = db.plans.find((p) => isRunPlan(p));
