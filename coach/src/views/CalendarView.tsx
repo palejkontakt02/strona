@@ -1,5 +1,11 @@
 import { apptReplyState } from "../lib/appts";
-import { useEffect, useState, type DragEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+} from "react";
 import { Icon, Modal, Seg, Tag } from "../components/ui";
 import type {
   Appointment,
@@ -21,8 +27,19 @@ import { fmtMonth, fmtShort, fmtWeekday } from "../format";
 import { clashes, clientHue } from "../lib/calendar";
 import { addDays, todayISO, weekStart } from "../lib/dates";
 import { useNav } from "../nav";
-import { currentPlan, doneInPass, nextDate, nextWorkout, planSequence, workoutDate } from "../lib/plan";
-import { sessionKind, SESSION_KIND_LABEL, type SessionKind } from "../lib/dataColors";
+import {
+  currentPlan,
+  doneInPass,
+  nextDate,
+  nextWorkout,
+  planSequence,
+  workoutDate,
+} from "../lib/plan";
+import {
+  sessionKind,
+  SESSION_KIND_LABEL,
+  type SessionKind,
+} from "../lib/dataColors";
 import type { Db } from "../data/db";
 import { LocationTag, locStyle } from "../components/location";
 import { put } from "../data/db";
@@ -197,10 +214,18 @@ export function CalendarView() {
       w.workouts.forEach((k) => {
         const planned = workoutDate(p, wi, k);
         const isNext = nx?.workout.id === k.id;
-        const d = isNext ? nextDate(p, nx, today) ?? planned : planned;
-        if (!d || (!isNext && done.has(k.id)) || !k.exercises.some((e) => e.name.trim()))
+        const d = isNext ? (nextDate(p, nx, today) ?? planned) : planned;
+        if (
+          !d ||
+          (!isNext && done.has(k.id)) ||
+          !k.exercises.some((e) => e.name.trim())
+        )
           return;
-        if (!isNext && (seqIds.indexOf(k.id) < ni || d < today || (nxD && d <= nxD))) return;
+        if (
+          !isNext &&
+          (seqIds.indexOf(k.id) < ni || d < today || (nxD && d <= nxD))
+        )
+          return;
         if (
           db.appointments.some(
             (a) =>
@@ -705,7 +730,10 @@ function SessionTile({ s }: { s: TrainingSession }) {
         </span>
       </span>
       <span className="tile-name">{c?.name ?? "—"}</span>
-      <span className="tile-unit" data-kind={sessionKind({ name: s.workoutName, exercises: s.exercises })}>
+      <span
+        className="tile-unit"
+        data-kind={sessionKind({ name: s.workoutName, exercises: s.exercises })}
+      >
         {s.workoutName || "Trening"}
       </span>
       <span className="tile-meta">
@@ -740,7 +768,11 @@ function apptUnit(
     if (k) return { name: k.name, kind: sessionKind(k) };
   }
   if (a.status !== "planned") return null;
-  const plan = currentPlan(db.plans.filter((p) => p.clientId === a.clientId && !p.extra && !p.parallel));
+  const plan = currentPlan(
+    db.plans.filter(
+      (p) => p.clientId === a.clientId && !p.extra && !p.parallel,
+    ),
+  );
   if (!plan) return null;
   const ss = db.sessions.filter((s) => s.clientId === a.clientId);
   const nx = nextWorkout(plan, ss);
@@ -782,19 +814,21 @@ function WeekAxis({
     from = Math.min(from, r.from);
     to = Math.max(to, r.to);
   }
-  const range =
-    from < to ? { from, to } : { from: 8 * 60, to: 18 * 60 };
+  const range = from < to ? { from, to } : { from: 8 * 60, to: 18 * 60 };
   const hours: number[] = [];
   for (let m = range.from; m <= range.to; m += 60) hours.push(m);
   const anyLoose = days.some(
     (d) => looseOn(d).length + assignedOn(d).length > 0,
   );
+  const hoursRef = useRef<HTMLDivElement>(null);
+  const PX = useFitPx(hoursRef, range.to - range.from);
   return (
     <div className={`week-axis-grid ${anyLoose ? "has-loose" : ""}`}>
       <div className="wk-gutter" aria-hidden>
         <div className="wk-head" />
         {anyLoose && <div className="wk-loose wk-loose-l">bez godziny</div>}
         <div
+          ref={hoursRef}
           className="wk-hours"
           style={{ height: `${(range.to - range.from) * PX}px` }}
         >
@@ -839,6 +873,7 @@ function WeekAxis({
             appts={apptsOn(date)}
             onDragEnd={onDragEnd}
             shared={range}
+            px={PX}
           />
         </section>
       ))}
@@ -846,8 +881,36 @@ function WeekAxis({
   );
 }
 
-/** Minuty → piksele na osi godzin widoku Dzień (godzina ≈ 64 px). */
+/** Minuty → piksele na osi godzin (godzina najwyżej 64 px). */
 const PX = 64 / 60;
+/** Najmniej ~24 px na godzinę — niżej kafelki przestają być czytelne. */
+const MIN_PX = 24 / 60;
+
+/**
+ * Oś godzin dopasowana do ekranu: wysokość godziny tak, żeby cały zakres zmieścił się od górnej krawędzi osi
+ * do dołu okna (z miejscem na legendę), między 24 a 64 px na godzinę.
+ */
+function useFitPx(
+  ref: React.RefObject<HTMLElement | null>,
+  minutes: number,
+  reserve = 80,
+): number {
+  const [px, setPx] = useState(PX);
+  useLayoutEffect(() => {
+    const calc = () => {
+      const el = ref.current;
+      if (!el || minutes <= 0) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top - reserve;
+      const next = Math.min(PX, Math.max(MIN_PX, avail / minutes));
+      setPx((cur) => (Math.abs(cur - next) > 0.001 ? next : cur));
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, [ref, minutes, reserve]);
+  return px;
+}
 
 /**
  * Widok Dzień: oś godzin (godziny pracy z profilu trenera, poszerzone o wizyty spoza nich), kafelki wizyt
@@ -859,11 +922,14 @@ function DayAxis({
   appts,
   onDragEnd,
   shared,
+  px,
 }: {
   date: ISODate;
   today: ISODate;
   appts: Appointment[];
   onDragEnd: () => void;
+  /** Widok tygodnia: wysokość minuty wspólna dla wszystkich dni (dopasowana do ekranu). */
+  px?: number;
   /** Widok tygodnia: wspólny zakres osi dla wszystkich dni, godziny opisane w osobnej kolumnie. */
   shared?: { from: number; to: number };
 }) {
@@ -884,6 +950,10 @@ function DayAxis({
   const timed = appts.filter((a) => a.time);
   // dzień poza godzinami pracy i bez wizyt — bez pustej osi
   const off = !hoursOn(date, profile.workHours);
+  const axisRef = useRef<HTMLDivElement>(null);
+  const fitRange = shared ?? axisRange(timed, date, profile.workHours);
+  const fitPx = useFitPx(axisRef, px ? 0 : fitRange.to - fitRange.from);
+  const PX = px ?? fitPx;
   if (!timed.length && off && !shared)
     return (
       <p className="muted small day-off">
@@ -904,6 +974,7 @@ function DayAxis({
   const y = (m: number) => (m - range.from) * PX;
   return (
     <div
+      ref={axisRef}
       className={`day-axis ${shared ? "day-axis-week" : ""} ${off ? "is-off" : ""}`}
       style={{ height: `${y(range.to)}px` }}
     >
@@ -1027,8 +1098,36 @@ function MonthGrid({
     days[days.length - 7].slice(0, 7) !== first.slice(0, 7)
   )
     days.splice(-7);
+  // wysokość wiersza dopasowana do ekranu; w komórce tyle wizyt, ile się zmieści (reszta jako „+N”)
+  const monthRef = useRef<HTMLDivElement>(null);
+  const rows = days.length / 7;
+  const [rowH, setRowH] = useState(112);
+  useLayoutEffect(() => {
+    if (phone) return;
+    const calc = () => {
+      const el = monthRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top - 68 - 24 - 6 * rows;
+      const next = Math.round(Math.min(160, Math.max(48, avail / rows)));
+      setRowH((cur) => (cur !== next ? next : cur));
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, [rows, phone]);
+  // numer dnia ~24 px, wpis ~21 px
+  const slots = Math.max(1, Math.floor((rowH - 30) / 21));
   return (
-    <div className="month">
+    <div
+      ref={monthRef}
+      className="month"
+      style={
+        phone
+          ? undefined
+          : ({ "--month-row": `${rowH}px` } as React.CSSProperties)
+      }
+    >
       {["pon", "wt", "śr", "czw", "pt", "sob", "nd"].map((d) => (
         <div key={d} className="month-dow">
           {d}
@@ -1038,8 +1137,8 @@ function MonthGrid({
         const items = apptsOn(d).filter((a) => a.status !== "cancel");
         const loose = [...looseOn(d), ...assignedOn(d)];
         const cls = `month-cell ${d.slice(0, 7) !== first.slice(0, 7) ? "other" : ""} ${d === today ? "is-today" : ""} ${d < today ? "is-past" : ""}`;
-        if (phone) {
-          // telefon: cyfra dnia i liczba wizyt (zamiast pasków bez treści)
+        if (phone || slots < 2) {
+          // telefon albo niski ekran: cyfra dnia i liczba wizyt (zamiast pasków bez treści)
           const n = items.length;
           return (
             <button
@@ -1057,45 +1156,50 @@ function MonthGrid({
         return (
           <button key={d} className={cls} onClick={() => onPickDay(d)}>
             <span className="month-num">{Number(d.slice(8))}</span>
-            {items.slice(0, 3).map((a) => (
-              <span
-                key={a.id}
-                className={`month-item tile-${a.status}`}
-                style={hueStyle(a.clientId)}
-              >
-                <span className="hide-mobile">{a.time} </span>
-                {clientById(db, a.clientId)?.name.split(" ")[0]}
-              </span>
-            ))}
-            {loose.slice(0, 1).map((s) =>
-              "workout" in s ? (
-                <span
-                  key={s.workout.id}
-                  className="month-item tile-loose"
-                  style={hueStyle(s.plan.clientId)}
-                >
-                  {clientById(db, s.plan.clientId)?.name.split(" ")[0]}
-                </span>
-              ) : (
-                <span
-                  key={s.id}
-                  className={`month-item tile-done ${isSolo(db, s) ? "tile-solo" : ""}`}
-                  style={hueStyle(s.clientId)}
-                >
-                  {clientById(db, s.clientId)?.name.split(" ")[0]}
-                </span>
-              ),
-            )}
-            {items.length + loose.length >
-              Math.min(items.length, 3) + Math.min(loose.length, 1) && (
-              <span className="month-more">
-                +
-                {items.length +
-                  loose.length -
-                  Math.min(items.length, 3) -
-                  Math.min(loose.length, 1)}
-              </span>
-            )}
+            {(() => {
+              const total = items.length + loose.length;
+              const room = total > slots ? slots - 1 : slots;
+              const showItems = items.slice(0, room);
+              const showLoose = loose.slice(
+                0,
+                Math.max(0, room - showItems.length),
+              );
+              const more = total - showItems.length - showLoose.length;
+              return (
+                <>
+                  {showItems.map((a) => (
+                    <span
+                      key={a.id}
+                      className={`month-item tile-${a.status}`}
+                      style={hueStyle(a.clientId)}
+                    >
+                      <span className="hide-mobile">{a.time} </span>
+                      {clientById(db, a.clientId)?.name.split(" ")[0]}
+                    </span>
+                  ))}
+                  {showLoose.map((s) =>
+                    "workout" in s ? (
+                      <span
+                        key={s.workout.id}
+                        className="month-item tile-loose"
+                        style={hueStyle(s.plan.clientId)}
+                      >
+                        {clientById(db, s.plan.clientId)?.name.split(" ")[0]}
+                      </span>
+                    ) : (
+                      <span
+                        key={s.id}
+                        className={`month-item tile-done ${isSolo(db, s) ? "tile-solo" : ""}`}
+                        style={hueStyle(s.clientId)}
+                      >
+                        {clientById(db, s.clientId)?.name.split(" ")[0]}
+                      </span>
+                    ),
+                  )}
+                  {more > 0 && <span className="month-more">+{more}</span>}
+                </>
+              );
+            })()}
           </button>
         );
       })}
