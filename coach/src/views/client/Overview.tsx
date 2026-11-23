@@ -6,12 +6,12 @@ import { Card, Dot, Empty, Icon, Kpi, Tag } from '../../components/ui';
 import type { Client } from '../../domain';
 import { lastSessionDate, plansOf, sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
-import { ago, fmtDate, fx, pln } from '../../format';
+import { ago, fmtDate, fnum, pln } from '../../format';
 import { clientAlerts } from '../../lib/alerts';
 import { healthFlags, requestPrivateNotesFocus, trainerNotesOf } from './Health';
 import { packageStatus } from '../../lib/billing';
 import { addDays, todayISO } from '../../lib/dates';
-import { acwrZone, loadStats } from '../../lib/load';
+import { loadVsBaseline } from '../../lib/load';
 import { currentPlan, nextWorkout } from '../../lib/plan';
 import { useNav } from '../../nav';
 import { APPT_STATUS } from '../CalendarView';
@@ -24,8 +24,7 @@ export function ClientOverview({ client }: { client: Client }) {
   const { setClientTab, openModal } = useNav();
   const today = todayISO();
   const sessions = sessionsOf(db, client.id);
-  const st = loadStats(sessions, today);
-  const zone = acwrZone(st.acwr);
+  const lb = loadVsBaseline(sessions, today);
   const alerts = clientAlerts(client, sessions, today, healthFlags(trainerNotesOf(db.trainer_notes, client.id).health, client.intake));
   const pk = packageStatus(client, sessions);
   const last4w = sessions.filter((s) => s.date > addDays(today, -28)).length;
@@ -61,11 +60,11 @@ export function ClientOverview({ client }: { client: Client }) {
       <div className="kpi-grid kpi-strip">
         <Kpi label="Ostatni trening" value={ago(lastSessionDate(db, client.id))} sub={`${last4w} w ostatnich 4 tyg.`} />
         <Kpi
-          label="ACWR"
-          hint="Obciążenie z ostatnich 7 dni względem średniej z 4 tygodni (obciążenie = RPE treningu × minuty). 0,8–1,3: bezpiecznie, powyżej 1,5: za szybki wzrost."
-          value={st.acwr != null ? fx(st.acwr, 2) : '—'}
-          sub={zone.label}
-          tone={zone.level === 'red' ? 'danger' : zone.level === 'yellow' ? 'warn' : zone.level === 'green' ? 'ok' : undefined}
+          label="Obciążenie 7 dni"
+          hint="Obciążenie = ocena trudności treningu (sRPE) × minuty, porównane z własną średnią z 4 poprzednich tygodni. To opis zmiany, nie prognoza kontuzji."
+          value={`${fnum(lb.week, 0)} AU`}
+          sub={lb.pct != null ? `${lb.pct >= 0 ? '+' : '−'}${Math.round(Math.abs(lb.pct) * 100)}% wobec średniej 4 tyg.` : 'zbieram dane (3 tygodnie)'}
+          tone={lb.pct != null && lb.pct >= 0.5 ? 'warn' : undefined}
         />
         <Kpi
           label={client.billing === 'pakiet' || (!client.billing && pk) ? 'Pakiet' : 'Rozliczenie'}

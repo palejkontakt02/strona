@@ -78,6 +78,47 @@ export function loadStats(sessions: TrainingSession[], at: ISODate = todayISO())
 
 export type Level = 'green' | 'yellow' | 'red';
 
+export interface LoadVsBase {
+  /** Obciążenie z ostatnich 7 dni (AU). */
+  week: number;
+  /** Średnia tygodniowa z 4 poprzednich tygodni (dni 8–35, bez bieżącego tygodnia), null — za mało danych. */
+  base: number | null;
+  /** Zmiana względem średniej (0,35 = +35%). */
+  pct: number | null;
+  /** Pełne tygodnie historii przed bieżącym (do 4). */
+  weeks: number;
+}
+
+/**
+ * Obciążenie 7 dni wobec średniej z 4 POPRZEDNICH tygodni (bez nakładania się okresów, jak radzi krytyka ACWR).
+ * Średnia dopiero przy ≥ 3 tygodniach historii — wcześniej „zbieram dane”. Opis neutralny: to nie prognoza kontuzji.
+ */
+export function loadVsBaseline(sessions: TrainingSession[], at: ISODate = todayISO()): LoadVsBase {
+  const dl = dailyLoads(sessions);
+  const days = Object.keys(dl).sort();
+  const sum = (from: number, to: number) => {
+    let t = 0;
+    for (let i = from; i <= to; i++) t += dl[addDays(at, -i)] || 0;
+    return t;
+  };
+  const week = sum(0, 6);
+  const span = days.length ? Math.floor((new Date(`${at}T12:00:00`).getTime() - new Date(`${days[0]}T12:00:00`).getTime()) / 864e5) - 6 : 0;
+  const weeks = Math.max(0, Math.min(4, Math.floor(span / 7)));
+  const base = weeks >= 3 ? sum(7, 7 + weeks * 7 - 1) / weeks : null;
+  return { week, base, pct: base && base > 0 ? week / base - 1 : null, weeks };
+}
+
+/** Do wykresu tygodni: średnia z 4 poprzednich tygodni dla każdego tygodnia (null, gdy mniej niż 3 tygodnie wstecz). */
+export function trailingAvg(pts: { y: number }[], n = 4, min = 3): (number | null)[] {
+  // tygodnie przed pierwszym treningiem nie są „zerowym obciążeniem” — nie wchodzą do średniej
+  const start = pts.findIndex((p) => p.y > 0);
+  return pts.map((_p, i) => {
+    if (start < 0) return null;
+    const prev = pts.slice(Math.max(start, i - n), i).map((p) => p.y);
+    return prev.length >= min ? prev.reduce((a, b) => a + b, 0) / prev.length : null;
+  });
+}
+
 export function acwrZone(a: number | null): { level: Level | null; label: string } {
   if (a == null) return { level: null, label: 'brak danych' };
   if (a < 0.8) return { level: 'yellow', label: 'niedociążenie' };

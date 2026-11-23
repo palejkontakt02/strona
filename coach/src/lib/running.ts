@@ -387,3 +387,16 @@ export function kmSpike(sessions: TrainingSession[], today: ISODate = todayISO()
   }
   return null;
 }
+
+/**
+ * Najdłuższy bieg z ostatnich 7 dni wobec najdłuższego z 30 dni przed nim (Garmin-RUNSAFE 2025: ryzyko przeciążenia
+ * rośnie, gdy pojedynczy bieg jest > 10% dłuższy niż najdłuższy z 30 dni). Reguła 10% tygodniowo nie ma poparcia.
+ */
+export function longestRunFlag(sessions: TrainingSession[], today: ISODate = todayISO()): { date: ISODate; km: number; prevMax: number; pct: number } | null {
+  const runs = sessions.map((s) => ({ date: s.date, km: runTotals(s, true)?.km ?? 0 })).filter((r) => r.km > 0);
+  const recent = runs.filter((r) => r.date > addDays(today, -7) && r.date <= today).sort((a, b) => b.km - a.km)[0];
+  if (!recent) return null;
+  const prevMax = Math.max(0, ...runs.filter((r) => r.date < recent.date && r.date >= addDays(recent.date, -30)).map((r) => r.km));
+  if (prevMax <= 0) return null;
+  return { date: recent.date, km: recent.km, prevMax, pct: recent.km / prevMax - 1 };
+}

@@ -152,9 +152,12 @@ describe('zakładka Monitoring', () => {
     const ss = db.sessions.filter((s) => s.clientId === client.id);
     const plan = db.plans.find((p) => p.clientId === client.id && p.weeks.length)!;
     const wb = fitowaWorkbook([plan], client, ss, { monitoring: client });
-    const mon = wb.find((x) => x.name === 'Monitoring')!;
-    const txt = mon.rows.flat().map((x) => (x && typeof x === 'object' ? String(x.v ?? '') : String(x ?? '')));
-    for (const t of ['Teraz', 'Tygodnie', 'Treningi', 'ACWR']) expect(txt).toContain(t);
-    expect(mon.rows.length).toBeGreaterThan(ss.length);
+    const txt = (name: string) => wb.find((x) => x.name === name)!.rows.flat().map((x) => (x && typeof x === 'object' ? String(x.v ?? '') : String(x ?? '')));
+    const basic = txt('Monitoring');
+    for (const t of ['Teraz', 'Tygodnie', 'Treningi', 'Średnia 4 poprz. tyg.']) expect(basic).toContain(t);
+    expect(basic.some((t) => /ACWR/.test(t))).toBe(false);
+    const adv = txt('Monitoring zaawansowany');
+    for (const t of ['ACWR (7 / 28 dni)', 'Monotonia (7 dni)', 'Partia', 'Pytanie']) expect(adv).toContain(t);
+    expect(wb.find((x) => x.name === 'Monitoring')!.rows.length).toBeGreaterThan(ss.length);
   });
 });

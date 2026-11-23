@@ -52,3 +52,38 @@ export function readinessNorm(
   }
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
+
+export interface WellnessItemRow {
+  key: keyof Wellness;
+  label: string;
+  /** Średnia z ostatnich 7 dni (1–5). */
+  now: number | null;
+  /** Norma: średnia z 28 dni przed nimi. */
+  norm: number | null;
+  /** Wpisy w normie (mniej niż 8 — „zbieram dane”). */
+  n: number;
+}
+
+/**
+ * Samopoczucie pytanie po pytaniu: ostatnie 7 dni wobec własnej normy z 28 dni przed nimi.
+ * Źródło na dzień: check-in, a bez niego ankieta z treningu. Pokazuje, które pytanie ciągnie wynik w dół.
+ */
+export function wellnessItems(checkins: Checkin[], sessions: TrainingSession[], today: ISODate = todayISO()): WellnessItemRow[] {
+  const byDay = new Map<string, Wellness>();
+  for (const s of sessions) if (s.wellness && values(s.wellness)) byDay.set(s.date, s.wellness);
+  for (const c of checkins) if (values(c)) byDay.set(c.date, c);
+  const from7 = addDays(today, -6);
+  const from35 = addDays(today, -34);
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  return WELLNESS_ITEMS.map(([key, label]) => {
+    const now: number[] = [];
+    const norm: number[] = [];
+    for (const [d, w] of byDay) {
+      const v = w[key];
+      if (v == null || d > today) continue;
+      if (d >= from7) now.push(v);
+      else if (d >= from35) norm.push(v);
+    }
+    return { key, label, now: avg(now), norm: avg(norm), n: norm.length };
+  });
+}

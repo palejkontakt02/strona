@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmtClock, fmtDur, fmtKm, paceText, parseDur, parseKm, planRunTotals, racePace, recoverySec, RUN_TEMPLATES, runTotals, targetText, zoneOf } from './running';
+import { longestRunFlag, fmtClock, fmtDur, fmtKm, paceText, parseDur, parseKm, planRunTotals, racePace, recoverySec, RUN_TEMPLATES, runTotals, targetText, zoneOf } from './running';
 import { buildRunExercise, cardioByName, runToExercises, sessionToRun } from './run';
 
 describe('bieganie', () => {
@@ -150,7 +150,14 @@ describe('strefy z progu (LTHR), kilometraż tygodniowy, skok km', async () => {
     expect(kmSpike([run('2026-10-13', 8), run('2026-10-20', 16)], TODAY)).toBeNull();
     // bieżący tydzień jeszcze niski — liczy się ostatni pełny vs wcześniejszy
     expect(kmSpike([run('2026-10-06', 24), run('2026-10-13', 32), run('2026-10-20', 4)], TODAY)).toMatchObject({ level: 'red', from: 24, to: 32 });
+  });
+  it('sygnał: bieg > 30% dłuższy niż najdłuższy z 30 dni (zamiast reguły tygodniowej)', () => {
     const c = { id: 'c1', name: 'T', status: 'aktywny' as const, payments: [], measurements: [], tests: [], injuryLog: [], checkins: [] };
-    expect(clientAlerts(c, [run('2026-10-06', 24), run('2026-10-13', 32)], TODAY)).toContainEqual({ level: 'red', text: 'Kilometraż +33% (24 → 32 km)' });
+    const f = longestRunFlag([run('2026-10-01', 10), run(TODAY, 14)], TODAY)!;
+    expect(Math.round(f.pct * 100)).toBe(40);
+    expect(clientAlerts(c, [run('2026-10-01', 10), run(TODAY, 14)], TODAY).some((a) => /dłuższy niż najdłuższy/.test(a.text))).toBe(true);
+    expect(longestRunFlag([run('2026-10-01', 10), run(TODAY, 10.5)], TODAY)!.pct).toBeCloseTo(0.05);
+    // tygodniowy skok km sam w sobie nie jest już alertem
+    expect(clientAlerts(c, [run('2026-10-06', 24), run('2026-10-13', 32)], TODAY).some((a) => /Kilometraż/.test(a.text))).toBe(false);
   });
 });

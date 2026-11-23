@@ -454,7 +454,11 @@ export function fitowaWorkbook(plans: Plan[], client: Pick<Client, 'name'>, sess
     }
   }
   // zakładka „Monitoring”: obciążenie, ACWR, ból, wellness, e1RM — ze wszystkich treningów podopiecznego
-  if (opts.monitoring) out.push(monitoringSheet(opts.monitoring, sessions, opts.today, sheetName('Monitoring', taken)));
+  if (opts.monitoring) {
+    const a = monitoringSheet(opts.monitoring, sessions, opts.today, sheetName('Monitoring', taken), 'basic');
+    taken.push(a.name);
+    out.push(a, monitoringSheet(opts.monitoring, sessions, opts.today, sheetName('Monitoring zaawansowany', taken), 'advanced'));
+  }
   return out;
 }
 

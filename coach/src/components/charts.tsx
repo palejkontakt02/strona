@@ -8,12 +8,27 @@ export interface Pt {
 const W = 600;
 
 /** Wykres słupkowy (np. tygodniowe obciążenie). */
-export function BarChart({ pts, height = 180, label, format = (v: number) => String(Math.round(v)) }: { pts: Pt[]; height?: number; label: string; format?: (v: number) => string }) {
+export function BarChart({
+  pts,
+  height = 180,
+  label,
+  format = (v: number) => String(Math.round(v)),
+  line,
+  lineLabel,
+}: {
+  pts: Pt[];
+  height?: number;
+  label: string;
+  format?: (v: number) => string;
+  /** Linia porównania nad słupkami (np. średnia z 4 poprzednich tygodni); null — brak punktu. */
+  line?: (number | null)[];
+  lineLabel?: string;
+}) {
   const L = 8;
   const R = 8;
   const T = 18;
   const B = 24;
-  const max = Math.max(1, ...pts.map((p) => p.y));
+  const max = Math.max(1, ...pts.map((p) => p.y), ...(line ?? []).map((v) => v ?? 0));
   const bw = (W - L - R) / Math.max(1, pts.length);
   return (
     <svg className="chart" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={label}>
@@ -38,6 +53,30 @@ export function BarChart({ pts, height = 180, label, format = (v: number) => Str
           </g>
         );
       })}
+      {line &&
+        (() => {
+          // linia średniej: odcinki tylko między kolejnymi tygodniami z wartością
+          const xy = line.map((v, i) => (v == null ? null : ([L + i * bw + bw * 0.5, height - B - ((height - T - B) * v) / max] as const)));
+          const segs: string[] = [];
+          let cur = '';
+          xy.forEach((p) => {
+            if (!p) {
+              if (cur) segs.push(cur);
+              cur = '';
+              return;
+            }
+            cur += `${cur ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+          });
+          if (cur) segs.push(cur);
+          return (
+            <g className="chart-avg" aria-label={lineLabel}>
+              {segs.map((d, i) => (
+                <path key={i} d={d} fill="none" />
+              ))}
+              {xy.map((p, i) => (p ? <circle key={i} cx={p[0]} cy={p[1]} r={2.5} /> : null))}
+            </g>
+          );
+        })()}
     </svg>
   );
 }

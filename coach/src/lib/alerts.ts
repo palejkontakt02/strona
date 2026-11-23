@@ -1,7 +1,7 @@
 import type { Client, ISODate, TrainingSession } from '../domain';
 import { todayISO } from './dates';
-import { loadStats, type Level } from './load';
-import { kmSpike } from './running';
+import { loadVsBaseline, type Level } from './load';
+import { longestRunFlag } from './running';
 import { wellnessTotal } from './wellness';
 
 export interface Alert {
@@ -14,21 +14,20 @@ const fmtD = (iso: ISODate) =>
   new Date(iso + 'T12:00:00').toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
 
 /**
- * Sygnały ostrzegawcze klienta: ACWR > 1,5 (czerwony) / > 1,3 (żółty); monotonia > 2;
+ * Sygnały ostrzegawcze klienta: obciążenie 7 dni ≥ +50% wobec średniej z 4 poprzednich tygodni (żółty);
+ * bieg > 30% dłuższy niż najdłuższy z 30 dni (żółty);
  * wellness ≤ 12/25 lub spadek > 20% vs średnia 4 poprzednich; ból ≥ 4 (≥ 6 czerwony);
  * aktywne urazy; LSI < 90% (< 80% czerwony) z najnowszego wyniku każdego testu;
- * kilometraż biegu tydzień do tygodnia > 15% (> 30% czerwony), gdy poprzedni tydzień ≥ 10 km.
  */
 export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO(), extra: Alert[] = []): Alert[] {
   const a: Alert[] = [...extra];
-  const st = loadStats(sessions, today);
-  if (st.acwr != null && st.acwr > 1.5) a.push({ level: 'red', text: `ACWR ${fx(st.acwr, 2)}: gwałtowny wzrost obciążeń` });
-  else if (st.acwr != null && st.acwr > 1.3)
-    a.push({ level: 'yellow', text: `ACWR ${fx(st.acwr, 2)}: obciążenie rośnie szybko` });
-  if (st.monotony != null && st.monotony > 2)
-    a.push({ level: 'yellow', text: `Monotonia ${fx(st.monotony, 1)}: mało zróżnicowane obciążenia` });
-  const km = kmSpike(sessions, today);
-  if (km) a.push({ level: km.level, text: `Kilometraż +${Math.round(km.pct * 100)}% (${Math.round(km.from)} → ${Math.round(km.to)} km)` });
+  // obciążenie 7 dni wobec własnej średniej z 4 poprzednich tygodni — sygnał „do sprawdzenia”, nie prognoza kontuzji
+  // (progi ACWR 0,8–1,3 / 1,5 i monotonia nie przeszły testów w badaniach 2019–2026)
+  const lb = loadVsBaseline(sessions, today);
+  if (lb.pct != null && lb.pct >= 0.5) a.push({ level: 'yellow', text: `Obciążenie 7 dni +${Math.round(lb.pct * 100)}% wobec średniej z 4 tygodni: sprawdź, jak to znosi` });
+  // bieg: pojedynczy bieg dużo dłuższy niż najdłuższy z 30 dni (najlepiej udokumentowany sygnał u biegaczy amatorów)
+  const lr = longestRunFlag(sessions, today);
+  if (lr && lr.pct > 0.3) a.push({ level: 'yellow', text: `Bieg ${fmtD(lr.date)} o ${Math.round(lr.pct * 100)}% dłuższy niż najdłuższy z 30 dni (${fx(lr.km, 1)} km)` });
 
   // ból i samopoczucie: tylko świeże dane (14 dni) — stary wynik nie świeci miesiącami
   const since = new Date(new Date(today + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
