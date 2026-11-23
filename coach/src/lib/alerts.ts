@@ -1,8 +1,8 @@
-import type { Client, ISODate, TrainingSession } from '../domain';
+import type { Client, ISODate, TrainingSession, Wellness } from '../domain';
 import { todayISO } from './dates';
 import { loadVsBaseline, type Level } from './load';
 import { longestRunFlag } from './running';
-import { wellnessTotal } from './wellness';
+import { WELLNESS_ITEMS, wellnessTotal } from './wellness';
 import { painRising, painStatus } from './painModel';
 
 export interface Alert {
@@ -17,7 +17,7 @@ const fmtD = (iso: ISODate) =>
 /**
  * Sygnały ostrzegawcze klienta: obciążenie 7 dni ≥ +50% wobec średniej z 4 poprzednich tygodni (żółty);
  * bieg > 30% dłuższy niż najdłuższy z 30 dni (żółty);
- * wellness ≤ 12/25 lub spadek > 20% vs średnia 4 poprzednich; ból ≥ 4 (≥ 6 czerwony);
+ * samopoczucie ≤ 12/25 w 2 dni (czerwony) albo 2 z 3 ostatnich wpisów ≥ 3 pkt poniżej własnej normy (min. 8 wpisów); ból ≥ 4 (≥ 6 czerwony);
  * aktywne urazy; LSI < 90% (< 80% czerwony) z najnowszego wyniku każdego testu;
  */
 export function clientAlerts(client: Client, sessions: TrainingSession[], today: ISODate = todayISO(), extra: Alert[] = []): Alert[] {
@@ -33,26 +33,31 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
   // ból i samopoczucie: tylko świeże dane (14 dni) — stary wynik nie świeci miesiącami
   const since = new Date(new Date(today + 'T12:00:00').getTime() - 14 * 86400000).toISOString().slice(0, 10);
   const desc = [...sessions].sort((x, y) => y.date.localeCompare(x.date)).filter((s) => s.date >= since);
-  const ws = desc.filter((s) => wellnessTotal(s.wellness) != null);
-  if (ws.length) {
-    const last = wellnessTotal(ws[0].wellness)!;
-    const prev = ws.slice(1, 5).map((s) => wellnessTotal(s.wellness)!);
-    const avg = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
-    if (last <= 12) a.push({ level: 'red', text: `Wellness ${last}/25 na treningu ${fmtD(ws[0].date)}` });
-    else if (avg && last < avg * 0.8)
-      a.push({ level: 'yellow', text: `Wellness spadł do ${last}/25 (${fmtD(ws[0].date)}, średnio ${Math.round(avg)})` });
-  }
-
-  // check-in samopoczucia z ostatnich 2 dni (także bez treningu), jeśli nowszy niż ostatni trening z wellness
-  const ci = [...client.checkins].filter((c) => wellnessTotal(c) != null).sort((x, y) => y.date.localeCompare(x.date));
-  const lastCi = ci[0];
+  // samopoczucie (check-in, a bez niego ankieta z treningu) wobec własnej normy: pojedynczy słabszy dzień to szum —
+  // sygnał dopiero przy 2 z 3 ostatnich wpisów wyraźnie poniżej normy; norma z min. 8 wpisów (wcześniej „zbieram dane”)
+  const byDay = new Map<string, Wellness>();
+  for (const s of sessions) if (s.wellness && wellnessTotal(s.wellness) != null) byDay.set(s.date, s.wellness);
+  for (const c of client.checkins) if (wellnessTotal(c) != null) byDay.set(c.date, c);
+  const days = [...byDay.entries()].filter(([d]) => d <= today).sort((x, y) => y[0].localeCompare(x[0]));
   const twoDaysAgo = new Date(new Date(today + 'T12:00:00').getTime() - 2 * 86400000).toISOString().slice(0, 10);
-  if (lastCi && lastCi.date >= twoDaysAgo && (!ws.length || lastCi.date > ws[0].date)) {
-    const v = wellnessTotal(lastCi)!;
-    const prev = ci.slice(1, 8).map((c) => wellnessTotal(c)!);
-    const avg = prev.length ? prev.reduce((x, y) => x + y, 0) / prev.length : null;
-    if (v <= 12) a.push({ level: 'red', text: `Samopoczucie ${v}/25 (check-in ${fmtD(lastCi.date)})` });
-    else if (avg && v < avg * 0.8) a.push({ level: 'yellow', text: `Samopoczucie spadło do ${v}/25 (zwykle ${Math.round(avg)}), check-in ${fmtD(lastCi.date)}` });
+  const weekAgoW = new Date(new Date(today + 'T12:00:00').getTime() - 7 * 86400000).toISOString().slice(0, 10);
+  const recent = days.slice(0, 3).filter(([d]) => d >= weekAgoW);
+  const normDays = days.slice(3).filter(([d]) => d >= new Date(new Date(today + 'T12:00:00').getTime() - 35 * 86400000).toISOString().slice(0, 10));
+  const tot = (w: Wellness) => wellnessTotal(w)!;
+  const veryLow = recent.find(([d, w]) => d >= twoDaysAgo && tot(w) <= 12);
+  if (veryLow) a.push({ level: 'red', text: `Samopoczucie ${tot(veryLow[1])}/25 (${fmtD(veryLow[0])})` });
+  else if (recent.length >= 2 && normDays.length >= 8) {
+    const norm = normDays.reduce((x, [, w]) => x + tot(w), 0) / normDays.length;
+    const below = recent.filter(([, w]) => tot(w) <= norm - 3);
+    if (below.length >= 2) {
+      // które pytanie ciągnie w dół
+      const worst = WELLNESS_ITEMS.map(([k, label]) => {
+        const now = recent.reduce((x, [, w]) => x + (w[k] ?? 0), 0) / recent.length;
+        const was = normDays.reduce((x, [, w]) => x + (w[k] ?? 0), 0) / normDays.length;
+        return { label, diff: now - was };
+      }).sort((x, y) => x.diff - y.diff)[0];
+      a.push({ level: 'yellow', text: `Samopoczucie poniżej normy ${below.length} z ${recent.length} ostatnich razy (${tot(recent[0][1])}/25, zwykle ${Math.round(norm)})${worst && worst.diff <= -0.5 ? `, najbardziej: ${worst.label.toLowerCase()}` : ''}` });
+    }
   }
 
   // najwyższy ból z 7 dni (dzień bez bólu po treningu z bólem 7/10 nie gasi sygnału), inaczej ostatni zapisany

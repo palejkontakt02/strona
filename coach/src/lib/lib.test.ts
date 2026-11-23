@@ -351,14 +351,16 @@ describe('alerts', () => {
       ],
     });
     const w = (v: number) => ({ sleep: v, energy: v, muscle: v, stress: v, mood: v });
+    // norma z 10 wpisów po 25/25, a 2 z 3 ostatnich wyraźnie niżej (15/25) — sygnał; jeden słabszy dzień by nie wystarczył
     const ss = [
       sess({ date: addDays(TODAY, -1), wellness: w(3), pain: 6 }), // 15
-      sess({ date: addDays(TODAY, -3), wellness: w(5) }), // 25
+      sess({ date: addDays(TODAY, -3), wellness: w(3) }),
       sess({ date: addDays(TODAY, -5), wellness: w(5) }),
+      ...Array.from({ length: 10 }, (_x, i) => sess({ date: addDays(TODAY, -8 - i * 2), wellness: w(5) })),
     ];
     const texts = clientAlerts(c, ss, TODAY);
     expect(texts).toEqual([
-      { level: 'yellow', text: expect.stringMatching(/^Wellness spadł do 15\/25 \(.+, średnio 25\)$/) },
+      { level: 'yellow', text: expect.stringMatching(/^Samopoczucie poniżej normy 2 z 3 ostatnich razy \(15\/25, zwykle 25\)/) },
       { level: 'red', text: expect.stringMatching(/^Ból po treningu .*ból 6\/10 w trakcie/) },
       { level: 'yellow', text: 'Aktywne urazy: Skręcenie kostki' },
       { level: 'yellow', text: 'Single hop (cm): LSI 85% (cel ≥90%)' },
