@@ -1,3 +1,4 @@
+import { todayISO } from '../lib/dates';
 import { currentPlan, nextWorkout } from '../lib/plan';
 import { runTotals } from '../lib/running';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1412,7 +1413,7 @@ export function Player({ client, run, setRun, onHome, onSaved, onCancel, mode = 
       <header className="player-head">
         <h1>{run.name}</h1>
         <p className="muted small">
-          {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
+          {[editing ? `Poprawki treningu z ${fmtDay(run.date)}` : run.date < todayISO() ? `Zaległy trening z ${fmtDay(run.date)}` : '', run.planName, run.weekName, `${doneSets}/${totalSets} serii`].filter(Boolean).join(' · ')}
         </p>
         {cb && !cb.full && !editing && (
           <div className="comeback-bar" role="status">

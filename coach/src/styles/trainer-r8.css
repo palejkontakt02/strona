@@ -971,3 +971,6 @@ button.start-tile:hover:not(:disabled),
 .chart-avg path { stroke: var(--color-text); stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.7; }
 .chart-avg circle { fill: var(--color-text); opacity: 0.7; }
 .mon-muscles td, .mon-muscles th { padding-top: 4px; padding-bottom: 4px; }
+.mon-share { width: auto; max-width: 100%; }
+.ath-monitoring { margin-top: var(--space-4, 16px); }
+.ath-monitoring .two-col { grid-template-columns: 1fr; }

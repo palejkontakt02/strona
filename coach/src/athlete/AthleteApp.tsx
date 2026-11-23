@@ -82,6 +82,7 @@ import { NutritionCard } from "./Nutrition";
 import { TrainerTab } from "./TrainerTab";
 import { MyData } from "./MyData";
 import { ProgressExtra } from "./progress/ProgressExtra";
+import { ClientMonitoring } from "../views/client/Monitoring";
 import { useAthleteUnread } from "../components/Chat";
 import { WeeklyReportCard } from "../components/WeeklyReport";
 import { DayLogCard } from "../components/DayLog";
@@ -176,6 +177,78 @@ function Glyph({ name, size = 22 }: { name: Tab | "repeat"; size?: number }) {
 }
 
 /** Jeden styl nagłówka arkusza: tytuł po lewej, „×” (Zamknij) po prawej. */
+/** Zaległy trening: data (do 60 dni wstecz) i jednostka z planu albo trening własny. */
+function LateWorkoutSheet({
+  plans,
+  sessions,
+  onClose,
+  onStart,
+}: {
+  plans: Plan[];
+  sessions: TrainingSession[];
+  onClose: () => void;
+  onStart: (date: string, st: RunStart | null) => void;
+}) {
+  const today = todayISO();
+  const [date, setDate] = useState(addDays(today, -1));
+  const opts = plans.flatMap((p) => {
+    const done = doneInPass(p, sessions);
+    const nx = nextWorkout(p, sessions);
+    return p.weeks.flatMap((w) =>
+      w.workouts
+        .filter((k) => k.exercises.some((e) => e.name.trim()))
+        .map((k) => ({
+          value: `${p.id}|${k.id}`,
+          label: `${k.name} · ${w.name}${k.date ? ` · ${fmtDay(k.date)}` : ""}${done.has(k.id) ? " ✓" : nx?.workout.id === k.id ? " (następny)" : ""}`,
+          group: p.name,
+          next: nx?.workout.id === k.id,
+        })),
+    );
+  });
+  const [pick, setPick] = useState(() => opts.find((o) => o.next)?.value ?? opts[0]?.value ?? "own");
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today && date >= addDays(today, -60);
+  return (
+    <Sheet label="Zaległy trening" onClose={onClose}>
+      <SheetTop title="Zaległy trening" onClose={onClose} />
+      <p className="muted small">Trening, którego nie zapisałeś w dniu, w którym go zrobiłeś. Zapisze się z wybraną datą, a plan przesunie się dalej.</p>
+      <label className="field">
+        <span>Kiedy był trening</span>
+        <input className="input" type="date" value={date} min={addDays(today, -60)} max={today} onChange={(e) => setDate(e.target.value)} />
+      </label>
+      <label className="field">
+        <span>Co robiłeś</span>
+        <select className="input" value={pick} onChange={(e) => setPick(e.target.value)}>
+          {[...new Set(opts.map((o) => o.group))].map((g) => (
+            <optgroup key={g} label={g}>
+              {opts
+                .filter((o) => o.group === g)
+                .map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+          <option value="own">Trening własny (dodam ćwiczenia)</option>
+        </select>
+      </label>
+      <div className="actions">
+        <button
+          className="btn btn-primary btn-lg"
+          disabled={!ok}
+          onClick={() => {
+            if (pick === "own") return onStart(date, null);
+            const [planId, workoutId] = pick.split("|");
+            onStart(date, { planId, workoutId });
+          }}
+        >
+          Uzupełnij serie
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 function SheetTop({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="between sheet-top">
@@ -224,6 +297,7 @@ export function AthleteApp({
   const [planId, setPlanId] = useState<string | null>(null);
   const [look, setLook] = useState(false);
   const [absOpen, setAbsOpen] = useState(false);
+  const [lateOpen, setLateOpen] = useState(false);
   /** Trening czekający na krótki check-in samopoczucia (krok przed Start). */
   const [pre, setPre] = useState<Run | null>(null);
 
@@ -347,6 +421,7 @@ export function AthleteApp({
     if (
       mode === "client" &&
       !r.editSessionId &&
+      r.date === todayISO() &&
       !client.checkins.some((c) => c.date === todayISO())
     )
       return setPre(r);
@@ -380,6 +455,15 @@ export function AthleteApp({
       !(await ask(dupText(dup), { confirm: "Zapisz drugi raz", danger: false }))
     )
       return;
+    void replaceRun(r);
+  };
+  /** Zaległy trening: zapis z wcześniejszą datą (z planu albo własny), bez porannej ankiety. */
+  const startLate = async (date: string, st: RunStart | null) => {
+    if (!st) return void replaceRun(emptyRun("Trening własny", date));
+    const r = runFromStart(db, clientId, st, date);
+    if (typeof r === "string") return toast(r);
+    const dup = savedSameDay(db, clientId, r.planId, r.workoutId, date);
+    if (dup && !(await ask(dupText(dup), { confirm: "Zapisz drugi raz", danger: false }))) return;
     void replaceRun(r);
   };
   const start = async (workoutId?: string) => {
@@ -552,6 +636,17 @@ export function AthleteApp({
           )}
         </Sheet>
       )}
+      {lateOpen && (
+        <LateWorkoutSheet
+          plans={[...(plan ? [plan] : []), ...parallelPlansOf(db, clientId)]}
+          sessions={sessions}
+          onClose={() => setLateOpen(false)}
+          onStart={(date, st) => {
+            setLateOpen(false);
+            void startLate(date, st);
+          }}
+        />
+      )}
       {absOpen && (
         <AbsenceSheet
           client={client}
@@ -636,6 +731,7 @@ export function AthleteApp({
               onResume={() => setScreen("run")}
               onIntake={openIntake}
               onAbsence={() => setAbsOpen(true)}
+              onLate={() => setLateOpen(true)}
               notify={mode === "client"}
               onDiscard={() => {
                 if (run)
@@ -653,6 +749,11 @@ export function AthleteApp({
           {tab === "history" && (
             <div className="ath-page fade">
               <h1 className="ath-page-title">Historia</h1>
+              {!run && (
+                <button type="button" className="link small ath-late-link" onClick={() => setLateOpen(true)}>
+                  + Dodaj zaległy trening
+                </button>
+              )}
               <MonthCalendar
                 done={sessions.reduce(
                   (m, s) =>
@@ -805,9 +906,11 @@ function TodayTab({
   onDiscard,
   onIntake,
   onAbsence,
+  onLate,
   notify,
 }: {
   onAbsence: () => void;
+  onLate: () => void;
   notify: boolean;
   clientId: string;
   plan: ReturnType<typeof currentPlan>;
@@ -1318,6 +1421,11 @@ function TodayTab({
           )}
         </div>
       )}
+      {!run && (
+        <button type="button" className="link small ath-late-link" onClick={onLate}>
+          + Dodaj zaległy trening (z wcześniejszą datą)
+        </button>
+      )}
 
       {!away && !run && <AbsenceLink client={client} onOpen={onAbsence} />}
 
@@ -1552,6 +1660,8 @@ function CheckinCard({
 }
 
 /** Zakładka „Postępy”: podsumowania (ProgressExtra), siła, rekordy, ciało, bieg, raport tygodnia. */
+const PROGRESS_VIEWS = ["Postępy", "Monitoring"] as const;
+
 function ProgressTab({
   client,
   canImport,
@@ -1560,6 +1670,7 @@ function ProgressTab({
   canImport: boolean;
 }) {
   const { db } = useStore();
+  const [view, setView] = useState<(typeof PROGRESS_VIEWS)[number]>("Postępy");
   const sessions = sessionsOf(db, client.id);
   const recs = records(sessions).slice(0, 5);
   const extra = extraPlanOf(db, client.id);
@@ -1576,9 +1687,21 @@ function ProgressTab({
       8,
     ),
   );
+  // monitoring włączony przez trenera: druga podzakładka obok postępów
+  if (client.monitoring && view === "Monitoring")
+    return (
+      <div className="ath-page fade">
+        <h1 className="ath-page-title">Postępy</h1>
+        <Seg options={PROGRESS_VIEWS} value={view} onChange={setView} label="Widok" />
+        <div className="ath-monitoring">
+          <ClientMonitoring client={client} athlete />
+        </div>
+      </div>
+    );
   return (
     <div className="ath-page fade">
       <h1 className="ath-page-title">Postępy</h1>
+      {client.monitoring && <Seg options={PROGRESS_VIEWS} value={view} onChange={setView} label="Widok" />}
       <ProgressExtra client={client} />
       <h2 className="ath-sec">Siła i wysiłek</h2>
       <Progress clientId={client.id} />

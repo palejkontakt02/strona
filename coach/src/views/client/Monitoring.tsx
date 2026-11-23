@@ -5,6 +5,7 @@ import { Card, Empty, Kpi, Seg } from '../../components/ui';
 import type { Client } from '../../domain';
 import { sessionsOf } from '../../data/ops';
 import { useStore } from '../../data/store';
+import { put } from '../../data/db';
 import { fmtDay, fmtShort, fnum, fx } from '../../format';
 import { addDays, todayISO, weekStart } from '../../lib/dates';
 import { loadStats, loadVsBaseline, sessionLoad, tonnage, trailingAvg, weekly } from '../../lib/load';
@@ -25,19 +26,28 @@ const pctText = (p: number) => `${p >= 0 ? '+' : '−'}${Math.round(Math.abs(p) 
 /** Model monitorowania bólu: 0–2 bezpiecznie, 3–5 akceptowalnie (jeśli ustępuje do rana), powyżej 5 — stop. */
 const painTone = (v: number | null | undefined) => (v == null ? undefined : v > 5 ? 'danger' : v >= 3 ? 'warn' : 'ok');
 
-export function ClientMonitoring({ client }: { client: Client }) {
-  const { db } = useStore();
+const SHARE: [NonNullable<Client['monitoring']> | '', string][] = [
+  ['', 'Podopieczny nie widzi'],
+  ['basic', 'Podopieczny widzi: podstawowy'],
+  ['all', 'Podopieczny widzi: podstawowy i zaawansowany'],
+];
+
+/** Monitoring: u trenera oba poziomy i włącznik widoczności; u podopiecznego (`athlete`) tylko to, co włączył trener. */
+export function ClientMonitoring({ client, athlete = false }: { client: Client; athlete?: boolean }) {
+  const { db, apply } = useStore();
   const today = todayISO();
   const sessions = sessionsOf(db, client.id);
   // poziom szczegółów zapamiętany dla podopiecznego na tym urządzeniu
   const key = `fitowa-mon-level-${client.id}`;
-  const [level, setLevelState] = useState<Level>(() => {
+  const levels: readonly Level[] = athlete && client.monitoring !== 'all' ? ['Podstawowy'] : LEVELS;
+  const [levelState, setLevelState] = useState<Level>(() => {
     try {
       return localStorage.getItem(key) === 'Zaawansowany' ? 'Zaawansowany' : 'Podstawowy';
     } catch {
       return 'Podstawowy';
     }
   });
+  const level: Level = levels.includes(levelState) ? levelState : 'Podstawowy';
   const setLevel = (v: Level) => {
     setLevelState(v);
     try {
@@ -47,20 +57,45 @@ export function ClientMonitoring({ client }: { client: Client }) {
     }
   };
 
-  if (sessions.length === 0) return <Empty>Brak treningów. Monitoring pojawi się po pierwszych zapisach z oceną trudności (sRPE) i czasem.</Empty>;
+  const share = !athlete && (
+    <select
+      className="input input-sm mon-share"
+      value={client.monitoring ?? ''}
+      aria-label="Czy podopieczny widzi monitoring w swojej aplikacji"
+      onChange={(e) => {
+        const v = e.target.value as Client['monitoring'] | '';
+        void apply([put('clients', { ...client, monitoring: v || undefined })], v ? `Podopieczny widzi monitoring (${v === 'all' ? 'podstawowy i zaawansowany' : 'podstawowy'}) w zakładce Postępy.` : 'Monitoring ukryty przed podopiecznym.');
+      }}
+    >
+      {SHARE.map(([v, t]) => (
+        <option key={v} value={v}>
+          {t}
+        </option>
+      ))}
+    </select>
+  );
+
+  if (sessions.length === 0)
+    return (
+      <>
+        {share && <div className="mon-level">{share}</div>}
+        <Empty>{athlete ? 'Monitoring pojawi się po pierwszych treningach z oceną trudności i czasem.' : 'Brak treningów. Monitoring pojawi się po pierwszych zapisach z oceną trudności (sRPE) i czasem.'}</Empty>
+      </>
+    );
 
   return (
     <>
       <div className="mon-level">
-        <Seg options={LEVELS} value={level} onChange={setLevel} label="Poziom monitoringu" />
-        <span className="muted small">{level === 'Podstawowy' ? 'Najważniejsze: regularność, obciążenie, samopoczucie, ból, postęp.' : 'Dla trenera przygotowania motorycznego: wskaźniki obciążenia, objętość na partie, e1RM, samopoczucie pytanie po pytaniu.'}</span>
+        {levels.length > 1 && <Seg options={levels} value={level} onChange={setLevel} label="Poziom monitoringu" />}
+        {share}
+        {!athlete && <span className="muted small">{level === 'Podstawowy' ? 'Najważniejsze: regularność, obciążenie, samopoczucie, ból, postęp.' : 'Dla trenera przygotowania motorycznego: wskaźniki obciążenia, objętość na partie, e1RM, samopoczucie pytanie po pytaniu.'}</span>}
       </div>
-      {level === 'Podstawowy' ? <Basic client={client} sessions={sessions} today={today} /> : <Advanced client={client} sessions={sessions} today={today} />}
+      {level === 'Podstawowy' ? <Basic client={client} sessions={sessions} today={today} athlete={athlete} /> : <Advanced client={client} sessions={sessions} today={today} />}
     </>
   );
 }
 
-type P = { client: Client; sessions: ReturnType<typeof sessionsOf>; today: string };
+type P = { client: Client; sessions: ReturnType<typeof sessionsOf>; today: string; athlete?: boolean };
 
 /** Tygodnie obciążenia (sRPE × min) z linią średniej z 4 poprzednich tygodni. */
 function LoadWeeks({ sessions, today }: Omit<P, 'client'>) {
@@ -69,7 +104,7 @@ function LoadWeeks({ sessions, today }: Omit<P, 'client'>) {
   return <BarChart pts={all.slice(-12)} line={avg} lineLabel="Średnia z 4 poprzednich tygodni" label="Tygodniowe obciążenie sRPE" />;
 }
 
-function Basic({ client, sessions, today }: P) {
+function Basic({ client, sessions, today, athlete }: P) {
   const lb = loadVsBaseline(sessions, today);
   const thisWeek = sessions.filter((s) => s.date >= weekStart(today)).length;
   const prev4 = sessions.filter((s) => s.date >= addDays(weekStart(today), -28) && s.date < weekStart(today)).length / 4;
@@ -113,7 +148,7 @@ function Basic({ client, sessions, today }: P) {
       <div className="two-col">
         <Card title="Obciążenie tygodniowe">
           <LoadWeeks sessions={sessions} today={today} />
-          <p className="muted small">Słupki: suma sRPE × minuty w tygodniu. Linia: średnia z 4 poprzednich tygodni. Duży skok ponad linię to sygnał do sprawdzenia, jak podopieczny to znosi.</p>
+          <p className="muted small">Słupki: suma sRPE × minuty w tygodniu. Linia: średnia z 4 poprzednich tygodni. Duży skok ponad linię to sygnał do sprawdzenia, jak {athlete ? 'organizm to znosi' : 'podopieczny to znosi'}.</p>
         </Card>
         <Card title={`Samopoczucie (1–5)${norm != null ? ` · norma ${fx(norm, 1)}` : ''}`}>
           {wellPts.length + checkPts.length < 2 ? (
