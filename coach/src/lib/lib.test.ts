@@ -359,7 +359,7 @@ describe('alerts', () => {
     const texts = clientAlerts(c, ss, TODAY);
     expect(texts).toEqual([
       { level: 'yellow', text: expect.stringMatching(/^Wellness spadł do 15\/25 \(.+, średnio 25\)$/) },
-      { level: 'red', text: expect.stringMatching(/^Ból 6\/10 na treningu/) },
+      { level: 'red', text: expect.stringMatching(/^Ból po treningu .*ból 6\/10 w trakcie/) },
       { level: 'yellow', text: 'Aktywne urazy: Skręcenie kostki' },
       { level: 'yellow', text: 'Single hop (cm): LSI 85% (cel ≥90%)' },
     ]);

@@ -15,6 +15,8 @@ import {
   groupOf,
   lastSessionDate,
   paymentLabel,
+  parallelPlansOf,
+  plansOf,
   sessionsOf,
   type PaymentRow,
 } from "../data/ops";
@@ -24,6 +26,7 @@ import { markPaid } from "../data/payActions";
 import { useStore } from "../data/store";
 import { ago, fmtDate, fmtDay, fmtLong, plural, pln } from "../format";
 import { clientAlerts } from "../lib/alerts";
+import { dropReasons } from "../lib/adherence";
 import { healthFlags, trainerNotesOf } from "./client/Health";
 import { isOverdue, packageStatus, PACKAGE_WARN_AT } from "../lib/billing";
 import { addDays, daysBetween, todayISO } from "../lib/dates";
@@ -210,20 +213,19 @@ export function Dashboard() {
     )
     .sort((a, b) => a.pk!.left - b.pk!.left);
 
+  // „Odpada”: plan (opuszczone zaplanowane treningi), bez planu 10+ dni bez treningu, 2 raporty z rzędu
   const idle = active
-    .map((c) => ({ c, last: lastSessionDate(db, c.id) }))
-    // nowy podopieczny bez treningów, ale z zaplanowaną wizytą, nie jest „nieaktywny”
-    .filter((x) =>
-      !x.last
-        ? !db.appointments.some(
-            (a) =>
-              a.clientId === x.c.id &&
-              a.status === "planned" &&
-              a.date >= today,
-          )
-        : daysBetween(x.last, today) >= 10,
-    )
-    .sort((a, b) => (a.last || "").localeCompare(b.last || ""));
+    .map((c) => {
+      const last = lastSessionDate(db, c.id);
+      const fresh =
+        !last &&
+        !db.appointments.some((a) => a.clientId === c.id && a.status === "planned" && a.date >= today);
+      const reasons = dropReasons(c, [...plansOf(db, c.id), ...parallelPlansOf(db, c.id)], sessionsOf(db, c.id), today, last ?? undefined);
+      if (fresh) reasons.push({ level: "yellow", text: "Jeszcze bez treningu i bez wizyty" });
+      return { c, last, reasons };
+    })
+    .filter((x) => x.reasons.length > 0)
+    .sort((a, b) => Number(b.reasons.some((r) => r.level === "red")) - Number(a.reasons.some((r) => r.level === "red")) || (a.last || "").localeCompare(b.last || ""));
 
   const recent = [...db.sessions]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -1084,21 +1086,27 @@ export function Dashboard() {
 
   secs.push({
     id: "idle",
-    title: "Bez treningu 10+ dni",
+    title: "Odpada z planu",
     className: "dash-idle",
     badge: idle.length || "",
     body:
       idle.length === 0 ? (
-        <Empty>Wszyscy trenują regularnie.</Empty>
+        <Empty>Wszyscy trzymają plan.</Empty>
       ) : (
         <ul className="rows">
-          {idle.map(({ c, last }) => (
+          {idle.map(({ c, last, reasons }) => (
             <li key={c.id} className="row">
               <Avatar name={c.name} size={30} />
-              <button className="link grow" onClick={() => openClient(c.id)}>
-                {c.name}
-              </button>
-              <span className="small muted">{ago(last)}</span>
+              <span className="grow">
+                <button className="link" onClick={() => openClient(c.id)}>
+                  {c.name}
+                </button>
+                <span className="small muted"> · ostatni trening {ago(last)}</span>
+                <span className="small" style={{ display: "block" }}>
+                  {reasons.map((r) => r.text).join(" · ")}
+                </span>
+              </span>
+              <Tag tone={reasons.some((r) => r.level === "red") ? "danger" : "warn"}>{reasons.some((r) => r.level === "red") ? "pilne" : "sprawdź"}</Tag>
             </li>
           ))}
         </ul>
@@ -1287,7 +1295,7 @@ export function Dashboard() {
     },
     {
       id: "idle",
-      title: "Bez treningu 10+ dni",
+      title: "Odpada z planu",
       n: idle.length,
       badge: idle.length || "",
       open: false,

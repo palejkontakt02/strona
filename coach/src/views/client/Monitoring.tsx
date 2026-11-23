@@ -13,6 +13,7 @@ import { num } from '../../lib/parse';
 import { e1rmHistory, exerciseE1, exerciseRecords, RECORD_REPS, records, type LiftRecord } from '../../lib/strength';
 import { painHistory, painSpotsOf } from '../../lib/analytics';
 import { painLabel } from '../../lib/painMap';
+import { painStatus } from '../../lib/painModel';
 import { PainMap } from '../../components/PainMap';
 import { readiness, readinessNorm, wellnessItems } from '../../lib/wellness';
 import { fmtClock, fmtKm, longestRunFlag, pace5k, runTotals, zoneHr, zoneHrRange, zoneSourceText, ZONES } from '../../lib/running';
@@ -112,7 +113,8 @@ function Basic({ client, sessions, today, athlete }: P) {
   const lastCi = [...client.checkins].filter((c) => readiness(c) != null).sort((a, b) => b.date.localeCompare(a.date))[0];
   const lastWs = sessions.find((s) => readiness(s.wellness) != null);
   const lastR = lastCi && (!lastWs || lastCi.date >= lastWs.date) ? { v: readiness(lastCi)!, d: lastCi.date } : lastWs ? { v: readiness(lastWs.wellness)!, d: lastWs.date } : null;
-  const pain7 = sessions.filter((s) => s.pain != null && s.date > addDays(today, -7)).map((s) => s.pain!);
+  const pain7 = sessions.filter((s) => s.date > addDays(today, -7)).flatMap((s) => [s.pain, s.painNext?.level]).filter((v): v is number => v != null);
+  const painRecent = sessions.filter((s) => painStatus(s) && ((s.pain ?? 0) > 0 || (s.painNext?.level ?? 0) > 0)).slice(0, 5);
   const painMax = pain7.length ? Math.max(...pain7) : null;
 
   const asc = [...sessions].reverse();
@@ -178,7 +180,24 @@ function Basic({ client, sessions, today, athlete }: P) {
               format={(v) => fnum(v, 0)}
             />
           )}
-          <p className="muted small">Do 2: bezpiecznie. 3–5: w porządku, jeśli rano wraca do normy. Powyżej 5 albo rośnie z tygodnia na tydzień: zmień obciążenie.</p>
+          {painRecent.length > 0 && (
+            <ul className="rows pain-model">
+              {painRecent.map((s) => {
+                const st = painStatus(s)!;
+                return (
+                  <li key={s.id} className="row">
+                    <span className={`pm-dot pm-${st.light}`} aria-hidden />
+                    <span className="row-time">{fmtShort(s.date)}</span>
+                    <span className="grow small">
+                      w trakcie {s.pain ?? '—'} · rano {s.painNext ? `${s.painNext.level}${s.painNext.stiff ? ', sztywność' : ''}` : 'brak wpisu'}
+                    </span>
+                    <span className="small muted">{st.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="muted small">Do 2: bezpiecznie. 3–5: w porządku, jeśli rano wraca do normy (podopieczny dostaje pytanie rano). Powyżej 5, nie ustępuje do rana albo rośnie z tygodnia na tydzień: zmień obciążenie.</p>
         </Card>
         {hasRun && (
           <Card title="Bieganie: kilometraż tygodniowy">

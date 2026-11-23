@@ -555,3 +555,11 @@
 .ath .ath-plan > .ath-sel { max-width: 100%; width: 100%; margin-top: var(--space-2, 8px); }
 .ath .ath-plan > .between > .muted.small { text-align: right; max-width: 50%; }
 .ath .ath-late-link { display: block; margin: 8px auto 0; min-height: 44px; }
+
+/* Ból rano (model monitorowania bólu) */
+.ath .pain-morning { display: grid; gap: 10px; }
+.ath .pm-scale { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+.ath .pm-n { min-height: 44px; border: 1px solid var(--color-divider); border-radius: 8px; background: var(--color-surface); font: inherit; font-variant-numeric: tabular-nums; color: var(--color-text); cursor: pointer; padding: 0; }
+.ath .pm-n.active { background: var(--color-text); color: var(--color-bg, #fff); border-color: var(--color-text); }
+.ath .pm-n.mid:not(.active) { border-color: color-mix(in srgb, var(--st-warn, #b7791f) 60%, transparent); }
+.ath .pm-n.hi:not(.active) { border-color: color-mix(in srgb, var(--st-danger, #c53030) 60%, transparent); }

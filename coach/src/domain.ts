@@ -531,6 +531,8 @@ export interface TrainingSession {
   srpe?: number;
   /** Ból 0–10. */
   pain?: number;
+  /** Ból następnego ranka (model monitorowania bólu): 0–10, sztywność, kiedy wpisany. */
+  painNext?: { level: number; stiff?: boolean; at: string };
   /** Gdzie bolało (mapa ciała) — szczegóły do `pain`. */
   painMap?: PainSpot[];
   notes?: string;

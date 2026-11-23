@@ -3,6 +3,7 @@ import { todayISO } from './dates';
 import { loadVsBaseline, type Level } from './load';
 import { longestRunFlag } from './running';
 import { wellnessTotal } from './wellness';
+import { painRising, painStatus } from './painModel';
 
 export interface Alert {
   level: Exclude<Level, 'green'>;
@@ -64,8 +65,17 @@ export function clientAlerts(client: Client, sessions: TrainingSession[], today:
     const where = (sp.spots ?? []).map((p) => (p.side ? `${p.area} ${p.side}` : p.area)).join(', ');
     a.push({ level: sp.level >= 6 ? 'red' : 'yellow', text: `Przerwany trening z bólem ${sp.level}/10${where ? ` (${where})` : ''}${sp.exName ? `, ${sp.exName}` : ''}, ${fmtD(stop.date)}` });
   }
-  if (lp && lp.pain! >= 4 && lp !== stop)
+  // model monitorowania bólu: >5 w trakcie, nieustępujący do rana albo rano gorzej — czerwony; 3–5 rano — żółty
+  // „sprawdź rano” ma sens tylko 2 dni po treningu (wtedy podopieczny dostaje pytanie); starszy bez wpisu — bez sygnału
+  const twoAgo = new Date(new Date(today + 'T12:00:00').getTime() - 2 * 86400000).toISOString().slice(0, 10);
+  const ps = desc
+    .filter((s) => s.date >= weekAgo && s !== stop)
+    .map((s) => ({ s, st: painStatus(s) }))
+    .find((x) => x.st && x.st.light !== 'green' && !(x.st.light === 'yellow' && !x.s.painNext && x.s.date < twoAgo));
+  if (ps) a.push({ level: ps.st!.light === 'red' ? 'red' : 'yellow', text: `Ból po treningu ${fmtD(ps.s.date)}: ${ps.st!.text}` });
+  else if (lp && lp.pain! >= 4 && lp !== stop)
     a.push({ level: lp.pain! >= 6 ? 'red' : 'yellow', text: `Ból ${lp.pain}/10 na treningu ${fmtD(lp.date)}` });
+  if (painRising(sessions, today)) a.push({ level: 'yellow', text: 'Ból rośnie drugi tydzień z rzędu' });
 
   // stan przewlekły (stabilny) nie świeci ciągle — jest w profilu
   const inj = client.injuryLog.filter((i) => i.status === 'aktywny' || i.status === 'w rehabilitacji');

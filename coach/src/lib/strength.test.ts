@@ -13,6 +13,7 @@ import {
   platesText,
   roundLoad,
   sessionRecords,
+  reliableE1,
 } from './strength';
 import { cleanPainMap, painLabel, painSummary, removePain, setPainLevel, togglePain } from './painMap';
 
@@ -156,5 +157,21 @@ describe('obwód: następna seria', () => {
     expect(nextBlockSet(run, [0, 1])).toMatchObject({ k: 1, i: 0, round: 0 });
     run.ex[1].sets[0].done = true;
     expect(nextBlockSet(run, [0, 1])).toMatchObject({ k: 0, i: 1, round: 1 });
+  });
+});
+
+describe('e1RM tylko z wiarygodnych serii', () => {
+  it('powt. + RIR ≤ 10 i RIR ≤ 4 przy wpisanym RPE', () => {
+    expect(reliableE1(100, 5, 8)).not.toBeNull(); // 5 + 2
+    expect(reliableE1(100, 8, 7)).toBeNull(); // 8 + 3 = 11
+    expect(reliableE1(100, 3, 5)).toBeNull(); // RIR 5 — za daleko od upadku
+    expect(reliableE1(60, 12, undefined)).toBeNull(); // 12 powtórzeń bez RPE
+    expect(reliableE1(60, 10, undefined)).not.toBeNull();
+  });
+  it('rekord e1RM nie powstaje z serii 15 powtórzeń', () => {
+    const s = (date: string, load: number, reps: number, rpe?: number) => ({ id: date, clientId: 'c', date, charge: 'brak' as const, exercises: [{ name: 'Przysiad', setsLog: [{ load, reps, rpe }] }] });
+    const rec = exerciseRecords([s('2026-11-01', 100, 5, 8), s('2026-11-08', 90, 15, 9)], 'Przysiad');
+    expect(rec.e1?.reps).toBe(5);
+    expect(e1rmHistory([s('2026-11-01', 100, 5, 8), s('2026-11-08', 90, 15, 9)], 'Przysiad').map((x) => x.date)).toEqual(['2026-11-01']);
   });
 });

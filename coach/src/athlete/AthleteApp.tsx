@@ -68,6 +68,7 @@ import { activeAbsence, streakWithAbsences } from "../lib/absence";
 import { AbsenceLink, AbsenceSheet, AbsenceToday } from "./Absence";
 import { readiness, readinessNorm, WELLNESS_ITEMS } from "../lib/wellness";
 import { hasConsent } from "../lib/rodo";
+import { painMorningDue } from "../lib/painModel";
 import {
   checkinAdvice,
   firstOpenWeek,
@@ -246,6 +247,37 @@ function LateWorkoutSheet({
         </button>
       </div>
     </Sheet>
+  );
+}
+
+/** Dzień po treningu z bólem: „jak ból dziś rano?” (model monitorowania bólu — czy ustąpił do rana). */
+function PainMorningCard({ sessions }: { sessions: TrainingSession[] }) {
+  const { apply } = useStore();
+  const due = painMorningDue(sessions, todayISO());
+  const [level, setLevel] = useState<number | null>(null);
+  const [stiff, setStiff] = useState(false);
+  if (!due) return null;
+  const save = (v: number) =>
+    void apply([put("sessions", { ...due, painNext: { level: v, ...(stiff ? { stiff: true } : {}), at: new Date().toISOString() } })], v > Math.max(2, due.pain ?? 0) || v > 5 ? "Zapisane. Trener zobaczy, że ból nie ustąpił." : "Zapisane, dzięki.");
+  return (
+    <section className="acard pain-morning">
+      <span className="eyebrow">Ból po treningu {fmtDay(due.date)}</span>
+      <h3>Jak ból dziś rano?</h3>
+      <p className="muted small">Na treningu było {due.pain}/10. 0 = nic nie boli, 10 = najgorszy ból.</p>
+      <div className="pm-scale" role="group" aria-label="Ból rano 0–10">
+        {Array.from({ length: 11 }, (_x, i) => (
+          <button key={i} type="button" className={`pm-n ${level === i ? "active" : ""} ${i > 5 ? "hi" : i >= 3 ? "mid" : ""}`} aria-pressed={level === i} onClick={() => setLevel(i)}>
+            {i}
+          </button>
+        ))}
+      </div>
+      <label className="check small">
+        <input type="checkbox" checked={stiff} onChange={(e) => setStiff(e.target.checked)} /> Sztywność rano dłużej niż 30 min
+      </label>
+      <button className="btn btn-primary" disabled={level == null} onClick={() => level != null && save(level)}>
+        Zapisz
+      </button>
+    </section>
   );
 }
 
@@ -985,6 +1017,7 @@ function TodayTab({
         <p className="muted first-cap">{fmtLong(today)}</p>
       </header>
       <VacationBanner profile={profile} />
+      {!run && <PainMorningCard sessions={sessions} />}
 
       {liveMarkActive(client.liveBy) && (
         <div className="live-by-trainer" role="status">

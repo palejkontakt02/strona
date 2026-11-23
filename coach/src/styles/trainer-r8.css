@@ -974,3 +974,7 @@ button.start-tile:hover:not(:disabled),
 .mon-share { width: auto; max-width: 100%; }
 .ath-monitoring { margin-top: var(--space-4, 16px); }
 .ath-monitoring .two-col { grid-template-columns: 1fr; }
+.pain-model .pm-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.pm-dot.pm-green { background: var(--st-ok, #2f855a); }
+.pm-dot.pm-yellow { background: var(--st-warn, #b7791f); }
+.pm-dot.pm-red { background: var(--st-danger, #c53030); }

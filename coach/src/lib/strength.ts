@@ -23,6 +23,19 @@ export function e1rmRPE(load: unknown, reps: unknown, rpe: unknown, fallbackRir 
   return r + rir === 1 ? l : l * (1 + (r + rir) / 30);
 }
 
+/**
+ * e1RM tylko z wiarygodnej serii (do monitoringu i rekordów): powtórzenia + RIR ≤ 10 i, przy wpisanym RPE, RIR ≤ 4.
+ * Wzory tracą trafność powyżej ~10 powtórzeń, a RIR daleko od upadku to zgadywanie (Halperin 2022, ±1 powt.).
+ */
+export function reliableE1(load: unknown, reps: unknown, rpe: unknown): number | null {
+  const r = repsN(reps);
+  if (!r) return null;
+  const given = num(rpe) != null;
+  const rir = rirOf(rpe, 0);
+  if (r + rir > 10 || (given && rir > 4)) return null;
+  return e1rmRPE(load, reps, rpe);
+}
+
 /** Ciężar pod cel: e1RM / (1 + (powt + RIR_cel)/30), zaokrąglony do 2,5 kg (albo `round`). Brak RPE → RIR 2. */
 export function loadFor(e1: number, reps: unknown, rpe: unknown, round: (v: number) => number = round25): number {
   const r = repsN(reps) || 1;
@@ -34,13 +47,13 @@ function workSets(e: SessionExercise): SetLog[] {
   return (e.setsLog || []).filter((s) => !s.warmup && s.done !== false && !s.complex && !s.unit); // serie na czas nie liczą się do siły
 }
 
-/** Najlepszy e1RM ćwiczenia w sesji: max z serii roboczych, a bez serii — z podsumowania. */
+/** Najlepszy e1RM ćwiczenia w sesji (tylko wiarygodne serie): max z serii roboczych, a bez serii — z podsumowania. */
 export function exerciseE1(e: SessionExercise): number | null {
   const sets = workSets(e);
-  if (sets.length === 0) return e.setsLog?.length || String(e.reps ?? '').includes('+') ? null : e1rmRPE(e.load, e.reps, e.rpe);
+  if (sets.length === 0) return e.setsLog?.length || String(e.reps ?? '').includes('+') ? null : reliableE1(e.load, e.reps, e.rpe);
   let best: number | null = null;
   for (const s of sets) {
-    const v = e1rmRPE(s.load, s.reps, s.rpe);
+    const v = reliableE1(s.load, s.reps, s.rpe);
     if (v != null && (best == null || v > best)) best = v;
   }
   return best;
@@ -283,6 +296,8 @@ export interface LiftRecord {
   /** Szacowane maks. tej serii (Epley z RIR). */
   e1: number;
   date: string;
+  /** e1RM z wiarygodnej serii (powt. + RIR ≤ 10, RIR ≤ 4) — tylko takie liczą się do rekordu e1RM i wykresu. */
+  reliable?: boolean;
 }
 
 export interface ExerciseRecords {
@@ -315,8 +330,9 @@ function liftOf(x: LiftSet, date: string): LiftRecord | null {
   const reps = repsN(x.reps);
   if (!load || load <= 0 || !reps || reps <= 0) return null;
   const rpe = num(x.rpe) ?? undefined;
-  const e1 = e1rmRPE(load, reps, rpe) ?? e1rmRPE(load, Math.min(reps, 15), undefined) ?? load;
-  return { load, reps, rpe, e1: Math.round(e1 * 10) / 10, date };
+  const strict = reliableE1(load, reps, rpe);
+  const e1 = strict ?? e1rmRPE(load, reps, rpe) ?? e1rmRPE(load, Math.min(reps, 15), undefined) ?? load;
+  return { load, reps, rpe, e1: Math.round(e1 * 10) / 10, date, reliable: strict != null };
 }
 
 const emptyRecords = (): ExerciseRecords => ({ rm: { 1: null, 3: null, 5: null }, e1: null });
@@ -327,7 +343,7 @@ export function addToRecords(rec: ExerciseRecords, set: LiftSet, date: string): 
   if (!l) return rec;
   const rm = { ...rec.rm };
   for (const n of RECORD_REPS) if (l.reps >= n && (!rm[n] || l.load > rm[n]!.load)) rm[n] = l;
-  return { rm, e1: !rec.e1 || l.e1 > rec.e1.e1 ? l : rec.e1 };
+  return { rm, e1: l.reliable && (!rec.e1 || l.e1 > rec.e1.e1) ? l : rec.e1 };
 }
 
 /**
@@ -346,7 +362,7 @@ export function e1rmHistory(sessions: TrainingSession[], name: string): { date: 
   const by = new Map<string, LiftRecord>();
   for (const x of liftSets(sessions, name)) {
     const l = liftOf(x, x.date);
-    if (l && (!by.has(x.date) || l.e1 > by.get(x.date)!.e1)) by.set(x.date, l);
+    if (l && l.reliable && (!by.has(x.date) || l.e1 > by.get(x.date)!.e1)) by.set(x.date, l);
   }
   return [...by.values()].map((l) => ({ date: l.date, e1: l.e1, load: l.load, reps: l.reps }));
 }
