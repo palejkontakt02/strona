@@ -1,3 +1,4 @@
+import type { RunStart } from '../athlete/start';
 import type { Appointment, Client, ISODate, Measurement, Payment, Plan, PlanExercise, PlanWorkout, SetGroup, SetType, TrainingSession } from '../domain';
 import { SET_TYPES } from '../domain';
 import { fmtDay, fnum, plural, uid } from '../format';
@@ -310,7 +311,7 @@ export function saveAppointment(appt: Appointment, repeatWeeks: number): Change[
   if (repeatWeeks <= 1) return [put('appointments', appt)];
   const seriesId = uid();
   return weeklyDates(appt.date, repeatWeeks).map((date, i) =>
-    put('appointments', { ...appt, id: i === 0 ? appt.id : uid(), date, seriesId }),
+    put('appointments', { ...appt, id: i === 0 ? appt.id : uid(), date, seriesId, ...(i ? { planRef: undefined, repeatOf: undefined } : {}) }),
   );
 }
 
@@ -341,8 +342,8 @@ export function saveGroupAppointments(db: Db, draft: Appointment, partnerIds: st
     const seriesId = uid();
     const dates = weeklyDates(main.date, repeatWeeks);
     for (const [i, date] of dates.entries()) {
-      changes.push(put('appointments', { ...main, id: i === 0 ? main.id : uid(), date, seriesId }));
-      for (const cid of ids) changes.push(put('appointments', { ...main, id: uid(), clientId: cid, date, seriesId: `${seriesId}:${cid}`, sessionId: undefined, status: 'planned', note: undefined }));
+      changes.push(put('appointments', { ...main, id: i === 0 ? main.id : uid(), date, seriesId, ...(i ? { planRef: undefined, repeatOf: undefined } : {}) }));
+      for (const cid of ids) changes.push(put('appointments', { ...main, id: uid(), clientId: cid, date, seriesId: `${seriesId}:${cid}`, sessionId: undefined, status: 'planned', note: undefined, planRef: undefined, repeatOf: undefined }));
     }
     return changes;
   }
@@ -350,7 +351,7 @@ export function saveGroupAppointments(db: Db, draft: Appointment, partnerIds: st
   for (const cid of ids) {
     const prev = before.find((x) => x.clientId === cid);
     const same = { date: main.date, time: main.time, duration: main.duration, locationId: main.locationId, location: main.location, groupId };
-    changes.push(put('appointments', prev ? { ...prev, ...same } : { ...main, ...same, id: uid(), clientId: cid, status: 'planned', sessionId: undefined, seriesId: undefined, note: undefined }));
+    changes.push(put('appointments', prev ? { ...prev, ...same } : { ...main, ...same, id: uid(), clientId: cid, status: 'planned', sessionId: undefined, seriesId: undefined, note: undefined, planRef: undefined, repeatOf: undefined }));
   }
   for (const x of before.filter((x) => !ids.includes(x.clientId))) changes.push(...dropPartner(x));
   return changes;
@@ -623,4 +624,11 @@ export function followPlan(db: Db, before: Appointment, date: string): Change[] 
   const plan = db.plans.find((p) => p.id === before.planRef!.planId);
   if (!plan || !plan.weeks.some((w) => w.workouts.some((k) => k.id === before.planRef!.workoutId))) return [];
   return savePlan(db, moveWorkoutInPlan(plan, before.planRef.workoutId, date, before.date, 'trainer'));
+}
+
+/** Co uruchomić na wizycie: przypisana jednostka (plan / zadany) albo powtórka zapisanego treningu. */
+export function apptStart(a: Pick<Appointment, 'planRef' | 'repeatOf'>): RunStart | undefined {
+  if (a.planRef) return { planId: a.planRef.planId, workoutId: a.planRef.workoutId };
+  if (a.repeatOf) return { repeatSessionId: a.repeatOf };
+  return undefined;
 }

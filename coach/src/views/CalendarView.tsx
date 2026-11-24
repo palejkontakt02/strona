@@ -767,6 +767,14 @@ function apptUnit(
       .find((x) => x.id === a.planRef!.workoutId);
     if (k) return { name: k.name, kind: sessionKind(k) };
   }
+  if (a.repeatOf) {
+    const s = db.sessions.find((x) => x.id === a.repeatOf);
+    if (s)
+      return {
+        name: `Powtórka: ${s.workoutName || "Trening"}`,
+        kind: sessionKind({ name: s.workoutName, exercises: s.exercises }),
+      };
+  }
   if (a.status !== "planned") return null;
   const plan = currentPlan(
     db.plans.filter(

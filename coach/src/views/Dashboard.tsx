@@ -11,6 +11,7 @@ import {
 } from "../components/ui";
 import {
   allPayments,
+  apptStart,
   clientById,
   groupOf,
   lastSessionDate,
@@ -350,7 +351,7 @@ export function Dashboard() {
                 {nearest && (
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => startLive(a.clientId, a.id)}
+                    onClick={() => startLive(a.clientId, a.id, undefined, apptStart(a))}
                     title="Prowadź trening na żywo, seria po serii"
                     aria-label="Prowadź trening"
                   >

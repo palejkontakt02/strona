@@ -42,3 +42,18 @@ describe('odpada z planu', () => {
     expect(dropReasons(c, [plan], [done('a', '2026-11-10'), done('b', '2026-11-14'), done('c', '2026-11-17')], '2026-11-20')).toEqual([]);
   });
 });
+
+import { apptStart, saveAppointment } from '../data/ops';
+describe('wizyta z przypisanym treningiem', () => {
+  it('start: jednostka planu albo powtórka', () => {
+    expect(apptStart({ planRef: { planId: 'p', workoutId: 'k' } })).toEqual({ planId: 'p', workoutId: 'k' });
+    expect(apptStart({ repeatOf: 's1' })).toEqual({ repeatSessionId: 's1' });
+    expect(apptStart({})).toBeUndefined();
+  });
+  it('wizyty cykliczne: trening przypisany tylko do pierwszej', () => {
+    const ch = saveAppointment({ id: 'a', clientId: 'c', date: '2026-11-24', time: '18:00', status: 'planned', planRef: { planId: 'p', workoutId: 'k' } }, 3);
+    const items = ch.map((c) => (c as { item: { planRef?: unknown } }).item);
+    expect(items[0].planRef).toBeTruthy();
+    expect(items.slice(1).every((x) => !x.planRef)).toBe(true);
+  });
+});

@@ -586,6 +586,8 @@ export interface Appointment {
   reply?: ApptReply;
   /** Wizyta umówiona na konkretną jednostkę planu („Termin” w tabeli planu) — zmiana terminu przesuwa jedno i drugie. */
   planRef?: { planId: string; workoutId: string };
+  /** Trening na wizytę: powtórka zapisanego treningu (id sesji) — gdy nie z planu. */
+  repeatOf?: string;
 }
 
 export interface ApptReply {

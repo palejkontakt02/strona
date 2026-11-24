@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { Field, Icon, Modal } from '../components/ui';
 import type { Appointment, AppointmentStatus } from '../domain';
 import { put } from '../data/db';
-import { clientById, deleteAppointment, followPlan, groupOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
+import { apptStart, clientById, deleteAppointment, extraPlanOf, extraState, followPlan, groupOf, parallelPlansOf, plansOf, saveAppointment, saveGroupAppointments, sessionsOf } from '../data/ops';
+import { currentPlan, doneInPass, nextWorkout } from '../lib/plan';
 import { canMove, moveVisit, seriesEdit, visitsLeftInPackage } from '../lib/calendarMove';
 import { packageStatus } from '../lib/billing';
 import { useStore } from '../data/store';
@@ -43,6 +44,8 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const [note, setNote] = useState(editing?.note ?? '');
   const [status, setStatus] = useState<AppointmentStatus>(editing?.status ?? 'planned');
   const [repeat, setRepeat] = useState(false);
+  // trening na wizytę: „plan|planId|workoutId”, „rep|sessionId” albo „” (następny z planu przy starcie)
+  const [link, setLink] = useState(() => (editing?.planRef ? `plan|${editing.planRef.planId}|${editing.planRef.workoutId}` : editing?.repeatOf ? `rep|${editing.repeatOf}` : ''));
   const cl = clientById(db, clientId);
   const pk = cl ? packageStatus(cl, sessionsOf(db, cl.id)) : null;
   const [charged, setCharged] = useState(!!editing && !!cl?.noShowCharges?.includes(editing.id));
@@ -52,6 +55,34 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
   const [partners, setPartners] = useState<string[]>(() => group.map((x) => x.clientId));
   const [addingPartner, setAddingPartner] = useState(false);
 
+  // opcje treningu dla wybranego podopiecznego
+  const linkOpts = (() => {
+    if (!clientId) return null;
+    const ss = sessionsOf(db, clientId);
+    const main = currentPlan(plansOf(db, clientId));
+    const plans = [...(main ? [main] : []), ...parallelPlansOf(db, clientId)];
+    const fromPlans = plans.map((p) => {
+      const done = doneInPass(p, ss);
+      const nx = nextWorkout(p, ss);
+      return {
+        label: p.name,
+        items: p.weeks.flatMap((w) =>
+          w.workouts
+            .filter((k) => k.exercises.some((e) => e.name.trim()))
+            .map((k) => ({ v: `plan|${p.id}|${k.id}`, t: `${k.name} · ${w.name}${nx?.workout.id === k.id ? ' (następny)' : done.has(k.id) ? ' ✓' : ''}` })),
+        ),
+      };
+    });
+    const ex = extraPlanOf(db, clientId);
+    const assigned = (ex?.weeks.flatMap((w) => w.workouts) ?? [])
+      .filter((k) => k.exercises.some((e) => e.name.trim()) && extraState(k, ex!.id, ss, todayISO()).state !== 'done')
+      .map((k) => ({ v: `plan|${ex!.id}|${k.id}`, t: `${k.name}${k.date ? ` · ${fmtShort(k.date)}` : ''}` }));
+    const repeats = ss.filter((x) => x.exercises.length).slice(0, 12).map((x) => ({ v: `rep|${x.id}`, t: `${fmtShort(x.date)} · ${x.workoutName || 'Trening'}` }));
+    return { fromPlans, assigned, repeats, hasPlan: !!main };
+  })();
+  // wybór od innego podopiecznego (zmiana osoby w formularzu) — nie przenosimy
+  const linkOk = !link || !!linkOpts && [...linkOpts.fromPlans.flatMap((g) => g.items), ...linkOpts.assigned, ...linkOpts.repeats].some((o) => o.v === link) || link === (editing?.planRef ? `plan|${editing.planRef.planId}|${editing.planRef.workoutId}` : editing?.repeatOf ? `rep|${editing.repeatOf}` : '');
+  const eff = linkOk ? link : '';
   const draft: Appointment = {
     ...(editing ?? {}),
     id: editing?.id ?? uid(),
@@ -64,6 +95,8 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
     note: note.trim() || undefined,
     status,
     groupId: partners.length ? editing?.groupId : undefined,
+    planRef: eff.startsWith('plan|') ? { planId: eff.split('|')[1], workoutId: eff.split('|')[2] } : undefined,
+    repeatOf: eff.startsWith('rep|') ? eff.split('|')[1] : undefined,
   };
   // Kolizje sprawdzamy dla każdego terminu serii (wizyty cykliczne), nie tylko pierwszego.
   const repeatN = repeat && !editing ? Math.min(24, Math.max(2, num(weeks) ?? 8)) : 1;
@@ -165,7 +198,7 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
                   onClick={async () => {
                     // z partnerami — najpierw zapis pary, żeby prowadzenie otworzyło obie osoby
                     if (!(await apply(partners.length || editing.groupId ? saveGroupAppointments(db, draft, partners, 1, editing) : [put('appointments', draft)]))) return;
-                    startLive(clientId, draft.id);
+                    startLive(clientId, draft.id, undefined, apptStart(draft));
                   }}
                 >
                   {partners.length ? 'Prowadź w parze' : 'Prowadź trening'}
@@ -297,6 +330,42 @@ export function ApptModal({ m }: { m: Extract<ModalState, { kind: 'appt' }> }) {
         <Field label="Notatka" wide>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
+        {linkOpts && !linkedSession && (
+          <Field label="Trening na tę wizytę" wide hint="Po „Prowadź trening” od razu otworzy się ten trening.">
+            <select className="input" value={eff} onChange={(e) => setLink(e.target.value)} aria-label="Trening na tę wizytę">
+              <option value="">{linkOpts.hasPlan ? 'Następny z planu (w dniu wizyty)' : 'Bez przypisanego treningu'}</option>
+              {linkOpts.fromPlans.map((g) =>
+                g.items.length ? (
+                  <optgroup key={g.label} label={`Z planu: ${g.label}`}>
+                    {g.items.map((o) => (
+                      <option key={o.v} value={o.v}>
+                        {o.t}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null,
+              )}
+              {linkOpts.assigned.length > 0 && (
+                <optgroup label="Zadane / poza planem">
+                  {linkOpts.assigned.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.t}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {linkOpts.repeats.length > 0 && (
+                <optgroup label="Powtórz zrobiony trening">
+                  {linkOpts.repeats.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.t}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </Field>
+        )}
         {editing?.seriesId && <p className="muted small field-wide"><Icon name="repeat" size={14} /> Wizyta cykliczna (co tydzień). Zmianę godziny, czasu lub miejsca możesz zastosować do kolejnych wizyt z serii.</p>}
         {!editing && (
           <div className="field-wide check-row repeat-row">
