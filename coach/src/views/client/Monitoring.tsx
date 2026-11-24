@@ -58,6 +58,20 @@ export function ClientMonitoring({ client, athlete = false }: { client: Client; 
     }
   };
 
+  const daily = !athlete && (
+    <select
+      className="input input-sm mon-share"
+      value={client.checkinDaily ? 'daily' : 'training'}
+      aria-label="Jak często podopieczny wypełnia ankietę samopoczucia"
+      onChange={(e) => {
+        const on = e.target.value === 'daily';
+        void apply([put('clients', { ...client, checkinDaily: on || undefined })], on ? 'Ankieta samopoczucia codziennie.' : 'Ankieta samopoczucia w dni treningowe.');
+      }}
+    >
+      <option value="training">Ankieta samopoczucia: w dni treningowe</option>
+      <option value="daily">Ankieta samopoczucia: codziennie (np. rehabilitacja)</option>
+    </select>
+  );
   const share = !athlete && (
     <select
       className="input input-sm mon-share"
@@ -79,7 +93,12 @@ export function ClientMonitoring({ client, athlete = false }: { client: Client; 
   if (sessions.length === 0)
     return (
       <>
-        {share && <div className="mon-level">{share}</div>}
+        {share && (
+          <div className="mon-level">
+            {share}
+            {daily}
+          </div>
+        )}
         <Empty>{athlete ? 'Monitoring pojawi się po pierwszych treningach z oceną trudności i czasem.' : 'Brak treningów. Monitoring pojawi się po pierwszych zapisach z oceną trudności (sRPE) i czasem.'}</Empty>
       </>
     );
@@ -89,6 +108,7 @@ export function ClientMonitoring({ client, athlete = false }: { client: Client; 
       <div className="mon-level">
         {levels.length > 1 && <Seg options={levels} value={level} onChange={setLevel} label="Poziom monitoringu" />}
         {share}
+        {daily}
         {!athlete && <span className="muted small">{level === 'Podstawowy' ? 'Najważniejsze: regularność, obciążenie, samopoczucie, ból, postęp.' : 'Dla trenera przygotowania motorycznego: wskaźniki obciążenia, objętość na partie, e1RM, samopoczucie pytanie po pytaniu.'}</span>}
       </div>
       {level === 'Podstawowy' ? <Basic client={client} sessions={sessions} today={today} athlete={athlete} /> : <Advanced client={client} sessions={sessions} today={today} />}

@@ -353,11 +353,14 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
     if (num(srpe) == null && rows.some((r) => r.name.trim()) && !(await ask('Brak sRPE: trening nie wliczy się do obciążenia (ACWR). Zapisać mimo to?', { confirm: 'Zapisz bez sRPE', danger: false })))
       return;
     if (problem) return toast(problem);
-    const wellness: Wellness = {};
+    let wellness: Wellness = {};
     for (const [k] of WELLNESS_ITEMS) {
       const v = num(w[k]);
       if (v != null) wellness[k] = v;
     }
+    // jedna ankieta: puste pola — z porannej ankiety podopiecznego z tego dnia
+    const ci = client.checkins.find((c) => c.date === date);
+    if (!Object.keys(wellness).length && ci) wellness = Object.fromEntries(WELLNESS_ITEMS.filter(([k]) => ci[k] != null).map(([k]) => [k, ci[k]])) as Wellness;
     const session: TrainingSession = {
       // pola spoza formularza (komentarz trenera, obejrzane nagrania, przerwany z bólu, powiązana płatność…) zostają
       ...(existing ?? {}),
@@ -740,6 +743,7 @@ export function SessionModal({ m }: { m: Extract<ModalState, { kind: 'session' }
 
       <details className="form-section wellness-details" open={Object.values(w).some(Boolean) || !!sleepH || !!rhr}>
         <summary>Samopoczucie przed treningiem (opcjonalnie)</summary>
+        {client?.checkins.some((c) => c.date === date) && !Object.values(w).some(Boolean) && <p className="muted small">Podopieczny wypełnił ankietę tego dnia: zostawiając pola puste, zapiszesz jego odpowiedzi.</p>}
       <div className="wellness-grid">
         {WELLNESS_ITEMS.map(([k, label]) => (
           <div key={k} className="field">

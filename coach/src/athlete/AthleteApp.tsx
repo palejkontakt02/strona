@@ -1555,7 +1555,13 @@ function TodayTab({
         </dl>
       </section>
 
-      <CheckinCard client={client} onSave={(c) => saveCheckin(client.id, c)} />
+      {/* jedna ankieta samopoczucia dziennie: codziennie (gdy trener włączył) albo w dni treningowe; przed treningiem pyta i tak */}
+      {(client.checkinDaily ||
+        planned.has(today) ||
+        sessions.some((s) => s.date === today) ||
+        client.checkins.some((c) => c.date === today)) && (
+        <CheckinCard client={client} onSave={(c) => saveCheckin(client.id, c)} />
+      )}
       <TodayHabits client={client} />
       <NutritionCard client={client} />
       <DayLogCard client={client} />

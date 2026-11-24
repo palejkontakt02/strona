@@ -343,7 +343,7 @@ function ReviewQueue({ items }: { items: ReviewItem[] }) {
               {report.sleep != null && <Stat label="Sen" value={`${report.sleep}/5`} warn={report.sleep <= 2} />}
               {report.energy != null && <Stat label="Energia" value={`${report.energy}/5`} warn={report.energy <= 2} />}
               {report.stress != null && <Stat label="Spokój" value={`${report.stress}/5`} warn={report.stress <= 2} />}
-              {report.adherence != null && <Stat label="Plan" value={`${report.adherence}/5`} warn={report.adherence <= 2} />}
+              {report.adherence != null && <Stat label="Dieta i nawyki" value={`${report.adherence}/5`} warn={report.adherence <= 2} />}
               {report.steps != null && <Stat label="Kroki" value={report.steps.toLocaleString('pl-PL')} />}
             </dl>
             {report.comment && <blockquote className="review-quote">{report.comment}</blockquote>}

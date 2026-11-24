@@ -244,6 +244,8 @@ export interface Client {
   weeklyReport?: boolean;
   /** Monitoring w aplikacji podopiecznego (włącza trener): podstawowy albo podstawowy i zaawansowany. Brak — nie widzi. */
   monitoring?: 'basic' | 'all';
+  /** Ankieta samopoczucia codziennie (rehabilitacja, 4+ treningi w tygodniu). Brak — tylko w dni treningowe i przed treningiem. */
+  checkinDaily?: boolean;
   /** RODO: zgody podopiecznego (dane o zdrowiu, zdjęcia/nagrania) i prośba o usunięcie konta — zapisuje tylko on sam (lib/rodo.ts). */
   consents?: ConsentEntry[];
   /** Trener: kiedy wysłał zaproszenie do aplikacji (ISO; lib/onboarding.ts). */
